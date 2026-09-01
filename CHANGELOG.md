@@ -7,6 +7,33 @@
 ### Planned
 - 等用戶從 20 張風格圖選定方向，把更多 theme preset 填進 `lib/themes/presets/`
 - 第一個 prototype 頁面（Tonight's Pick landing）
+- 裝 vitest，補 theme registry 的 unit test（呼應 `.memory/2026-09-01-skipped-unit-tests-before-commit.md`）
+
+## [0.3.0] — 2026-09-01
+
+### Added
+- **`.harness/` 目錄** — 團隊開發規範，分五個面向：
+  - `README.md` — 索引與讀取時機
+  - `workflow.md` — 任務流程、提交前檢查清單
+  - `coding-standards.md` — TypeScript / React / 檔案結構 / 命名 / import 順序 / 不做清單
+  - `testing.md` — 何時必寫 unit test、commit gate、例外標記
+  - `git.md` — 分支策略、commit 格式（type/scope/subject/body/footer）、不可做清單
+  - `architecture.md` — 技術棧決策與原因、theme 系統設計、待補 ADR
+- **`.memory/` 目錄** — 教訓紀錄，初始 5 條：
+  - `README.md` — 格式規範（四段：情境/問題/原因/修正）
+  - `2026-09-01-skipped-unit-tests-before-commit.md` — 跳過 unit test 的疏漏
+  - `2026-09-01-git-post-buffer-large-commit.md` — git 2.15 push 7MiB commit 失敗
+  - `2026-09-01-shadcn-uses-base-ui-not-radix.md` — shadcn 新版用 base-ui 不是 Radix
+  - `2026-09-01-node-version-pinning-required.md` — Node 22 是 hard requirement
+  - `2026-09-01-co-authored-by-apostrophe-shell-escape.md` — Bash commit message 含 apostrophe 報錯
+- **`CLAUDE.md` 補上** — Claude Code 啟動時必讀 `.harness/workflow.md` + `.memory/`，每次開發任務開始前先檢查
+- **`.nvmrc`** — 寫入 `22`，讓 `nvm use` 自動選對版本
+- **`package.json` engines** — `node: ">=22"` 明確聲明最低版本
+
+### Changed
+- 沒有改既有功能，純加規範基礎建設
+
+## [0.2.0] — 2026-09-01
 
 ## [0.2.0] — 2026-09-01
 
