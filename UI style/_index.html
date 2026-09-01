@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Whattodrink — UI Style Exploration (20)</title>
+<style>
+  :root {
+    --bg: #0e0e10;
+    --fg: #f5f5f7;
+    --muted: #8e8e93;
+    --card: #1c1c1f;
+    --border: #2c2c2e;
+    --accent: #f5a524;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    padding: 32px 24px 80px;
+  }
+  header {
+    max-width: 1280px;
+    margin: 0 auto 32px;
+  }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .sub {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--muted);
+    flex-wrap: wrap;
+  }
+  .legend span { white-space: nowrap; }
+  .grid {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: transform .15s ease, border-color .15s ease;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+  }
+  .img-wrap {
+    aspect-ratio: 1 / 1;
+    background: #000;
+    overflow: hidden;
+  }
+  .img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .meta {
+    padding: 12px 14px;
+  }
+  .num {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+  }
+  .name {
+    margin-top: 2px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .group {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .group-tag {
+    display: inline-block;
+    background: rgba(255,255,255,0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-right: 4px;
+  }
+  .actions {
+    max-width: 1280px;
+    margin: 32px auto 0;
+    padding: 20px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+  .actions strong { color: var(--fg); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>UI Style Exploration · 啤酒主題</h1>
+  <p class="sub">20 種視覺風格，每張以啤酒為主題，方便評估 app 整體調性。</p>
+  <div class="legend">
+    <span>圖片皆透過 MiniMax image-01 生成 · 1:1 · base64 → JPG</span>
+    <span>點擊卡片可放大</span>
+  </div>
+</header>
+
+<div class="grid">
+  <div class="card"><div class="img-wrap"><img src="01 Flat.jpg" alt="Flat Illustration"></div><div class="meta"><div class="num">01</div><div class="name">Flat Illustration</div><div class="group"><span class="group-tag">扁平插畫系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="02 Ligne.jpg" alt="Ligne Claire"></div><div class="meta"><div class="num">02</div><div class="name">Ligne Claire</div><div class="group"><span class="group-tag">扁平插畫系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="03 Corporate.jpg" alt="Corporate Memphis"></div><div class="meta"><div class="num">03</div><div class="name">Corporate Memphis (變體)</div><div class="group"><span class="group-tag">扁平插畫系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="04 Sticker.jpg" alt="Sticker"></div><div class="meta"><div class="num">04</div><div class="name">Sticker 貼紙風</div><div class="group"><span class="group-tag">扁平插畫系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="05 Memphis.jpg" alt="Memphis Design"></div><div class="meta"><div class="num">05</div><div class="name">Memphis Design</div><div class="group"><span class="group-tag">復古/流行文化系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="06 Pop.jpg" alt="Pop Art"></div><div class="meta"><div class="num">06</div><div class="name">Pop Art 漫畫網點</div><div class="group"><span class="group-tag">復古/流行文化系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="07 Y2K.jpg" alt="Y2K"></div><div class="meta"><div class="num">07</div><div class="name">Y2K 千禧風</div><div class="group"><span class="group-tag">復古/流行文化系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="08 Vintage Tiki.jpg" alt="Vintage Tiki"></div><div class="meta"><div class="num">08</div><div class="name">Vintage Tiki 雞尾酒海報</div><div class="group"><span class="group-tag">復古/流行文化系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="09 Vintage Travel.jpg" alt="Vintage Travel Poster"></div><div class="meta"><div class="num">09</div><div class="name">Vintage Travel Poster</div><div class="group"><span class="group-tag">復古/流行文化系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="10 Cutout.jpg" alt="Cutout Collage"></div><div class="meta"><div class="num">10</div><div class="name">Cutout Collage 剪紙拼貼</div><div class="group"><span class="group-tag">手繪/藝術系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="11 Doodle.jpg" alt="Doodle"></div><div class="meta"><div class="num">11</div><div class="name">Doodle 塗鴉</div><div class="group"><span class="group-tag">手繪/藝術系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="12 Gouache.jpg" alt="Gouache"></div><div class="meta"><div class="num">12</div><div class="name">Gouache 水粉</div><div class="group"><span class="group-tag">手繪/藝術系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="13 Woodcut.jpg" alt="Woodcut"></div><div class="meta"><div class="num">13</div><div class="name">Woodcut 木刻版畫</div><div class="group"><span class="group-tag">手繪/藝術系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="14 Watercolor.jpg" alt="Watercolor"></div><div class="meta"><div class="num">14</div><div class="name">Watercolor 水彩</div><div class="group"><span class="group-tag">手繪/藝術系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="15 Bauhaus.jpg" alt="Bauhaus"></div><div class="meta"><div class="num">15</div><div class="name">Bauhaus 包浩斯</div><div class="group"><span class="group-tag">幾何/現代藝術系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="16 Isometric.jpg" alt="Isometric"></div><div class="meta"><div class="num">16</div><div class="name">Isometric 等距插畫</div><div class="group"><span class="group-tag">幾何/現代藝術系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="17 Terrazzo.jpg" alt="Terrazzo"></div><div class="meta"><div class="num">17</div><div class="name">Terrazzo 水磨石</div><div class="group"><span class="group-tag">幾何/現代藝術系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="18 Blueprint.jpg" alt="Blueprint"></div><div class="meta"><div class="num">18</div><div class="name">Blueprint 圖紙線稿</div><div class="group"><span class="group-tag">幾何/現代藝術系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="19 Neo-Brutalism.jpg" alt="Neo-Brutalism"></div><div class="meta"><div class="num">19</div><div class="name">Neo-Brutalism 新粗野</div><div class="group"><span class="group-tag">幾何/現代藝術系</span></div></div></div>
+  <div class="card"><div class="img-wrap"><img src="20 Risograph.jpg" alt="Risograph"></div><div class="meta"><div class="num">20</div><div class="name">Risograph 孔版印刷</div><div class="group"><span class="group-tag">混合系</span></div></div></div>
+</div>
+
+<div class="actions">
+  <strong>使用方式：</strong> 在 Finder 打開 <code>UI style/_index.html</code> 即可瀏覽並排比較。<br>
+  <strong>選定後：</strong> 告訴我選哪 1–2 個方向，我會 (1) 用該風格生成對應的手機 UI mockup、(2) 建立 Next.js 專案並套用選定風格當 design system 基礎。
+</div>
+
+</body>
+</html>
