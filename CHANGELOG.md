@@ -6,8 +6,34 @@
 
 ### Planned
 - 等用戶從 20 張風格圖選定方向，把更多 theme preset 填進 `lib/themes/presets/`
-- 第一個 prototype 頁面（Tonight's Pick landing）
+- 用戶會在 backlog 補首頁詳細需求，屆時替換 sections 的 placeholder 內容
 - 裝 vitest，補 theme registry 的 unit test（呼應 `.memory/2026-09-01-skipped-unit-tests-before-commit.md`）
+
+## [0.5.2] — 2026-09-02
+
+### Changed
+- `.harness/workflow.md` — Step 10 拆成 10a-10d，明確「含 UI 變更的開發完成後必須啟動瀏覽器讓用戶親眼確認才 commit」；純文檔/config/refactor 例外
+- `CLAUDE.md` — 硬規則區塊新增此條，並列 Step 10 摘要
+
+### Memory
+- `.memory/2026-09-02-user-must-verify-ui-in-browser.md` — 用戶糾正：vision tool 不是用戶確認的替代品
+
+## [0.5.1] — 2026-09-02
+
+### Fixed
+- `<Button render={<a>}>` 在 5 處加 `nativeButton={false}`，消除 Base UI 的 5 條「nativeButton expected」console warning（影響 accessibility 與表單語意）
+
+### Changed（防禦性，順手加）
+- 字級 mobile 從 `text-4xl` 降到 `text-3xl`（hero h1）/ `text-3xl` 降到 `text-2xl`（section h2）— 窄螢幕更穩
+- `text-balance` / `text-pretty` → `break-words` — 對未知長度更 robust
+- `<body>` 加 `overflow-x-hidden` — 兜底防意外
+- `<Stack>` 加 `min-w-0` — flex container 防 overflow 通用守則
+
+### Memory
+- `.memory/2026-09-02-skipped-playwright-step-6.md` — 漏執行 Step 6 的紀錄
+- `.memory/2026-09-02-chrome-headless-screenshot-unreliable.md` — Chrome headless `--screenshot` 在 CJK 字型渲染不可靠，視覺回報可能是 false alarm；改用 playwright
+
+## [0.5.0] — 2026-09-02
 
 ## [0.4.0] — 2026-09-02
 

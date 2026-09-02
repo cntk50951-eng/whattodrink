@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ThemePicker } from "@/components/theme-picker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,6 +19,11 @@ export const metadata: Metadata = {
     "Hong Kong drinking-mood companion. Tonight's pick, mood log, photo pick, local bars.",
 };
 
+/**
+ * Root layout — owns <html>, <body>, ThemeProvider, and font wiring.
+ * Page-specific chrome (header / footer) lives in each route group's layout,
+ * so marketing and app sections can render different nav without colliding.
+ */
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
@@ -27,16 +31,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
-        <ThemeProvider>
-          <header className="flex items-center justify-between px-6 py-4 border-b">
-            <div className="font-heading font-semibold tracking-tight">
-              whattodrink
-            </div>
-            <ThemePicker />
-          </header>
-          <main className="flex-1">{children}</main>
-        </ThemeProvider>
+      <body className="min-h-full flex flex-col bg-background text-foreground overflow-x-hidden">
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );
