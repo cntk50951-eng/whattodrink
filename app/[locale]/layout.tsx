@@ -8,8 +8,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Container } from "@/components/layout/container";
-import { ThemePicker } from "@/components/theme-picker";
-import { LanguagePicker } from "@/components/language-picker";
+import { ThemeSwitcher } from "@/components/theme-switcher";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import { Footer } from "@/components/marketing/footer";
 
@@ -86,8 +86,8 @@ export default async function LocaleLayout({
                   whattodrink
                 </Link>
                 <div className="flex items-center gap-2">
-                  <ThemePicker />
-                  <LanguagePicker />
+                  <ThemeSwitcher />
+                  <LanguageSwitcher />
                   <Button
                     size="sm"
                     nativeButton={false}

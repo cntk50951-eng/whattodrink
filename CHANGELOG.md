@@ -9,6 +9,22 @@
 - 用戶會在 backlog 補首頁詳細需求，屆時替換 sections 的 placeholder 內容
 - 裝 vitest，補 theme registry 的 unit test（呼應 `.memory/2026-09-01-skipped-unit-tests-before-commit.md`）
 
+## [0.7.0] — 2026-09-02
+
+### Added
+- **UR 1.2 — 語言與主題切換元件**
+  - `components/language-switcher.tsx` — segmented control（3 按鈕：繁/简/EN），常駐顯示、`aria-pressed` 狀態
+  - `components/theme-switcher.tsx` — 雙軌：桌面 Popover（anchored）+ 手機 Sheet（bottom）
+  - `components/theme-preview-card.tsx` — 主題視覺縮圖，**局部套用 theme tokens** 確保預覽反映主題實際樣貌
+- **shadcn 新元件** `components/ui/popover.tsx`（base-ui Popover）+ `components/ui/sheet.tsx`（base-ui Dialog）
+
+### Changed
+- `app/[locale]/layout.tsx` — 用 `LanguageSwitcher` 取代 `LanguagePicker`（dropdown）、用 `ThemeSwitcher` 取代 `ThemePicker`（dropdown）
+- 移除 `components/language-picker.tsx` 與 `components/theme-picker.tsx`（被取代）
+
+### Memory
+- `.memory/2026-09-02-base-ui-popover-sheet-pattern.md` — 同 trigger 不同 viewport 行為的雙軌設計、local CSS vars 預覽手法
+
 ## [0.6.0] — 2026-09-02
 
 ### Added

@@ -85,3 +85,125 @@
 - AC6：切換語言（繁中／簡中／英文）時，卡片文案即時更新
 - AC7：`prefers-reduced-motion` 開啟時，動畫效果被移除
 - AC8：所有主題下，卡片對比度通過 WCAG AA 自動化檢測
+
+**UR 1.2　語言與主題切換元件**
+
+作為（匿名或已登入的）用戶，我希望語言和主題的切換方式更直覺、更符合年輕族群的使用習慣，而不是傳統的下拉選單，這樣切換的過程本身也能感受到產品的設計質感。
+
+*語言切換*
+- 桌面／手機皆採用常駐分段式按鈕（segmented control），直接顯示在頁首，不需額外點擊展開
+- 初期支援：繁體中文、簡體中文、English，三個選項
+- 當語言數量超過 4 個時，分段按鈕降級為「更多」入口，展開為清單／選單形式，避免橫向擠壓變形
+
+*主題切換*
+- 桌面：頁首主題按鈕（色點＋目前主題名稱）點擊後，以 anchored popover 彈出視覺化色卡選單
+- 手機：同一個觸發點擊後，改以 bottom sheet 從底部滑出，不使用 anchored 彈出面板
+- 色卡選單每個主題需顯示一個視覺縮圖（代表該主題的實際外觀），而非純文字描述；選中狀態需有明確的邊框與勾選圖示標示
+- 色卡的版面／視覺語言，需與首頁 Bento Grid 卡片保持一致的設計語彙（沿用同一套圓角、邊框、間距規則）
+
+*主題與樣式*
+- 語言切換元件與主題切換元件本身的樣式，也必須讀取主題 token，確保切換主題時，這兩個控制項本身的外觀也能即時同步更新，不可自成一套獨立樣式
+
+*無障礙*
+- 分段式語言按鈕需支援鍵盤左右鍵切換選項，並有明確的 focus 樣式
+- 色卡選單開啟時，焦點需自動移入面板內第一個可互動元素；關閉（Esc 或點擊外部）後焦點需返回觸發按鈕
+- Bottom sheet 需同時支援上滑手勢關閉、點擊背景遮罩、明確的關閉按鈕三種關閉方式，不能只靠手勢
+- 所有主題色卡的縮圖與文字對比，需符合 WCAG AA
+
+*邊界情況／失敗處理*
+- 語言／主題選擇結果需即時生效並記住使用者的選擇：同一次瀏覽 session 內至少要記得，登入用戶則需儲存到帳號設定，避免每次重新整理都要重選
+- 若主題 token 讀取失敗（例如網路異常導致設定檔未能載入），需自動 fallback 到預設主題（Nova），不可讓頁面樣式錯亂或空白
+
+*驗收標準（Acceptance Criteria）*
+- AC1：語言切換於桌面與手機皆以常駐分段式按鈕呈現，不使用下拉選單
+- AC2：語言選項超過 4 個時，自動降級為「更多」清單形式
+- AC3：主題切換於桌面以 anchored popover 呈現色卡選單，手機以 bottom sheet 呈現
+- AC4：色卡選單中每個主題皆有可辨識的視覺縮圖，並清楚標示目前選中的主題
+- AC5：語言切換元件與主題切換元件本身的樣式隨主題 token 即時更新
+- AC6：分段按鈕支援鍵盤操作與正確的 focus 管理
+- AC7：Bottom sheet 可透過手勢、背景點擊、明確關閉按鈕三種方式關閉
+- AC8：語言與主題的選擇會被記住，重新整理頁面後維持使用者的選擇
+- AC9：主題設定載入失敗時，自動 fallback 至 Nova 預設主題
+
+**UR 1.3　主題系統技術 POC（Phase 1）**
+ 
+*目的／要驗證的假設*
+驗證「同一套元件庫可以透過 design token 即時切換多種結構性不同的視覺主題（例如 Nova／Flat Illustration／Neo-Brutalism／Watercolor），且不需重新整理頁面」這個技術路線是否可行，並找出兩個主題來源（項目 UI style 目錄、Stitch）能否轉換成一致的 token 結構。
+ 
+*範圍*
+- 產出物是一份**獨立的 HTML demo**，不需接入正式項目程式碼庫，呈現首頁在不同主題下的實際效果，讓 PM 可以直接在瀏覽器開啟、切換比對
+- 要測試的主題數量與具體選項如下，基於你之前提供的UI style 目錄或 Stitch 的UI風格，我需要你POC下面的的主題頁面.
+UI style 目錄下的：
+1) /Users/yuki/Desktop/whattodrink/UI style/02 Ligne.jpg
+2) /Users/yuki/Desktop/whattodrink/UI style/05 Memphis.jpg
+3) /Users/yuki/Desktop/whattodrink/UI style/06 Pop.jpg
+4) /Users/yuki/Desktop/whattodrink/UI style/08 Vintage Tiki.jpg
+5) /Users/yuki/Desktop/whattodrink/UI style/09 Vintage Travel.jpg
+6) /Users/yuki/Desktop/whattodrink/UI style/10 Cutout.jpg
+7) /Users/yuki/Desktop/whattodrink/UI style/11 Doodle.jpg
+8) /Users/yuki/Desktop/whattodrink/UI style/14 Watercolor.jpg
+9) /Users/yuki/Desktop/whattodrink/UI style/16 Isometric.jpg
+10) /Users/yuki/Desktop/whattodrink/UI style/19 Neo-Brutalism.jpg
+要求：
+ - 針對上述圖片，逐個圖片去解讀、理解UI設計風格、POC 製作可以直接打開的html頁面
+ - html文件生產在UI style目錄下的phase1子目錄
+
+- POC 聚焦在首頁（對應 UR1.1 的 Bento 卡片、UR1.2 的語言／主題切換元件），不擴及全站或其他功能頁
+*不在範圍內*
+- 不需要是生產環境等級的程式碼，不需要接入正式 project codebase
+- 不包含拍照選酒、心情推薦等其他 demo 頁面的實作
+- 不處理真實資料或後端串接，純前端視覺 demo 即可
+*產出物／退出條件*
+- 一份可在瀏覽器直接開啟的 HTML 檔案（或部署好的預覽連結），呈現首頁在指定主題下的實際視覺效果，並可在頁面上直接切換主題比對
+- 開發需附上簡短技術評估：哪些視覺屬性可以純靠 token 切換、哪些做不到、需要另外處理（component variant 或設計調整）
+- 對兩個主題來源（UI style 目錄／Stitch）的可轉換性做出結論，說明是否需要設計端補齊結構化的 token 定義
+*決策關卡（Review Gate）*
+- PM review 這份 HTML demo 後，才決定：（a）哪些主題維持進入正式開發、（b）是否需要調整 UR1.1／UR1.2 的技術路線、（c）是否有主題需要重新設計
+- 只有在 PM 給出明確反饋與 go 決定之後，才開始 UR1.1／UR1.2 在正式 project codebase 中的實際開發，此 POC 為前置阻塞任務（blocking dependency）
+*時間盒*
+- 由開發於確認主題數量後回報預估工時，非固定天數（複雜度會隨 PM 選定的主題數量變化）
+
+**UR 1.4　主題系統技術 POC（Phase 2）**
+ 
+*目的／要驗證的假設*
+驗證「同一套元件庫可以透過 design token 即時切換多種結構性不同的視覺主題（例如 Nova／Flat Illustration／Neo-Brutalism／Watercolor），且不需重新整理頁面」這個技術路線是否可行，並找出兩個主題來源（項目 UI style 目錄、Stitch）能否轉換成一致的 token 結構。
+ 
+*範圍*
+- 產出物是一份**獨立的 HTML demo**，不需接入正式項目程式碼庫，呈現首頁在不同主題下的實際效果，讓 PM 可以直接在瀏覽器開啟、切換比對
+- 要測試的主題數量與具體選項如下，基於你之前提供的Stitch 的UI風格，我需要你POC下面的的主題頁面.
+
+Stitch中的：
+1） Ligne Claire Noir 風格
+2） Urban Sip 風格
+3） Ligne Claire Urban 風格
+4） Liquid Cyber Y2K 風格
+5)  Mid-Century Harbour 或者Victoria Peak Draught 風格
+6） Cutout paper collage illustration. 風格
+7） Hand-drawn doodle illustration. 風格
+8） Graphic Narrative System 風格
+9） Modern Pop Narrative 風格
+10）Liquid Neon 風格
+11）Doodle Notebook Sketch 風格
+12）Gouache Brew 風格
+13）Artisanal Lithograph 風格
+14）Aureate Mist 風格
+15）Artisanal Gouache 風格
+要求：
+ - 針對上述stitch中的設計風格，首先調用工具進行獲取設計，然後充分理解設計。在解讀與理解UI設計風格之後，POC 製作可以直接打開的html頁面
+ - html文件生產在UI style目錄下的phase2子目錄
+
+- POC 聚焦在首頁（對應 UR1.1 的 Bento 卡片、UR1.2 的語言／主題切換元件），不擴及全站或其他功能頁
+*不在範圍內*
+- 不需要是生產環境等級的程式碼，不需要接入正式 project codebase
+- 不包含拍照選酒、心情推薦等其他 demo 頁面的實作
+- 不處理真實資料或後端串接，純前端視覺 demo 即可
+*產出物／退出條件*
+- 一份可在瀏覽器直接開啟的 HTML 檔案（或部署好的預覽連結），呈現首頁在指定主題下的實際視覺效果，並可在頁面上直接切換主題比對
+- 開發需附上簡短技術評估：哪些視覺屬性可以純靠 token 切換、哪些做不到、需要另外處理（component variant 或設計調整）
+- 對兩個主題來源（UI style 目錄／Stitch）的可轉換性做出結論，說明是否需要設計端補齊結構化的 token 定義
+*決策關卡（Review Gate）*
+- PM review 這份 HTML demo 後，才決定：（a）哪些主題維持進入正式開發、（b）是否需要調整 UR1.1／UR1.2 的技術路線、（c）是否有主題需要重新設計
+- 只有在 PM 給出明確反饋與 go 決定之後，才開始 UR1.1／UR1.2 在正式 project codebase 中的實際開發，此 POC 為前置阻塞任務（blocking dependency）
+*時間盒*
+- 由開發於確認主題數量後回報預估工時，非固定天數（複雜度會隨 PM 選定的主題數量變化）
+ 
