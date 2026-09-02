@@ -9,6 +9,15 @@
 - 第一個 prototype 頁面（Tonight's Pick landing）
 - 裝 vitest，補 theme registry 的 unit test（呼應 `.memory/2026-09-01-skipped-unit-tests-before-commit.md`）
 
+## [0.4.0] — 2026-09-02
+
+### Changed
+- `.harness/workflow.md` 重寫為完整 10 步流程：理解需求 → 思考確認 → 工具查 API → 寫碼 → 驗證 → 瀏覽器測試 → 修正 → memory → 日誌 → 確認提交。每步有 input/output 與降階條件。
+- `CLAUDE.md` 加入硬規則摘要：未確認不 commit / 新 lib 先查 API / 邏輯錯立即修並重走 step 3-7 / 每次修正要寫 memory
+
+### Added
+- `.memory/2026-09-02-workflow-10-step-process.md` — 記錄這次 workflow 升級的決策與理由
+
 ## [0.3.0] — 2026-09-01
 
 ### Added

@@ -6,12 +6,19 @@
 
 ## ⚠️ 每次開始任務前必讀（不可跳過）
 
-1. **`.harness/workflow.md`** — 任務流程與提交前檢查清單
+1. **`.harness/workflow.md`** — 10 步開發流程（理解需求 → 思考確認 → 工具查 API → 寫碼 → 驗證 → 測試 → 修正 → 紀錄 → 日誌 → 確認提交）
 2. **`.harness/coding-standards.md`** — 寫程式前的風格對齊
 3. **`.memory/` 最新 3–5 條** — 確認沒有重蹈覆轍（檔名格式 `YYYY-MM-DD-*.md`）
 4. 依任務性質再讀對應的 `.harness/` 子檔（testing / git / architecture）
 
 開始寫程式前，如果最近 24 小時有新增 memory 條目，**全部讀完**。
+
+## 開發時必須遵守的硬規則
+
+- **未經用戶確認前不要自動 commit / push**（workflow.md Step 10）
+- **新 lib / 新版本要先用 context7 查 API**（Step 3），不要憑訓練資料寫
+- **邏輯有錯立即修，並重新走 step 3→7**（Step 7）
+- **每次修正 / 用戶糾正 / 工具鏈踩雷都要寫 memory**（Step 8）
 
 ## 環境要求
 
