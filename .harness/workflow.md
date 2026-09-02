@@ -83,16 +83,57 @@
 - 中文或英文皆可，但 type 統一英文
 - 同個版本可以包含多個 commits 的累積變更
 
-## Step 10 · 確認提交
+## Step 10 · 用戶視覺確認 + 提交
 
-- **用戶沒明確說「commit / push」之前，不要自動 commit**
+> 任何**含 UI 變更**的開發完成後，必須先用本地瀏覽器讓用戶親眼確認，才進 commit 流程。
+
+### 10a. 啟動本地瀏覽器
+
+- 確保 dev server 跑著（`npm run dev` 在背景）
+- 用 macOS `open` 指令或提供 URL 給用戶開啟
+  ```bash
+  open http://localhost:3000/
+  ```
+- 提供 network URL（同網段手機可測響應式）：
+  ```
+  http://<lan-ip>:3000/
+  ```
+- **不要**用 vision tool 自動看截圖就當用戶已確認 — vision 看的不等於人眼
+
+### 10b. 等用戶反饋
+
+- 等用戶：
+  - 在瀏覽器實際打開
+  - 切換不同 viewport（DevTools device mode）看響應式
+  - 切換 theme picker 看 design tokens 即時換
+  - 確認 layout / 文案 / 互動 OK，或指出要改的地方
+- 在用戶給出「OK 可以 commit」或具體修改指示前，**不要**：
+  - git commit
+  - git push
+  - 準備「確認提交？」問題
+
+### 10c. 收到反饋後
+
+- 如果用戶說「OK 可以 commit」 → 進 10d
+- 如果用戶指出要改 → 回 Step 4（修改）→ 重走 Step 5-9 → 再回 10a（瀏覽器確認）
+
+### 10d. 確認提交
+
 - 準備 commit 時顯示：
   - 改了哪些檔
   - CHANGELOG 寫了什麼
   - test / build / lint 結果
-- 等用戶確認才執行 `git commit` + `git push`
+- 用 `AskUserQuestion` 問「Commit + push 嗎？」拿最終確認
+- 等用戶明確答「要」才執行 `git commit` + `git push`
 - commit message 遵循 `git.md` 格式
 - 推送用 token inline URL，不寫進 git config
+
+### 例外（純非 UI 變更）
+
+- 純文檔、純 config、純 refactor（沒改任何視覺或行為）：
+  - 可以**省略 10a-10b**（不需開瀏覽器）
+  - 但仍要 10c-10d（拿到 commit 確認）
+- commit message 註明 `[docs-only]` / `[skip-tests]` / `[no-ui-change]`
 
 ---
 

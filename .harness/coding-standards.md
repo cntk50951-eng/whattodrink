@@ -68,3 +68,10 @@ docs/
 - ❌ 用 `// @ts-ignore` — 改用 `// @ts-expect-error` + comment 說明
 - ❌ 任何型別用 `any`
 - ❌ 把 secrets 寫進 source code（用 `.env`，參考 `.env.example`）
+
+## Layout primitives
+
+- 所有 layout 元件（`Container` / `Section` / `Grid` / `Stack` 等）**必須**支援 responsive variants
+- 型別簽章用 `type Responsive<T> = T | Partial<Record<"base" | "md" | "lg", T>>`，不要只給單一 string
+- Token 範圍給寬一點（gap、padding 等）— `0/1/2/3/4/6/8/10/12` 全包，不要事後才補
+- 設計新 primitive 前，先 grep call site 看實際需求，避免事後 refactor（見 `.memory/2026-09-02-stack-need-responsive-variants.md`）
