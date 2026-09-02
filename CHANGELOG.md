@@ -9,6 +9,36 @@
 - 用戶會在 backlog 補首頁詳細需求，屆時替換 sections 的 placeholder 內容
 - 裝 vitest，補 theme registry 的 unit test（呼應 `.memory/2026-09-01-skipped-unit-tests-before-commit.md`）
 
+## [0.6.0] — 2026-09-02
+
+### Added
+- **i18n architecture (next-intl 4.x + Next.js 16)**
+  - `i18n/routing.ts` — `defineRouting({ locales: ["zh-Hant","zh-Hans","en"], defaultLocale: "zh-Hant", localePrefix: "never" })`
+  - `i18n/request.ts` — `getRequestConfig` loads messages per locale
+  - `proxy.ts` — Next.js 16 renamed from `middleware.ts`, runs `createMiddleware(routing)`
+  - `messages/{zh-Hant,zh-Hans,en}.json` — translation files for all 3 locales
+- **`app/[locale]/` route segment** — required by next-intl for URL routing; was ` (marketing)` before (didn't work — proxy rewrites to `/zh-Hant` with no matching route)
+  - `layout.tsx` — `NextIntlClientProvider`, `ThemeProvider`, header (theme picker + language picker + sign-in CTA), Footer
+  - `page.tsx` — Bento Grid (UR 1.1)
+  - `camera/page.tsx` — stub
+  - `mood/page.tsx` — stub
+- **`components/language-picker.tsx`** — header dropdown; switches cookie + `window.location.reload()`
+- **Theme + language i18n** — `useTheme()` + `useTranslations()` integration across nav, footer, Bento cards, metadata title
+- **Bento Grid (UR 1.1)** — 3 cards in asymmetric CSS Grid
+  - `RandomPickCard` (client, in-place expand with state machine: idle → loading → result / timeout)
+  - `PhotoPickCard` (server, Link → /camera)
+  - `MoodRecCard` (server, Link → /mood)
+- **`lib/beers.ts`** — 15-entry mock beer catalog + `pickRandomBeer()` pure function
+
+### Changed
+- **Route structure** — all pages moved into `[locale]/` segment (was `(marketing)` + `(app)`)
+- **`components/ui/button.tsx` style** — `buttonVariants` now imported directly into ThemePicker / LanguagePicker instead of using Button wrapper (base-ui's `render` prop doesn't pass children)
+- **`components/ui/dropdown-menu.tsx`** — wrapped Label/Items in `DropdownMenuGroup` per base-ui's MenuGroupContext requirement
+
+### Memory
+- `.memory/2026-09-02-next-intl-requires-locale-segment.md`
+- `.memory/2026-09-02-base-ui-dropdown-patterns.md`
+
 ## [0.5.2] — 2026-09-02
 
 ### Changed

@@ -1,0 +1,70 @@
+{
+  "common": {
+    "appName": "Whattodrink",
+    "tagline": "今晚喝咩？",
+    "loading": "载入中…",
+    "error": "出了点问题，请稍后再试"
+  },
+  "nav": {
+    "bars": "酒吧",
+    "moods": "心情流",
+    "about": "关于",
+    "signIn": "登录"
+  },
+  "footer": {
+    "tagline": "香港年轻人的选酒与心情记录伙伴",
+    "links": {
+      "about": "关于",
+      "privacy": "隐私",
+      "terms": "条款",
+      "contact": "联系"
+    },
+    "copyright": "© {year} whattodrink. 理性饮酒，未成年请勿饮酒。"
+  },
+  "theme": {
+    "label": "主题",
+    "options": {
+      "nova": "Nova（默认）",
+      "flat-illustration": "Flat Illustration",
+      "neo-brutalism": "Neo-Brutalism",
+      "watercolor": "Watercolor"
+    }
+  },
+  "language": {
+    "label": "语言",
+    "options": {
+      "zh-Hant": "繁體中文",
+      "zh-Hans": "简体中文",
+      "en": "English"
+    }
+  },
+  "bento": {
+    "randomPick": {
+      "eyebrow": "主卡片",
+      "title": "今晚喝咩？",
+      "description": "让天意决定你今晚喝什么",
+      "cta": "让天意决定",
+      "resultTitle": "今晚的选择",
+      "tryAgain": "再抽一次",
+      "loadingDrink": "正在挑选你的命定之酒…",
+      "timeoutMessage": "天意犹豫了，再试一次？",
+      "resultEmoji": "🍻",
+      "resultSubtitle": "今晚就喝这杯"
+    },
+    "photoPick": {
+      "eyebrow": "拍照选酒",
+      "title": "看到喜欢的酒？",
+      "description": "拍下酒标或酒柜，AI 帮你判断适不适合你"
+    },
+    "moodRecommend": {
+      "eyebrow": "心情推荐",
+      "title": "今晚心情如何？",
+      "description": "说一个情绪字，AI 为你推荐最合适的那一杯"
+    },
+    "comingSoon": "即将推出"
+  },
+  "stubs": {
+    "back": "返回首页",
+    "placeholder": "（功能页占位）"
+  }
+}

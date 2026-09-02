@@ -1,15 +1,18 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { Container } from "@/components/layout/container";
 import { Stack } from "@/components/layout/stack";
 
-const FOOTER_LINKS: { label: string; href: string }[] = [
-  { label: "關於", href: "/about" },
-  { label: "隱私", href: "/privacy" },
-  { label: "條款", href: "/terms" },
-  { label: "聯絡", href: "mailto:hello@whattodrink.app" },
-];
+export async function Footer() {
+  const t = await getTranslations("footer");
 
-export function Footer() {
+  const links = [
+    { key: "about", href: "/about" },
+    { key: "privacy", href: "/privacy" },
+    { key: "terms", href: "/terms" },
+    { key: "contact", href: "mailto:hello@whattodrink.app" },
+  ] as const;
+
   return (
     <footer className="border-t mt-auto">
       <Container className="py-8 md:py-12">
@@ -21,20 +24,18 @@ export function Footer() {
         >
           <Stack gap="2">
             <p className="font-heading font-semibold">whattodrink</p>
-            <p className="text-sm text-muted-foreground">
-              香港年輕人的選酒與心情記錄夥伴
-            </p>
+            <p className="text-sm text-muted-foreground">{t("tagline")}</p>
           </Stack>
 
           <nav aria-label="Footer">
             <Stack direction="row" gap="6" className="text-sm flex-wrap">
-              {FOOTER_LINKS.map((link) => (
+              {links.map((link) => (
                 <Link
-                  key={link.href}
+                  key={link.key}
                   href={link.href}
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  {link.label}
+                  {t(`links.${link.key}`)}
                 </Link>
               ))}
             </Stack>
@@ -42,7 +43,7 @@ export function Footer() {
         </Stack>
 
         <p className="text-xs text-muted-foreground mt-6">
-          © {new Date().getFullYear()} whattodrink. 理性飲酒，未成年請勿飲酒。
+          {t("copyright", { year: new Date().getFullYear() })}
         </p>
       </Container>
     </footer>

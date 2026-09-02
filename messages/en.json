@@ -1,0 +1,70 @@
+{
+  "common": {
+    "appName": "Whattodrink",
+    "tagline": "Tonight's Pick",
+    "loading": "Loading…",
+    "error": "Something went wrong. Please try again."
+  },
+  "nav": {
+    "bars": "Bars",
+    "moods": "Moods",
+    "about": "About",
+    "signIn": "Sign in"
+  },
+  "footer": {
+    "tagline": "Hong Kong's drinking-mood companion for the young",
+    "links": {
+      "about": "About",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "contact": "Contact"
+    },
+    "copyright": "© {year} whattodrink. Please drink responsibly. Not for minors."
+  },
+  "theme": {
+    "label": "Theme",
+    "options": {
+      "nova": "Nova (Default)",
+      "flat-illustration": "Flat Illustration",
+      "neo-brutalism": "Neo-Brutalism",
+      "watercolor": "Watercolor"
+    }
+  },
+  "language": {
+    "label": "Language",
+    "options": {
+      "zh-Hant": "繁體中文",
+      "zh-Hans": "简体中文",
+      "en": "English"
+    }
+  },
+  "bento": {
+    "randomPick": {
+      "eyebrow": "Primary card",
+      "title": "Tonight's Pick",
+      "description": "Let fate decide what you're drinking",
+      "cta": "Pick for me",
+      "resultTitle": "Tonight's Pour",
+      "tryAgain": "Try again",
+      "loadingDrink": "Calling fate…",
+      "timeoutMessage": "Fate is hesitating — try once more?",
+      "resultEmoji": "🍻",
+      "resultSubtitle": "Drink this tonight"
+    },
+    "photoPick": {
+      "eyebrow": "Photo pick",
+      "title": "Spotted a bottle?",
+      "description": "Snap the label or shelf — AI will judge if it suits you"
+    },
+    "moodRecommend": {
+      "eyebrow": "Mood recommend",
+      "title": "How are you tonight?",
+      "description": "Name a feeling — AI will suggest the right pour for it"
+    },
+    "comingSoon": "Coming soon"
+  },
+  "stubs": {
+    "back": "Back to home",
+    "placeholder": "(Function page placeholder)"
+  }
+}
