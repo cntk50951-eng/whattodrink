@@ -19,6 +19,10 @@
   - `components/camera/camera-flow.tsx` — 單屏 entry（用途＋PDPO 同意＋雙入口，一次點即同意，仍獨立於原生彈窗）；拒絕→重試＋上傳，永久封鎖→設定指引，無相機→直接上傳；拍攝止於縮圖＋重拍（後續屬 UR2.2）
   - `lib/camera.ts` — 純函數錯誤分類＋能力偵測（待 vitest 落地補 test）
   - 待用戶真機驗收（sandbox 無相機）：允許／拒絕／封鎖／上傳四條路徑
+- **UR 2.2 — 拍照後輸入補充（WIP，待真機＋咪驗收）**
+  - `CameraFlow` 加 `review` 階段（同頁延續，免跨路由傳圖）：大預覽＋重拍／換源、選填文字（500 字＋計數）、`VoiceRecorder`（錄音鍵＋計時＋60 秒自動停＋回放重錄，轉文字留 UR2.3）、可空送出→收到確認＋再來一張
+  - 無障礙：錄音中文字＋跳動點＋aria-live，全原生 button／textarea；待用戶真機驗（相機＋咪）
+  - redesign（taste skill）：筆記改橫線紙＋膠帶＋手寫計數；錄音改圓形錄音鍵＋計時＋60 秒真實進度軌＋自訂播放（去 emoji，換 lucide）；送出改全幅藥丸＋硬陰影＋按壓動效；EN 文案去 em-dash
 
 ### Planned
 - 等用戶從 20 張風格圖選定方向，把更多 theme preset 填進 `lib/themes/presets/`

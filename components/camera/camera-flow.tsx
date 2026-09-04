@@ -2,12 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { ArrowRight, PencilLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
+  MAX_NOTE_CHARS,
   classifyGetUserMediaError,
+  formatClock,
   hasMediaDevices,
 } from "@/lib/camera";
+import { VoiceRecorder } from "./voice-recorder";
 
 type Phase =
   | "intro"
@@ -17,7 +21,8 @@ type Phase =
   | "blocked"
   | "no-camera"
   | "upload"
-  | "captured";
+  | "review"
+  | "received";
 
 type PhotoSource = "camera" | "upload";
 
@@ -39,6 +44,15 @@ export function CameraFlow() {
   const [phase, setPhase] = useState<Phase>("intro");
   const [photo, setPhoto] = useState<string | null>(null);
   const [source, setSource] = useState<PhotoSource | null>(null);
+  const [note, setNote] = useState("");
+  const [audio, setAudio] = useState<{ url: string; seconds: number } | null>(
+    null,
+  );
+  const [receipt, setReceipt] = useState<{
+    photo: string;
+    note: string;
+    audioSeconds: number | null;
+  } | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -52,16 +66,25 @@ export function CameraFlow() {
   const toLive = useCallback((stream: MediaStream) => {
     stopStream(streamRef.current);
     streamRef.current = stream;
-    const video = videoRef.current;
-    if (video) {
-      video.srcObject = stream;
-      void video.play().catch(() => {
-        /* autoplay blocked — user can press play */
-      });
-    }
     setSource("camera");
     setPhase("live");
+    // NOTE: the <video> element only mounts once phase === "live", so the
+    // stream is attached in the effect below — attaching here would hit a
+    // null ref and leave a black viewfinder (fixed 2026-09-04).
   }, []);
+
+  // Attach the live stream once the viewfinder has mounted.
+  useEffect(() => {
+    if (phase !== "live") return;
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!video || !stream) return;
+    video.muted = true; // set via property — the JSX muted attr is unreliable
+    video.srcObject = stream;
+    void video.play().catch(() => {
+      /* autoplay blocked — user can press play */
+    });
+  }, [phase]);
 
   const requestCamera = useCallback(async () => {
     setPhase("requesting");
@@ -137,7 +160,7 @@ export function CameraFlow() {
     });
     setPhoto(URL.createObjectURL(file));
     setSource("upload");
-    setPhase("captured");
+    setPhase("review");
   }, []);
 
   const capture = useCallback(() => {
@@ -151,8 +174,39 @@ export function CameraFlow() {
     streamRef.current = null;
     setPhoto(canvas.toDataURL("image/jpeg", 0.85));
     setSource("camera");
-    setPhase("captured");
+    setPhase("review");
   }, []);
+
+  const clearAudio = useCallback(() => {
+    setAudio((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+  }, []);
+
+  const submit = useCallback(() => {
+    if (!photo) return;
+    setReceipt({
+      photo,
+      note: note.trim(),
+      audioSeconds: audio?.seconds ?? null,
+    });
+    setPhase("received");
+  }, [photo, note, audio]);
+
+  const restart = useCallback(() => {
+    stopStream(streamRef.current);
+    streamRef.current = null;
+    setPhoto((prev) => {
+      if (prev && prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return null;
+    });
+    clearAudio();
+    setSource(null);
+    setNote("");
+    setReceipt(null);
+    setPhase("intro");
+  }, [clearAudio]);
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
@@ -338,43 +392,131 @@ export function CameraFlow() {
         </section>
       )}
 
-      {phase === "captured" && photo && (
+      {phase === "review" && photo && (
         <section
-          aria-labelledby="camera-captured-title"
-          className="overflow-hidden rounded-2xl border-2 bg-card text-card-foreground"
+          aria-labelledby="camera-review-title"
+          className="flex flex-col gap-5"
         >
-          <h1 id="camera-captured-title" className="sr-only">
-            {t("capturedTitle")}
+          <h1 id="camera-review-title" className="sr-only">
+            {t("reviewTitle")}
           </h1>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={photo}
-            alt={t("previewAlt")}
-            className="aspect-[3/4] w-full object-cover"
+          <div className="overflow-hidden rounded-2xl border-2 bg-card text-card-foreground">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photo}
+              alt={t("previewAlt")}
+              className="aspect-[3/4] w-full object-cover"
+            />
+            <div className="flex flex-wrap items-center gap-3 p-4 md:p-6">
+              <Button size="sm" variant="outline" onClick={retake}>
+                {t(source === "camera" ? "retake" : "reselect")}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  source === "camera"
+                    ? fileRef.current?.click()
+                    : void requestCamera()
+                }
+              >
+                {t(source === "camera" ? "useUpload" : "openCamera")}
+              </Button>
+            </div>
+          </div>
+
+          <div className="relative rounded-2xl border-2 bg-card p-4 pt-6 text-card-foreground md:p-5 md:pt-7">
+            <div
+              aria-hidden
+              className="absolute -top-3 left-1/2 h-6 w-24 -translate-x-1/2 -rotate-2 bg-(--tape)"
+            />
+            <label
+              htmlFor="camera-note"
+              className="font-hand flex items-center gap-2 text-2xl font-bold"
+            >
+              <PencilLine className="size-5" aria-hidden />
+              {t("notesLabel")}
+            </label>
+            <textarea
+              id="camera-note"
+              rows={4}
+              maxLength={MAX_NOTE_CHARS}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={t("notesPlaceholder")}
+              className={cn(
+                "mt-2 w-full bg-transparent text-base leading-7",
+                "placeholder:text-muted-foreground",
+                "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-(--ring)",
+                "[background-image:repeating-linear-gradient(transparent_0,transparent_27px,var(--border)_27px,var(--border)_28px)]",
+                "[background-attachment:local]",
+              )}
+            />
+            <p className="font-hand text-muted-foreground mt-1 text-right text-lg leading-none">
+              {t("charsLeft", {
+                n: MAX_NOTE_CHARS - note.length,
+              })}
+            </p>
+          </div>
+
+          <VoiceRecorder
+            onComplete={(url, seconds) => setAudio({ url, seconds })}
+            onClear={clearAudio}
           />
-          <div
+
+          <Button
+            onClick={submit}
             className={cn(
-              "flex flex-wrap items-center gap-3 p-4 md:p-6",
+              "h-auto w-full rounded-full border-2 py-4 text-xl font-bold",
+              "shadow-[4px_4px_0_var(--border)]",
+              "motion-safe:transition-all motion-safe:hover:-translate-y-0.5",
+              "motion-safe:hover:shadow-[6px_6px_0_var(--border)]",
+              "motion-safe:active:translate-x-[2px] motion-safe:active:translate-y-[2px]",
+              "motion-safe:active:shadow-none",
             )}
           >
-            <Button size="lg" variant="outline" onClick={retake}>
-              {t(source === "camera" ? "retake" : "reselect")}
-            </Button>
-            <Button
-              size="lg"
-              variant="ghost"
-              onClick={() =>
-                source === "camera"
-                  ? fileRef.current?.click()
-                  : void requestCamera()
-              }
-            >
-              {t(source === "camera" ? "useUpload" : "openCamera")}
+            {t("submit")}
+            <ArrowRight className="size-6" aria-hidden />
+          </Button>
+        </section>
+      )}
+
+      {phase === "received" && receipt && (
+        <section
+          aria-labelledby="camera-received-title"
+          className="rounded-2xl border-2 bg-card p-6 text-center text-card-foreground md:p-8"
+        >
+          <p aria-hidden className="font-hand text-6xl text-(--doodle-red)">
+            ✓
+          </p>
+          <h1
+            id="camera-received-title"
+            className="font-hand mt-2 text-4xl font-bold tracking-tight md:text-5xl"
+          >
+            {t("receivedTitle")}
+          </h1>
+          <p className="text-muted-foreground mt-3 text-sm leading-relaxed md:text-base">
+            {t("receivedBody")}
+          </p>
+          <div className="text-muted-foreground mx-auto mt-4 max-w-sm text-left text-sm">
+            <p>
+              {t("receiptNote")}:{" "}
+              {receipt.note || t("noText")}
+            </p>
+            <p className="mt-1">
+              {t("receiptAudio")}:{" "}
+              {receipt.audioSeconds !== null
+                ? t("audioLength", {
+                    t: formatClock(receipt.audioSeconds),
+                  })
+                : t("noAudio")}
+            </p>
+          </div>
+          <div className="mt-6">
+            <Button size="lg" variant="outline" onClick={restart}>
+              {t("again")}
             </Button>
           </div>
-          <p className="text-muted-foreground px-4 pb-4 text-xs md:px-6 md:pb-6">
-            {t("capturedNote")}
-          </p>
         </section>
       )}
 
