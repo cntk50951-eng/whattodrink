@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Added
+- Muse Code harness 對應（與 Claude / opencode 同步）
+  - `.agents/skills/` — `harness-workflow` / `code-review` / `github-api`（內容同 `.opencode/skills/`，查 API 改用 `web_search` + `web_fetch`）
+  - `AGENTS.md` 新增 Muse 工具 / 插件對應段（Muse 讀本檔為專案規則；不另建 `.muse/settings.json`）
+
 ### Planned
 - 等用戶從 20 張風格圖選定方向，把更多 theme preset 填進 `lib/themes/presets/`
 - 用戶會在 backlog 補首頁詳細需求，屆時替換 sections 的 placeholder 內容
