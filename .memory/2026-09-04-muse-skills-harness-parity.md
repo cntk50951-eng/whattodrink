@@ -24,3 +24,4 @@
 2. `AGENTS.md` 末尾加「Muse Code harness 對應」段（skill 位置、工具對應表、插件對應表）；不建 `.muse/settings.json`。
 3. 驗證用 `muse skills validate .agents/skills/<name>` 逐個跑，不要依賴 `muse skills list`（sandbox 下不可用）。
 4. 之後改任一邊 skill 時同步另一邊，避免漂移。
+5. `github-api` skill 取 token 的 key 名必須與 `.env` 一致（本專案是小寫 `github_key`，`grep` 區分大小寫；寫錯會導致 push 時 token 為空）。已同步修正兩邊 skill。
