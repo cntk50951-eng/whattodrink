@@ -56,3 +56,14 @@ Any commit with new logic **must** include corresponding unit tests. Exceptions 
 - Never hardcode `.env` content into shell commands, URLs, commit messages
 - Extract API keys with `grep '^KEY_NAME=' .env | cut -d= -f2-` into shell variables
 - Push with inline token URL, not `git remote set-url`
+
+## Cleanup — end of every task
+
+Before handing back, delete scratch files created during the task:
+
+- `/tmp` probes and scripts (`/tmp/wtd-*.py`, `/tmp/check-*.js`, `/tmp/shot-*.png`, downloaded references like `/tmp/stitch-*.png`, `/tmp/stitch-last.json`)
+- Any workspace scratch outside the deliverable scope
+- Remove by exact path (`rm -f` the files you created); never wildcard-delete directories you don't own
+
+Keep: deliverables, memory entries, CHANGELOG updates, and anything the user explicitly asked to keep.
+Never delete: repo files outside the task scope, files from other sessions, anything you didn't create this session.

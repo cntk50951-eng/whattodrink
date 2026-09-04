@@ -23,7 +23,7 @@ export async function Footer() {
           align={{ base: "start", md: "center" }}
         >
           <Stack gap="2">
-            <p className="font-heading font-semibold">whattodrink</p>
+            <p className="font-hand text-2xl font-bold">whattodrink</p>
             <p className="text-sm text-muted-foreground">{t("tagline")}</p>
           </Stack>
 

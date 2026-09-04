@@ -49,6 +49,10 @@
 }
 
 :root {
+  --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+  --font-geist-sans: "Geist", system-ui, -apple-system, sans-serif;
+  --font-geist-mono: "Geist Mono", ui-monospace, monospace;
+  --font-hand: "Caveat", cursive;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -127,4 +131,15 @@
   html {
     @apply font-sans;
   }
+}
+
+/* UR1.5 doodle display face: Caveat for latin, system fallback for CJK. */
+@utility font-hand {
+  font-family:
+    var(--font-hand),
+    ui-rounded,
+    "PingFang HK",
+    "Microsoft JhengHei",
+    system-ui,
+    sans-serif;
 }

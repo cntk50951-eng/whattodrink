@@ -27,7 +27,8 @@
       "nova": "Nova（默认）",
       "flat-illustration": "Flat Illustration",
       "neo-brutalism": "Neo-Brutalism",
-      "watercolor": "Watercolor"
+      "watercolor": "Watercolor",
+      "doodle": "手绘涂鸦"
     }
   },
   "language": {
@@ -66,5 +67,39 @@
   "stubs": {
     "back": "返回首页",
     "placeholder": "（功能页占位）"
+  },
+  "hero": {
+    "eyebrow": "~ from my notebook ~",
+    "title": "今晚喝什么？",
+    "subtitle": "在笔记本写下心情——让命运帮你选杯适合你的酒",
+    "cta": "随机抽一杯",
+    "cheers": "cheers!"
+  },
+  "camera": {
+    "title": "拍照选酒",
+    "openCamera": "开启相机",
+    "useUpload": "改用上传照片",
+    "requesting": "正在请求相机权限…",
+    "deniedTitle": "打不开相机",
+    "deniedBody": "你点了不允许。可以再试一次，或者直接上传照片，一样可以。",
+    "blockedTitle": "浏览器屏蔽了相机",
+    "blockedBody": "请在浏览器设置里重新打开。\n或者直接上传照片，不用等。",
+    "retry": "再试一次",
+    "noCameraTitle": "这台设备没有相机",
+    "noCameraBody": "没关系，直接上传酒柜照片，效果一样。",
+    "uploadTitle": "上传酒柜照片",
+    "chooseFile": "选择照片",
+    "takePhoto": "拍一张",
+    "retake": "重新拍摄",
+    "reselect": "重新选择",
+    "capturedTitle": "照片已准备好",
+    "previewAlt": "已拍摄或上传的照片预览",
+    "capturedNote": "拍好了！下一步（文字／语音补充＋提交）是 UR2.2 的范围。",
+    "introEyebrow": "~ 等一下 ~",
+    "introTitle": "先拍下酒柜！",
+    "introPoint1": "让 AI 看看有什么可选，帮你选杯合适的",
+    "introPoint2": "照片只用来认酒，不认人，不作他用",
+    "introPoint3": "点「开启相机」即表示你同意；不想拍，直接上传也行",
+    "introNote": "~ 你说了算 ~"
   }
 }

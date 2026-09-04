@@ -8,6 +8,17 @@
 - Muse Code harness 對應（與 Claude / opencode 同步）
   - `.agents/skills/` — `harness-workflow` / `code-review` / `github-api`（內容同 `.opencode/skills/`，查 API 改用 `web_search` + `web_fetch`）
   - `AGENTS.md` 新增 Muse 工具 / 插件對應段（Muse 讀本檔為專案規則；不另建 `.muse/settings.json`）
+- Stitch MCP：key 存 `.env`（`STITCH_API_KEY`，gitignored），`.env.example` 加佔位；Muse 側配 `~/.config/muse/settings.json` → `mcp_servers.stitch`（streamable_http，見 `.memory/2026-09-04-stitch-mcp-setup.md`）
+- **UR 1.5 — 首頁正式開發（doodle 單風格，WIP 未驗收）**
+  - `lib/themes/presets/doodle.ts` — 07 POC 精確色票 token 化，註冊為預設（其他 preset 保留無入口）
+  - `app/[locale]/layout.tsx` — 移除主題／語言切換器 UI（基建保留）；`components/marketing/hero.tsx` — 筆記本 hero＋程序化塗鴉杯（token 驅動）；標題字換 Caveat 手寫體（`<link>` 載入，見 memory）
+  - 待用戶側跑 `npm run build`＋瀏覽器驗收（sandbox 內 Turbopack／dev server 起不來）
+  - fix：`LOCKED_THEME_ID` 鎖死 doodle（殘留的 flat-illustration 深底曾劫持首頁）；次卡 teal／粉實底、全卡 2px 墨線、hero 補酒花麥穗氣泡（貼近 07 POC）
+  - detail pass：hero 加膠帶、手寫旁注、星星愛心、杯上粉色 W·D 徽章、標題紅波浪線；三卡片加迷你塗鴉（瓶杯／手機／心形氣泡）
+- **UR 2.1 — 拍照喚起與權限處理（WIP，待真機驗收）**
+  - `components/camera/camera-flow.tsx` — 單屏 entry（用途＋PDPO 同意＋雙入口，一次點即同意，仍獨立於原生彈窗）；拒絕→重試＋上傳，永久封鎖→設定指引，無相機→直接上傳；拍攝止於縮圖＋重拍（後續屬 UR2.2）
+  - `lib/camera.ts` — 純函數錯誤分類＋能力偵測（待 vitest 落地補 test）
+  - 待用戶真機驗收（sandbox 無相機）：允許／拒絕／封鎖／上傳四條路徑
 
 ### Planned
 - 等用戶從 20 張風格圖選定方向，把更多 theme preset 填進 `lib/themes/presets/`

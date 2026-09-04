@@ -27,7 +27,8 @@
       "nova": "Nova（預設）",
       "flat-illustration": "Flat Illustration",
       "neo-brutalism": "Neo-Brutalism",
-      "watercolor": "Watercolor"
+      "watercolor": "Watercolor",
+      "doodle": "手繪塗鴉"
     }
   },
   "language": {
@@ -66,5 +67,39 @@
   "stubs": {
     "back": "返回首頁",
     "placeholder": "（功能頁佔位）"
+  },
+  "hero": {
+    "eyebrow": "~ from my notebook ~",
+    "title": "今晚喝咩？",
+    "subtitle": "在筆記本寫下心情——讓命運幫你揀返杯啱你嘅酒",
+    "cta": "隨機抽一杯",
+    "cheers": "cheers!"
+  },
+  "camera": {
+    "title": "拍照選酒",
+    "openCamera": "開啟相機",
+    "useUpload": "改用上傳照片",
+    "requesting": "問緊相機權限…",
+    "deniedTitle": "開唔到相機",
+    "deniedBody": "你撳咗唔允許。可以再試一次，或者直接上傳照片，一樣做得到。",
+    "blockedTitle": "瀏覽器封鎖咗相機",
+    "blockedBody": "要喺瀏覽器設定開返：\nChrome：撳網址列 🔒 → 網站設定 → 相機 → 允許；iPhone：去 設定 → Safari → 相機 → 允許。\n或者直接上傳照片，唔使等。",
+    "retry": "再試一次",
+    "noCameraTitle": "呢部機冇相機",
+    "noCameraBody": "唔緊要，直接上傳酒櫃相，效果一樣。",
+    "uploadTitle": "上傳酒櫃相",
+    "chooseFile": "選擇照片",
+    "takePhoto": "影一張",
+    "retake": "重新拍攝",
+    "reselect": "重新選擇",
+    "capturedTitle": "照片已準備好",
+    "previewAlt": "已拍攝或上傳的照片預覽",
+    "capturedNote": "影好喇！下一步（文字／語音補充＋送出）係 UR2.2 嘅範圍。",
+    "introEyebrow": "~ 等陣先 ~",
+    "introTitle": "影低個酒櫃先！",
+    "introPoint1": "等 AI 睇下有咩好揀，幫你揀返杯啱嘅",
+    "introPoint2": "相片只用嚟認酒，唔認人，唔作他用",
+    "introPoint3": "撳「開啟相機」即係你同意；唔想影，直接上傳都得",
+    "introNote": "~ 你話事 ~"
   }
 }

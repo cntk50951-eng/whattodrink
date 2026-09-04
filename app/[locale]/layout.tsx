@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { notFound } from "next/navigation";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
@@ -8,20 +7,13 @@ import { ThemeProvider } from "@/components/theme-provider";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Container } from "@/components/layout/container";
-import { ThemeSwitcher } from "@/components/theme-switcher";
-import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import { Footer } from "@/components/marketing/footer";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+/* UR1.5 note: fonts load via <link> in the root layout (see app/layout.tsx).
+ * next/font/google can't fetch in this sandbox (proxy returns truetype-only
+ * CSS that next/font fails to bundle — build module-not-found), so the
+ * --font-* variables live in globals.css :root instead. */
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -49,9 +41,11 @@ export async function generateMetadata({
  *   - Wraps everything in `NextIntlClientProvider` so client components
  *     can call `useTranslations` / `useLocale`
  *
- * Both ThemeProvider and the chrome (header / footer) live here so they
- * remount with the locale — which is intentional for the language picker
- * UX (a real reload is a clean reset).
+ * Both ThemeProvider and the chrome (header / footer) live here.
+ *
+ * UR1.5: no theme / language switcher UI on the page (single doodle style,
+ * single zh-Hant). The i18n + theme infra stays so multi-theme / multi-locale
+ * can return by re-adding the switcher components.
  */
 export default async function LocaleLayout({
   children,
@@ -72,22 +66,20 @@ export default async function LocaleLayout({
 
   return (
     <div
-      className={`${geistSans.variable} ${geistMono.variable} flex min-h-full flex-col antialiased`}
+      className="flex min-h-full flex-col antialiased"
     >
       <NextIntlClientProvider locale={locale} messages={messages}>
         <ThemeProvider>
-          <header className="border-b">
+          <header className="border-b-2 border-dashed">
             <Container>
               <div className="flex h-14 items-center justify-between gap-2">
                 <Link
                   href="/"
-                  className="font-heading font-semibold tracking-tight"
+                  className="font-hand text-3xl font-bold tracking-tight"
                 >
                   whattodrink
                 </Link>
                 <div className="flex items-center gap-2">
-                  <ThemeSwitcher />
-                  <LanguageSwitcher />
                   <Button
                     size="sm"
                     nativeButton={false}

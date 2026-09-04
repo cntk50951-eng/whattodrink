@@ -27,7 +27,8 @@
       "nova": "Nova (Default)",
       "flat-illustration": "Flat Illustration",
       "neo-brutalism": "Neo-Brutalism",
-      "watercolor": "Watercolor"
+      "watercolor": "Watercolor",
+      "doodle": "Doodle"
     }
   },
   "language": {
@@ -66,5 +67,39 @@
   "stubs": {
     "back": "Back to home",
     "placeholder": "(Function page placeholder)"
+  },
+  "hero": {
+    "eyebrow": "~ from my notebook ~",
+    "title": "What to drink tonight?",
+    "subtitle": "Jot down your mood — let fate pick the right drink for you",
+    "cta": "Pick for me",
+    "cheers": "cheers!"
+  },
+  "camera": {
+    "title": "Snap to pick",
+    "openCamera": "Open camera",
+    "useUpload": "Upload instead",
+    "requesting": "Asking for camera permission…",
+    "deniedTitle": "Can't open the camera",
+    "deniedBody": "You tapped deny. Try again, or just upload a photo instead.",
+    "blockedTitle": "Camera is blocked",
+    "blockedBody": "Re-enable it in your browser settings.\nOr just upload a photo — no waiting.",
+    "retry": "Try again",
+    "noCameraTitle": "No camera on this device",
+    "noCameraBody": "No problem — uploading a shelf photo works just as well.",
+    "uploadTitle": "Upload a shelf photo",
+    "chooseFile": "Choose photo",
+    "takePhoto": "Snap",
+    "retake": "Retake",
+    "reselect": "Reselect",
+    "capturedTitle": "Photo ready",
+    "previewAlt": "Preview of the captured or uploaded photo",
+    "capturedNote": "Got it! Next (text/voice notes + submit) is UR2.2 territory.",
+    "introEyebrow": "~ hold on ~",
+    "introTitle": "Snap the shelf first!",
+    "introPoint1": "Let AI see the options and pick your drink",
+    "introPoint2": "Photos only identify drinks — never people, nothing else",
+    "introPoint3": "Tapping “Open camera” is your consent; rather upload? Go ahead",
+    "introNote": "~ your call ~"
   }
 }

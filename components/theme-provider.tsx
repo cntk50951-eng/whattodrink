@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   DEFAULT_THEME_ID,
+  LOCKED_THEME_ID,
   THEME_STORAGE_KEY,
   getTheme,
   themes,
@@ -34,10 +35,14 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
  * possible but acceptable for a prototype.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [themeId, setThemeIdState] = useState<string>(DEFAULT_THEME_ID);
+  const [themeId, setThemeIdState] = useState<string>(
+    LOCKED_THEME_ID ?? DEFAULT_THEME_ID,
+  );
 
-  // Hydrate from localStorage after mount.
+  // Hydrate from localStorage after mount — skipped while LOCKED_THEME_ID is
+  // set (UR1.5 single-style phase: stale stored ids must not override doodle).
   useEffect(() => {
+    if (LOCKED_THEME_ID) return;
     try {
       const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
       if (stored && themes.some((t) => t.id === stored)) {
@@ -61,6 +66,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [themeId]);
 
   const setThemeId = useCallback((id: string) => {
+    if (LOCKED_THEME_ID) return;
     if (!themes.some((t) => t.id === id)) return;
     setThemeIdState(id);
     try {
