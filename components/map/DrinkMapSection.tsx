@@ -10,6 +10,8 @@ import { DrinkMap } from "@/components/map/DrinkMap";
  */
 export async function DrinkMapSection(): Promise<ReactElement> {
   const t = await getTranslations("map");
+  const stadiaMissing =
+    (process.env.NEXT_PUBLIC_STADIA_KEY ?? "").trim().length === 0;
 
   return (
     <section aria-label={t("mapLabel")}>
@@ -29,6 +31,11 @@ export async function DrinkMapSection(): Promise<ReactElement> {
         <p className="text-muted-foreground mt-3 text-xs md:text-sm">
           {t("mockNote")}
         </p>
+        {stadiaMissing ? (
+          <p className="text-muted-foreground mt-1 text-xs md:text-sm">
+            {t("tilesFallback")}
+          </p>
+        ) : null}
       </Container>
     </section>
   );

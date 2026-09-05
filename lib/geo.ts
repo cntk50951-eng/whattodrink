@@ -31,11 +31,32 @@ export const GEOLOCATION_TIMEOUT_MS = 10_000;
 /** Accept a cached position up to this age to avoid re-prompting. */
 export const GEOLOCATION_MAX_AGE_MS = 60_000;
 
-/** Free CARTO Voyager raster tiles — no API key needed, attribution required. */
-export const TILE_URL =
-  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-export const TILE_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
+/**
+ * Tile providers (UR1.1).
+ *
+ * Primary: Stadia Stamen Watercolor — hand-painted raster that matches the
+ * doodle brand. Needs a free `NEXT_PUBLIC_STADIA_KEY`
+ * (https://client.stadiamaps.com → API key); the key lives in the tile URL
+ * by design (public client-side key, referrer-lockable in the dashboard).
+ * Watercolor renders natively to z16 — Leaflet over-zooms past that.
+ *
+ * Fallback (no key configured): Esri Light Gray Canvas — keyless with
+ * attribution. The map picks it automatically so it never renders empty.
+ */
+export const STADIA_MAX_NATIVE_ZOOM = 16;
+
+export const STADIA_ATTRIBUTION =
+  '&copy; <a href="https://stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://stamen.com/" target="_blank">Stamen Design</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
+/** Pure builder — unit tested. Key is interpolated, never defaulted. */
+export function stadiaTileUrl(apiKey: string): string {
+  return `https://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.jpg?api_key=${apiKey}`;
+}
+
+export const ESRI_URL =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+export const ESRI_ATTRIBUTION =
+  "Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ";
 
 /**
  * Whether a point falls inside the Hong Kong bounding box.

@@ -156,6 +156,7 @@
     "cheersCount": "{n} 人乾過杯",
     "close": "關閉",
     "selfHere": "你喺呢度！",
-    "selfHint": "撳下面俾天意揀一杯，即刻落個「想喝」。"
+    "selfHint": "撳下面俾天意揀一杯，即刻落個「想喝」。",
+    "tilesFallback": "水彩底圖要 Stadia key 先開到，未加之前暫用備用底圖（加 key 後重開即換）。"
   }
 }

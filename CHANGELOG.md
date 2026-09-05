@@ -14,6 +14,7 @@
   - 選型結論：Remotion 是視頻渲染框架，不做即時互動地圖——只借其設計語言（粗描邊／扁平色／貼紙感）用 CSS＋SVG 實現，未引入依賴（見 memory）
   - 待用戶側跑 `npm run build`＋瀏覽器驗收（sandbox 內 Turbopack／dev server 起不來）：定位允許／拒絕、縮放至全港、隨機推薦→「想喝」落點、乾杯卡三條路徑
   - fix（用戶驗收發現）：React 覆蓋層缺 z-index 被 Leaflet panes（200–700）壓住導致「入口按鈕消失」——`.above{z-index:1000}`；點自己 pin 無反應——改彈 self 卡（含推薦按鈕）；手繪增強：筆記本圓點紙紋、膠帶貼、指南針貼紙、LIVE 跳動點、pins 交錯傾斜（全走 token＋reduced-motion 降級）
+  - fix（底圖換源）：CARTO 政策改為匿名瓦片打「API KEY REQUIRED」水印——主源換 Stadia Stamen Watercolor（`NEXT_PUBLIC_STADIA_KEY`，見 `.env.example`），無 key 時自動降級 Esri 淺灰（免 key），水彩原生只到 z16（`maxNativeZoom` 過縮）；attribution 依官方文檔更新
 - Muse Code harness 對應（與 Claude / opencode 同步）
   - `.agents/skills/` — `harness-workflow` / `code-review` / `github-api`（內容同 `.opencode/skills/`，查 API 改用 `web_search` + `web_fetch`）
   - `AGENTS.md` 新增 Muse 工具 / 插件對應段（Muse 讀本檔為專案規則；不另建 `.muse/settings.json`）

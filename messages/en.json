@@ -156,6 +156,7 @@
     "cheersCount": "{n} cheers",
     "close": "Close",
     "selfHere": "You're here!",
-    "selfHint": "Tap below for a fated pick and drop a “want” pin."
+    "selfHint": "Tap below for a fated pick and drop a “want” pin.",
+    "tilesFallback": "The watercolor basemap needs a Stadia key; showing the fallback until it is set (restart after adding)."
   }
 }

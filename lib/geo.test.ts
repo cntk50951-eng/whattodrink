@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_CENTER,
+  ESRI_ATTRIBUTION,
+  ESRI_URL,
   HK_BOUNDS,
+  STADIA_ATTRIBUTION,
   ZOOM_DEFAULT,
   ZOOM_HK_WIDE,
   ZOOM_MAX,
   ZOOM_MIN,
   isWithinHongKong,
+  stadiaTileUrl,
 } from "./geo";
 
 describe("isWithinHongKong", () => {
@@ -40,5 +44,22 @@ describe("geo constants", () => {
     expect(ZOOM_MIN).toBeLessThanOrEqual(ZOOM_HK_WIDE);
     expect(ZOOM_HK_WIDE).toBeLessThanOrEqual(ZOOM_DEFAULT);
     expect(ZOOM_DEFAULT).toBeLessThanOrEqual(ZOOM_MAX);
+  });
+});
+
+describe("tile providers", () => {
+  it("builds the Stadia watercolor URL with the key as a query param", () => {
+    const url = stadiaTileUrl("test-key-123");
+    expect(url).toContain("tiles.stadiamaps.com/tiles/stamen_watercolor/");
+    expect(url).toContain("{z}/{x}/{y}");
+    expect(url).toContain("api_key=test-key-123");
+  });
+
+  it("keeps attributions non-empty (legally required on-map credit)", () => {
+    expect(STADIA_ATTRIBUTION).toContain("Stadia Maps");
+    expect(STADIA_ATTRIBUTION).toContain("Stamen Design");
+    expect(STADIA_ATTRIBUTION).toContain("OpenStreetMap");
+    expect(ESRI_URL).toContain("arcgisonline.com");
+    expect(ESRI_ATTRIBUTION).toContain("Esri");
   });
 });

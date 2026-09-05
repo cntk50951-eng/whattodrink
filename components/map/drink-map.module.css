@@ -6,9 +6,10 @@
  * follows theme switching like every other component.
  */
 
-/* Paper tone over the CARTO Voyager tiles: warm, notebook-like. */
+/* Gentle warmth over the tiles. Kept light because the Stadia watercolor
+ * basemap is already hand-painted — revisit after eyeballing on device. */
 .frame :global(.leaflet-tile-pane) {
-  filter: sepia(0.28) saturate(0.88) brightness(1.02);
+  filter: sepia(0.14) saturate(1) brightness(1);
 }
 
 .frame :global(.leaflet-container) {
