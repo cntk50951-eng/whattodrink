@@ -27,6 +27,7 @@
 - **UR 1.3 — 手機沉浸地圖與面板免下滑（WIP，待真機驗收）**
   - 手機地圖佔滿首屏（`100svh-header`，桌面 560px 不變）；首頁 slim Hero 退役、標題縮成地圖頂部浮條（`Hero` 元件保留備用）；推薦 pill 移到底部、任一卡片展開時隱藏防打架
   - 結果區緊湊橫排＋雙鈕一行兩格，抽屜 max-h 50%，避讓高度同步；16 tests／tsc／lint（無新增）全綠；未提交
+  - fix（頁面滾動被地圖吞掉，用戶回報）：沉浸式高地圖下整屏手勢被 Leaflet 獨佔——`scrollWheelZoom: false`（桌面滾輪還給頁面）＋容器 `touch-action: pan-y pinch-zoom`（手機豎滑滾頁面、橫拖動地圖、雙指縮放）；未提交
 - Muse Code harness 對應（與 Claude / opencode 同步）
   - `.agents/skills/` — `harness-workflow` / `code-review` / `github-api`（內容同 `.opencode/skills/`，查 API 改用 `web_search` + `web_fetch`）
   - `AGENTS.md` 新增 Muse 工具 / 插件對應段（Muse 讀本檔為專案規則；不另建 `.muse/settings.json`）

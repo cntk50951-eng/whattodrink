@@ -18,6 +18,10 @@
   font: inherit;
   background: var(--card);
   outline: none;
+  /* UR1.3 scroll-trap fix: one-finger vertical swipes scroll the page,
+   * horizontal drags pan the map, pinch still zooms. Without this Leaflet
+   * swallows every touch and the page can never scroll past a tall map. */
+  touch-action: pan-y pinch-zoom;
 }
 
 .frame :global(.leaflet-control-attribution) {
