@@ -29,6 +29,8 @@ import {
   ZOOM_DEFAULT,
   ZOOM_MAX,
   ZOOM_MIN,
+  formatDistance,
+  haversineMeters,
   isWithinHongKong,
 } from "@/lib/geo";
 import { BeerMugDoodle } from "@/components/marketing/BeerMugDoodle";
@@ -57,6 +59,17 @@ const SELF_ID = "self";
 const SHEET_OFFSET_PX = 180;
 /** Down-drag distance on the sheet handle that dismisses the sheet. */
 const SHEET_DISMISS_DY = 72;
+/**
+ * UR1.6 two-up frame: the open cheers card eats this much bottom space,
+ * so the frame's bottom pad clears it and neither dot hides under the card.
+ */
+const FOCUS_CARD_CLEAR_PX = 240;
+/**
+ * UR1.6: closer than this, self and the check-in are the same spot for
+ * framing purposes — fitBounds would dive to max zoom on a degenerate
+ * bound, so fall back to a plain fly-to instead.
+ */
+const MIN_FOCUS_SEPARATION_M = 50;
 export function DrinkMap() {
   const t = useTranslations("map");
   const heroT = useTranslations("hero");
@@ -99,6 +112,53 @@ export function DrinkMap() {
     [],
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // UR1.6: the init effect closes over the FIRST render, so the Leaflet
+  // marker callbacks it registers would read stale geo forever. They go
+  // through this ref instead — synced below on every geo change.
+  const geoRef = useRef({ status: geoStatus, position: geoPosition });
+
+  /**
+   * UR1.6 focus-a-drinker: open their card and frame both of us.
+   * Declared BEFORE the init effect (lint: no use-before-define) and reads
+   * geo from geoRef (fresh), never from the render closure (stale).
+   * With a fix: fitBounds(self, them) so both dots share the screen.
+   * Without one (Q1 decision): just fly to them; the card shows the
+   * locate hint instead of a distance. Outside-HK fixes still count —
+   * the distance to HK is real even when the dot is parked.
+   */
+  function handleFocusPerson(c: Checkin): void {
+    const map = mapRef.current;
+    setSelectedId(c.id);
+    if (map === null) return;
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const self =
+      geoRef.current.status === "success" && geoRef.current.position !== null
+        ? geoRef.current.position
+        : null;
+    if (
+      self === null ||
+      haversineMeters(self, c.position) < MIN_FOCUS_SEPARATION_M
+    ) {
+      const z = Math.max(map.getZoom(), 14);
+      if (reduced) map.setView([c.position.lat, c.position.lng], z);
+      else map.flyTo([c.position.lat, c.position.lng], z, { duration: 1 });
+      return;
+    }
+    const frame: [[number, number], [number, number]] = [
+      [self.lat, self.lng],
+      [c.position.lat, c.position.lng],
+    ];
+    if (reduced) {
+      map.fitBounds(frame, { padding: [24, 24], animate: false });
+    } else {
+      map.fitBounds(frame, {
+        paddingTopLeft: [24, 24],
+        paddingBottomRight: [24, FOCUS_CARD_CLEAR_PX],
+      });
+    }
+  }
   const [sentIds, setSentIds] = useState<string[]>([]);
   const [picked, setPicked] = useState<Beer | null>(null);
   const [wantAt, setWantAt] = useState<LatLng | null>(null);
@@ -118,6 +178,13 @@ export function DrinkMap() {
     geoStatus === "success" && geoPosition !== null
       ? !isWithinHongKong(geoPosition)
       : false;
+  /**
+   * UR1.6 live self fix for the card distance. Render-time plain value —
+   * every watch update re-renders, so the distance stays dynamic with no
+   * extra state. Null (denied/failed) → the card shows the locate hint.
+   */
+  const selfFix =
+    geoStatus === "success" && geoPosition !== null ? geoPosition : null;
 
   /* ---- init Leaflet once ---- */
   useEffect(() => {
@@ -175,7 +242,7 @@ export function DrinkMap() {
             iconAnchor: [20, 38],
           }),
         });
-        marker.on("click", () => setSelectedId(c.id));
+        marker.on("click", () => handleFocusPerson(c));
         marker.addTo(map);
       }
       holder.dataset.ready = "1";
@@ -256,6 +323,11 @@ export function DrinkMap() {
       fitHk();
     }
   }, [mapReady, geoStatus, geoPosition, geoFailed, t]);
+
+  /* ---- UR1.6: keep the Leaflet-callback geo ref current ---- */
+  useEffect(() => {
+    geoRef.current = { status: geoStatus, position: geoPosition };
+  }, [geoStatus, geoPosition]);
 
   /* ---- UR1.2 live-follow: move the dot, never the camera ---- */
   useEffect(() => {
@@ -746,6 +818,17 @@ export function DrinkMap() {
                   </p>
                   <p className="text-muted-foreground text-sm">
                     {t("drinking", { drink: card.drinkName })}
+                  </p>
+                  {/* UR1.6 live distance — pure render calc from the watch
+                      fix, so it tracks you as you move. */}
+                  <p className="text-muted-foreground text-sm">
+                    {selfFix !== null
+                      ? t("distanceAway", {
+                          d: formatDistance(
+                            haversineMeters(selfFix, card.position),
+                          ),
+                        })
+                      : t("needLocateForDistance")}
                   </p>
                 </div>
               </div>

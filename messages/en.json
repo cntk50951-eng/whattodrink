@@ -157,6 +157,8 @@
     "cheers": "Cheers!",
     "cheersSent": "Sent! Redeem it next time you meet!",
     "cheersCount": "{n} cheers",
+    "distanceAway": "{d} from you",
+    "needLocateForDistance": "Enable location to see your distance",
     "close": "Close",
     "selfHere": "You're here!",
     "selfHint": "Tap below for a fated pick and drop a “want” pin.",

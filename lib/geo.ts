@@ -80,3 +80,35 @@ export function isWithinHongKong(point: LatLng): boolean {
     point.lng <= HK_BOUNDS.east
   );
 }
+
+/** Mean Earth radius in metres, for the haversine below. */
+export const EARTH_RADIUS_M = 6_371_000;
+
+/**
+ * Great-circle distance between two points (haversine, UR1.6).
+ * Pure — the cheers card calls this at render time from the live watch
+ * position, so the shown distance stays real and dynamic with no extra
+ * state and no re-computation machinery.
+ */
+export function haversineMeters(a: LatLng, b: LatLng): number {
+  const toRad = (deg: number): number => (deg * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
+}
+
+/** At/above this the card shows kilometres, below it metres. */
+export const KM_THRESHOLD_M = 1000;
+
+/**
+ * Human distance for the cheers card: "350 m" / "2.3 km".
+ * Units (m/km) travel unchanged across locales, so no i18n needed here.
+ */
+export function formatDistance(meters: number): string {
+  if (!Number.isFinite(meters) || meters < 0) return "—";
+  if (meters < KM_THRESHOLD_M) return `${Math.round(meters)} m`;
+  return `${(meters / KM_THRESHOLD_M).toFixed(1)} km`;
+}

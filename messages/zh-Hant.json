@@ -157,6 +157,8 @@
     "cheers": "乾杯！",
     "cheersSent": "已送出，下次見面兌現！",
     "cheersCount": "{n} 人乾過杯",
+    "distanceAway": "距你 {d}",
+    "needLocateForDistance": "開定位後顯示同你嘅距離",
     "close": "關閉",
     "selfHere": "你喺呢度！",
     "selfHint": "撳下面俾天意揀一杯，即刻落個「想喝」。",

@@ -38,6 +38,9 @@
   - fix（沉底不生效的根因，用户回报）：沉底的 max＋env 任意类被 Tailwind 扫描器静默丢弃（编译产物查无此规则，兄弟规则正常）——定位改纯 CSS Module（`.fabDock`／`.fabLifted` 互斥），扇形动态 delay 类同病，改 CSS 变量 `--fan-delay`（错峰动画至此才真正跑起来）；16 tests／tsc 全绿、lint 0 error；未提交
   - fix（hydration 崩＋卡片展开时按钮浮空，用户回报）：静默期 localStorage 懒读致服务端／客户端首屏分叉——改 useSyncExternalStore（server 快照恒 false）；dial 行为改隐藏：卡片展开时整个 dial 不渲染（删 fabLifted），关卡即回左下角；16 tests／tsc 全绿、lint 0 error；未提交
   - fix（沉底屡修不生效的真根因，用户定位）：关闭的扇形格 opacity-0 但仍在流内占位，column-reverse 把啤酒垫高约 360px——扇形格改绝对定位（CSS 变量逐格定高，脱流），关闭态容器只剩啤酒，真正贴角；16 tests／tsc 全绿、lint 0 error；未提交
+- **UR 1.6 — 全港找人＋双人同框＋实时距离（[✓] 用户已验收）**
+  - 点他人 pin：`fitBounds(self, TA)` 两人同框＋开卡（任何视图都触发）；无定位时只飞对方单点，卡片显示开定位提示（用户已确认两点）
+  - 卡片加距离行：render 内纯算 `haversineMeters(selfFix, TA)`，随 watch 实时更新；`lib/geo.ts` 新增 `haversineMeters`＋`formatDistance` 纯函数＋6 单测，三语文案；22 tests／tsc 全绿、lint 0 error（3 旧 warning）；未提交
 - **UR 1.5 — 扇形整行可点（[✓] 用户已验收）**
   - 扇形每行 `div＋button＋span` 改单个 `<button>`：图标退为纯视觉 span，文字和图标同一点击区、单个 tab stop，行为沿用既有 `action.run`（keepOpen 连点规则不变）；按压缩放反馈走 `group-active:` 平移到圆形上；16 tests／tsc 全绿、lint 0 error（3 旧 warning）；未提交
 - Muse Code harness 對應（與 Claude / opencode 同步）
