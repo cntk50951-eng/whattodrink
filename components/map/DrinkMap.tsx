@@ -427,21 +427,30 @@ export function DrinkMap() {
     >
       <div
         ref={holderRef}
-        className="h-[62svh] w-full md:h-[560px]"
+        // UR1.3 immersive mobile: header (3.5rem) + section pt-3 (0.75rem)
+        // above, map fills the rest of the first viewport. Desktop unchanged.
+        className="h-[calc(100svh-4.25rem)] w-full md:h-[560px]"
         role="application"
         aria-label={t("mapLabel")}
       />
 
+      {/* UR1.3 floating title — the retired slim hero lives on here. */}
+      <div
+        className={`${styles.above} font-hand pointer-events-none absolute top-3 left-1/2 max-w-[38%] -translate-x-1/2 truncate rounded-full border-2 bg-card/90 px-3 py-1 text-center text-sm font-bold backdrop-blur-sm`}
+      >
+        {heroT("title")}
+      </div>
+
       {/* Notebook dot-grid over the tiles */}
       <div aria-hidden className={styles.paper} />
 
-      {/* UR1.2 pick entry — collapsed pill/chip <-> bottom sheet.
-          Journey step 1 lives in the same component as the map. */}
-      {!sheetOpen && (
+      {/* UR1.3 pick entry — idle-only pill above the mock badge. Hidden
+          while any card is open: one bottom entry at a time, no pile-ups. */}
+      {!sheetOpen && card === null && !(geoFailed && !guideDismissed) && (
         <button
           type="button"
           onClick={() => setSheetOpen(true)}
-          className={`${styles.above} font-hand absolute top-3 left-3 inline-flex max-w-[70%] items-center gap-2 rounded-full border-2 bg-card/95 px-4 py-2 text-base font-bold shadow-[3px_3px_0_var(--border)] backdrop-blur-sm transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none`}
+          className={`${styles.above} font-hand absolute bottom-12 left-3 inline-flex max-w-[70%] items-center gap-2 rounded-full border-2 bg-card/95 px-4 py-2 text-base font-bold shadow-[3px_3px_0_var(--border)] backdrop-blur-sm transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none`}
         >
           {picked !== null && wantSaved ? (
             <>
@@ -459,7 +468,7 @@ export function DrinkMap() {
       {sheetOpen && (
         <div
           ref={sheetRef}
-          className={`${styles.above} absolute inset-x-3 bottom-3 max-h-[42%] overflow-y-auto rounded-2xl border-2 bg-card/30 px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[3px_3px_0_var(--border)] backdrop-blur-xl motion-safe:transition-transform motion-safe:duration-300`}
+          className={`${styles.above} absolute inset-x-3 bottom-3 max-h-[50%] overflow-y-auto rounded-2xl border-2 bg-card/30 px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[3px_3px_0_var(--border)] backdrop-blur-xl motion-safe:transition-transform motion-safe:duration-300`}
         >
           <div
             aria-hidden
@@ -492,17 +501,25 @@ export function DrinkMap() {
               {t("pickCta")}
             </button>
           ) : (
+            // UR1.3 compact result: one row (emoji + name/tagline) + one row
+            // of two half-width buttons — reachable without inner scroll.
             <div className="mt-3">
-              <p className="text-3xl" aria-hidden>
-                {picked.emoji}
-              </p>
-              <p className="mt-1 font-bold">{picked.name}</p>
-              <p className="text-muted-foreground text-sm">{picked.tagline}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <p className="text-4xl" aria-hidden>
+                  {picked.emoji}
+                </p>
+                <div className="min-w-0">
+                  <p className="truncate font-bold">{picked.name}</p>
+                  <p className="text-muted-foreground truncate text-sm">
+                    {picked.tagline}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={handleWant}
-                  className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-accent px-3 py-1.5 text-sm font-bold text-accent-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                  className="font-hand inline-flex items-center justify-center gap-1.5 rounded-full border-2 bg-accent px-3 py-1.5 text-sm font-bold text-accent-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
                 >
                   <Plus size={15} aria-hidden />
                   {t("wantToDrink")}
@@ -580,7 +597,7 @@ export function DrinkMap() {
       <div
         className={`${styles.above} absolute right-3 flex flex-col gap-2 ${
           sheetOpen || card !== null || (geoFailed && !guideDismissed)
-            ? "bottom-[calc(46%+0.75rem)]"
+            ? "bottom-[calc(50%+0.75rem)]"
             : "bottom-14 md:bottom-16"
         }`}
       >

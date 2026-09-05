@@ -9,6 +9,7 @@
 - **重述需求**：用自己的話寫出 goal & non-goal，給用戶確認
 - **拆 acceptance criteria**：完成條件是什麼？（可驗證的）
 - **查 product backlog**：`docs/PRODUCT_BACKLOG.md` 有沒有對應 epic / UR
+- **查 UR 狀態**（見 `ur-status.md`）：要碰的 UR 無 tag 先補 `[]`；開工（第一個實作動作前）置 `[WIP]`
 - **不要假設**：用戶說「做個 X」時，先確認他腦中的 X 是哪個 X
 
 ## Step 2 · 獨立深度思考 + 找不確定點
@@ -119,6 +120,8 @@
 
 ### 10d. 確認提交
 
+- 先對 UR 狀態（見 `ur-status.md`）：只有用戶**明確確認該 UR 完成**，才把 backlog 標題改為 `[x]`；測試綠／已合併／轉場下一題都不算完成。狀態改動隨相關 commit 一起提交，不必單獨 commit
+
 - 準備 commit 時顯示：
   - 改了哪些檔
   - CHANGELOG 寫了什麼
@@ -140,7 +143,7 @@
 ## 快速 checklist（每個任務結束前自查）
 
 ```
-□ Step 1 — 需求有寫下來、AC 列了
+□ Step 1 — 需求有寫下來、AC 列了、UR 狀態 tag 對（無→`[]`，開工→`[WIP]`）
 □ Step 2 — 疑慮有問完
 □ Step 3 — API 查過最新版本
 □ Step 4 — coding-standards 對齊
@@ -149,7 +152,7 @@
 □ Step 7 — 看到的錯都修了（root cause 不是 patch）
 □ Step 8 — memory 有加（如有修正）
 □ Step 9 — CHANGELOG 更新
-□ Step 10 — 等用戶確認 commit
+□ Step 10 — 等用戶確認 commit；`[x]` 只在用戶明確驗收該 UR 後打勾
 ```
 
 ## 例外與降階

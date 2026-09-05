@@ -13,18 +13,9 @@ export async function DrinkMapSection(): Promise<ReactElement> {
 
   return (
     <section aria-label={t("mapLabel")}>
-      <Container className="pb-10 md:pb-16">
-        <div className="mb-4 max-w-prose">
-          <p className="font-hand text-lg text-(--doodle-red) md:text-xl">
-            {t("badge")}
-          </p>
-          <h2 className="font-hand mt-1 text-3xl leading-tight font-bold text-balance md:text-4xl">
-            {t("title")}
-          </h2>
-          <p className="text-muted-foreground mt-2 text-base md:text-lg">
-            {t("subtitle")}
-          </p>
-        </div>
+      {/* UR1.3 immersive: no heading block — the title floats on the map
+          and every pixel of the first viewport goes to it. */}
+      <Container className="pt-3 pb-10 md:pb-16">
         <DrinkMap />
         <p className="text-muted-foreground mt-3 text-xs md:text-sm">
           {t("mockNote")}

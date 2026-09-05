@@ -24,6 +24,9 @@
   - self 改無字閃動 teal 圓點（watch 實時跟，只動點不動鏡頭）；新增回位十字鈕（無位置時退化為請求定位）；開 sheet／回位時鏡頭上移 180px 讓位；地圖手機改 62svh
   - 16 tests 全綠；tsc 全過；lint 無新增 error；待用戶手機真機驗收（走動跟隨＋抽屜手感＋回位）後再進 commit 流程
   - fix（先拒後允 stranded，用戶回報）：一次性的 settle gate 在重試時不重置，先拒後允會永遠停全港視圖——重試入口統一走 `handleRetryLocate`（重置 gate），settle 改冪等（marker 只建一次、鏡頭只飛一次）；抽屜再調透（bg-card/70＋blur-lg＋max-h 42%）；未提交
+- **UR 1.3 — 手機沉浸地圖與面板免下滑（WIP，待真機驗收）**
+  - 手機地圖佔滿首屏（`100svh-header`，桌面 560px 不變）；首頁 slim Hero 退役、標題縮成地圖頂部浮條（`Hero` 元件保留備用）；推薦 pill 移到底部、任一卡片展開時隱藏防打架
+  - 結果區緊湊橫排＋雙鈕一行兩格，抽屜 max-h 50%，避讓高度同步；16 tests／tsc／lint（無新增）全綠；未提交
 - Muse Code harness 對應（與 Claude / opencode 同步）
   - `.agents/skills/` — `harness-workflow` / `code-review` / `github-api`（內容同 `.opencode/skills/`，查 API 改用 `web_search` + `web_fetch`）
   - `AGENTS.md` 新增 Muse 工具 / 插件對應段（Muse 讀本檔為專案規則；不另建 `.muse/settings.json`）
