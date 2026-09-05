@@ -1,18 +1,16 @@
 import { BentoGrid } from "@/components/marketing/bento/bento-grid";
-import { Hero } from "@/components/marketing/hero";
 import { DrinkMapSection } from "@/components/map/DrinkMapSection";
 
 /**
- * Marketing landing — anonymous visitor entry point (UR 1.1 rewrite).
+ * Marketing landing — anonymous visitor entry point (UR1.1 rewrite, UR1.3).
  *
- * UR1.1 new direction: the homepage IS the live drink map (protagonist).
- * Slim hero keeps the title + brand, the map follows immediately with the
- * random-pick entry embedded, and the Bento demo cards move below.
+ * UR1.3 immersive mobile: the slim hero is retired from the home page —
+ * its title lives on as a floating bar inside the map, and the map takes
+ * the full first viewport under the header. Bento follows below.
  */
 export default function MarketingHome() {
   return (
     <>
-      <Hero variant="slim" />
       <DrinkMapSection />
       <div id="cards" className="scroll-mt-20">
         <BentoGrid />

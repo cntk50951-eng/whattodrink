@@ -6,7 +6,7 @@
 
 | 任務性質 | 必讀檔案 |
 |---|---|
-| **每次開始任務** | `workflow.md` |
+| **每次開始任務** | `workflow.md` + `ur-status.md` |
 | **寫程式前** | `coding-standards.md` |
 | **測試相關** | `testing.md` |
 | **commit / PR 前** | `git.md` + `workflow.md` |
@@ -19,6 +19,7 @@
 - [`testing.md`](testing.md) — 何時必須寫 unit test、工具、commit gate
 - [`git.md`](git.md) — 分支策略、commit 格式、PR 規範
 - [`architecture.md`](architecture.md) — 技術棧決策與原因
+- [`ur-status.md`](ur-status.md) — UR 狀態標記（`[]`／`[WIP]`／`[x]`）與打勾規則
 
 ## 與 `.memory/` 的關係
 
