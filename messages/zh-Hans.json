@@ -157,6 +157,8 @@
     "close": "关闭",
     "selfHere": "你在这里！",
     "selfHint": "点下面让天意选一杯，立刻落个“想喝”。",
-    "tilesFallback": "水彩底图需要 Stadia key 才能加载，没加之前暂用备用底图（加 key 后重启即换）。"
+    "tilesFallback": "水彩底图需要 Stadia key 才能加载，没加之前暂用备用底图（加 key 后重启即换）。",
+    "retryLocate": "重新定位",
+    "deniedGuide": "多数是之前点了不允许，或者手机根本没开定位。逐样查：1）系统总开关：iPhone 去设置 → 隐私与安全性 → 定位服务要开；安卓去设置 → 位置要开。2）浏览器网站权限：Chrome 点地址栏锁头 → 位置 → 允许。3）微信／IG 里面打开的，转用 Safari／Chrome 打开这条链接。"
   }
 }

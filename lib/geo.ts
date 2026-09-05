@@ -26,8 +26,11 @@ export const ZOOM_HK_WIDE = 11;
 export const ZOOM_MIN = 10;
 export const ZOOM_MAX = 18;
 
-/** How long we wait for the browser geolocation before giving up. */
-export const GEOLOCATION_TIMEOUT_MS = 10_000;
+/**
+ * How long we wait for the browser geolocation before giving up.
+ * 15s: desktop fails fast enough, mobile cold fixes get a fair chance.
+ */
+export const GEOLOCATION_TIMEOUT_MS = 15_000;
 /** Accept a cached position up to this age to avoid re-prompting. */
 export const GEOLOCATION_MAX_AGE_MS = 60_000;
 

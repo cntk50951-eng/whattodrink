@@ -157,6 +157,8 @@
     "close": "關閉",
     "selfHere": "你喺呢度！",
     "selfHint": "撳下面俾天意揀一杯，即刻落個「想喝」。",
-    "tilesFallback": "水彩底圖要 Stadia key 先開到，未加之前暫用備用底圖（加 key 後重開即換）。"
+    "tilesFallback": "水彩底圖要 Stadia key 先開到，未加之前暫用備用底圖（加 key 後重開即換）。",
+    "retryLocate": "重新定位",
+    "deniedGuide": "多數係之前撳咗唔允許，或者部機根本冇開定位。逐樣 check：1）系統總開關：iPhone 去設定 → 隱私權與安全性 → 定位服務要開；Android 去設定 → 位置要開。2）瀏覽器網站權限：Chrome 撳網址列鎖頭 → 位置 → 允許。3）微信／IG 入面開的，轉用 Safari／Chrome 開呢條 link。"
   }
 }

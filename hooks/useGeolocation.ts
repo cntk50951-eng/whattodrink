@@ -32,6 +32,30 @@ export type GeoState = {
  * setState from async continuations, and the idle → locating transition
  * legitimately happens on mount.
  */
+/**
+ * Permission pre-check via the Permissions API (where supported).
+ * Returns "granted" | "denied" | "prompt", or null when the API is missing
+ * (older Safari/Firefox) — callers fall back to a direct request.
+ * Querying never triggers a browser prompt, so a remembered "denied" can
+ * be surfaced straight to the settings guide instead of failing silently.
+ */
+async function queryPermission(): Promise<string | null> {
+  try {
+    if (
+      typeof navigator === "undefined" ||
+      navigator.permissions?.query === undefined
+    ) {
+      return null;
+    }
+    const res = await navigator.permissions.query({
+      name: "geolocation",
+    });
+    return res.state;
+  } catch {
+    return null;
+  }
+}
+
 export function useGeolocation(): GeoState {
   const [status, setStatus] = useState<GeoStatus>("idle");
   const [position, setPosition] = useState<LatLng | null>(null);
@@ -44,25 +68,34 @@ export function useGeolocation(): GeoState {
     }
     const attempt = ++attemptRef.current;
     setStatus("locating");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (attemptRef.current !== attempt) return;
-        setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setStatus("success");
-      },
-      (err) => {
-        if (attemptRef.current !== attempt) return;
-        if (err.code === err.PERMISSION_DENIED) setStatus("denied");
-        else if (err.code === err.POSITION_UNAVAILABLE)
-          setStatus("unavailable");
-        else setStatus("timeout");
-      },
-      {
-        enableHighAccuracy: false,
-        timeout: GEOLOCATION_TIMEOUT_MS,
-        maximumAge: GEOLOCATION_MAX_AGE_MS,
-      },
-    );
+    // Async continuation (set-state-in-effect compliant): skip the real
+    // request when permission is already denied — no prompt would show.
+    void queryPermission().then((perm) => {
+      if (attemptRef.current !== attempt) return;
+      if (perm === "denied") {
+        setStatus("denied");
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (attemptRef.current !== attempt) return;
+          setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          setStatus("success");
+        },
+        (err) => {
+          if (attemptRef.current !== attempt) return;
+          if (err.code === err.PERMISSION_DENIED) setStatus("denied");
+          else if (err.code === err.POSITION_UNAVAILABLE)
+            setStatus("unavailable");
+          else setStatus("timeout");
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: GEOLOCATION_TIMEOUT_MS,
+          maximumAge: GEOLOCATION_MAX_AGE_MS,
+        },
+      );
+    });
   }, []);
 
   useEffect(() => {
