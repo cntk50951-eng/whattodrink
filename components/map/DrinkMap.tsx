@@ -70,7 +70,12 @@ const FOCUS_CARD_CLEAR_PX = 240;
  * bound, so fall back to a plain fly-to instead.
  */
 const MIN_FOCUS_SEPARATION_M = 50;
-export function DrinkMap() {
+export function DrinkMap({
+  initialPickOpen = false,
+}: {
+  /** UR1.7 `?pick=1` deep-link: arrive in the fan-pick end state. */
+  initialPickOpen?: boolean;
+}) {
   const t = useTranslations("map");
   const heroT = useTranslations("hero");
   const router = useRouter();
@@ -91,8 +96,13 @@ export function DrinkMap() {
   const [guideDismissed, setGuideDismissed] = useState(false);
   // UR1.2 bottom sheet: closed pill <-> open half-sheet. Auto-closes into
   // a chip when the 想喝 pin drops so the map is never buried on small screens.
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [fabOpen, setFabOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(initialPickOpen);
+  const [fabOpen, setFabOpen] = useState(initialPickOpen);
+  // UR1.7: App Router reuses the client tree when only searchParams change
+  // (/ → /?pick=1), so useState-initial alone misses menu clicks from home.
+  // This fires only on a false→true transition (direct loads are covered
+  // by the initializers above; the settle effect owns their camera).
+  const prevPickOpen = useRef(initialPickOpen);
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ startY: number; dy: number } | null>(null);
 
@@ -328,6 +338,49 @@ export function DrinkMap() {
   useEffect(() => {
     geoRef.current = { status: geoStatus, position: geoPosition };
   }, [geoStatus, geoPosition]);
+
+  /* ---- UR1.7 `?pick=1`: reproduce the hand-tapped fan-pick end state ----
+   * Two legs with separate latches: opening the sheet/fan, and homing the
+   * camera. Split because the fix may arrive AFTER the tap (locating) — a
+   * single latch would swallow the camera leg forever. Retries on every
+   * geo change until a fix flies; closing the sheet by hand never
+   * resurrects (homed stays true until the param leaves).
+   * Camera math mirrors flyShifted(..., openSheet=true) inline so this
+   * effect keeps exact deps and adds no lint warnings. */
+  const pickHomed = useRef(false);
+  useEffect(() => {
+    if (!initialPickOpen) {
+      prevPickOpen.current = false;
+      pickHomed.current = false;
+      return;
+    }
+    if (!prevPickOpen.current) {
+      prevPickOpen.current = true;
+      // Sheet open = the dial hides itself per the UR1.3 rule, exactly
+      // like tapping the fan pick entry by hand.
+      setSheetOpen(true);
+      setFabOpen(true);
+    }
+    const map = mapRef.current;
+    if (
+      pickHomed.current ||
+      map === null ||
+      geoStatus !== "success" ||
+      geoPosition === null ||
+      !isWithinHongKong(geoPosition)
+    ) {
+      return;
+    }
+    pickHomed.current = true;
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const z = Math.max(map.getZoom(), 15);
+    const point = map.project([geoPosition.lat, geoPosition.lng], z);
+    const target = map.unproject(point.subtract([0, SHEET_OFFSET_PX]), z);
+    if (reduced) map.setView(target, z);
+    else map.flyTo(target, z, { duration: 1 });
+  }, [initialPickOpen, geoStatus, geoPosition]);
 
   /* ---- UR1.2 live-follow: move the dot, never the camera ---- */
   useEffect(() => {

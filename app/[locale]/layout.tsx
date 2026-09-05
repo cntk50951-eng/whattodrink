@@ -9,6 +9,7 @@ import { getTranslations } from "next-intl/server";
 import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
 import { Footer } from "@/components/marketing/footer";
+import { HeaderMenu } from "@/components/marketing/HeaderMenu";
 
 /* UR1.5 note: fonts load via <link> in the root layout (see app/layout.tsx).
  * next/font/google can't fetch in this sandbox (proxy returns truetype-only
@@ -87,6 +88,9 @@ export default async function LocaleLayout({
                   >
                     {t("signIn")}
                   </Button>
+                  {/* UR1.7: retired-Bento entries live here now. Last in the
+                      row = closest to the thumb corner. */}
+                  <HeaderMenu />
                 </div>
               </div>
             </Container>

@@ -39,6 +39,10 @@
   - fix（hydration 崩＋卡片展开时按钮浮空，用户回报）：静默期 localStorage 懒读致服务端／客户端首屏分叉——改 useSyncExternalStore（server 快照恒 false）；dial 行为改隐藏：卡片展开时整个 dial 不渲染（删 fabLifted），关卡即回左下角；16 tests／tsc 全绿、lint 0 error；未提交
   - fix（沉底屡修不生效的真根因，用户定位）：关闭的扇形格 opacity-0 但仍在流内占位，column-reverse 把啤酒垫高约 360px——扇形格改绝对定位（CSS 变量逐格定高，脱流），关闭态容器只剩啤酒，真正贴角；16 tests／tsc 全绿、lint 0 error；未提交
 - **UR 1.6 — 全港找人＋双人同框＋实时距离（[✓] 用户已验收）**
+- **UR 1.7 — 首页地图独占＋顶部菜单（[✓] 用户已验收）**
+  - 首页删 `BentoGrid` 整段（4 文件 `git rm`，git 历史可找回）；header 加汉堡菜单（Base UI dropdown，涂鸦重皮肤：border-2＋硬阴影＋font-hand＋44px 触点）
+  - 三项：今晚喝什麼→`/?pick=1` 深链（回地图＋飞当前位置＋展扇形＋自动开选酒面板，手動终态一致）、拍照→`/camera`、心情→`/mood`（删 Bento 后心情唯一入口）
+  - 深链跨导航状态同步：`useState` 初始化＋`false→true`  transition effect 双保险；开面板／飞镜头双闩（定位后到不吞镜头）；22 tests／tsc 全绿、lint 0 error（3 旧 warning）；未提交
   - 点他人 pin：`fitBounds(self, TA)` 两人同框＋开卡（任何视图都触发）；无定位时只飞对方单点，卡片显示开定位提示（用户已确认两点）
   - 卡片加距离行：render 内纯算 `haversineMeters(selfFix, TA)`，随 watch 实时更新；`lib/geo.ts` 新增 `haversineMeters`＋`formatDistance` 纯函数＋6 单测，三语文案；22 tests／tsc 全绿、lint 0 error（3 旧 warning）；未提交
 - **UR 1.5 — 扇形整行可点（[✓] 用户已验收）**

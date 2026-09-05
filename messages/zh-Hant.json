@@ -9,7 +9,11 @@
     "bars": "酒吧",
     "moods": "心情流",
     "about": "關於",
-    "signIn": "登入"
+    "signIn": "登入",
+    "menu": "菜單",
+    "randomPick": "今晚喝咩？",
+    "photoPick": "拍照推薦",
+    "moodPick": "心情推薦"
   },
   "footer": {
     "tagline": "香港年輕人的選酒與心情記錄夥伴",
