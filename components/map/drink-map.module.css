@@ -1,0 +1,185 @@
+/**
+ * UR1.1 drink map — doodle re-skin over Leaflet (plain CSS Module so it can
+ * ship inside a client component; Leaflet overrides go through :global).
+ *
+ * All colors come from theme tokens — no hardcoded values, so the map
+ * follows theme switching like every other component.
+ */
+
+/* Gentle warmth over the tiles. Kept light because the Stadia watercolor
+ * basemap is already hand-painted — revisit after eyeballing on device. */
+.frame :global(.leaflet-tile-pane) {
+  filter: sepia(0.14) saturate(1) brightness(1);
+}
+
+.frame :global(.leaflet-container) {
+  font: inherit;
+  background: var(--card);
+  outline: none;
+}
+
+.frame :global(.leaflet-control-attribution) {
+  font-size: 10px;
+  line-height: 1.4;
+  padding: 1px 6px;
+  background: var(--card);
+  color: var(--muted-foreground);
+  border-radius: 8px 0 0 0;
+}
+
+.frame :global(.leaflet-control-attribution) a {
+  color: var(--muted-foreground);
+}
+
+/*
+ * React overlays (pick panel, zoom pills, badges, cards) must sit above
+ * Leaflet's own panes (tiles 200 … popups 700, controls 1000). Without an
+ * explicit z-index they paint UNDER the tiles and look "missing".
+ */
+.above {
+  z-index: 1000;
+}
+
+/* Notebook dot-grid over the tiles (below markers at 600, above vectors). */
+.paper {
+  position: absolute;
+  inset: 0;
+  z-index: 500;
+  pointer-events: none;
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--border) 16%, transparent) 1px,
+    transparent 1.4px
+  );
+  background-size: 18px 18px;
+}
+
+/* Pulsing LIVE dot for the mock badge. */
+.liveDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--doodle-red);
+  animation: live-blink 1.6s ease-in-out infinite;
+}
+
+@keyframes live-blink {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+
+/* ---- Doodle pins (rendered by Leaflet divIcon, so plain classes) ---- */
+
+.pin {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  background: var(--card);
+  border: 2.5px solid var(--border);
+  box-shadow: 2px 3px 0 var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+  transform: rotate(-4deg);
+  animation: pin-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+}
+
+/* Alternate tilt so neighbouring pins feel like scattered stickers. */
+.pinAlt {
+  transform: rotate(5deg);
+  animation-name: pin-pop-alt;
+}
+
+@keyframes pin-pop-alt {
+  from {
+    transform: rotate(5deg) scale(0.4);
+  }
+  to {
+    transform: rotate(5deg) scale(1);
+  }
+}
+
+.pinSelf {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: 2.5px solid var(--border);
+  box-shadow: 2px 3px 0 var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  animation: pin-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pinWant {
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 2.5px dashed var(--border);
+  box-shadow: 2px 3px 0 var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  line-height: 1;
+  position: relative;
+}
+
+/* Pulsing ring around the 「想喝」 pin */
+.pinWant::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 9999px;
+  border: 2px solid var(--doodle-red);
+  opacity: 0.7;
+  animation: want-ring 1.8s ease-out infinite;
+}
+
+@keyframes pin-pop {
+  from {
+    transform: rotate(-4deg) scale(0.4);
+  }
+  to {
+    transform: rotate(-4deg) scale(1);
+  }
+}
+
+@keyframes want-ring {
+  from {
+    transform: scale(0.7);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pin,
+  .pinAlt,
+  .pinSelf,
+  .liveDot {
+    animation: none;
+  }
+  .pinWant::after {
+    animation: none;
+    opacity: 0;
+  }
+}

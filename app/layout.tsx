@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+// Leaflet default styles (markers, controls, attribution). Global CSS is
+// only allowed in the root layout — the map re-skins on top of this via
+// components/map/drink-map.module.css. Loaded on every page; negligible.
+import "leaflet/dist/leaflet.css";
 
 /**
  * Root layout — minimal shell. Locale-specific chrome, providers, and i18n
