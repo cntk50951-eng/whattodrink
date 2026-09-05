@@ -10,6 +10,8 @@ import {
   ZOOM_HK_WIDE,
   ZOOM_MAX,
   ZOOM_MIN,
+  formatDistance,
+  haversineMeters,
   isWithinHongKong,
   stadiaTileUrl,
 } from "./geo";
@@ -44,6 +46,47 @@ describe("geo constants", () => {
     expect(ZOOM_MIN).toBeLessThanOrEqual(ZOOM_HK_WIDE);
     expect(ZOOM_HK_WIDE).toBeLessThanOrEqual(ZOOM_DEFAULT);
     expect(ZOOM_DEFAULT).toBeLessThanOrEqual(ZOOM_MAX);
+  });
+});
+
+describe("haversineMeters", () => {
+  it("returns 0 for the same point", () => {
+    expect(
+      haversineMeters({ lat: 22.2819, lng: 114.1577 }, { lat: 22.2819, lng: 114.1577 }),
+    ).toBe(0);
+  });
+
+  it("measures one equatorial degree of longitude as ~111.2 km", () => {
+    expect(haversineMeters({ lat: 0, lng: 0 }, { lat: 0, lng: 1 })).toBeCloseTo(
+      111195,
+      0,
+    );
+  });
+
+  it("puts Central-to-TST in a sane walking-plus-harbour range", () => {
+    const d = haversineMeters(
+      { lat: 22.2819, lng: 114.1577 },
+      { lat: 22.2976, lng: 114.1722 },
+    );
+    expect(d).toBeGreaterThan(2000);
+    expect(d).toBeLessThan(2600);
+  });
+});
+
+describe("formatDistance", () => {
+  it("shows metres below 1 km", () => {
+    expect(formatDistance(0)).toBe("0 m");
+    expect(formatDistance(350.4)).toBe("350 m");
+  });
+
+  it("shows kilometres at/above 1 km with one decimal", () => {
+    expect(formatDistance(1000)).toBe("1.0 km");
+    expect(formatDistance(2296)).toBe("2.3 km");
+  });
+
+  it("falls back to a dash for garbage input", () => {
+    expect(formatDistance(NaN)).toBe("—");
+    expect(formatDistance(-5)).toBe("—");
   });
 });
 
