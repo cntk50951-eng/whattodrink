@@ -168,6 +168,7 @@
     "stepInApp": "You are in an in-app browser (WeChat/IG etc.) which blocks location — copy the link into Safari/Chrome",
     "stepRetryBack": "Come back and tap Retry locate",
     "openSettings": "Open system location settings",
+    "recenter": "Back to my location",
     "deniedGuide": "Usually a past denial or location turned off system-wide. Check in order: 1) OS master switch: iPhone Settings → Privacy & Security → Location Services on; Android Settings → Location on. 2) Browser site permission: Chrome lock icon → Location → Allow. 3) Opened inside WeChat/IG? Reopen this link in Safari/Chrome."
   }
 }
