@@ -24,10 +24,14 @@
   - self 改無字閃動 teal 圓點（watch 實時跟，只動點不動鏡頭）；新增回位十字鈕（無位置時退化為請求定位）；開 sheet／回位時鏡頭上移 180px 讓位；地圖手機改 62svh
   - 16 tests 全綠；tsc 全過；lint 無新增 error；待用戶手機真機驗收（走動跟隨＋抽屜手感＋回位）後再進 commit 流程
   - fix（先拒後允 stranded，用戶回報）：一次性的 settle gate 在重試時不重置，先拒後允會永遠停全港視圖——重試入口統一走 `handleRetryLocate`（重置 gate），settle 改冪等（marker 只建一次、鏡頭只飛一次）；抽屜再調透（bg-card/70＋blur-lg＋max-h 42%）；未提交
-- **UR 1.3 — 手機沉浸地圖與面板免下滑（WIP，待真機驗收）**
+- **UR 1.3 — 手機沉浸地圖與面板免下滑（[✓] 用戶已驗收，待合併）**
   - 手機地圖佔滿首屏（`100svh-header`，桌面 560px 不變）；首頁 slim Hero 退役、標題縮成地圖頂部浮條（`Hero` 元件保留備用）；推薦 pill 移到底部、任一卡片展開時隱藏防打架
   - 結果區緊湊橫排＋雙鈕一行兩格，抽屜 max-h 50%，避讓高度同步；16 tests／tsc／lint（無新增）全綠；未提交
+  - fix（滑動陷阱未根除＋入口收斂，用戶回報）：證實 Leaflet 自帶 `touch-action:none` 常贏過 CSS 覆寫——改 init 內 `!important` 直寫（根治）；舊縮放組／回位鈕／pill 全併入 `MapFab` 單一 speed-dial（扇形錯峰彈簧、label pills、Esc／拖圖收起、紅點語義態），縮放加減退役（雙指＋雙擊保留）；16 tests／tsc／lint（無新增）全綠；未提交
   - fix（頁面滾動被地圖吞掉，用戶回報）：沉浸式高地圖下整屏手勢被 Leaflet 獨佔——`scrollWheelZoom: false`（桌面滾輪還給頁面）＋容器 `touch-action: pan-y pinch-zoom`（手機豎滑滾頁面、橫拖動地圖、雙指縮放）；未提交
+  - fix（縮放退役錯＋主鈕太醜，用戶回報）：縮放加減返嚟（扇形第 1、2 格，共 5 格：放大／縮小／睇全香港／回位／隨機推薦）；主鈕換手繪啤酒（杯內三氣泡無限上升，reduced-motion 靜止）＋首訪提示 pill「㩒我揀嘢飲！」（localStorage 睇過即收，三語）；附帶修掉 theme-provider 舊 lint error（localStorage 改 lazy initializer，同 pattern 修 MapFab）；16 tests／tsc 全綠、lint 0 error（3 舊 warning）；本機 `npm run build` 被沙盒 EPERM 擋（同 CSS 無關，postcss 單驗 OK），build 交 Vercel 驗；未提交
+  - fix（泡沫太素＋看不出可点＋扇形不该收，用户回报）：泡沫重画（溢出盖＋淌下两道＋质感点＋酒液高光），按钮 56px→64px，红色呼吸光环＋行动指向提示 pill（首点前），按钮上移到 bottom-24 让开右下角拥挤区；相机类操作（缩放±／回位／全港）点后扇形保持展开可连点，只有选酒收起让位抽屉；16 tests／tsc 全绿、lint 0 error；未提交
+  - fix（闲置无提示＋按钮搬左下，用户回报）：3 秒无点击杯子摇晃一次（有限遍数，不循环），20 秒无操作弹漫画气泡（带尾巴，取代小 pill），任意点击重置计时；点开后时间戳存 localStorage，12 小时静默；按钮搬左下（MOCK badge 让位搬左上），扇形标签镜像到按钮右侧；16 tests／tsc 全绿、lint 0 error；未提交
 - Muse Code harness 對應（與 Claude / opencode 同步）
   - `.agents/skills/` — `harness-workflow` / `code-review` / `github-api`（內容同 `.opencode/skills/`，查 API 改用 `web_search` + `web_fetch`）
   - `AGENTS.md` 新增 Muse 工具 / 插件對應段（Muse 讀本檔為專案規則；不另建 `.muse/settings.json`）
