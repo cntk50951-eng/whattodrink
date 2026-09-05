@@ -453,7 +453,9 @@ export function DrinkMap() {
           </p>
           {geoFailed && (
             <div className="mt-1.5">
-              {geoStatus === "denied" && (
+              {/* "unavailable" usually means the OS master switch is off or
+                  the device has no fix — same settings guide applies. */}
+              {(geoStatus === "denied" || geoStatus === "unavailable") && (
                 <p className="text-muted-foreground mx-auto max-w-64 text-xs">
                   {t("deniedGuide")}
                 </p>
