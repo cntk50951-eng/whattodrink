@@ -46,7 +46,11 @@ const SELF_ID = "self";
 export function DrinkMap() {
   const t = useTranslations("map");
   const heroT = useTranslations("hero");
-  const { status: geoStatus, position: geoPosition } = useGeolocation();
+  const {
+    status: geoStatus,
+    position: geoPosition,
+    retry: retryGeo,
+  } = useGeolocation();
 
   const holderRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
@@ -432,16 +436,38 @@ export function DrinkMap() {
         {t("mockBadge")}
       </p>
 
-      {/* Geo status notice */}
+      {/* Geo status notice. Failed states carry a retry entry + re-enable
+          guide — without them one denial strands the user on the HK-wide
+          view forever (the Vercel report that prompted this). */}
       {(geoStatus === "locating" || geoFailed || outsideHk) && (
-        <p
-          role="status"
-          className={`${styles.above} absolute bottom-3 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-full border-2 bg-card/95 px-4 py-1.5 text-center text-xs font-bold md:text-sm`}
+        <div
+          className={`${styles.above} absolute bottom-3 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-2xl border-2 bg-card/95 px-4 py-2 text-center backdrop-blur-sm`}
         >
-          {geoStatus === "locating" && t("locating")}
-          {geoFailed && t("denied")}
-          {outsideHk && t("outside")}
-        </p>
+          <p
+            role="status"
+            className="text-xs font-bold md:text-sm"
+          >
+            {geoStatus === "locating" && t("locating")}
+            {geoFailed && t("denied")}
+            {outsideHk && t("outside")}
+          </p>
+          {geoFailed && (
+            <div className="mt-1.5">
+              {geoStatus === "denied" && (
+                <p className="text-muted-foreground mx-auto max-w-64 text-xs">
+                  {t("deniedGuide")}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={retryGeo}
+                className="font-hand mt-2 inline-flex items-center gap-1.5 rounded-full border-2 bg-accent px-3 py-1 text-sm font-bold text-accent-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+              >
+                {t("retryLocate")}
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Selected pin card — own marker or a mock check-in */}

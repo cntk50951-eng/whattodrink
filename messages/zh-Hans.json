@@ -157,6 +157,8 @@
     "close": "关闭",
     "selfHere": "你在这里！",
     "selfHint": "点下面让天意选一杯，立刻落个“想喝”。",
-    "tilesFallback": "水彩底图需要 Stadia key 才能加载，没加之前暂用备用底图（加 key 后重启即换）。"
+    "tilesFallback": "水彩底图需要 Stadia key 才能加载，没加之前暂用备用底图（加 key 后重启即换）。",
+    "retryLocate": "重新定位",
+    "deniedGuide": "你点了不允许。点上面再试一次，或在浏览器里打开：Chrome 点地址栏锁头 → 网站设置 → 位置 → 允许；iPhone 去设置 → Safari → 位置。如果是在微信／IG 里面打开的，转用 Safari／Chrome 打开这条链接。"
   }
 }
