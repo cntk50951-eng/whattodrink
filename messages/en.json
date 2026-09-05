@@ -159,6 +159,15 @@
     "selfHint": "Tap below for a fated pick and drop a “want” pin.",
     "tilesFallback": "The watercolor basemap needs a Stadia key; showing the fallback until it is set (restart after adding).",
     "retryLocate": "Retry locate",
+    "overlayTitle": "Location is needed for the map",
+    "stepOsIos": "iPhone Settings → Privacy & Security → Location Services: master switch on",
+    "stepAppSafari": "Settings → Safari → Location: Allow",
+    "stepAppChromeIos": "Settings → Chrome → Location: While Using the App",
+    "stepOsAndroid": "Settings → Location: master switch on",
+    "stepAppAndroid": "Chrome lock icon → Location → Allow",
+    "stepInApp": "You are in an in-app browser (WeChat/IG etc.) which blocks location — copy the link into Safari/Chrome",
+    "stepRetryBack": "Come back and tap Retry locate",
+    "openSettings": "Open system location settings",
     "deniedGuide": "Usually a past denial or location turned off system-wide. Check in order: 1) OS master switch: iPhone Settings → Privacy & Security → Location Services on; Android Settings → Location on. 2) Browser site permission: Chrome lock icon → Location → Allow. 3) Opened inside WeChat/IG? Reopen this link in Safari/Chrome."
   }
 }

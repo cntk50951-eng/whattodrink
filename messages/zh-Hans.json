@@ -159,6 +159,15 @@
     "selfHint": "点下面让天意选一杯，立刻落个“想喝”。",
     "tilesFallback": "水彩底图需要 Stadia key 才能加载，没加之前暂用备用底图（加 key 后重启即换）。",
     "retryLocate": "重新定位",
+    "overlayTitle": "要开定位才能玩地图",
+    "stepOsIos": "去 iPhone“设置”→“隐私与安全性”→“定位服务”，总开关要开",
+    "stepAppSafari": "“设置”→“Safari”→“位置”，选“允许”",
+    "stepAppChromeIos": "“设置”→“Chrome”→“位置”，选“使用 App 期间允许”",
+    "stepOsAndroid": "去“设置”→“位置”，总开关要开",
+    "stepAppAndroid": "Chrome 地址栏锁头→“位置”→选允许",
+    "stepInApp": "你现在在 App 内置浏览器（微信／IG 等），它们禁了定位——复制链接去 Safari／Chrome 打开",
+    "stepRetryBack": "回来点“重新定位”",
+    "openSettings": "直达系统定位设置",
     "deniedGuide": "多数是之前点了不允许，或者手机根本没开定位。逐样查：1）系统总开关：iPhone 去设置 → 隐私与安全性 → 定位服务要开；安卓去设置 → 位置要开。2）浏览器网站权限：Chrome 点地址栏锁头 → 位置 → 允许。3）微信／IG 里面打开的，转用 Safari／Chrome 打开这条链接。"
   }
 }

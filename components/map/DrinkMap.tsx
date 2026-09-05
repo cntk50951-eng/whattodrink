@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
 import { useTranslations } from "next-intl";
 import { Dices, Expand, Minus, Plus, X } from "lucide-react";
 
 import { useGeolocation } from "@/hooks/useGeolocation";
+import {
+  ANDROID_LOCATION_SETTINGS_INTENT,
+  detectBrowser,
+  detectPlatform,
+} from "@/lib/device";
+import type { DeviceBrowser, DevicePlatform } from "@/lib/device";
 import { MOCK_CHECKINS } from "@/lib/checkins";
 import type { Checkin } from "@/lib/checkins";
 import { pickRandomBeer } from "@/lib/beers";
@@ -60,6 +66,23 @@ export function DrinkMap() {
   const settledRef = useRef(false);
 
   const [mapReady, setMapReady] = useState(false);
+  const [guideDismissed, setGuideDismissed] = useState(false);
+
+  // Platform for the permission overlay (SSR-safe: "other" on the server).
+  const platform = useMemo<DevicePlatform>(
+    () =>
+      typeof navigator === "undefined"
+        ? "other"
+        : detectPlatform(navigator.userAgent),
+    [],
+  );
+  const browser = useMemo<DeviceBrowser>(
+    () =>
+      typeof navigator === "undefined"
+        ? "other"
+        : detectBrowser(navigator.userAgent),
+    [],
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sentIds, setSentIds] = useState<string[]>([]);
   const [picked, setPicked] = useState<Beer | null>(null);
@@ -265,9 +288,25 @@ export function DrinkMap() {
     setSentIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
   }
 
+  /**
+   * Android-only: jump straight into the system Location settings.
+   * Must run in a tap handler; Chrome resolves the intent scheme, other
+   * browsers ignore it — manual steps stay on screen regardless.
+   */
+  function openAndroidSettings(): void {
+    window.location.assign(ANDROID_LOCATION_SETTINGS_INTENT);
+  }
+
   function handleZoom(delta: number): void {
     if (delta > 0) mapRef.current?.zoomIn();
     else mapRef.current?.zoomOut();
+  }
+
+  /** Second overlay step, matched to the exact browser in use. */
+  function appStep(): string {
+    if (browser === "chrome-ios") return t("stepAppChromeIos");
+    if (browser === "in-app") return t("stepInApp");
+    return platform === "ios" ? t("stepAppSafari") : t("stepAppAndroid");
   }
 
   function handleFitHk(): void {
@@ -436,39 +475,80 @@ export function DrinkMap() {
         {t("mockBadge")}
       </p>
 
-      {/* Geo status notice. Failed states carry a retry entry + re-enable
-          guide — without them one denial strands the user on the HK-wide
-          view forever (the Vercel report that prompted this). */}
-      {(geoStatus === "locating" || geoFailed || outsideHk) && (
-        <div
-          className={`${styles.above} absolute bottom-3 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-2xl border-2 bg-card/95 px-4 py-2 text-center backdrop-blur-sm`}
+      {/* Slim status pill: locating, outside-HK, or a dismissed failure.
+          Tapping the dismissed pill retries and reopens the guide. */}
+      {(geoStatus === "locating" || outsideHk) && (
+        <p
+          role="status"
+          className={`${styles.above} absolute bottom-3 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-full border-2 bg-card/95 px-4 py-1.5 text-center text-xs font-bold md:text-sm`}
         >
-          <p
-            role="status"
-            className="text-xs font-bold md:text-sm"
+          {geoStatus === "locating" && t("locating")}
+          {outsideHk && t("outside")}
+        </p>
+      )}
+      {geoFailed && guideDismissed && (
+        <button
+          type="button"
+          onClick={() => {
+            setGuideDismissed(false);
+            retryGeo();
+          }}
+          className={`${styles.above} absolute bottom-3 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-full border-2 bg-card/95 px-4 py-1.5 text-center text-xs font-bold md:text-sm`}
+        >
+          {t("denied")} · {t("retryLocate")}
+        </button>
+      )}
+
+      {/* Permission guide sheet: platform-matched steps. Mobile browsers
+          remember a denial and in-app webviews block geolocation outright,
+          so the fix is always OS/browser settings — never another silent
+          request. iOS has no settings deep-link from the web; Android does. */}
+      {geoFailed && !guideDismissed && (
+        <div
+          className={`${styles.above} absolute inset-x-3 bottom-3 rounded-2xl border-2 bg-card/95 p-4 text-left shadow-[3px_3px_0_var(--border)] backdrop-blur-sm md:right-auto md:left-1/2 md:w-96 md:-translate-x-1/2`}
+        >
+          <button
+            type="button"
+            onClick={() => setGuideDismissed(true)}
+            aria-label={t("close")}
+            className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border-2"
           >
-            {geoStatus === "locating" && t("locating")}
-            {geoFailed && t("denied")}
-            {outsideHk && t("outside")}
+            <X size={16} aria-hidden />
+          </button>
+          <p className="font-hand pr-8 text-xl leading-tight font-bold">
+            {t("overlayTitle")}
           </p>
-          {geoFailed && (
-            <div className="mt-1.5">
-              {/* "unavailable" usually means the OS master switch is off or
-                  the device has no fix — same settings guide applies. */}
-              {(geoStatus === "denied" || geoStatus === "unavailable") && (
-                <p className="text-muted-foreground mx-auto max-w-64 text-xs">
-                  {t("deniedGuide")}
-                </p>
-              )}
+          {platform === "ios" || platform === "android" ? (
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
+              <li>
+                {platform === "ios" ? t("stepOsIos") : t("stepOsAndroid")}
+              </li>
+              <li>{appStep()}</li>
+              <li>{t("stepRetryBack")}</li>
+            </ol>
+          ) : (
+            <p className="text-muted-foreground mt-2 text-sm">
+              {t("deniedGuide")}
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {platform === "android" && browser !== "in-app" && (
               <button
                 type="button"
-                onClick={retryGeo}
-                className="font-hand mt-2 inline-flex items-center gap-1.5 rounded-full border-2 bg-accent px-3 py-1 text-sm font-bold text-accent-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                onClick={openAndroidSettings}
+                className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-primary px-4 py-1.5 text-sm font-bold text-primary-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
               >
-                {t("retryLocate")}
+                {t("openSettings")}
               </button>
-            </div>
-          )}
+            )}
+            <button
+              type="button"
+              onClick={retryGeo}
+              className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-accent px-4 py-1.5 text-sm font-bold text-accent-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+            >
+              {t("retryLocate")}
+            </button>
+          </div>
         </div>
       )}
 
