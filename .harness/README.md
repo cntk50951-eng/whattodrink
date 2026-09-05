@@ -19,7 +19,7 @@
 - [`testing.md`](testing.md) — 何時必須寫 unit test、工具、commit gate
 - [`git.md`](git.md) — 分支策略、commit 格式、PR 規範
 - [`architecture.md`](architecture.md) — 技術棧決策與原因
-- [`ur-status.md`](ur-status.md) — UR 狀態標記（`[]`／`[WIP]`／`[x]`）與打勾規則
+- [`ur-status.md`](ur-status.md) — UR 狀態標記（`[]`／`[WIP]`／`[✓]`）與打勾規則
 
 ## 與 `.memory/` 的關係
 

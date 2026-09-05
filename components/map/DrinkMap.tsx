@@ -130,6 +130,11 @@ export function DrinkMap() {
       ).matches;
       map = L.map(holder, {
         zoomControl: false,
+        // UR1.3 scroll-trap fix: the map is embedded in a scrolling page,
+        // not a full map-app — wheel must scroll the page (zoom stays on
+        // buttons / double-click), touch verticals go to the page (see the
+        // touch-action rule in the CSS module).
+        scrollWheelZoom: false,
         minZoom: ZOOM_MIN,
         maxZoom: ZOOM_MAX,
         zoomAnimation: !reduced,
