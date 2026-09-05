@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import type * as Leaflet from "leaflet";
 import { useTranslations } from "next-intl";
-import { Dices, Expand, Minus, Plus, X } from "lucide-react";
+import { Dices, Expand, LocateFixed, Minus, Plus, X } from "lucide-react";
 
 import { useGeolocation } from "@/hooks/useGeolocation";
 import {
@@ -49,6 +50,11 @@ import styles from "./drink-map.module.css";
 
 /** Sentinel selection id for the user's own marker (no backend row). */
 const SELF_ID = "self";
+
+/** Pixels the camera shifts up so sheet-open content clears the drawer. */
+const SHEET_OFFSET_PX = 180;
+/** Down-drag distance on the sheet handle that dismisses the sheet. */
+const SHEET_DISMISS_DY = 72;
 export function DrinkMap() {
   const t = useTranslations("map");
   const heroT = useTranslations("hero");
@@ -56,7 +62,7 @@ export function DrinkMap() {
     status: geoStatus,
     position: geoPosition,
     retry: retryGeo,
-  } = useGeolocation();
+  } = useGeolocation({ watch: true });
 
   const holderRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
@@ -67,6 +73,11 @@ export function DrinkMap() {
 
   const [mapReady, setMapReady] = useState(false);
   const [guideDismissed, setGuideDismissed] = useState(false);
+  // UR1.2 bottom sheet: closed pill <-> open half-sheet. Auto-closes into
+  // a chip when the 想喝 pin drops so the map is never buried on small screens.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const sheetRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{ startY: number; dy: number } | null>(null);
 
   // Platform for the permission overlay (SSR-safe: "other" on the server).
   const platform = useMemo<DevicePlatform>(
@@ -180,41 +191,60 @@ export function DrinkMap() {
       );
     };
 
+    // Settle gate is one-shot per request round: handleRetryLocate resets it
+    // so a grant-after-denial re-settles instead of stranding the map.
     if (geoStatus === "success" && geoPosition !== null) {
-      settledRef.current = true;
       if (isWithinHongKong(geoPosition)) {
-        const reduced = window.matchMedia(
-          "(prefers-reduced-motion: reduce)",
-        ).matches;
-        if (reduced) {
-          map.setView([geoPosition.lat, geoPosition.lng], 15);
-        } else {
-          map.flyTo([geoPosition.lat, geoPosition.lng], 15, {
-            duration: 1.2,
-          });
+        // UR1.2 live dot — textless pulsing marker; created once, moved by
+        // the follow effect below, camera untouched after the first settle.
+        if (selfMarkerRef.current === null) {
+          selfMarkerRef.current = L.marker(
+            [geoPosition.lat, geoPosition.lng],
+            {
+              title: t("you"),
+              keyboard: false,
+              icon: L.divIcon({
+                className: "",
+                html: `<div class="${styles.pinLive}"></div>`,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+              }),
+            },
+          );
+          selfMarkerRef.current.on("click", () => setSelectedId(SELF_ID));
+          selfMarkerRef.current.addTo(map);
         }
-        selfMarkerRef.current = L.marker(
-          [geoPosition.lat, geoPosition.lng],
-          {
-            title: t("you"),
-            icon: L.divIcon({
-              className: "",
-              html: `<div class="${styles.pinSelf}">${t("you")}</div>`,
-              iconSize: [40, 40],
-              iconAnchor: [20, 38],
-            }),
-          },
-        );
-        selfMarkerRef.current.on("click", () => setSelectedId(SELF_ID));
-        selfMarkerRef.current.addTo(map);
-      } else {
+        if (!settledRef.current) {
+          settledRef.current = true;
+          const reduced = window.matchMedia(
+            "(prefers-reduced-motion: reduce)",
+          ).matches;
+          if (reduced) {
+            map.setView([geoPosition.lat, geoPosition.lng], 15);
+          } else {
+            map.flyTo([geoPosition.lat, geoPosition.lng], 15, {
+              duration: 1.2,
+            });
+          }
+        }
+      } else if (!settledRef.current) {
+        settledRef.current = true;
         fitHk();
       }
-    } else if (geoFailed) {
+    } else if (geoFailed && !settledRef.current) {
       settledRef.current = true;
       fitHk();
     }
   }, [mapReady, geoStatus, geoPosition, geoFailed, t]);
+
+  /* ---- UR1.2 live-follow: move the dot, never the camera ---- */
+  useEffect(() => {
+    const marker = selfMarkerRef.current;
+    if (!mapReady || marker === null || geoPosition === null) return;
+    // Off-map fixes keep the last on-map dot (frozen, not vanished).
+    if (!isWithinHongKong(geoPosition)) return;
+    marker.setLatLng([geoPosition.lat, geoPosition.lng]);
+  }, [mapReady, geoPosition]);
 
   /* ---- 「想喝」 pin layer ---- */
   useEffect(() => {
@@ -260,6 +290,75 @@ export function DrinkMap() {
     setWantSaved(false);
   }
 
+  /**
+   * Fly the camera so the target clears the open sheet (shifted up by
+   * SHEET_OFFSET_PX). Plain centring when the sheet is closed.
+   */
+  function flyShifted(map: Leaflet.Map, at: LatLng, zoom: number): void {
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const z = Math.max(map.getZoom(), zoom);
+    const point = map.project([at.lat, at.lng], z);
+    const target = sheetOpen
+      ? map.unproject(point.subtract([0, SHEET_OFFSET_PX]), z)
+      : map.unproject(point, z);
+    if (reduced) map.setView(target, z);
+    else map.flyTo(target, z, { duration: 1 });
+  }
+
+  /** UR1.2 recenter button: snap back to the latest fix, or request one. */
+  /**
+   * Retry entry shared by the recenter fallback and the guide sheet.
+   * Resets the one-shot settle gate so a grant-after-denial fully settles
+   * (marker + camera) instead of stranding the map on the HK-wide view —
+   * that exact strand is the "granted but nothing happens" report.
+   */
+  function handleRetryLocate(): void {
+    settledRef.current = false;
+    retryGeo();
+  }
+
+  /** UR1.2 recenter button: snap back to the latest fix, or request one. */
+  function handleRecenter(): void {
+    const map = mapRef.current;
+    if (map === null) return;
+    if (
+      geoStatus === "success" &&
+      geoPosition !== null &&
+      isWithinHongKong(geoPosition)
+    ) {
+      flyShifted(map, geoPosition, 15);
+    } else {
+      handleRetryLocate();
+    }
+  }
+
+  /* Bottom-sheet drag: pull down past the threshold to dismiss. Direct DOM
+   * transform during the gesture (no re-renders); snap-back animates via
+   * the sheet's CSS transition when the transform is cleared. */
+  function onSheetPointerDown(e: ReactPointerEvent<HTMLDivElement>): void {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = { startY: e.clientY, dy: 0 };
+  }
+
+  function onSheetPointerMove(e: ReactPointerEvent<HTMLDivElement>): void {
+    const drag = dragRef.current;
+    const el = sheetRef.current;
+    if (drag === null || el === null) return;
+    drag.dy = Math.max(0, e.clientY - drag.startY);
+    el.style.transform = `translateY(${drag.dy}px)`;
+  }
+
+  function onSheetPointerUp(): void {
+    const drag = dragRef.current;
+    const el = sheetRef.current;
+    dragRef.current = null;
+    if (el === null) return;
+    el.style.transform = "";
+    if (drag !== null && drag.dy > SHEET_DISMISS_DY) setSheetOpen(false);
+  }
+
   function handleWant(): void {
     const map = mapRef.current;
     if (picked === null) return;
@@ -274,6 +373,9 @@ export function DrinkMap() {
           : DEFAULT_CENTER;
     setWantAt(at);
     setWantSaved(true);
+    // UR1.2: dropping the pin collapses the sheet into a chip — the map
+    // must never stay buried under the drawer on small screens.
+    setSheetOpen(false);
   }
 
   function handleSelfPick(): void {
@@ -325,7 +427,7 @@ export function DrinkMap() {
     >
       <div
         ref={holderRef}
-        className="h-[420px] w-full md:h-[560px]"
+        className="h-[62svh] w-full md:h-[560px]"
         role="application"
         aria-label={t("mapLabel")}
       />
@@ -333,58 +435,95 @@ export function DrinkMap() {
       {/* Notebook dot-grid over the tiles */}
       <div aria-hidden className={styles.paper} />
 
-      {/* Pick entry overlay — journey step 1, same component as the map */}
-      <div
-        className={`${styles.above} absolute top-3 left-3 max-w-[240px] rounded-2xl border-2 bg-card/95 p-4 shadow-[3px_3px_0_var(--border)] backdrop-blur-sm md:max-w-xs`}
-      >
-        <span
-          aria-hidden
-          className="absolute -top-3 left-1/2 h-5 w-16 -translate-x-1/2 -rotate-4 rounded-[2px] bg-[var(--tape)] opacity-90"
-        />
-        <p className="font-hand text-xl leading-none font-bold md:text-2xl">
-          {t("pickTitle")}
-        </p>
-        {picked === null ? (
+      {/* UR1.2 pick entry — collapsed pill/chip <-> bottom sheet.
+          Journey step 1 lives in the same component as the map. */}
+      {!sheetOpen && (
+        <button
+          type="button"
+          onClick={() => setSheetOpen(true)}
+          className={`${styles.above} font-hand absolute top-3 left-3 inline-flex max-w-[70%] items-center gap-2 rounded-full border-2 bg-card/95 px-4 py-2 text-base font-bold shadow-[3px_3px_0_var(--border)] backdrop-blur-sm transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none`}
+        >
+          {picked !== null && wantSaved ? (
+            <>
+              <span aria-hidden>{picked.emoji}</span>
+              <span className="truncate">{picked.name}</span>
+            </>
+          ) : (
+            <>
+              <Dices size={18} aria-hidden />
+              {t("pickCta")}
+            </>
+          )}
+        </button>
+      )}
+      {sheetOpen && (
+        <div
+          ref={sheetRef}
+          className={`${styles.above} absolute inset-x-3 bottom-3 max-h-[42%] overflow-y-auto rounded-2xl border-2 bg-card/30 px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[3px_3px_0_var(--border)] backdrop-blur-xl motion-safe:transition-transform motion-safe:duration-300`}
+        >
+          <div
+            aria-hidden
+            className="h-6 w-full cursor-grab touch-none active:cursor-grabbing"
+            onPointerDown={onSheetPointerDown}
+            onPointerMove={onSheetPointerMove}
+            onPointerUp={onSheetPointerUp}
+            onPointerCancel={onSheetPointerUp}
+          >
+            <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-(--border)" />
+          </div>
           <button
             type="button"
-            onClick={handlePick}
-            className="font-hand mt-3 inline-flex items-center gap-2 rounded-full border-2 bg-primary px-4 py-2 text-base font-bold text-primary-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+            onClick={() => setSheetOpen(false)}
+            aria-label={t("close")}
+            className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full border-2"
           >
-            <Dices size={18} aria-hidden />
-            {t("pickCta")}
+            <X size={16} aria-hidden />
           </button>
-        ) : (
-          <div className="mt-3">
-            <p className="text-3xl" aria-hidden>
-              {picked.emoji}
-            </p>
-            <p className="mt-1 font-bold">{picked.name}</p>
-            <p className="text-muted-foreground text-sm">{picked.tagline}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={handleWant}
-                className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-accent px-3 py-1.5 text-sm font-bold text-accent-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-              >
-                <Plus size={15} aria-hidden />
-                {t("wantToDrink")}
-              </button>
-              <button
-                type="button"
-                onClick={handlePick}
-                className="rounded-full border-2 px-3 py-1.5 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-              >
-                {t("pickAgain")}
-              </button>
-            </div>
-            {wantSaved && (
-              <p className="text-muted-foreground mt-2 text-xs">
-                {t("wantSaved")}
+          <p className="font-hand pr-10 text-2xl leading-none font-bold">
+            {t("pickTitle")}
+          </p>
+          {picked === null ? (
+            <button
+              type="button"
+              onClick={handlePick}
+              className="font-hand mt-3 inline-flex items-center gap-2 rounded-full border-2 bg-primary px-4 py-2 text-base font-bold text-primary-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+            >
+              <Dices size={18} aria-hidden />
+              {t("pickCta")}
+            </button>
+          ) : (
+            <div className="mt-3">
+              <p className="text-3xl" aria-hidden>
+                {picked.emoji}
               </p>
-            )}
-          </div>
-        )}
-      </div>
+              <p className="mt-1 font-bold">{picked.name}</p>
+              <p className="text-muted-foreground text-sm">{picked.tagline}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleWant}
+                  className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-accent px-3 py-1.5 text-sm font-bold text-accent-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                >
+                  <Plus size={15} aria-hidden />
+                  {t("wantToDrink")}
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePick}
+                  className="rounded-full border-2 px-3 py-1.5 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                >
+                  {t("pickAgain")}
+                </button>
+              </div>
+              {wantSaved && (
+                <p className="text-muted-foreground mt-2 text-xs">
+                  {t("wantSaved")}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Beer doodle — brand corner decoration */}
       <div
@@ -436,10 +575,24 @@ export function DrinkMap() {
         </svg>
       </div>
 
-      {/* Custom zoom controls (doodle pills, not Leaflet defaults) */}
+      {/* Custom zoom controls (doodle pills, not Leaflet defaults).
+          Lifted above any open bottom card so they never get buried. */}
       <div
-        className={`${styles.above} absolute right-3 bottom-14 flex flex-col gap-2 md:bottom-16`}
+        className={`${styles.above} absolute right-3 flex flex-col gap-2 ${
+          sheetOpen || card !== null || (geoFailed && !guideDismissed)
+            ? "bottom-[calc(46%+0.75rem)]"
+            : "bottom-14 md:bottom-16"
+        }`}
       >
+        <button
+          type="button"
+          onClick={handleRecenter}
+          aria-label={t("recenter")}
+          title={t("recenter")}
+          className="flex h-10 w-10 items-center justify-center rounded-full border-2 bg-primary text-primary-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+        >
+          <LocateFixed size={18} aria-hidden />
+        </button>
         <button
           type="button"
           onClick={() => handleZoom(1)}
@@ -491,7 +644,7 @@ export function DrinkMap() {
           type="button"
           onClick={() => {
             setGuideDismissed(false);
-            retryGeo();
+            handleRetryLocate();
           }}
           className={`${styles.above} absolute bottom-3 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-full border-2 bg-card/95 px-4 py-1.5 text-center text-xs font-bold md:text-sm`}
         >
@@ -543,7 +696,7 @@ export function DrinkMap() {
             )}
             <button
               type="button"
-              onClick={retryGeo}
+              onClick={handleRetryLocate}
               className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-accent px-4 py-1.5 text-sm font-bold text-accent-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
             >
               {t("retryLocate")}

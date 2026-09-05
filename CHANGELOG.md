@@ -19,6 +19,11 @@
   - fix（定位失敗無入口，用戶回報）：定位失敗卡片加「重新定位」按鈕（接 hook 既有 retry）＋拒絕重開指引（Chrome／iPhone 路徑＋微信／IG 轉 Safari／Chrome 提示），三語；未提交，等驗收一併處理
   - fix（手機無彈框，用戶回報）：Permissions API 預檢（已拒絕直接進指引，不再靜默失敗；不支援的瀏覽器走原路徑）；指引擴到 unavailable（系統總開關步驟放第一位）；超時 10s→15s 照顧手機冷啟動；未提交
   - fix（權限指引卡，用戶回報）：定位失敗改底部指引卡——`lib/device.ts` 純函數 UA 辨平台／瀏覽器（Safari／Chrome iOS／Chrome Android／內置瀏覽器，單測覆蓋），步驟精確到瀏覽器（iOS Chrome 是「設定→Chrome→位置」，不是 Safari）；Android 附一鍵直達系統定位 intent，iOS 無網頁可達的設定 deep-link 只給手動步驟；卡片可關，關後剩小 pill 點即重試＋重開卡；未提交
+- **UR 1.2 — 首頁地圖小屏交互重做（WIP，待真機驗收）**
+  - 推薦面板改底部抽屜：收起 pill／半高 sheet（拖拽手柄下滑關閉＋X＋safe-area），落「想喝」自動收成 chip；`lib/geoWatch.ts` 純函數 watch 可測化，hook 加 watch 模式（切後台／卸載自動停，報錯凍結末點）
+  - self 改無字閃動 teal 圓點（watch 實時跟，只動點不動鏡頭）；新增回位十字鈕（無位置時退化為請求定位）；開 sheet／回位時鏡頭上移 180px 讓位；地圖手機改 62svh
+  - 16 tests 全綠；tsc 全過；lint 無新增 error；待用戶手機真機驗收（走動跟隨＋抽屜手感＋回位）後再進 commit 流程
+  - fix（先拒後允 stranded，用戶回報）：一次性的 settle gate 在重試時不重置，先拒後允會永遠停全港視圖——重試入口統一走 `handleRetryLocate`（重置 gate），settle 改冪等（marker 只建一次、鏡頭只飛一次）；抽屜再調透（bg-card/70＋blur-lg＋max-h 42%）；未提交
 - Muse Code harness 對應（與 Claude / opencode 同步）
   - `.agents/skills/` — `harness-workflow` / `code-review` / `github-api`（內容同 `.opencode/skills/`，查 API 改用 `web_search` + `web_fetch`）
   - `AGENTS.md` 新增 Muse 工具 / 插件對應段（Muse 讀本檔為專案規則；不另建 `.muse/settings.json`）
@@ -41,6 +46,8 @@
   - 瀏覽器側 `lib/audio.ts`（webm 解碼→16k 單聲道→WAV base64）；錄完自動轉、可改、可重試、失敗回打字；送出 bundle 帶 note＋transcript
   - 待訊飛 APP_ID／API_KEY／API_SECRET 做粵語實測（AC1–AC4 全要真錄音驗）
   - redesign（taste skill）：筆記改橫線紙＋膠帶＋手寫計數；錄音改圓形錄音鍵＋計時＋60 秒真實進度軌＋自訂播放（去 emoji，換 lucide）；送出改全幅藥丸＋硬陰影＋按壓動效；EN 文案去 em-dash
+
+- harness：新增 `workflow.md` Step 3.5——UI 設計相關改動（新頁面／redesign／tokens／動畫／layout primitives）寫 code 前先調設計 skill（`stitch-design`／`design-taste-frontend`／`taste`），品牌層（doodle）不可動；同步 `.harness/README.md`、`harness-workflow` skill（`.agents/`＋`.opencode/`）、`AGENTS.md` 工具對應表
 
 ### Planned
 - 等用戶從 20 張風格圖選定方向，把更多 theme preset 填進 `lib/themes/presets/`

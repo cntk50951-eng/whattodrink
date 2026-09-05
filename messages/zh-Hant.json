@@ -168,6 +168,7 @@
     "stepInApp": "你而家喺 App 內置瀏覽器（微信／IG 等），佢哋禁咗定位——複製條 link 去 Safari／Chrome 開",
     "stepRetryBack": "返嚟撳「重新定位」",
     "openSettings": "直達系統定位設定",
+    "recenter": "回到我的位置",
     "deniedGuide": "多數係之前撳咗唔允許，或者部機根本冇開定位。逐樣 check：1）系統總開關：iPhone 去設定 → 隱私權與安全性 → 定位服務要開；Android 去設定 → 位置要開。2）瀏覽器網站權限：Chrome 撳網址列鎖頭 → 位置 → 允許。3）微信／IG 入面開的，轉用 Safari／Chrome 開呢條 link。"
   }
 }
