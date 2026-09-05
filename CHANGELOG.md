@@ -18,6 +18,7 @@
   - fix（底圖再換源，用戶決策）：免 key 優先——主源改 OSM 標準 raster（零註冊，彩色街道／水系／公園，attribution 合規，prototype 規模可用），Stadia 水彩降為休眠備選（builder＋attribution 保留）；手繪皮膚第一版盲調（暖 sepia＋高飽和＋紙紋，待親眼驗收再迭代）；Esri 備用移除
   - fix（定位失敗無入口，用戶回報）：定位失敗卡片加「重新定位」按鈕（接 hook 既有 retry）＋拒絕重開指引（Chrome／iPhone 路徑＋微信／IG 轉 Safari／Chrome 提示），三語；未提交，等驗收一併處理
   - fix（手機無彈框，用戶回報）：Permissions API 預檢（已拒絕直接進指引，不再靜默失敗；不支援的瀏覽器走原路徑）；指引擴到 unavailable（系統總開關步驟放第一位）；超時 10s→15s 照顧手機冷啟動；未提交
+  - fix（權限指引卡，用戶回報）：定位失敗改底部指引卡——`lib/device.ts` 純函數 UA 辨平台／瀏覽器（Safari／Chrome iOS／Chrome Android／內置瀏覽器，單測覆蓋），步驟精確到瀏覽器（iOS Chrome 是「設定→Chrome→位置」，不是 Safari）；Android 附一鍵直達系統定位 intent，iOS 無網頁可達的設定 deep-link 只給手動步驟；卡片可關，關後剩小 pill 點即重試＋重開卡；未提交
 - Muse Code harness 對應（與 Claude / opencode 同步）
   - `.agents/skills/` — `harness-workflow` / `code-review` / `github-api`（內容同 `.opencode/skills/`，查 API 改用 `web_search` + `web_fetch`）
   - `AGENTS.md` 新增 Muse 工具 / 插件對應段（Muse 讀本檔為專案規則；不另建 `.muse/settings.json`）
