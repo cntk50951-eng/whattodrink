@@ -147,6 +147,8 @@
     "hkWide": "看全香港",
     "pickTitle": "今晚喝什么？",
     "pickCta": "随机推荐一杯",
+    "fabHint": "点我选今晚喝什么！",
+    "fabBubble": "点我喝一杯！今晚喝什么我帮你选！",
     "pickAgain": "你再想一想",
     "wantToDrink": "想喝",
     "wantSaved": "“想喝”已经落在地图上（本地预览）",
@@ -169,6 +171,7 @@
     "stepRetryBack": "回来点“重新定位”",
     "openSettings": "直达系统定位设置",
     "recenter": "回到我的位置",
+    "fabMenu": "地图操作",
     "deniedGuide": "多数是之前点了不允许，或者手机根本没开定位。逐样查：1）系统总开关：iPhone 去设置 → 隐私与安全性 → 定位服务要开；安卓去设置 → 位置要开。2）浏览器网站权限：Chrome 点地址栏锁头 → 位置 → 允许。3）微信／IG 里面打开的，转用 Safari／Chrome 打开这条链接。"
   }
 }

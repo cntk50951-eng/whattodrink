@@ -147,6 +147,8 @@
     "hkWide": "睇全香港",
     "pickTitle": "今晚飲咩？",
     "pickCta": "隨機推薦一杯",
+    "fabHint": "㩒我睇今晚飲咩！",
+    "fabBubble": "㩒我飲一杯！今晚嘅酒我幫你揀！",
     "pickAgain": "你再想一想",
     "wantToDrink": "想喝",
     "wantSaved": "「想喝」已經落喺地圖（本地預覽）",
@@ -169,6 +171,7 @@
     "stepRetryBack": "返嚟撳「重新定位」",
     "openSettings": "直達系統定位設定",
     "recenter": "回到我的位置",
+    "fabMenu": "地圖操作",
     "deniedGuide": "多數係之前撳咗唔允許，或者部機根本冇開定位。逐樣 check：1）系統總開關：iPhone 去設定 → 隱私權與安全性 → 定位服務要開；Android 去設定 → 位置要開。2）瀏覽器網站權限：Chrome 撳網址列鎖頭 → 位置 → 允許。3）微信／IG 入面開的，轉用 Safari／Chrome 開呢條 link。"
   }
 }

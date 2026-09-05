@@ -30,28 +30,24 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
  * Applies a theme's tokens as inline CSS variables on <html>, falling back to
  * globals.css :root for any unset token. Persists the choice to localStorage.
  *
- * NOTE: Until the user picks a style we render children against the default theme
- * on the server, then swap to the persisted theme on mount. A tiny flash is
- * possible but acceptable for a prototype.
+ * NOTE: The persisted id is read in the state initializer, so the server
+ * render and the first client paint already agree — no post-mount swap.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [themeId, setThemeIdState] = useState<string>(
-    LOCKED_THEME_ID ?? DEFAULT_THEME_ID,
-  );
-
-  // Hydrate from localStorage after mount — skipped while LOCKED_THEME_ID is
-  // set (UR1.5 single-style phase: stale stored ids must not override doodle).
-  useEffect(() => {
-    if (LOCKED_THEME_ID) return;
+  // Read the persisted id lazily: SSR has no window (ReferenceError falls
+  // through to the default), first paint already knows — no hydrate effect,
+  // no flash, no cascading render. LOCKED_THEME_ID wins over stale storage
+  // (UR1.5 single-style phase).
+  const [themeId, setThemeIdState] = useState<string>(() => {
+    if (LOCKED_THEME_ID) return LOCKED_THEME_ID;
     try {
       const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-      if (stored && themes.some((t) => t.id === stored)) {
-        setThemeIdState(stored);
-      }
+      if (stored && themes.some((t) => t.id === stored)) return stored;
     } catch {
       /* localStorage unavailable — ignore */
     }
-  }, []);
+    return DEFAULT_THEME_ID;
+  });
 
   // Apply tokens to <html> whenever themeId changes.
   useEffect(() => {

@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type * as Leaflet from "leaflet";
 import { useTranslations } from "next-intl";
-import { Dices, Expand, LocateFixed, Minus, Plus, X } from "lucide-react";
+import { Dices, Plus, X } from "lucide-react";
+import { MapFab } from "@/components/map/MapFab";
 
 import { useGeolocation } from "@/hooks/useGeolocation";
 import {
@@ -76,6 +77,7 @@ export function DrinkMap() {
   // UR1.2 bottom sheet: closed pill <-> open half-sheet. Auto-closes into
   // a chip when the 想喝 pin drops so the map is never buried on small screens.
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ startY: number; dy: number } | null>(null);
 
@@ -148,6 +150,17 @@ export function DrinkMap() {
         maxNativeZoom: OSM_MAX_NATIVE_ZOOM,
       }).addTo(map);
       map.setView([DEFAULT_CENTER.lat, DEFAULT_CENTER.lng], ZOOM_DEFAULT);
+      // Scroll-trap root cause (Vercel report): Leaflet's own stylesheet
+      // pins touch-action:none on touch containers and wins the cascade
+      // often enough that the CSS-module override alone did not hold on
+      // device. Inline !important outranks every stylesheet rule.
+      holder.style.setProperty(
+        "touch-action",
+        "pan-y pinch-zoom",
+        "important",
+      );
+      // A map drag means "I'm navigating" — collapse the dial, no catcher.
+      map.on("dragstart", () => setFabOpen(false));
       for (const [i, c] of MOCK_CHECKINS.entries()) {
         const pinClass =
           i % 2 === 0 ? styles.pin : `${styles.pin} ${styles.pinAlt}`;
@@ -324,6 +337,11 @@ export function DrinkMap() {
     retryGeo();
   }
 
+  /** Zoom step for the speed-dial +/- actions (scroll-wheel stays off). */
+  function handleZoom(delta: 1 | -1): void {
+    mapRef.current?.setZoom(mapRef.current.getZoom() + delta);
+  }
+
   /** UR1.2 recenter button: snap back to the latest fix, or request one. */
   function handleRecenter(): void {
     const map = mapRef.current;
@@ -404,11 +422,6 @@ export function DrinkMap() {
     window.location.assign(ANDROID_LOCATION_SETTINGS_INTENT);
   }
 
-  function handleZoom(delta: number): void {
-    if (delta > 0) mapRef.current?.zoomIn();
-    else mapRef.current?.zoomOut();
-  }
-
   /** Second overlay step, matched to the exact browser in use. */
   function appStep(): string {
     if (browser === "chrome-ios") return t("stepAppChromeIos");
@@ -449,27 +462,8 @@ export function DrinkMap() {
       {/* Notebook dot-grid over the tiles */}
       <div aria-hidden className={styles.paper} />
 
-      {/* UR1.3 pick entry — idle-only pill above the mock badge. Hidden
-          while any card is open: one bottom entry at a time, no pile-ups. */}
-      {!sheetOpen && card === null && !(geoFailed && !guideDismissed) && (
-        <button
-          type="button"
-          onClick={() => setSheetOpen(true)}
-          className={`${styles.above} font-hand absolute bottom-12 left-3 inline-flex max-w-[70%] items-center gap-2 rounded-full border-2 bg-card/95 px-4 py-2 text-base font-bold shadow-[3px_3px_0_var(--border)] backdrop-blur-sm transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none`}
-        >
-          {picked !== null && wantSaved ? (
-            <>
-              <span aria-hidden>{picked.emoji}</span>
-              <span className="truncate">{picked.name}</span>
-            </>
-          ) : (
-            <>
-              <Dices size={18} aria-hidden />
-              {t("pickCta")}
-            </>
-          )}
-        </button>
-      )}
+      {/* Pick entry lives in the speed-dial now (single entry point) —
+          the sheet opens from there or from the self-pin card. */}
       {sheetOpen && (
         <div
           ref={sheetRef}
@@ -597,54 +591,26 @@ export function DrinkMap() {
         </svg>
       </div>
 
-      {/* Custom zoom controls (doodle pills, not Leaflet defaults).
-          Lifted above any open bottom card so they never get buried. */}
-      <div
-        className={`${styles.above} absolute right-3 flex flex-col gap-2 ${
+      {/* Speed-dial: every map action consolidated in one button. Lifts
+          above open bottom cards so it never gets buried. */}
+      <MapFab
+        open={fabOpen}
+        onToggle={() => setFabOpen((v) => !v)}
+        onClose={() => setFabOpen(false)}
+        lifted={
           sheetOpen || card !== null || (geoFailed && !guideDismissed)
-            ? "bottom-[calc(50%+0.75rem)]"
-            : "bottom-14 md:bottom-16"
-        }`}
-      >
-        <button
-          type="button"
-          onClick={handleRecenter}
-          aria-label={t("recenter")}
-          title={t("recenter")}
-          className="flex h-10 w-10 items-center justify-center rounded-full border-2 bg-primary text-primary-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-        >
-          <LocateFixed size={18} aria-hidden />
-        </button>
-        <button
-          type="button"
-          onClick={() => handleZoom(1)}
-          aria-label={t("zoomIn")}
-          className="flex h-10 w-10 items-center justify-center rounded-full border-2 bg-card shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-        >
-          <Plus size={18} aria-hidden />
-        </button>
-        <button
-          type="button"
-          onClick={() => handleZoom(-1)}
-          aria-label={t("zoomOut")}
-          className="flex h-10 w-10 items-center justify-center rounded-full border-2 bg-card shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-        >
-          <Minus size={18} aria-hidden />
-        </button>
-        <button
-          type="button"
-          onClick={handleFitHk}
-          aria-label={t("hkWide")}
-          title={t("hkWide")}
-          className="flex h-10 w-10 items-center justify-center rounded-full border-2 bg-card shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-        >
-          <Expand size={18} aria-hidden />
-        </button>
-      </div>
+        }
+        hasWant={picked !== null && wantSaved}
+        onPick={() => setSheetOpen(true)}
+        onRecenter={handleRecenter}
+        onFitHk={handleFitHk}
+        onZoomIn={() => handleZoom(1)}
+        onZoomOut={() => handleZoom(-1)}
+      />
 
-      {/* MOCK badge — always visible while seed data is on the map */}
+      {/* MOCK badge — top-left now; bottom-left belongs to the beer dial. */}
       <p
-        className={`${styles.above} absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full border-2 bg-card/95 px-3 py-1 text-xs font-bold`}
+        className={`${styles.above} absolute top-3 left-3 flex items-center gap-1.5 rounded-full border-2 bg-card/95 px-3 py-1 text-xs font-bold`}
       >
         <span aria-hidden className={styles.liveDot} />
         {t("mockBadge")}
