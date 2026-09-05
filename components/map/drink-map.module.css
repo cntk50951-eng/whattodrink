@@ -6,10 +6,12 @@
  * follows theme switching like every other component.
  */
 
-/* Gentle warmth over the tiles. Kept light because the Stadia watercolor
- * basemap is already hand-painted — revisit after eyeballing on device. */
+/* Doodle skin, pass 1 (blind-tuned — revisit after eyeballing on device):
+ * push the OSM palette warm and candy-like. Cream paper feel comes from
+ * sepia, pop from saturation; contrast slightly down so marker stickers
+ * and the dot-grid sit on top visually. */
 .frame :global(.leaflet-tile-pane) {
-  filter: sepia(0.14) saturate(1) brightness(1);
+  filter: sepia(0.22) saturate(1.45) brightness(1.03) contrast(0.96);
 }
 
 .frame :global(.leaflet-container) {
