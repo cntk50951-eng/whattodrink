@@ -9,7 +9,11 @@
     "bars": "Bars",
     "moods": "Moods",
     "about": "About",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "menu": "Menu",
+    "randomPick": "Tonight's pick",
+    "photoPick": "Snap & pick",
+    "moodPick": "Mood pick"
   },
   "footer": {
     "tagline": "Hong Kong's drinking-mood companion for the young",
