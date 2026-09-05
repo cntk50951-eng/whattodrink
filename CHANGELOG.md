@@ -32,6 +32,12 @@
   - fix（縮放退役錯＋主鈕太醜，用戶回報）：縮放加減返嚟（扇形第 1、2 格，共 5 格：放大／縮小／睇全香港／回位／隨機推薦）；主鈕換手繪啤酒（杯內三氣泡無限上升，reduced-motion 靜止）＋首訪提示 pill「㩒我揀嘢飲！」（localStorage 睇過即收，三語）；附帶修掉 theme-provider 舊 lint error（localStorage 改 lazy initializer，同 pattern 修 MapFab）；16 tests／tsc 全綠、lint 0 error（3 舊 warning）；本機 `npm run build` 被沙盒 EPERM 擋（同 CSS 無關，postcss 單驗 OK），build 交 Vercel 驗；未提交
   - fix（泡沫太素＋看不出可点＋扇形不该收，用户回报）：泡沫重画（溢出盖＋淌下两道＋质感点＋酒液高光），按钮 56px→64px，红色呼吸光环＋行动指向提示 pill（首点前），按钮上移到 bottom-24 让开右下角拥挤区；相机类操作（缩放±／回位／全港）点后扇形保持展开可连点，只有选酒收起让位抽屉；16 tests／tsc 全绿、lint 0 error；未提交
   - fix（闲置无提示＋按钮搬左下，用户回报）：3 秒无点击杯子摇晃一次（有限遍数，不循环），20 秒无操作弹漫画气泡（带尾巴，取代小 pill），任意点击重置计时；点开后时间戳存 localStorage，12 小时静默；按钮搬左下（MOCK badge 让位搬左上），扇形标签镜像到按钮右侧；16 tests／tsc 全绿、lint 0 error；未提交
+- **UR 1.4 — 扇形加拍照入口＋按钮沉底（[WIP]，待用户验收）**
+  - 扇形加第 6 格「拍照推荐」（accent 高亮主入口，选酒上一格），点后跳 `/camera` 整页（和 Bento 拍照卡一致，不碰 CameraFlow）；心情合并只做扇形侧，Bento 心情卡不动
+  - 啤酒按钮 bottom-24→bottom-14；扇形展开时底部状态 pill 自动隐藏让位，收起即回；16 tests／tsc 全绿、lint 0 error（3 旧 warning）；未提交
+  - fix（沉底不生效的根因，用户回报）：沉底的 max＋env 任意类被 Tailwind 扫描器静默丢弃（编译产物查无此规则，兄弟规则正常）——定位改纯 CSS Module（`.fabDock`／`.fabLifted` 互斥），扇形动态 delay 类同病，改 CSS 变量 `--fan-delay`（错峰动画至此才真正跑起来）；16 tests／tsc 全绿、lint 0 error；未提交
+  - fix（hydration 崩＋卡片展开时按钮浮空，用户回报）：静默期 localStorage 懒读致服务端／客户端首屏分叉——改 useSyncExternalStore（server 快照恒 false）；dial 行为改隐藏：卡片展开时整个 dial 不渲染（删 fabLifted），关卡即回左下角；16 tests／tsc 全绿、lint 0 error；未提交
+  - fix（沉底屡修不生效的真根因，用户定位）：关闭的扇形格 opacity-0 但仍在流内占位，column-reverse 把啤酒垫高约 360px——扇形格改绝对定位（CSS 变量逐格定高，脱流），关闭态容器只剩啤酒，真正贴角；16 tests／tsc 全绿、lint 0 error；未提交
 - Muse Code harness 對應（與 Claude / opencode 同步）
   - `.agents/skills/` — `harness-workflow` / `code-review` / `github-api`（內容同 `.opencode/skills/`，查 API 改用 `web_search` + `web_fetch`）
   - `AGENTS.md` 新增 Muse 工具 / 插件對應段（Muse 讀本檔為專案規則；不另建 `.muse/settings.json`）

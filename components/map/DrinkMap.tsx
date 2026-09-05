@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type * as Leaflet from "leaflet";
 import { useTranslations } from "next-intl";
@@ -59,6 +60,7 @@ const SHEET_DISMISS_DY = 72;
 export function DrinkMap() {
   const t = useTranslations("map");
   const heroT = useTranslations("hero");
+  const router = useRouter();
   const {
     status: geoStatus,
     position: geoPosition,
@@ -591,17 +593,19 @@ export function DrinkMap() {
         </svg>
       </div>
 
-      {/* Speed-dial: every map action consolidated in one button. Lifts
-          above open bottom cards so it never gets buried. */}
+      {/* Speed-dial: every map action consolidated in one button. Hides
+          while any bottom card is open (the beer lives in the corner,
+          nowhere else); closing the card brings it back. */}
       <MapFab
         open={fabOpen}
         onToggle={() => setFabOpen((v) => !v)}
         onClose={() => setFabOpen(false)}
-        lifted={
+        hidden={
           sheetOpen || card !== null || (geoFailed && !guideDismissed)
         }
         hasWant={picked !== null && wantSaved}
         onPick={() => setSheetOpen(true)}
+        onPhoto={() => router.push("/camera")}
         onRecenter={handleRecenter}
         onFitHk={handleFitHk}
         onZoomIn={() => handleZoom(1)}
@@ -618,23 +622,24 @@ export function DrinkMap() {
 
       {/* Slim status pill: locating, outside-HK, or a dismissed failure.
           Tapping the dismissed pill retries and reopens the guide. */}
-      {(geoStatus === "locating" || outsideHk) && (
+      {/* UR1.4：扇形展开时让位隐藏，收起即回来 */}
+      {(geoStatus === "locating" || outsideHk) && !fabOpen && (
         <p
           role="status"
-          className={`${styles.above} absolute bottom-3 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-full border-2 bg-card/95 px-4 py-1.5 text-center text-xs font-bold md:text-sm`}
+          className={`${styles.above} absolute top-14 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-full border-2 bg-card/95 px-4 py-1.5 text-center text-xs font-bold md:text-sm`}
         >
           {geoStatus === "locating" && t("locating")}
           {outsideHk && t("outside")}
         </p>
       )}
-      {geoFailed && guideDismissed && (
+      {geoFailed && guideDismissed && !fabOpen && (
         <button
           type="button"
           onClick={() => {
             setGuideDismissed(false);
             handleRetryLocate();
           }}
-          className={`${styles.above} absolute bottom-3 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-full border-2 bg-card/95 px-4 py-1.5 text-center text-xs font-bold md:text-sm`}
+          className={`${styles.above} absolute top-14 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-full border-2 bg-card/95 px-4 py-1.5 text-center text-xs font-bold md:text-sm`}
         >
           {t("denied")} · {t("retryLocate")}
         </button>
