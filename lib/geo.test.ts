@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_CENTER,
-  ESRI_ATTRIBUTION,
-  ESRI_URL,
   HK_BOUNDS,
+  OSM_ATTRIBUTION,
+  OSM_URL,
   STADIA_ATTRIBUTION,
   ZOOM_DEFAULT,
   ZOOM_HK_WIDE,
@@ -56,10 +56,9 @@ describe("tile providers", () => {
   });
 
   it("keeps attributions non-empty (legally required on-map credit)", () => {
+    expect(OSM_URL).toContain("tile.openstreetmap.org");
+    expect(OSM_ATTRIBUTION).toContain("OpenStreetMap");
     expect(STADIA_ATTRIBUTION).toContain("Stadia Maps");
     expect(STADIA_ATTRIBUTION).toContain("Stamen Design");
-    expect(STADIA_ATTRIBUTION).toContain("OpenStreetMap");
-    expect(ESRI_URL).toContain("arcgisonline.com");
-    expect(ESRI_ATTRIBUTION).toContain("Esri");
   });
 });

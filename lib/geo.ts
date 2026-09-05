@@ -34,14 +34,14 @@ export const GEOLOCATION_MAX_AGE_MS = 60_000;
 /**
  * Tile providers (UR1.1).
  *
- * Primary: Stadia Stamen Watercolor — hand-painted raster that matches the
- * doodle brand. Needs a free `NEXT_PUBLIC_STADIA_KEY`
- * (https://client.stadiamaps.com → API key); the key lives in the tile URL
- * by design (public client-side key, referrer-lockable in the dashboard).
- * Watercolor renders natively to z16 — Leaflet over-zooms past that.
+ * Tile providers (UR1.1).
  *
- * Fallback (no key configured): Esri Light Gray Canvas — keyless with
- * attribution. The map picks it automatically so it never renders empty.
+ * Active: OSM standard raster (keyless — see below).
+ *
+ * Dormant alternative: Stadia Stamen Watercolor — hand-painted raster.
+ * Needs a free `NEXT_PUBLIC_STADIA_KEY`; renders natively to z16.
+ * Re-activate if PM ever wants the watercolor look (builder + attribution
+ * kept, both unit tested).
  */
 export const STADIA_MAX_NATIVE_ZOOM = 16;
 
@@ -53,10 +53,17 @@ export function stadiaTileUrl(apiKey: string): string {
   return `https://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.jpg?api_key=${apiKey}`;
 }
 
-export const ESRI_URL =
-  "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}";
-export const ESRI_ATTRIBUTION =
-  "Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ";
+/**
+ * Primary: OSM standard raster — keyless, no signup, colourful streets /
+ * water / parks out of the box. Browsers send Referer/User-Agent
+ * automatically (required by the OSM Tile Usage Policy). Prototype-scale
+ * use is fine; self-host tiles if traffic ever grows teeth.
+ * Serves natively past z19.
+ */
+export const OSM_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+export const OSM_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+export const OSM_MAX_NATIVE_ZOOM = 19;
 
 /**
  * Whether a point falls inside the Hong Kong bounding box.

@@ -13,16 +13,14 @@ import type { Beer } from "@/lib/beers";
 import type { LatLng } from "@/lib/geo";
 import {
   DEFAULT_CENTER,
-  ESRI_ATTRIBUTION,
-  ESRI_URL,
   HK_BOUNDS,
-  STADIA_ATTRIBUTION,
-  STADIA_MAX_NATIVE_ZOOM,
+  OSM_ATTRIBUTION,
+  OSM_MAX_NATIVE_ZOOM,
+  OSM_URL,
   ZOOM_DEFAULT,
   ZOOM_MAX,
   ZOOM_MIN,
   isWithinHongKong,
-  stadiaTileUrl,
 } from "@/lib/geo";
 import { BeerMugDoodle } from "@/components/marketing/BeerMugDoodle";
 import styles from "./drink-map.module.css";
@@ -99,15 +97,12 @@ export function DrinkMap() {
         zoomAnimation: !reduced,
         fadeAnimation: !reduced,
       });
-      // Stadia watercolor when the public key is configured, otherwise the
-      // keyless Esri fallback — the map never renders empty while waiting
-      // for the key. maxNativeZoom lets Leaflet over-zoom past z16 tiles.
-      const stadiaKey = (process.env.NEXT_PUBLIC_STADIA_KEY ?? "").trim();
-      const useStadia = stadiaKey.length > 0;
-      L.tileLayer(useStadia ? stadiaTileUrl(stadiaKey) : ESRI_URL, {
-        attribution: useStadia ? STADIA_ATTRIBUTION : ESRI_ATTRIBUTION,
+      // OSM standard raster — keyless, no signup. Colourful out of the box;
+      // the doodle skin (CSS filter + dot-grid + stickers) pushes it warm.
+      L.tileLayer(OSM_URL, {
+        attribution: OSM_ATTRIBUTION,
         maxZoom: ZOOM_MAX,
-        maxNativeZoom: STADIA_MAX_NATIVE_ZOOM,
+        maxNativeZoom: OSM_MAX_NATIVE_ZOOM,
       }).addTo(map);
       map.setView([DEFAULT_CENTER.lat, DEFAULT_CENTER.lng], ZOOM_DEFAULT);
       for (const [i, c] of MOCK_CHECKINS.entries()) {
