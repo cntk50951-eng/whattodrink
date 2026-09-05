@@ -162,38 +162,42 @@ export function MapFab({
       {actions.map((action, i) => {
         const Icon = action.icon;
         return (
-          <div
+          // UR1.5：整行单个 button——图标＋文字同一点击区、单个 tab stop。
+          // button 不可嵌套 button，所以圆形图标退为纯视觉 span；
+          // 按压缩放反馈走 group-active 平移过去（点文字时圆形照样压一下）。
+          <button
             key={action.key}
-            className={`${styles.fanItem} flex items-center gap-2 transition-all motion-safe:duration-200 ${
-              open
-                ? "translate-y-0 scale-100 opacity-100"
-                : "pointer-events-none translate-y-3 scale-50 opacity-0"
-            }`}
+            type="button"
+            tabIndex={open ? 0 : -1}
+            aria-label={action.label}
+            onClick={() => {
+              action.run();
+              if (!action.keepOpen) onClose();
+            }}
             style={
               {
                 "--fan-rise": `${74 + (actions.length - 1 - i) * 54}px`,
                 "--fan-delay": `${(actions.length - 1 - i) * 50}ms`,
               } as CSSProperties
             }
+            className={`${styles.fanItem} group flex cursor-pointer items-center gap-2 text-left transition-all motion-safe:duration-200 ${
+              open
+                ? "translate-y-0 scale-100 opacity-100"
+                : "pointer-events-none translate-y-3 scale-50 opacity-0"
+            }`}
           >
-            <button
-              type="button"
-              tabIndex={open ? 0 : -1}
-              aria-label={action.label}
-              onClick={() => {
-                action.run();
-                if (!action.keepOpen) onClose();
-              }}
-              className={`flex h-11 w-11 items-center justify-center rounded-full border-2 shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none ${
+            <span
+              aria-hidden
+              className={`flex h-11 w-11 items-center justify-center rounded-full border-2 shadow-[2px_2px_0_var(--border)] transition-transform group-active:translate-x-0.5 group-active:translate-y-0.5 group-active:shadow-none ${
                 action.hot ? "bg-accent text-accent-foreground" : "bg-card"
               }`}
             >
               <Icon size={19} aria-hidden />
-            </button>
+            </span>
             <span className="rounded-full border-2 bg-card px-2.5 py-1 text-xs font-bold whitespace-nowrap shadow-[2px_2px_0_var(--border)]">
               {action.label}
             </span>
-          </div>
+          </button>
         );
       })}
       <div className="relative flex items-center gap-2">
