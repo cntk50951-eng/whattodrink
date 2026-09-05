@@ -5,6 +5,15 @@
 ## [Unreleased]
 
 ### Added
+- **UR 1.1 — 首頁互動式頁面重構（WIP，待用戶側 build＋瀏覽器驗收）**
+  - 新依賴：`leaflet@1.9.4`（真實地理底圖＋免費 CARTO Voyager 瓦片，免 key）、`vitest@^3`（`@types/node@20` 與 vitest 5 互斥，只能用 v3）＋ `npm test` 腳本
+  - `components/map/DrinkMap.tsx` — 地圖＋推薦入口同一組件：geolocation 狀態機、拒絕／失敗→全港視圖、塗鴉 pins（自己／MOCK 他人／「想喝」虛線圈）、自訂縮放＋睇全港按鈕、乾杯卡（本地 mock）、`prefers-reduced-motion` 降級
+  - `lib/geo.ts`（全港 bounds＋`isWithinHongKong`）、`lib/checkins.ts`（MOCK 種子，處處標 MOCK）、`hooks/useGeolocation.ts`（idle→locating→success/denied/unavailable/timeout/unsupported）
+  - `lib/geo.test.ts`＋`lib/checkins.test.ts` — 8 tests 全綠；`tsc` 全過；lint 無新增 error（僅剩 theme-provider 舊 error）
+  - 首頁重排：`Hero variant="slim"`（標題保留，啤酒杯抽成 `BeerMugDoodle` 供地圖角落復用）→ `DrinkMapSection` 置頂主角 → Bento 後移；三語 `map` 文案
+  - 選型結論：Remotion 是視頻渲染框架，不做即時互動地圖——只借其設計語言（粗描邊／扁平色／貼紙感）用 CSS＋SVG 實現，未引入依賴（見 memory）
+  - 待用戶側跑 `npm run build`＋瀏覽器驗收（sandbox 內 Turbopack／dev server 起不來）：定位允許／拒絕、縮放至全港、隨機推薦→「想喝」落點、乾杯卡三條路徑
+  - fix（用戶驗收發現）：React 覆蓋層缺 z-index 被 Leaflet panes（200–700）壓住導致「入口按鈕消失」——`.above{z-index:1000}`；點自己 pin 無反應——改彈 self 卡（含推薦按鈕）；手繪增強：筆記本圓點紙紋、膠帶貼、指南針貼紙、LIVE 跳動點、pins 交錯傾斜（全走 token＋reduced-motion 降級）
 - Muse Code harness 對應（與 Claude / opencode 同步）
   - `.agents/skills/` — `harness-workflow` / `code-review` / `github-api`（內容同 `.opencode/skills/`，查 API 改用 `web_search` + `web_fetch`）
   - `AGENTS.md` 新增 Muse 工具 / 插件對應段（Muse 讀本檔為專案規則；不另建 `.muse/settings.json`）
@@ -22,6 +31,10 @@
 - **UR 2.2 — 拍照後輸入補充（WIP，待真機＋咪驗收）**
   - `CameraFlow` 加 `review` 階段（同頁延續，免跨路由傳圖）：大預覽＋重拍／換源、選填文字（500 字＋計數）、`VoiceRecorder`（錄音鍵＋計時＋60 秒自動停＋回放重錄，轉文字留 UR2.3）、可空送出→收到確認＋再來一張
   - 無障礙：錄音中文字＋跳動點＋aria-live，全原生 button／textarea；待用戶真機驗（相機＋咪）
+- **UR 2.3 — 語音轉文字（WIP，待訊飛 key 實測）**
+  - 訊飛 IAT v2（`lib/iflytek.ts`，由舊專案實證模式移植，Node 原生 WebSocket 免新依賴）＋`app/api/transcribe`（粵→普→英順序兜底，key 全放 server）
+  - 瀏覽器側 `lib/audio.ts`（webm 解碼→16k 單聲道→WAV base64）；錄完自動轉、可改、可重試、失敗回打字；送出 bundle 帶 note＋transcript
+  - 待訊飛 APP_ID／API_KEY／API_SECRET 做粵語實測（AC1–AC4 全要真錄音驗）
   - redesign（taste skill）：筆記改橫線紙＋膠帶＋手寫計數；錄音改圓形錄音鍵＋計時＋60 秒真實進度軌＋自訂播放（去 emoji，換 lucide）；送出改全幅藥丸＋硬陰影＋按壓動效；EN 文案去 em-dash
 
 ### Planned
