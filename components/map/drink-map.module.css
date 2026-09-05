@@ -257,6 +257,27 @@
   }
 }
 
+/* UR1.4 dock: pinned to the bottom-left corner, clearing the iPhone
+ * home bar. NOTE — this MUST stay plain CSS: the equivalent Tailwind
+ * arbitrary class bottom-[max(0.75rem,env(safe-area-inset-bottom))] is
+ * silently dropped by the scanner (verified: absent from dev chunks while
+ * its calc()/plain siblings generate). Scanner-invisible = no bottom. */
+.fabDock {
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+/* Fan items are absolutely stacked above the beer (see --fan-rise).
+ * They MUST NOT stay in flow: invisible-but-in-flow rows still occupy
+ * ~54px each, and with the old column-reverse container that pushed the
+ * beer ~360px up — the "never reaches the corner" bug. Stagger still via
+ * --fan-delay (dynamic delay-[nms] classes are scanner-invisible). */
+.fanItem {
+  position: absolute;
+  left: 0;
+  bottom: var(--fan-rise, 0px);
+  transition-delay: var(--fan-delay, 0ms);
+}
+
 /* Idle shake: plays ONCE after 3s of no taps (finite iterations, then
  * rests — never a nag loop). Pivots near the mug base like a nudge. */
 .fabShake {
