@@ -45,6 +45,7 @@
   - 深链跨导航状态同步：`useState` 初始化＋`false→true`  transition effect 双保险；开面板／飞镜头双闩（定位后到不吞镜头）；22 tests／tsc 全绿、lint 0 error（3 旧 warning）；未提交
   - 点他人 pin：`fitBounds(self, TA)` 两人同框＋开卡（任何视图都触发）；无定位时只飞对方单点，卡片显示开定位提示（用户已确认两点）
   - 卡片加距离行：render 内纯算 `haversineMeters(selfFix, TA)`，随 watch 实时更新；`lib/geo.ts` 新增 `haversineMeters`＋`formatDistance` 纯函数＋6 单测，三语文案；22 tests／tsc 全绿、lint 0 error（3 旧 warning）；未提交
+  - fix（顶部下拉被地图盖住，用户回报）：Leaflet panes z-200–1000 > dropdown 预设 z-50，下拉被瓦片压住——`components/ui/dropdown-menu.tsx` 的 Positioner＋Popup 统一 `z-50` 改 `z-[1100]`，UI primitive 层一次修，下拉任何使用点都受益；注解标明 Leaflet pane 范围，下次维护不再凭直觉写回 `z-50`；build／lint 全绿、`.z-\[1100\] { z-index: 1100; }` 已验证进 compiled CSS；未提交
 - **UR 1.5 — 扇形整行可点（[✓] 用户已验收）**
   - 扇形每行 `div＋button＋span` 改单个 `<button>`：图标退为纯视觉 span，文字和图标同一点击区、单个 tab stop，行为沿用既有 `action.run`（keepOpen 连点规则不变）；按压缩放反馈走 `group-active:` 平移到圆形上；16 tests／tsc 全绿、lint 0 error（3 旧 warning）；未提交
 - Muse Code harness 對應（與 Claude / opencode 同步）
