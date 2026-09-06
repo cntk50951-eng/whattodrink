@@ -42,6 +42,11 @@
 - **UR 1.7 — 首页地图独占＋顶部菜单（[✓] 用户已验收）**
 - **UR 1.8 — 想喝打卡回看面板（[✓] 用户已验收）**
 - **UR 1.9 — 前端数据目录＋harness 数据检查规则（[✓] 用户已验收）** `[docs-only]`
+- **[harness]** Step 1 加開工門禁（記憶回顧未報備不許進 Step 4）＋ Step 7 加改動回寫 UR（`改動記錄`＋CHANGELOG fix 行＋memory 三处互索引）；UR1.8／UR2.0 已按新规则补改動記錄 `[docs-only]`
+- **UR 2.0 — 想喝卡片加头像性别（[✓] 用户已验收）**
+  - 回看卡片头：`MOCK_ME`（`lib/me.ts`，avatarEmoji＋gender 三态，默认 secret）头圈＋性别 pill，酒 emoji 并入酒名行；三语文案；无新单测（静态常量＋纯展示，同 UR1.5／1.7 口径，浏览器覆盖）
+  - Step 9b 第一次实战：`docs/data/home-map.md`＋`future-schema.md`（users 桩位落定）同步；39 tests／tsc 全绿、lint 0 error；未提交
+  - fix（用户纠正两处）：① 他人乾杯卡漏头像性别——`Checkin` 加 `avatarEmoji`＋`gender`（mock 四人男／女），卡片头圈换人、性别 pill、酒 emoji 并入饮酒行，单测加新字段断言；② 上轮 9b 不全——他人新字段补进目录＋替换清单＋backlog 推翻“另开 UR”；39 tests／tsc 全绿、lint 0 error；未提交
   - 新建 `docs/data/`（README＋home-map＋photo-mood＋app-shell＋future-schema）：每字段四列（页面位置／类型／当前来源／未来表映射），MOCK 逐字段标，附未来表草图＋MOCK→真替换清单＋UR2.0 头像性别桩位
   - harness 加 Step 9b：每次功能后检查数据文档是否同步，无变化 commit 留痕；未提交
   - 落「想喝」瞬间快照 `{beer, at, position}` 进 localStorage（POC，用户决策：逆地理留到 native）；「想喝」marker 加点击，复用底部卡片新分支显示酒＋时间＋经纬度＋冻结说明
