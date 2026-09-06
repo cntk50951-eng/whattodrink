@@ -1,0 +1,10 @@
+export { AsahiIcon } from "./asahi-super-dry";
+export { BlueGirlIcon } from "./blue-girl";
+export { CoronaIcon } from "./corona-extra";
+export { HeinekenIcon } from "./heineken";
+export { HoegaardenIcon } from "./hoegaarden";
+export { KirinIcon } from "./kirin-ichiban";
+export { MoutaiIcon } from "./moutai-flying-fairy";
+export { TsingtaoIcon } from "./tsingtao-classic";
+export { YebisuIcon } from "./yebisu";
+export { YoungMasterIcon } from "./young-master";

@@ -46,6 +46,12 @@
 - **UR 2.0 — 想喝卡片加头像性别（[✓] 用户已验收）**
 - **UR 2.1 — 打卡面板锚定到 pin 旁（[✓] 用户已验收）**
 - **UR 2.2 — 顶部菜单弹出重设计（[✓] 用户已验收）**
+- **UR 2.3 — 酒类品牌大目录（[WIP]，第一批待验收）** `[docs-only]`
+- **UR 2.4 — 品牌去重＋手绘 icon（[WIP]，待用户验收）**
+  - 去重：脚本掃 18 簇＋人工判定，真重复 4 组（Asahi／Suntory／Harbin 小麦／Wusu 残行）合并，7 个错文件真品牌转正归位；全库 1144，脚本复核归零，标题数＝实际行
+  - icon：`beer-icons/` 手绘 SVG 10 品 v3（共享框＋独立 filter id，墨线主题色＋品牌定色填色）＋临时预览路由 `/preview-beer-icons`（[locale] 段内）；v1 凭印象失真，v2 起逐品看真实产品图重画（Wikimedia 9＋官网 packshot 1，看完删参照）：Asahi 巨黑字生字八角框／藍妹米白罐椭圆章／Corona 对开标金章／青島椭圆章栈桥徽／Hoegaarden 刻面杯／Heineken 颈星椭圆绿标／Kirin 银罐金麒麟／Yebisu 金罐／少爺红功夫裤／茅台红标白斜带；画法沉淀为 skill `beer-icon`；44 tests／tsc 全绿、lint 0 error
+  - `docs/data/beer-catalog/`：分类总纲 12 大类（`00-taxonomy.md`，用户修订：类别先行）＋品牌 10 文件合计 1148 条（官网首页 logo 来源，`待验证` 隔离存疑）
+  - 抽查 12 条：9 个 200（含 4 个正典域名纠正），3 个奢侈品牌 403 反爬已注行内；lint 0 error；未提交
   - 同架构进化：icon tile＋大字＋右箭头，行高 56px；行 stagger cascade（CSS 变量错峰，避扫描坑）；触发钮 Menu↔X 变形；零新文案、无 backdrop、z-1100 不动
   - Step 9b：纯视觉，零新增数据，数据文档无需更新；44 tests／tsc 全绿、lint 0 error；未提交
   - 三种卡改锚定浮层（pin 上方＋尾巴指向，贴边翻面／收边，拖图即关）；内容三分支原样搬迁，镜头逻辑不动；`lib/anchor.ts` 纯几何＋5 单测
