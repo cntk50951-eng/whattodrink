@@ -41,6 +41,9 @@
 - **UR 1.6 — 全港找人＋双人同框＋实时距离（[✓] 用户已验收）**
 - **UR 1.7 — 首页地图独占＋顶部菜单（[✓] 用户已验收）**
 - **UR 1.8 — 想喝打卡回看面板（[✓] 用户已验收）**
+- **UR 1.9 — 前端数据目录＋harness 数据检查规则（[✓] 用户已验收）** `[docs-only]`
+  - 新建 `docs/data/`（README＋home-map＋photo-mood＋app-shell＋future-schema）：每字段四列（页面位置／类型／当前来源／未来表映射），MOCK 逐字段标，附未来表草图＋MOCK→真替换清单＋UR2.0 头像性别桩位
+  - harness 加 Step 9b：每次功能后检查数据文档是否同步，无变化 commit 留痕；未提交
   - 落「想喝」瞬间快照 `{beer, at, position}` 进 localStorage（POC，用户决策：逆地理留到 native）；「想喝」marker 加点击，复用底部卡片新分支显示酒＋时间＋经纬度＋冻结说明
   - `lib/wantRecord.ts` 纯函数（parse 校验＋HK 时区时间＋坐标格式化）＋9 单测；刷新后 pin＋记录自动回来；新一轮推荐退役旧快照；31 tests／tsc 全绿、lint 0 error（3 旧 warning）；未提交
   - fix（用户验收反馈）：时间补年份并按语言定式（中文 `2026年9月5日 14:32`／英文 `2026-09-05 14:32`，formatToParts＋HK 时区）；地点联机逆地理真名（Nominatim＋memoize＋存回 storage，断网回落经纬度）；39 tests／tsc 全绿、lint 0 error；未提交
