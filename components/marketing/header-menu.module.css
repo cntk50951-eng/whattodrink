@@ -1,0 +1,31 @@
+/* UR2.2 menu row stagger — plain CSS on purpose.
+ *
+ * Per-row entrance delay rides --mi (set inline per item). Dynamic
+ * delay-[nms] Tailwind classes are scanner-invisible and silently never
+ * generate (see .memory/2026-09-05-tailwind-arbitrary-dropped.md), so the
+ * cascade lives here where no scanner is involved.
+ * transform/opacity only; the popup shell keeps its default subtle zoom
+ * (two competing `animation` shorthands would cascade unpredictably). */
+.menuItem {
+  opacity: 0;
+  animation: menu-row-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--mi, 0ms);
+}
+
+@keyframes menu-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menuItem {
+    animation: none;
+    opacity: 1;
+  }
+}
