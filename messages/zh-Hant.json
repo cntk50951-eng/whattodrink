@@ -161,6 +161,8 @@
     "cheers": "乾杯！",
     "cheersSent": "已送出，下次見面兌現！",
     "cheersCount": "{n} 人乾過杯",
+    "wantTitle": "想喝記錄",
+    "wantFrozenNote": "位置時間為打卡瞬間快照，之後移動唔會變",
     "distanceAway": "距你 {d}",
     "needLocateForDistance": "開定位後顯示同你嘅距離",
     "close": "關閉",

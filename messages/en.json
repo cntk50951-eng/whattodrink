@@ -161,6 +161,8 @@
     "cheers": "Cheers!",
     "cheersSent": "Sent! Redeem it next time you meet!",
     "cheersCount": "{n} cheers",
+    "wantTitle": "Want record",
+    "wantFrozenNote": "Frozen at check-in — moving away won't change it",
     "distanceAway": "{d} from you",
     "needLocateForDistance": "Enable location to see your distance",
     "close": "Close",

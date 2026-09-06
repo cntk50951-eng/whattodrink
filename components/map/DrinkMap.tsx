@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type * as Leaflet from "leaflet";
-import { useTranslations } from "next-intl";
-import { Dices, Plus, X } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import { Clock, Dices, MapPin, Plus, X } from "lucide-react";
 import { MapFab } from "@/components/map/MapFab";
 
 import { useGeolocation } from "@/hooks/useGeolocation";
@@ -20,6 +20,14 @@ import type { Checkin } from "@/lib/checkins";
 import { pickRandomBeer } from "@/lib/beers";
 import type { Beer } from "@/lib/beers";
 import type { LatLng } from "@/lib/geo";
+import type { WantRecord } from "@/lib/wantRecord";
+import {
+  formatWantCoords,
+  formatWantTime,
+  loadWantRecord,
+  resolvePlaceName,
+  saveWantRecord,
+} from "@/lib/wantRecord";
 import {
   DEFAULT_CENTER,
   HK_BOUNDS,
@@ -54,6 +62,8 @@ import styles from "./drink-map.module.css";
 
 /** Sentinel selection id for the user's own marker (no backend row). */
 const SELF_ID = "self";
+/** UR1.8 sentinel for the 想喝 pin — opens the snapshot card. */
+const WANT_ID = "want";
 
 /** Pixels the camera shifts up so sheet-open content clears the drawer. */
 const SHEET_OFFSET_PX = 180;
@@ -76,6 +86,7 @@ export function DrinkMap({
   /** UR1.7 `?pick=1` deep-link: arrive in the fan-pick end state. */
   initialPickOpen?: boolean;
 }) {
+  const locale = useLocale();
   const t = useTranslations("map");
   const heroT = useTranslations("hero");
   const router = useRouter();
@@ -173,12 +184,30 @@ export function DrinkMap({
   const [picked, setPicked] = useState<Beer | null>(null);
   const [wantAt, setWantAt] = useState<LatLng | null>(null);
   const [wantSaved, setWantSaved] = useState(false);
+  // UR1.8 frozen drop snapshot (null until the first 想喝, or after reset).
+  const [wantRecord, setWantRecord] = useState<WantRecord | null>(null);
+  // Place name fetched for the snapshot. Keyed by drop timestamp so a new
+  // drop never flashes the previous name while its lookup is in flight.
+  const [fetchedPlace, setFetchedPlace] = useState<{
+    at: number;
+    name: string;
+  } | null>(null);
+  const displayPlace =
+    wantRecord?.placeName ??
+    (fetchedPlace !== null &&
+    wantRecord !== null &&
+    fetchedPlace.at === wantRecord.at
+      ? fetchedPlace.name
+      : undefined);
 
   const isSelf = selectedId === SELF_ID;
-  /** Bottom card content: own marker, a mock check-in, or nothing. */
-  const card: "self" | Checkin | null = isSelf
+  const isWant = selectedId === WANT_ID;
+  /** Bottom card content: own marker, the 想喝 snapshot, a mock check-in, or nothing. */
+  const card: "self" | "want" | Checkin | null = isSelf
     ? "self"
-    : (MOCK_CHECKINS.find((c) => c.id === selectedId) ?? null);
+    : isWant && wantRecord !== null
+      ? "want"
+      : (MOCK_CHECKINS.find((c) => c.id === selectedId) ?? null);
   const geoFailed =
     geoStatus === "denied" ||
     geoStatus === "unavailable" ||
@@ -334,6 +363,43 @@ export function DrinkMap({
     }
   }, [mapReady, geoStatus, geoPosition, geoFailed, t]);
 
+  /* ---- UR1.8: resurrect the persisted snapshot after mount ----
+   * State starts null on both server and client (no hydration split);
+   * the stored record — pin included — returns in one effect pass. */
+  useEffect(() => {
+    // Microtask wrapper: the set-state-in-effect rule only allows setState
+    // in an async continuation (same pattern as useGeolocation mount — see
+    // .memory/2026-09-05-toolchain-pits.md).
+    void Promise.resolve().then(() => {
+      const saved = loadWantRecord();
+      if (saved === null) return;
+      setWantRecord(saved);
+      setPicked(saved.beer);
+      setWantAt(saved.position);
+      setWantSaved(true);
+    });
+  }, []);
+
+  /* ---- UR1.8 fix: resolve the stored position to a place name ----
+   * Stored names win (offline reuse, no network). Otherwise one lookup per
+   * drop, patched back into storage so the next cold start skips it.
+   * All setStates live in the async continuation (never sync in the body),
+   * per the set-state-in-effect rule. */
+  useEffect(() => {
+    if (wantRecord === null || wantRecord.placeName !== undefined) return;
+    let cancelled = false;
+    void resolvePlaceName(wantRecord.position, locale).then((name) => {
+      if (cancelled || name === null) return;
+      setFetchedPlace({ at: wantRecord.at, name });
+      const patched: WantRecord = { ...wantRecord, placeName: name };
+      setWantRecord(patched);
+      saveWantRecord(patched);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [wantRecord, locale]);
+
   /* ---- UR1.6: keep the Leaflet-callback geo ref current ---- */
   useEffect(() => {
     geoRef.current = { status: geoStatus, position: geoPosition };
@@ -405,6 +471,17 @@ export function DrinkMap({
         .getComputedStyle(document.documentElement)
         .getPropertyValue("--doodle-red")
         .trim() || "#b3261e";
+    // UR1.8: the 想喝 pin opens its frozen snapshot card.
+    const pin = L.marker([wantAt.lat, wantAt.lng], {
+      title: picked.name,
+      icon: L.divIcon({
+        className: "",
+        html: `<div class="${styles.pinWant}">${picked.emoji}</div>`,
+        iconSize: [48, 48],
+        iconAnchor: [24, 44],
+      }),
+    });
+    pin.on("click", () => setSelectedId(WANT_ID));
     const layer = L.layerGroup([
       L.circle([wantAt.lat, wantAt.lng], {
         radius: 350,
@@ -414,15 +491,7 @@ export function DrinkMap({
         fillColor: ink,
         fillOpacity: 0.08,
       }),
-      L.marker([wantAt.lat, wantAt.lng], {
-        title: picked.name,
-        icon: L.divIcon({
-          className: "",
-          html: `<div class="${styles.pinWant}">${picked.emoji}</div>`,
-          iconSize: [48, 48],
-          iconAnchor: [24, 44],
-        }),
-      }),
+      pin,
     ]);
     layer.addTo(map);
     wantLayerRef.current = layer;
@@ -430,9 +499,11 @@ export function DrinkMap({
   }, [mapReady, wantAt, picked]);
 
   function handlePick(): void {
+    // Rolling a new beer touches ONLY the candidate — the old pin and its
+    // snapshot stay alive until a new 想喝 actually drops (handleWant
+    // overwrites both). Retiring them here wiped the last check-in the
+    // moment the user re-rolled (UR1.8 bug report).
     setPicked(pickRandomBeer());
-    setWantAt(null);
-    setWantSaved(false);
   }
 
   /**
@@ -523,16 +594,25 @@ export function DrinkMap({
           : DEFAULT_CENTER;
     setWantAt(at);
     setWantSaved(true);
+    // UR1.8: freeze the drop moment — beer, clock, and fix travel together
+    // from here on; the pin and the card only ever read this snapshot.
+    const record: WantRecord = { beer: picked, at: Date.now(), position: at };
+    setWantRecord(record);
+    saveWantRecord(record);
     // UR1.2: dropping the pin collapses the sheet into a chip — the map
     // must never stay buried under the drawer on small screens.
     setSheetOpen(false);
   }
 
   function handleSelfPick(): void {
-    // From your own pin: close the card and run the journey entry —
-    // the result lands in the pick panel (now visible above the tiles).
+    // From your own pin: close the card, roll, and OPEN the sheet — the
+    // result must land somewhere visible. The old comment claimed the
+    // panel was "now visible", true in UR1.1 (always-open panel) but false
+    // since UR1.2 turned it into a default-closed sheet; this path has
+    // silently done nothing visible ever since (UR1.8 bug report).
     setSelectedId(null);
     handlePick();
+    setSheetOpen(true);
   }
 
   function handleCheers(id: string): void {
@@ -856,6 +936,44 @@ export function DrinkMap({
                 {t("pickCta")}
               </button>
             </div>
+          ) : card === "want" ? (
+            // UR1.8 frozen snapshot — beer, clock, and fix from drop time.
+            wantRecord !== null ? (
+              <div>
+                <div className="flex items-center gap-3">
+                  <span
+                    className="flex h-11 w-11 items-center justify-center rounded-full border-2 text-2xl"
+                    aria-hidden
+                  >
+                    {wantRecord.beer.emoji}
+                  </span>
+                  <div>
+                    <p className="font-bold">{t("wantTitle")}</p>
+                    <p className="text-muted-foreground text-sm">
+                      {wantRecord.beer.name}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-1 text-sm">
+                  <p className="flex items-center gap-1.5">
+                    <Clock size={15} aria-hidden />
+                    {formatWantTime(wantRecord.at, locale)}
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                    <MapPin size={15} aria-hidden />
+                    {displayPlace ?? formatWantCoords(wantRecord.position)}
+                  </p>
+                  {displayPlace !== undefined && (
+                    <p className="text-muted-foreground pl-6 text-xs">
+                      {formatWantCoords(wantRecord.position)}
+                    </p>
+                  )}
+                  <p className="text-muted-foreground text-xs">
+                    {t("wantFrozenNote")}
+                  </p>
+                </div>
+              </div>
+            ) : null
           ) : (
             <>
               <div className="flex items-center gap-3">
