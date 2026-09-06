@@ -44,6 +44,9 @@
 - **UR 1.9 — 前端数据目录＋harness 数据检查规则（[✓] 用户已验收）** `[docs-only]`
 - **[harness]** Step 1 加開工門禁（記憶回顧未報備不許進 Step 4）＋ Step 7 加改動回寫 UR（`改動記錄`＋CHANGELOG fix 行＋memory 三处互索引）；UR1.8／UR2.0 已按新规则补改動記錄 `[docs-only]`
 - **UR 2.0 — 想喝卡片加头像性别（[✓] 用户已验收）**
+- **UR 2.1 — 打卡面板锚定到 pin 旁（[✓] 用户已验收）**
+  - 三种卡改锚定浮层（pin 上方＋尾巴指向，贴边翻面／收边，拖图即关）；内容三分支原样搬迁，镜头逻辑不动；`lib/anchor.ts` 纯几何＋5 单测
+  - Step 9b：零新增数据字段，数据文档无需更新；44 tests／tsc 全绿、lint 0 error；未提交
   - 回看卡片头：`MOCK_ME`（`lib/me.ts`，avatarEmoji＋gender 三态，默认 secret）头圈＋性别 pill，酒 emoji 并入酒名行；三语文案；无新单测（静态常量＋纯展示，同 UR1.5／1.7 口径，浏览器覆盖）
   - Step 9b 第一次实战：`docs/data/home-map.md`＋`future-schema.md`（users 桩位落定）同步；39 tests／tsc 全绿、lint 0 error；未提交
   - fix（用户纠正两处）：① 他人乾杯卡漏头像性别——`Checkin` 加 `avatarEmoji`＋`gender`（mock 四人男／女），卡片头圈换人、性别 pill、酒 emoji 并入饮酒行，单测加新字段断言；② 上轮 9b 不全——他人新字段补进目录＋替换清单＋backlog 推翻“另开 UR”；39 tests／tsc 全绿、lint 0 error；未提交

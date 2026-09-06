@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type * as Leaflet from "leaflet";
@@ -29,6 +29,10 @@ import {
   resolvePlaceName,
   saveWantRecord,
 } from "@/lib/wantRecord";
+import {
+  ANCHOR_PANEL_W,
+  anchorPanel,
+} from "@/lib/anchor";
 import {
   DEFAULT_CENTER,
   HK_BOUNDS,
@@ -209,7 +213,7 @@ export function DrinkMap({
 
   const isSelf = selectedId === SELF_ID;
   const isWant = selectedId === WANT_ID;
-  /** Bottom card content: own marker, the 想喝 snapshot, a mock check-in, or nothing. */
+  /** Anchored card content: own marker, the 想喝 snapshot, a mock check-in, or nothing. */
   const card: "self" | "want" | Checkin | null = isSelf
     ? "self"
     : isWant && wantRecord !== null
@@ -231,6 +235,78 @@ export function DrinkMap({
    */
   const selfFix =
     geoStatus === "success" && geoPosition !== null ? geoPosition : null;
+
+  /* ---- UR2.1 anchored card ----
+   * React 19 forbids ref reads during render, so the pin's screen point
+   * lives in state: snapshotted when the card/fix changes, re-projected on
+   * every camera 'move' (flyTo, button zoom). The subscription only exists
+   * while a card is open — bare pans never re-render the tree. The first
+   * snapshot goes through a microtask (set-state-in-effect allows async
+   * continuations, never a sync body). */
+  /** Map position the open card belongs to (frozen snapshot for 想喝). */
+  const focusAt: LatLng | null =
+    card === null
+      ? null
+      : card === "self"
+        ? selfFix
+        : card === "want"
+          ? (wantRecord?.position ?? null)
+          : card.position;
+  const [view, setView] = useState<{
+    x: number;
+    y: number;
+    cw: number;
+    ch: number;
+  } | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    const holder = holderRef.current;
+    if (!mapReady || map === null || holder === null) return;
+    if (card === null || focusAt === null) return;
+    const snapshot = (): void => {
+      const point = map.latLngToContainerPoint([
+        focusAt.lat,
+        focusAt.lng,
+      ]);
+      setView({
+        x: point.x,
+        y: point.y,
+        cw: holder.clientWidth,
+        ch: holder.clientHeight,
+      });
+    };
+    void Promise.resolve().then(snapshot);
+    map.on("move", snapshot);
+    return () => {
+      map.off("move", snapshot);
+    };
+  }, [mapReady, card, focusAt]);
+  // Real panel height for the flip decision. Callback ref (not an effect)
+  // so the set-state-in-effect rule stays quiet; the panel remounts per
+  // card (key below), re-measuring on every content swap.
+  const [panelH, setPanelH] = useState(0);
+  const measureRef = useCallback((el: HTMLDivElement | null) => {
+    if (el === null) return;
+    const h = el.getBoundingClientRect().height;
+    if (h > 0) setPanelH(h);
+  }, []);
+  const anchor =
+    card !== null && view !== null && view.cw > 0
+      ? (() => {
+          const panelW = Math.min(ANCHOR_PANEL_W, view.cw - 24);
+          return {
+            placement: anchorPanel(
+              view.x,
+              view.y,
+              panelW,
+              panelH,
+              view.cw,
+              view.ch,
+            ),
+            panelW,
+          };
+        })()
+      : null;
 
   /* ---- init Leaflet once ---- */
   useEffect(() => {
@@ -275,7 +351,12 @@ export function DrinkMap({
         "important",
       );
       // A map drag means "I'm navigating" — collapse the dial, no catcher.
-      map.on("dragstart", () => setFabOpen(false));
+      // UR2.1 (Q1 decision): the anchored card closes too — a navigating
+      // user outruns any pin anyway, and re-tapping is one touch away.
+      map.on("dragstart", () => {
+        setFabOpen(false);
+        setSelectedId(null);
+      });
       for (const [i, c] of MOCK_CHECKINS.entries()) {
         const pinClass =
           i % 2 === 0 ? styles.pin : `${styles.pin} ${styles.pinAlt}`;
@@ -910,14 +991,30 @@ export function DrinkMap({
         </div>
       )}
 
-      {/* Selected pin card — own marker or a mock check-in */}
-      {card !== null && (
+      {/* UR2.1 anchored pin card — floats next to the tapped pin (with a
+          tail nub pointing at it) instead of sitting centered at the
+          bottom. The washi tape retired with the bottom dock: the tail is
+          the pointing device now. */}
+      {card !== null && anchor !== null && (
         <div
-          className={`${styles.above} absolute right-3 bottom-3 left-3 rounded-2xl border-2 bg-card/95 p-4 shadow-[3px_3px_0_var(--border)] backdrop-blur-sm md:right-auto md:left-1/2 md:w-80 md:-translate-x-1/2`}
+          key={
+            card === "self" ? "self" : card === "want" ? "want" : card.id
+          }
+          ref={measureRef}
+          className={`${styles.above} absolute rounded-2xl border-2 bg-card/95 p-4 shadow-[3px_3px_0_var(--border)] backdrop-blur-sm`}
+          style={{
+            left: anchor.placement.left,
+            top: anchor.placement.top,
+            width: anchor.panelW,
+          }}
         >
           <span
             aria-hidden
-            className="absolute -top-3 left-10 h-5 w-16 rotate-3 rounded-[2px] bg-[var(--tape)] opacity-90"
+            className={`absolute h-3.5 w-3.5 rotate-45 border-2 bg-card ${
+              anchor.placement.below ? "-top-2" : "-bottom-2"
+            }`}
+            // tailX is the nub center; h-3.5 is 14px, so shift half back.
+            style={{ left: anchor.placement.tailX - 7 }}
           />
           <button
             type="button"
