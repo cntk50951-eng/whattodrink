@@ -5,6 +5,8 @@ type BeerIconFrameProps = {
   filterId: string;
   label: string;
   className?: string;
+  /** Short CN style tag (e.g. 淡拉格/小麥白啤/醬香白酒) printed under the art. */
+  typeLabel?: string;
   children: ReactNode;
 };
 
@@ -15,11 +17,14 @@ type BeerIconFrameProps = {
  * looked generic — v2 keeps the ink lines themed but paints each product in
  * its real shelf livery (fixed brand hex fills) so the ten read as the
  * actual beers. Likenesses are stylised, not trademark artwork.
+ * The optional typeLabel strip (y=153) names the style under every icon so the
+ * set stays distinguishable on web and in exported mobile assets alike.
  */
 export function BeerIconFrame({
   filterId,
   label,
   className,
+  typeLabel,
   children,
 }: BeerIconFrameProps) {
   return (
@@ -50,6 +55,21 @@ export function BeerIconFrame({
       >
         {children}
       </g>
+      {typeLabel ? (
+        <text
+          x="60"
+          y="153"
+          textAnchor="middle"
+          fill="var(--foreground)"
+          opacity="0.8"
+          fontSize="8.5"
+          fontWeight="700"
+          stroke="none"
+          className="font-hand"
+        >
+          {typeLabel}
+        </text>
+      ) : null}
     </svg>
   );
 }

@@ -12,7 +12,7 @@ type TsingtaoIconProps = {
  */
 export function TsingtaoIcon({ className }: TsingtaoIconProps) {
   return (
-    <BeerIconFrame filterId="tsingtao-wobble" label="Tsingtao Classic" className={className}>
+    <BeerIconFrame typeLabel="淡拉格" filterId="tsingtao-wobble" label="Tsingtao Classic" className={className}>
       {/* Open mouth */}
       <path d="M 52 16 L 68 16 L 68 26 L 52 26 Z" fill="#0b5c2c" />
       {/* Neck + body */}

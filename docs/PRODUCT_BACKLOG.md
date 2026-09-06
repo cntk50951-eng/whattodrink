@@ -432,6 +432,9 @@
   Hoegaarden 六角刻面杯＋描边哥特字／Heineken 开口感唇＋颈星＋竖字＋椭圆绿标／
   Kirin 高瘦银罐＋金麒麟＋红带／Yebisu 金罐＋白字 Premium／少爺白罐＋红功夫裤＋
   少爺双圈／茅台高红盖＋红标白斜带＋斜构图
+- batch1＋2（30 图）：家族去重 1144－25＝1119（整词＋去括号，獭祭等清酒不误杀），
+  台账 `11-icon-progress.md` 批批报剩余；frame 类型 caption＋BEER_WALL 单源＋
+  `export:icons` 移动端顺带产出（见 skill `beer-icon` 第 5 节）
 - 商标：POC 内部评审用途，上线前需法务过目（记缺口）
 - 旧存档／推荐面板不接新 icon（接线另开 UR）
 *驗收標準（Acceptance Criteria）*

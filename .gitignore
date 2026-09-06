@@ -46,3 +46,6 @@ next-env.d.ts
 
 # Staging dir used during scaffold migration
 .staging/
+
+# icon export build cache (regenerable)
+scripts/.cache/

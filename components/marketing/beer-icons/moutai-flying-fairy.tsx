@@ -12,7 +12,7 @@ type MoutaiIconProps = {
  */
 export function MoutaiIcon({ className }: MoutaiIconProps) {
   return (
-    <BeerIconFrame filterId="moutai-wobble" label="Moutai Flying Fairy" className={className}>
+    <BeerIconFrame typeLabel="醬香白酒" filterId="moutai-wobble" label="Moutai Flying Fairy" className={className}>
       {/* Tall red cap */}
       <path d="M 50 12 L 70 12 L 70 34 L 50 34 Z" fill="#c8102e" />
       <path d="M 50 19 L 70 19 M 50 26 L 70 26" stroke="#8f0b20" strokeWidth="1.4" />

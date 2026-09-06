@@ -11,7 +11,7 @@ type HoegaardenIconProps = {
  */
 export function HoegaardenIcon({ className }: HoegaardenIconProps) {
   return (
-    <BeerIconFrame filterId="hoegaarden-wobble" label="Hoegaarden" className={className}>
+    <BeerIconFrame typeLabel="小麥白啤" filterId="hoegaarden-wobble" label="Hoegaarden" className={className}>
       {/* Faceted hex glass */}
       <path
         d="M 36 58 L 45 48 L 75 48 L 84 58 L 80 132 Q 79.6 142 69 142 L 51 142 Q 40.4 142 40 132 Z"

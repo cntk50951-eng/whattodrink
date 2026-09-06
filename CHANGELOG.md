@@ -50,6 +50,7 @@
 - **UR 2.4 — 品牌去重＋手绘 icon（[WIP]，待用户验收）**
   - 去重：脚本掃 18 簇＋人工判定，真重复 4 组（Asahi／Suntory／Harbin 小麦／Wusu 残行）合并，7 个错文件真品牌转正归位；全库 1144，脚本复核归零，标题数＝实际行
   - icon：`beer-icons/` 手绘 SVG 10 品 v3（共享框＋独立 filter id，墨线主题色＋品牌定色填色）＋临时预览路由 `/preview-beer-icons`（[locale] 段内）；v1 凭印象失真，v2 起逐品看真实产品图重画（Wikimedia 9＋官网 packshot 1，看完删参照）：Asahi 巨黑字生字八角框／藍妹米白罐椭圆章／Corona 对开标金章／青島椭圆章栈桥徽／Hoegaarden 刻面杯／Heineken 颈星椭圆绿标／Kirin 银罐金麒麟／Yebisu 金罐／少爺红功夫裤／茅台红标白斜带；画法沉淀为 skill `beer-icon`；44 tests／tsc 全绿、lint 0 error
+  - icon batch1＋2（各 10，预览墙共 30）：按目录顺序＋家族去重（1144－25＝1119 待画，台账 `11-icon-progress.md`）；batch1 拉格组／batch2 墨巴组，逐品看图；frame 加类型 caption 条（`typeLabel`，BEER_WALL `type` 同步，manifest 带类型）；`npm run export:icons` 顺带产移动端（纯 SVG＋iOS 三件套＋Android 五密度＋manifest，resvg＋sips，无需浏览器）；44 tests／tsc 全绿、lint 0 error
   - `docs/data/beer-catalog/`：分类总纲 12 大类（`00-taxonomy.md`，用户修订：类别先行）＋品牌 10 文件合计 1148 条（官网首页 logo 来源，`待验证` 隔离存疑）
   - 抽查 12 条：9 个 200（含 4 个正典域名纠正），3 个奢侈品牌 403 反爬已注行内；lint 0 error；未提交
   - 同架构进化：icon tile＋大字＋右箭头，行高 56px；行 stagger cascade（CSS 变量错峰，避扫描坑）；触发钮 Menu↔X 变形；零新文案、无 backdrop、z-1100 不动
