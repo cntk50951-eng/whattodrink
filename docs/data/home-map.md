@@ -23,6 +23,8 @@
 | `at`（打卡毫秒戳） | 回看卡片时间行 | `number` | 同上 | `checkins.created_at` |
 | `position.lat`／`lng`（打卡瞬间定位，冻结） | pin 位置、回看卡片坐标行 | `LatLng` | 同上 | `checkins.lat`／`checkins.lng` |
 | `placeName`（逆地理地名，异步回填） | 回看卡片地名行 | `string?` | 同上（无则在线查 Nominatim＋memoize） | `checkins.place_name` |
+| `MOCK_ME.avatarEmoji`（我头像占位） | 回看卡片头圈 | `string`（emoji） | `mock`（`lib/me.ts`，UR2.0） | `users.avatar_url` |
+| `MOCK_ME.gender`（我性别三态） | 回看卡片性别 pill | `Gender`（male／female／secret，`lib/me.ts`） | 同上，默认 `secret` | `users.gender`（enum 同名三值） |
 
 ## 四、他人打卡（MOCK，EPIC 3.0 替换）
 
@@ -30,6 +32,8 @@
 |---|---|---|---|---|
 | `id` | pin key、乾杯去重 | `string`（`mock-*-01`） | `mock`（`lib/checkins.ts`，4 条写死） | `checkins.id`（UUID） |
 | `nickname` | pin title、乾杯卡 | `string` | 同上 | `users.nickname`（join） |
+| `avatarEmoji`（他人头像占位，UR2.0） | 乾杯卡头圈 | `string`（emoji） | 同上 | `users.avatar_url`（join） |
+| `gender`（他人性别，UR2.0） | 乾杯卡性别 pill | `Gender`（male／female，`lib/me.ts`） | 同上 | `users.gender`（join） |
 | `drinkEmoji`／`drinkName` | pin 图标、乾杯卡“飲緊” | `string` | 同上 | `beers` join（emoji＋name） |
 | `area`（銅鑼灣／中環…） | 乾杯卡副标题 | `string` | 同上 | `checkins.place_name`（真数据不再手写区名） |
 | `position` | pin 位置、双人同框、实时距离 | `LatLng` | 同上 | `checkins.lat`／`lng` |

@@ -19,6 +19,8 @@ describe("MOCK_CHECKINS seed data", () => {
     expect(MOCK_CHECKINS.length).toBeGreaterThan(0);
     for (const c of MOCK_CHECKINS) {
       expect(c.nickname.trim().length).toBeGreaterThan(0);
+      expect(c.avatarEmoji.trim().length).toBeGreaterThan(0);
+      expect(["male", "female", "secret"]).toContain(c.gender);
       expect(c.drinkName.trim().length).toBeGreaterThan(0);
       expect(c.area.trim().length).toBeGreaterThan(0);
       expect(c.cheers).toBeGreaterThanOrEqual(0);

@@ -21,6 +21,7 @@ import { pickRandomBeer } from "@/lib/beers";
 import type { Beer } from "@/lib/beers";
 import type { LatLng } from "@/lib/geo";
 import type { WantRecord } from "@/lib/wantRecord";
+import { MOCK_ME } from "@/lib/me";
 import {
   formatWantCoords,
   formatWantTime,
@@ -64,6 +65,12 @@ import styles from "./drink-map.module.css";
 const SELF_ID = "self";
 /** UR1.8 sentinel for the 想喝 pin — opens the snapshot card. */
 const WANT_ID = "want";
+/** UR2.0 mock 性别标记文案 key（三态，数据源见 lib/me.ts）。 */
+const GENDER_KEY = {
+  male: "genderMale",
+  female: "genderFemale",
+  secret: "genderSecret",
+} as const;
 
 /** Pixels the camera shifts up so sheet-open content clears the drawer. */
 const SHEET_OFFSET_PX = 180;
@@ -945,12 +952,17 @@ export function DrinkMap({
                     className="flex h-11 w-11 items-center justify-center rounded-full border-2 text-2xl"
                     aria-hidden
                   >
-                    {wantRecord.beer.emoji}
+                    {MOCK_ME.avatarEmoji}
                   </span>
                   <div>
-                    <p className="font-bold">{t("wantTitle")}</p>
+                    <p className="flex items-center gap-2 font-bold">
+                      {t("wantTitle")}
+                      <span className="font-hand rounded-full border-2 bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">
+                        {t(GENDER_KEY[MOCK_ME.gender])}
+                      </span>
+                    </p>
                     <p className="text-muted-foreground text-sm">
-                      {wantRecord.beer.name}
+                      {wantRecord.beer.emoji} {wantRecord.beer.name}
                     </p>
                   </div>
                 </div>
@@ -981,13 +993,18 @@ export function DrinkMap({
                   className="flex h-11 w-11 items-center justify-center rounded-full border-2 text-2xl"
                   aria-hidden
                 >
-                  {card.drinkEmoji}
+                  {card.avatarEmoji}
                 </span>
                 <div>
-                  <p className="font-bold">
+                  <p className="flex items-center gap-2 font-bold">
                     {card.nickname} · {card.area}
+                    {/* UR2.0 他人性别标记（mock 数据，见 lib/checkins.ts） */}
+                    <span className="font-hand rounded-full border-2 bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">
+                      {t(GENDER_KEY[card.gender])}
+                    </span>
                   </p>
                   <p className="text-muted-foreground text-sm">
+                    {card.drinkEmoji}{" "}
                     {t("drinking", { drink: card.drinkName })}
                   </p>
                   {/* UR1.6 live distance — pure render calc from the watch
