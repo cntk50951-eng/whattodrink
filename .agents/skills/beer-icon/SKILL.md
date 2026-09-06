@@ -15,6 +15,10 @@ generic and get rejected at review.
 - Existing code: `components/marketing/beer-icons/` (one file per brand +
   `index.ts` barrel, shared `BeerIconFrame` in `doodle.tsx`), preview wall at
   `app/[locale]/preview-beer-icons/page.tsx`.
+- `BEER_WALL` (`components/marketing/beer-icons/wall.ts`) is the SINGLE source
+  of truth: every new batch appends `{en, cn, Icon}` entries there (plus the
+  barrel export). The preview wall and the mobile export both read it — never
+  enumerate icons anywhere else. `beerSlug(en)` gives the Android-safe asset name.
 
 ## 1. Reference photos (mandatory)
 
@@ -41,6 +45,10 @@ For each brand, look at the real product before drawing:
   language; fills use **fixed brand hex** so each icon reads as the real beer.
 - Type uses the `font-hand` class; never put a straight `'` inside SVG `<text>`
   (`react/no-unescaped-entities` — use `’`).
+- Every icon carries a style caption: pass `typeLabel="…"` (short CN, ≤5 chars,
+  e.g. 淡拉格/小麥白啤/醬香白酒/淡艾) to `BeerIconFrame` — the frame prints it
+  under the art (y=153) so web and exported mobile assets stay distinguishable.
+  Record the same string in the BEER_WALL entry's `type` field (must match).
 - Stylised likeness only, never an exact trademark copy (legal review still
   required before production use).
 
@@ -56,7 +64,22 @@ For each brand, look at the real product before drawing:
 - `npx tsc --noEmit`, `npm run lint` (0 errors), `npm test`.
 - Hand the user the preview URL and wait for per-icon verdicts; iterate.
 
-## 5. Records
+## 5. Mobile export (every batch)
+
+Run `npm run export:icons` after the gates pass — no dev server or browser needed:
+`scripts/make-wall.ts` renders each BEER_WALL entry to a pure SVG
+(`exported/beer-icons/svg/`, light-theme tokens baked, local Caveat TTF) plus a
+4x PNG via resvg; sips downscales to `ios/` (`@1x/@2x/@3x`) and
+`android/drawable-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/`, with `manifest.json`
+(includes each icon's style `type`).
+iOS: drag the three PNGs into an Asset Catalog image set. Android: copy the five
+`drawable-*` dirs into `res/`. PNGs are RGBA (transparent); the black background
+in chat image previews is only the viewer compositing.
+Sandbox pitfalls (macOS): run npm with `--cache /tmp/npm-cache`; bundle TS with
+esbuild, never tsx (its IPC socket is forbidden); render with resvg, never
+headless Chrome (screenshots SIGABRT, node-spawned Chrome is killed).
+
+## 6. Records
 
 - Backlog UR row: append a version note (what references were viewed, what v2
   mistakes were corrected).

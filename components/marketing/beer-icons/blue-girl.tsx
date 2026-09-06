@@ -12,7 +12,7 @@ type BlueGirlIconProps = {
  */
 export function BlueGirlIcon({ className }: BlueGirlIconProps) {
   return (
-    <BeerIconFrame filterId="bluegirl-wobble" label="Blue Girl" className={className}>
+    <BeerIconFrame typeLabel="皮爾森" filterId="bluegirl-wobble" label="Blue Girl" className={className}>
       {/* Cream can body */}
       <path
         d="M 38 34 L 38 132 Q 38 142 48 142 L 72 142 Q 82 142 82 132 L 82 34 Z"

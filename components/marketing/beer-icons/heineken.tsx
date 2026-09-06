@@ -12,7 +12,7 @@ type HeinekenIconProps = {
  */
 export function HeinekenIcon({ className }: HeinekenIconProps) {
   return (
-    <BeerIconFrame filterId="heineken-wobble" label="Heineken" className={className}>
+    <BeerIconFrame typeLabel="淡拉格" filterId="heineken-wobble" label="Heineken" className={className}>
       {/* Open crimped lip */}
       <path d="M 52 16 L 68 16 L 68 22 L 52 22 Z" fill="#0a5c2e" />
       <path d="M 52 25 L 68 25 M 52 28 L 68 28" strokeWidth="1.4" />

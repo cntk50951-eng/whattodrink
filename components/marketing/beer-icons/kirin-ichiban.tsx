@@ -11,7 +11,7 @@ type KirinIconProps = {
  */
 export function KirinIcon({ className }: KirinIconProps) {
   return (
-    <BeerIconFrame filterId="kirin-wobble" label="Kirin Ichiban" className={className}>
+    <BeerIconFrame typeLabel="淡拉格" filterId="kirin-wobble" label="Kirin Ichiban" className={className}>
       {/* Slim silver can */}
       <path
         d="M 42 30 L 42 132 Q 42 142 50 142 L 70 142 Q 78 142 78 132 L 78 30 Z"

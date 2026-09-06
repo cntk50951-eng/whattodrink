@@ -12,7 +12,7 @@ type YoungMasterIconProps = {
  */
 export function YoungMasterIcon({ className }: YoungMasterIconProps) {
   return (
-    <BeerIconFrame filterId="youngmaster-wobble" label="Young Master" className={className}>
+    <BeerIconFrame typeLabel="淡艾" filterId="youngmaster-wobble" label="Young Master" className={className}>
       {/* White can */}
       <path
         d="M 38 34 L 38 132 Q 38 142 48 142 L 72 142 Q 82 142 82 132 L 82 34 Z"

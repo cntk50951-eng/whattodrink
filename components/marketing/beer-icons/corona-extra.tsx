@@ -12,7 +12,7 @@ type CoronaIconProps = {
  */
 export function CoronaIcon({ className }: CoronaIconProps) {
   return (
-    <BeerIconFrame filterId="corona-wobble" label="Corona Extra" className={className}>
+    <BeerIconFrame typeLabel="淡拉格" filterId="corona-wobble" label="Corona Extra" className={className}>
       {/* Gold crown cap */}
       <path d="M 52 14 L 68 14 L 68 26 L 52 26 Z" fill="#d9a521" />
       <path d="M 52 18 L 68 18 M 52 22 L 68 22" strokeWidth="1" opacity="0.6" />

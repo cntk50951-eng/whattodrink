@@ -11,7 +11,7 @@ type AsahiIconProps = {
  */
 export function AsahiIcon({ className }: AsahiIconProps) {
   return (
-    <BeerIconFrame filterId="asahi-wobble" label="Asahi Super Dry" className={className}>
+    <BeerIconFrame typeLabel="乾拉格" filterId="asahi-wobble" label="Asahi Super Dry" className={className}>
       {/* Silver can body */}
       <path
         d="M 38 34 L 38 132 Q 38 142 48 142 L 72 142 Q 82 142 82 132 L 82 34 Z"

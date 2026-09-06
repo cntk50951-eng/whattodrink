@@ -1,0 +1,542 @@
+[
+  {
+    "slug": "asahi_super_dry",
+    "caption": "Asahi Super Dry（銀罐）",
+    "type": "乾拉格",
+    "svg": "svg/asahi_super_dry.svg",
+    "ios": [
+      "ios/asahi_super_dry@1x.png",
+      "ios/asahi_super_dry@2x.png",
+      "ios/asahi_super_dry@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/asahi_super_dry.png",
+      "android/drawable-hdpi/asahi_super_dry.png",
+      "android/drawable-xhdpi/asahi_super_dry.png",
+      "android/drawable-xxhdpi/asahi_super_dry.png",
+      "android/drawable-xxxhdpi/asahi_super_dry.png"
+    ]
+  },
+  {
+    "slug": "corona_extra",
+    "caption": "Corona Extra（透明瓶＋青檸）",
+    "type": "淡拉格",
+    "svg": "svg/corona_extra.svg",
+    "ios": [
+      "ios/corona_extra@1x.png",
+      "ios/corona_extra@2x.png",
+      "ios/corona_extra@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/corona_extra.png",
+      "android/drawable-hdpi/corona_extra.png",
+      "android/drawable-xhdpi/corona_extra.png",
+      "android/drawable-xxhdpi/corona_extra.png",
+      "android/drawable-xxxhdpi/corona_extra.png"
+    ]
+  },
+  {
+    "slug": "tsingtao_classic",
+    "caption": "Tsingtao Classic（綠瓶）",
+    "type": "淡拉格",
+    "svg": "svg/tsingtao_classic.svg",
+    "ios": [
+      "ios/tsingtao_classic@1x.png",
+      "ios/tsingtao_classic@2x.png",
+      "ios/tsingtao_classic@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/tsingtao_classic.png",
+      "android/drawable-hdpi/tsingtao_classic.png",
+      "android/drawable-xhdpi/tsingtao_classic.png",
+      "android/drawable-xxhdpi/tsingtao_classic.png",
+      "android/drawable-xxxhdpi/tsingtao_classic.png"
+    ]
+  },
+  {
+    "slug": "blue_girl",
+    "caption": "Blue Girl（藍妹）",
+    "type": "皮爾森",
+    "svg": "svg/blue_girl.svg",
+    "ios": [
+      "ios/blue_girl@1x.png",
+      "ios/blue_girl@2x.png",
+      "ios/blue_girl@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/blue_girl.png",
+      "android/drawable-hdpi/blue_girl.png",
+      "android/drawable-xhdpi/blue_girl.png",
+      "android/drawable-xxhdpi/blue_girl.png",
+      "android/drawable-xxxhdpi/blue_girl.png"
+    ]
+  },
+  {
+    "slug": "hoegaarden",
+    "caption": "Hoegaarden（六角杯）",
+    "type": "小麥白啤",
+    "svg": "svg/hoegaarden.svg",
+    "ios": [
+      "ios/hoegaarden@1x.png",
+      "ios/hoegaarden@2x.png",
+      "ios/hoegaarden@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/hoegaarden.png",
+      "android/drawable-hdpi/hoegaarden.png",
+      "android/drawable-xhdpi/hoegaarden.png",
+      "android/drawable-xxhdpi/hoegaarden.png",
+      "android/drawable-xxxhdpi/hoegaarden.png"
+    ]
+  },
+  {
+    "slug": "heineken",
+    "caption": "Heineken（綠瓶紅星）",
+    "type": "淡拉格",
+    "svg": "svg/heineken.svg",
+    "ios": [
+      "ios/heineken@1x.png",
+      "ios/heineken@2x.png",
+      "ios/heineken@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/heineken.png",
+      "android/drawable-hdpi/heineken.png",
+      "android/drawable-xhdpi/heineken.png",
+      "android/drawable-xxhdpi/heineken.png",
+      "android/drawable-xxxhdpi/heineken.png"
+    ]
+  },
+  {
+    "slug": "kirin_ichiban",
+    "caption": "Kirin Ichiban（一番搾）",
+    "type": "淡拉格",
+    "svg": "svg/kirin_ichiban.svg",
+    "ios": [
+      "ios/kirin_ichiban@1x.png",
+      "ios/kirin_ichiban@2x.png",
+      "ios/kirin_ichiban@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/kirin_ichiban.png",
+      "android/drawable-hdpi/kirin_ichiban.png",
+      "android/drawable-xhdpi/kirin_ichiban.png",
+      "android/drawable-xxhdpi/kirin_ichiban.png",
+      "android/drawable-xxxhdpi/kirin_ichiban.png"
+    ]
+  },
+  {
+    "slug": "yebisu",
+    "caption": "Yebisu（金罐）",
+    "type": "拉格",
+    "svg": "svg/yebisu.svg",
+    "ios": [
+      "ios/yebisu@1x.png",
+      "ios/yebisu@2x.png",
+      "ios/yebisu@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/yebisu.png",
+      "android/drawable-hdpi/yebisu.png",
+      "android/drawable-xhdpi/yebisu.png",
+      "android/drawable-xxhdpi/yebisu.png",
+      "android/drawable-xxxhdpi/yebisu.png"
+    ]
+  },
+  {
+    "slug": "young_master",
+    "caption": "Young Master（少爺）",
+    "type": "淡艾",
+    "svg": "svg/young_master.svg",
+    "ios": [
+      "ios/young_master@1x.png",
+      "ios/young_master@2x.png",
+      "ios/young_master@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/young_master.png",
+      "android/drawable-hdpi/young_master.png",
+      "android/drawable-xhdpi/young_master.png",
+      "android/drawable-xxhdpi/young_master.png",
+      "android/drawable-xxxhdpi/young_master.png"
+    ]
+  },
+  {
+    "slug": "moutai_flying_fairy",
+    "caption": "Moutai Flying Fairy（茅台）",
+    "type": "醬香白酒",
+    "svg": "svg/moutai_flying_fairy.svg",
+    "ios": [
+      "ios/moutai_flying_fairy@1x.png",
+      "ios/moutai_flying_fairy@2x.png",
+      "ios/moutai_flying_fairy@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/moutai_flying_fairy.png",
+      "android/drawable-hdpi/moutai_flying_fairy.png",
+      "android/drawable-xhdpi/moutai_flying_fairy.png",
+      "android/drawable-xxhdpi/moutai_flying_fairy.png",
+      "android/drawable-xxxhdpi/moutai_flying_fairy.png"
+    ]
+  },
+  {
+    "slug": "budweiser",
+    "caption": "Budweiser（百威）",
+    "type": "美式拉格",
+    "svg": "svg/budweiser.svg",
+    "ios": [
+      "ios/budweiser@1x.png",
+      "ios/budweiser@2x.png",
+      "ios/budweiser@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/budweiser.png",
+      "android/drawable-hdpi/budweiser.png",
+      "android/drawable-xhdpi/budweiser.png",
+      "android/drawable-xxhdpi/budweiser.png",
+      "android/drawable-xxxhdpi/budweiser.png"
+    ]
+  },
+  {
+    "slug": "carlsberg",
+    "caption": "Carlsberg（嘉士伯）",
+    "type": "皮爾森",
+    "svg": "svg/carlsberg.svg",
+    "ios": [
+      "ios/carlsberg@1x.png",
+      "ios/carlsberg@2x.png",
+      "ios/carlsberg@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/carlsberg.png",
+      "android/drawable-hdpi/carlsberg.png",
+      "android/drawable-xhdpi/carlsberg.png",
+      "android/drawable-xxhdpi/carlsberg.png",
+      "android/drawable-xxxhdpi/carlsberg.png"
+    ]
+  },
+  {
+    "slug": "sapporo",
+    "caption": "Sapporo（札幌）",
+    "type": "拉格",
+    "svg": "svg/sapporo.svg",
+    "ios": [
+      "ios/sapporo@1x.png",
+      "ios/sapporo@2x.png",
+      "ios/sapporo@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/sapporo.png",
+      "android/drawable-hdpi/sapporo.png",
+      "android/drawable-xhdpi/sapporo.png",
+      "android/drawable-xxhdpi/sapporo.png",
+      "android/drawable-xxxhdpi/sapporo.png"
+    ]
+  },
+  {
+    "slug": "snow",
+    "caption": "Snow（雪花）",
+    "type": "淡拉格",
+    "svg": "svg/snow.svg",
+    "ios": [
+      "ios/snow@1x.png",
+      "ios/snow@2x.png",
+      "ios/snow@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/snow.png",
+      "android/drawable-hdpi/snow.png",
+      "android/drawable-xhdpi/snow.png",
+      "android/drawable-xxhdpi/snow.png",
+      "android/drawable-xxxhdpi/snow.png"
+    ]
+  },
+  {
+    "slug": "yanjing",
+    "caption": "Yanjing（燕京）",
+    "type": "淡拉格",
+    "svg": "svg/yanjing.svg",
+    "ios": [
+      "ios/yanjing@1x.png",
+      "ios/yanjing@2x.png",
+      "ios/yanjing@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/yanjing.png",
+      "android/drawable-hdpi/yanjing.png",
+      "android/drawable-xhdpi/yanjing.png",
+      "android/drawable-xxhdpi/yanjing.png",
+      "android/drawable-xxxhdpi/yanjing.png"
+    ]
+  },
+  {
+    "slug": "harbin",
+    "caption": "Harbin（哈尔滨）",
+    "type": "拉格",
+    "svg": "svg/harbin.svg",
+    "ios": [
+      "ios/harbin@1x.png",
+      "ios/harbin@2x.png",
+      "ios/harbin@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/harbin.png",
+      "android/drawable-hdpi/harbin.png",
+      "android/drawable-xhdpi/harbin.png",
+      "android/drawable-xxhdpi/harbin.png",
+      "android/drawable-xxxhdpi/harbin.png"
+    ]
+  },
+  {
+    "slug": "bud_light",
+    "caption": "Bud Light（百威淡啤）",
+    "type": "淡拉格",
+    "svg": "svg/bud_light.svg",
+    "ios": [
+      "ios/bud_light@1x.png",
+      "ios/bud_light@2x.png",
+      "ios/bud_light@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/bud_light.png",
+      "android/drawable-hdpi/bud_light.png",
+      "android/drawable-xhdpi/bud_light.png",
+      "android/drawable-xxhdpi/bud_light.png",
+      "android/drawable-xxxhdpi/bud_light.png"
+    ]
+  },
+  {
+    "slug": "coors_light",
+    "caption": "Coors Light（酷姿淡啤）",
+    "type": "淡拉格",
+    "svg": "svg/coors_light.svg",
+    "ios": [
+      "ios/coors_light@1x.png",
+      "ios/coors_light@2x.png",
+      "ios/coors_light@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/coors_light.png",
+      "android/drawable-hdpi/coors_light.png",
+      "android/drawable-xhdpi/coors_light.png",
+      "android/drawable-xxhdpi/coors_light.png",
+      "android/drawable-xxxhdpi/coors_light.png"
+    ]
+  },
+  {
+    "slug": "miller_lite",
+    "caption": "Miller Lite（米勒淡啤）",
+    "type": "淡拉格",
+    "svg": "svg/miller_lite.svg",
+    "ios": [
+      "ios/miller_lite@1x.png",
+      "ios/miller_lite@2x.png",
+      "ios/miller_lite@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/miller_lite.png",
+      "android/drawable-hdpi/miller_lite.png",
+      "android/drawable-xhdpi/miller_lite.png",
+      "android/drawable-xxhdpi/miller_lite.png",
+      "android/drawable-xxxhdpi/miller_lite.png"
+    ]
+  },
+  {
+    "slug": "modelo_especial",
+    "caption": "Modelo Especial（莫德罗）",
+    "type": "淡拉格",
+    "svg": "svg/modelo_especial.svg",
+    "ios": [
+      "ios/modelo_especial@1x.png",
+      "ios/modelo_especial@2x.png",
+      "ios/modelo_especial@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/modelo_especial.png",
+      "android/drawable-hdpi/modelo_especial.png",
+      "android/drawable-xhdpi/modelo_especial.png",
+      "android/drawable-xxhdpi/modelo_especial.png",
+      "android/drawable-xxxhdpi/modelo_especial.png"
+    ]
+  },
+  {
+    "slug": "negra_modelo",
+    "caption": "Negra Modelo（莫德罗黑啤）",
+    "type": "深色拉格",
+    "svg": "svg/negra_modelo.svg",
+    "ios": [
+      "ios/negra_modelo@1x.png",
+      "ios/negra_modelo@2x.png",
+      "ios/negra_modelo@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/negra_modelo.png",
+      "android/drawable-hdpi/negra_modelo.png",
+      "android/drawable-xhdpi/negra_modelo.png",
+      "android/drawable-xxhdpi/negra_modelo.png",
+      "android/drawable-xxxhdpi/negra_modelo.png"
+    ]
+  },
+  {
+    "slug": "pacifico",
+    "caption": "Pacifico（太平洋）",
+    "type": "皮爾森",
+    "svg": "svg/pacifico.svg",
+    "ios": [
+      "ios/pacifico@1x.png",
+      "ios/pacifico@2x.png",
+      "ios/pacifico@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/pacifico.png",
+      "android/drawable-hdpi/pacifico.png",
+      "android/drawable-xhdpi/pacifico.png",
+      "android/drawable-xxhdpi/pacifico.png",
+      "android/drawable-xxxhdpi/pacifico.png"
+    ]
+  },
+  {
+    "slug": "tecate",
+    "caption": "Tecate（特卡特）",
+    "type": "淡拉格",
+    "svg": "svg/tecate.svg",
+    "ios": [
+      "ios/tecate@1x.png",
+      "ios/tecate@2x.png",
+      "ios/tecate@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/tecate.png",
+      "android/drawable-hdpi/tecate.png",
+      "android/drawable-xhdpi/tecate.png",
+      "android/drawable-xxhdpi/tecate.png",
+      "android/drawable-xxxhdpi/tecate.png"
+    ]
+  },
+  {
+    "slug": "dos_equis",
+    "caption": "Dos Equis（双 X）",
+    "type": "淡拉格",
+    "svg": "svg/dos_equis.svg",
+    "ios": [
+      "ios/dos_equis@1x.png",
+      "ios/dos_equis@2x.png",
+      "ios/dos_equis@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/dos_equis.png",
+      "android/drawable-hdpi/dos_equis.png",
+      "android/drawable-xhdpi/dos_equis.png",
+      "android/drawable-xxhdpi/dos_equis.png",
+      "android/drawable-xxxhdpi/dos_equis.png"
+    ]
+  },
+  {
+    "slug": "sol",
+    "caption": "Sol（太阳）",
+    "type": "淡拉格",
+    "svg": "svg/sol.svg",
+    "ios": [
+      "ios/sol@1x.png",
+      "ios/sol@2x.png",
+      "ios/sol@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/sol.png",
+      "android/drawable-hdpi/sol.png",
+      "android/drawable-xhdpi/sol.png",
+      "android/drawable-xxhdpi/sol.png",
+      "android/drawable-xxxhdpi/sol.png"
+    ]
+  },
+  {
+    "slug": "bohemia",
+    "caption": "Bohemia（波西米亚）",
+    "type": "皮爾森",
+    "svg": "svg/bohemia.svg",
+    "ios": [
+      "ios/bohemia@1x.png",
+      "ios/bohemia@2x.png",
+      "ios/bohemia@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/bohemia.png",
+      "android/drawable-hdpi/bohemia.png",
+      "android/drawable-xhdpi/bohemia.png",
+      "android/drawable-xxhdpi/bohemia.png",
+      "android/drawable-xxxhdpi/bohemia.png"
+    ]
+  },
+  {
+    "slug": "victoria",
+    "caption": "Victoria（维多利亚）",
+    "type": "維也納拉格",
+    "svg": "svg/victoria.svg",
+    "ios": [
+      "ios/victoria@1x.png",
+      "ios/victoria@2x.png",
+      "ios/victoria@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/victoria.png",
+      "android/drawable-hdpi/victoria.png",
+      "android/drawable-xhdpi/victoria.png",
+      "android/drawable-xxhdpi/victoria.png",
+      "android/drawable-xxxhdpi/victoria.png"
+    ]
+  },
+  {
+    "slug": "indio",
+    "caption": "Indio（印第欧）",
+    "type": "深色拉格",
+    "svg": "svg/indio.svg",
+    "ios": [
+      "ios/indio@1x.png",
+      "ios/indio@2x.png",
+      "ios/indio@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/indio.png",
+      "android/drawable-hdpi/indio.png",
+      "android/drawable-xhdpi/indio.png",
+      "android/drawable-xxhdpi/indio.png",
+      "android/drawable-xxxhdpi/indio.png"
+    ]
+  },
+  {
+    "slug": "skol",
+    "caption": "Skol（斯库尔）",
+    "type": "皮爾森",
+    "svg": "svg/skol.svg",
+    "ios": [
+      "ios/skol@1x.png",
+      "ios/skol@2x.png",
+      "ios/skol@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/skol.png",
+      "android/drawable-hdpi/skol.png",
+      "android/drawable-xhdpi/skol.png",
+      "android/drawable-xxhdpi/skol.png",
+      "android/drawable-xxxhdpi/skol.png"
+    ]
+  },
+  {
+    "slug": "brahma",
+    "caption": "Brahma（布拉马）",
+    "type": "皮爾森",
+    "svg": "svg/brahma.svg",
+    "ios": [
+      "ios/brahma@1x.png",
+      "ios/brahma@2x.png",
+      "ios/brahma@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/brahma.png",
+      "android/drawable-hdpi/brahma.png",
+      "android/drawable-xhdpi/brahma.png",
+      "android/drawable-xxhdpi/brahma.png",
+      "android/drawable-xxxhdpi/brahma.png"
+    ]
+  }
+]
