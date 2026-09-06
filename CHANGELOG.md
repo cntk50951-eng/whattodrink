@@ -40,6 +40,11 @@
   - fix（沉底屡修不生效的真根因，用户定位）：关闭的扇形格 opacity-0 但仍在流内占位，column-reverse 把啤酒垫高约 360px——扇形格改绝对定位（CSS 变量逐格定高，脱流），关闭态容器只剩啤酒，真正贴角；16 tests／tsc 全绿、lint 0 error；未提交
 - **UR 1.6 — 全港找人＋双人同框＋实时距离（[✓] 用户已验收）**
 - **UR 1.7 — 首页地图独占＋顶部菜单（[✓] 用户已验收）**
+- **UR 1.8 — 想喝打卡回看面板（[✓] 用户已验收）**
+  - 落「想喝」瞬间快照 `{beer, at, position}` 进 localStorage（POC，用户决策：逆地理留到 native）；「想喝」marker 加点击，复用底部卡片新分支显示酒＋时间＋经纬度＋冻结说明
+  - `lib/wantRecord.ts` 纯函数（parse 校验＋HK 时区时间＋坐标格式化）＋9 单测；刷新后 pin＋记录自动回来；新一轮推荐退役旧快照；31 tests／tsc 全绿、lint 0 error（3 旧 warning）；未提交
+  - fix（用户验收反馈）：时间补年份并按语言定式（中文 `2026年9月5日 14:32`／英文 `2026-09-05 14:32`，formatToParts＋HK 时区）；地点联机逆地理真名（Nominatim＋memoize＋存回 storage，断网回落经纬度）；39 tests／tsc 全绿、lint 0 error；未提交
+  - fix（bug：点圆圈没反应＋旧记录消失，用户回报）：两根因——① `handleSelfPick` 从 UR1.1 起就没开过 sheet，UR1.2 抽屉化后这条路静默无反应，补 `setSheetOpen(true)`；② UR1.8 退役旧快照放错地方（re-roll 即清），改只在新想喝落下时覆盖，旧 pin＋记录同生共死；39 tests／tsc 全绿、lint 0 error；未提交
   - 首页删 `BentoGrid` 整段（4 文件 `git rm`，git 历史可找回）；header 加汉堡菜单（Base UI dropdown，涂鸦重皮肤：border-2＋硬阴影＋font-hand＋44px 触点）
   - 三项：今晚喝什麼→`/?pick=1` 深链（回地图＋飞当前位置＋展扇形＋自动开选酒面板，手動终态一致）、拍照→`/camera`、心情→`/mood`（删 Bento 后心情唯一入口）
   - 深链跨导航状态同步：`useState` 初始化＋`false→true`  transition effect 双保险；开面板／飞镜头双闩（定位后到不吞镜头）；22 tests／tsc 全绿、lint 0 error（3 旧 warning）；未提交
