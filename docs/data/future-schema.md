@@ -30,6 +30,11 @@ UI 全确定后按此开工 EPIC 3.0 真表设计。
   inbox 多一条（`to_user_id = 对方` 的这同一行）。不做镜像双行（一行双读足够，
   计数 `count(cheers where checkin_id=…)` 不变）。`to_user_id` 为 UR3.0 新增列
   （原草图只有 from）。前端 `sentIds`＋乐观＋1 届时改读“`from_user_id = 我` 的行”。
+  **UR3.2 每日 15 次上限（EPIC 3.0 在 API 层强制执行）**：写入前查
+  `count(cheers where from_user_id＝我 and created_at >= 当天 00:00 HKT) >= 15`
+  即拒（429＋剩余额度 0），口径与前端 `canCheers` 一致；`created_at` 建索引
+  （按天范围查），不另加计数列（计数实时算，沿本表既有原则）。前端 mock
+  （`wtd-cheers-daily`／HK 日期键）届时整块删，换读服务端剩余额度。
 - `mood_logs(id, user_id, mood_text, created_at)` —— 心情输入流
 - （暂缓）`bars`、`friendships`、`game_*` —— EPIC 4.0 前不设计
 

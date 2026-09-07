@@ -189,6 +189,9 @@
     "recenter": "Back to my location",
     "fabMenu": "Map actions",
     "deniedGuide": "Usually a past denial or location turned off system-wide. Check in order: 1) OS master switch: iPhone Settings → Privacy & Security → Location Services on; Android Settings → Location on. 2) Browser site permission: Chrome lock icon → Location → Allow. 3) Opened inside WeChat/IG? Reopen this link in Safari/Chrome.",
-    "clusterTitle": "Zoom in to see {n} drinkers"
+    "clusterTitle": "Zoom in to see {n} drinkers",
+    "shakeSearching": "Shaking up nearby drinkers…",
+    "cheersLeft": "{n} cheers left today",
+    "cheersLimitReached": "Daily cheers used up (15). Come back tomorrow!"
   }
 }

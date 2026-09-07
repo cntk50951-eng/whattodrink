@@ -40,7 +40,7 @@
 | `position` | pin 位置、双人同框、实时距离 | `LatLng` | 同上 | `checkins.lat`／`lng` |
 | `cheers`（被乾杯数） | 乾杯卡计数 | `number` | 同上 | `count(cheers where checkin_id=…)`（不存数，实时算） |
 | `checkedInAt`（打卡毫秒戳，UR2.5） | 摇一摇 24h 窗口过滤（不直接展示） | `number`（种子相对模块加载时） | 同上 | `checkins.created_at` |
-| `sentIds`（我已乾杯 id 表） | “已送出”态 | `string[]` | state，会话 | `cheers(from_user_id, to_user_id, checkin_id, created_at)`（UR3.0 加 `to_user_id`，一行双读：发送方 sent＋接收方 inbox 各＋一条） |
+| `sentIds`（我已乾杯 id 表，UR3.2 按天） | “已送出”态＋额度 UI | `string[]` | state＋localStorage（`wtd-cheers-daily`＝{day（HK 日期键）, ids}，跨天归零，坏数据归零） | `cheers(from_user_id, to_user_id, checkin_id, created_at)`（UR3.0 加 `to_user_id`，一行双读；UR3.2 加服务端按天 15 次拒绝口径） |
 | `cheersFx`（碰杯特效中，UR3.0） | 特效层显隐＋计数乐观＋1 | `{id,key}｜null` | state，会话 | UI 纯状态，不进库（1.3s 后提交 `sentIds` 即拆） |
 
 ## 五、UI 纯状态（不进库，列出防误收）
