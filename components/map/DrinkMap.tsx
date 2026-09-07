@@ -1605,7 +1605,7 @@ export function DrinkMap({
             type="button"
             onClick={() => setSelectedId(null)}
             aria-label={t("close")}
-            className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border-2"
+            className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border-2 bg-card shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
           >
             <X size={16} aria-hidden />
           </button>
@@ -1685,6 +1685,9 @@ export function DrinkMap({
             <>
               {/* UR2.7 追加同构 hero 槽：酒名命中已画品牌 → 设计稿放主角位
                   （头像缩成角标保身份）；没命中保持原放大头像，不硬凑。 */}
+              {/* UR3.6 他人卡头：水彩 blob＋胶带贴纸裱头像；
+                  右侧 pr-10 给 X 贴纸让位＋全区 flex-wrap，在线态下沉到
+                  meta 行——结构上不再有东西能顶进 X 底下。 */}
               <div className="flex items-center gap-4">
                 {(() => {
                   const DrinkIcon = iconForDrinkName(card.drinkName);
@@ -1693,15 +1696,29 @@ export function DrinkMap({
                   const onlineDot = online ? (
                     <span aria-hidden className={styles.pinOnline} />
                   ) : null;
+                  const tape = (
+                    <span
+                      aria-hidden
+                      className={`${styles.tape} absolute -top-2 left-1/2 z-10 h-5 w-12 -translate-x-1/2 -rotate-6 rounded-[2px]`}
+                    />
+                  );
+                  const wash = (
+                    <span
+                      aria-hidden
+                      className={`${styles.waterWash} absolute -inset-2`}
+                    />
+                  );
                   return DrinkIcon !== null ? (
                     <span className="relative shrink-0">
+                      {wash}
+                      {tape}
                       <span
-                        className={`${styles.pickArtIn} block h-24 w-auto [&>svg]:h-full [&>svg]:w-auto`}
+                        className={`${styles.pickArtIn} relative block h-24 w-auto [&>svg]:h-full [&>svg]:w-auto`}
                       >
                         <DrinkIcon />
                       </span>
                       <span
-                        className="absolute -right-2 -bottom-2 flex h-9 w-9 items-center justify-center rounded-full border-2 bg-card text-xl"
+                        className="absolute -right-2 -bottom-2 z-10 flex h-9 w-9 items-center justify-center rounded-full border-2 bg-card text-xl"
                         aria-hidden
                       >
                         {card.avatarEmoji}
@@ -1709,27 +1726,44 @@ export function DrinkMap({
                       </span>
                     </span>
                   ) : (
-                    <span
-                      className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 text-3xl"
-                      aria-hidden
-                    >
-                      {card.avatarEmoji}
-                      {onlineDot}
+                    <span className="relative shrink-0">
+                      {wash}
+                      {tape}
+                      <span
+                        className="relative flex h-16 w-16 items-center justify-center rounded-full border-2 bg-card text-3xl"
+                        aria-hidden
+                      >
+                        {card.avatarEmoji}
+                        {onlineDot}
+                      </span>
                     </span>
                   );
                 })()}
-                <div>
-                  <p className="flex items-center gap-2 font-bold">
-                    {card.nickname} · {card.area}
+                <div className="min-w-0 pr-10">
+                  <p className="flex flex-wrap items-center gap-2 font-bold">
+                    {card.nickname}
                     {/* UR2.0 他人性别标记（mock 数据，见 lib/checkins.ts） */}
                     <span className="font-hand rounded-full border-2 bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">
                       {t(GENDER_KEY[card.gender])}
                     </span>
-                    {/* UR3.3 在线态（返工：去 pill 化——双 pill 并排打架，
-                        只留性别 pill；在线退成区名后的绿点＋绿字）。 */}
+                  </p>
+                  {/* meta 行：区名·距离·在线全收敛到这一行自由换行，
+                      上方名字行＋本行都有 pr-10，X 再也压不到字。 */}
+                  <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm">
+                    <span>{card.area}</span>
+                    <span aria-hidden>·</span>
+                    <span>
+                      {selfFix !== null
+                        ? t("distanceAway", {
+                            d: formatDistance(
+                              haversineMeters(selfFix, card.position),
+                            ),
+                          })
+                        : t("needLocateForDistance")}
+                    </span>
                     {isOnline(card, nowMs) && (
                       <span
-                        className={`${styles.inviteOk} inline-flex items-center gap-1 text-sm font-normal`}
+                        className={`${styles.inviteOk} inline-flex items-center gap-1 font-bold`}
                       >
                         <span
                           aria-hidden
@@ -1739,24 +1773,26 @@ export function DrinkMap({
                       </span>
                     )}
                   </p>
-                  <p className="text-muted-foreground text-sm">
+                  <p className="text-muted-foreground mt-1 text-sm">
                     {card.drinkEmoji}{" "}
                     {t("drinking", { drink: card.drinkName })}
                   </p>
-                  {/* UR1.6 live distance — pure render calc from the watch
-                      fix, so it tracks you as you move. */}
-                  <p className="text-muted-foreground text-sm">
-                    {selfFix !== null
-                      ? t("distanceAway", {
-                          d: formatDistance(
-                            haversineMeters(selfFix, card.position),
-                          ),
-                        })
-                      : t("needLocateForDistance")}
-                  </p>
                 </div>
               </div>
-              <div className="mt-3 flex items-center justify-between gap-2">
+              {/* UR3.6 手绘波浪分隔线：信息区和动作区的纸上分界。 */}
+              <svg
+                aria-hidden
+                viewBox="0 0 120 8"
+                className="mt-3 w-full"
+                fill="none"
+                stroke="var(--border)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                preserveAspectRatio="none"
+              >
+                <path d="M2 5 Q10 1 18 5 T34 5 T50 5 T66 5 T82 5 T98 5 T118 5" />
+              </svg>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-muted-foreground text-sm">
                   {t("cheersCount", {
                     // MOCK 乐观＋1：碰杯（特效中）即算数，EPIC 3.0 以 count 为准。
@@ -1768,7 +1804,7 @@ export function DrinkMap({
                         : 0),
                   })}
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {sentIds.includes(card.id) ? (
                     <p role="status" className="font-hand text-lg font-bold">
                       {t("cheersSent")}
@@ -1784,7 +1820,9 @@ export function DrinkMap({
                     </button>
                   )}
                   {/* UR3.3 约喝酒（副按钮，白底 ink 边）：只给在线人挂；
-                      乾杯是主按钮，两者独立，互不锁。 */}
+                      乾杯是主按钮，两者独立，互不锁。
+                      UR3.6 副钮降级（px-3 py-1 text-sm）：和主钮拉开层级，
+                      治“畸形大”；外层已 flex-wrap，窄卡自动另起一行。 */}
                   {isOnline(card, nowMs) &&
                     (() => {
                       const phase = invites[card.id];
@@ -1804,7 +1842,7 @@ export function DrinkMap({
                           type="button"
                           onClick={() => handleInvite(card.id)}
                           disabled={pending}
-                          className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-card px-4 py-1.5 font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none disabled:opacity-60"
+                          className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-card px-3 py-1 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none disabled:opacity-60"
                         >
                           {pending ? (
                             <>
