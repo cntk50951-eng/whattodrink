@@ -9,6 +9,9 @@ import { Clock, Dices, MapPin, Plus, X } from "lucide-react";
 import { MapFab } from "@/components/map/MapFab";
 
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { useShake } from "@/hooks/useShake";
+import { markShakeUsed } from "@/components/map/MapFab";
+import { pickNearestRecentCheckin } from "@/lib/shake";
 import {
   ANDROID_LOCATION_SETTINGS_INTENT,
   detectBrowser,
@@ -191,6 +194,77 @@ export function DrinkMap({
       });
     }
   }
+  /**
+   * UR2.5 摇一摇流程：有效触发 → 24h 内最近 → 用户位置声纳 ~1.2s →
+   * 复用 handleFocusPerson 开卡聚焦。按钮和真机摇动都走这里。
+   */
+  const [ripple, setRipple] = useState<{
+    x: number;
+    y: number;
+    key: number;
+  } | null>(null);
+  const [shakeToast, setShakeToast] = useState<string | null>(null);
+  const toastTimer = useRef<number | null>(null);
+  useEffect(() => {
+    const timer = toastTimer.current;
+    return () => {
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, []);
+
+  function showShakeToast(msg: string): void {
+    if (toastTimer.current !== null) window.clearTimeout(toastTimer.current);
+    setShakeToast(msg);
+    toastTimer.current = window.setTimeout(() => setShakeToast(null), 3500);
+  }
+
+  function runShakeFlow(): void {
+    markShakeUsed();
+    const geo = geoRef.current;
+    const self =
+      geo.status === "success" && geo.position !== null ? geo.position : null;
+    if (self === null) {
+      showShakeToast(t("shakeNoGeo"));
+      return;
+    }
+    const pick = pickNearestRecentCheckin(self, MOCK_CHECKINS, Date.now());
+    if (pick === null) {
+      showShakeToast(t("shakeNoneNearby"));
+      return;
+    }
+    const map = mapRef.current;
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (map !== null && !reduced) {
+      const pt = map.latLngToContainerPoint([self.lat, self.lng]);
+      setRipple({ x: pt.x, y: pt.y, key: Date.now() });
+      window.setTimeout(() => {
+        setRipple(null);
+        handleFocusPerson(pick);
+      }, 1250);
+    } else {
+      // reduced-motion：跳过涟漪直接聚焦（handleFocusPerson 内走 setView）。
+      handleFocusPerson(pick);
+    }
+  }
+
+  // useShake 回调走内部 ref（和 geoRef 同一 stale-closure 解法），直接传即可。
+  const { needsPermission, permission, requestPermission } =
+    useShake(runShakeFlow);
+
+  /** 摇摇按钮：iOS 先要动作权限（必须在点击手势里），再走同一流程。 */
+  function handleShakeRequest(): void {
+    if (needsPermission && permission !== "granted") {
+      void requestPermission().then((ok) => {
+        if (!ok) showShakeToast(t("shakeDenied"));
+        else runShakeFlow();
+      });
+      return;
+    }
+    runShakeFlow();
+  }
+
   const [sentIds, setSentIds] = useState<string[]>([]);
   const [picked, setPicked] = useState<Beer | null>(null);
   const [wantAt, setWantAt] = useState<LatLng | null>(null);
@@ -886,6 +960,26 @@ export function DrinkMap({
         </svg>
       </div>
 
+      {/* UR2.5 摇一摇声纳：盖在瓦片上但 pointer-events 关死，
+          1250ms 后卸载并聚焦，绝不挡地图操作。 */}
+      {ripple !== null && (
+        <span
+          key={ripple.key}
+          aria-hidden
+          className={`${styles.above} ${styles.shakeRipple} pointer-events-none`}
+          style={{ left: ripple.x, top: ripple.y }}
+        />
+      )}
+      {/* UR2.5 摇摇 toast：空结果／无定位／权限拒绝的唯一出口，3.5 秒自散。 */}
+      {shakeToast !== null && (
+        <p
+          role="status"
+          className={`${styles.above} ${styles.fabBubblePop} pointer-events-none absolute top-24 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-full border-2 bg-card/95 px-4 py-1.5 text-center text-xs font-bold md:text-sm`}
+        >
+          {shakeToast}
+        </p>
+      )}
+
       {/* Speed-dial: every map action consolidated in one button. Hides
           while any bottom card is open (the beer lives in the corner,
           nowhere else); closing the card brings it back. */}
@@ -903,6 +997,7 @@ export function DrinkMap({
         onFitHk={handleFitHk}
         onZoomIn={() => handleZoom(1)}
         onZoomOut={() => handleZoom(-1)}
+        onShake={handleShakeRequest}
       />
 
       {/* MOCK badge — top-left now; bottom-left belongs to the beer dial. */}

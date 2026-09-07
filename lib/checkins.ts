@@ -23,9 +23,18 @@ export type Checkin = {
   area: string;
   position: LatLng;
   cheers: number;
+  /**
+   * UR2.5 打卡时刻（epoch ms）。种子按模块加载时算相对时间，
+   * 保证"24h 内"窗口永远有活数据；真后端用 row 的 created_at。
+   */
+  checkedInAt: number;
   /** Always true for seed data — lets the UI badge mock entries. */
   mock: true;
 };
+
+/** 模块加载时刻 —— 种子时间全是相对它算的，不会放久过期。 */
+const SEED_AT = Date.now();
+const HOURS = 3600_000;
 
 export const MOCK_CHECKINS: Checkin[] = [
   {
@@ -38,6 +47,7 @@ export const MOCK_CHECKINS: Checkin[] = [
     area: "銅鑼灣",
     position: { lat: 22.2783, lng: 114.1827 },
     cheers: 12,
+    checkedInAt: SEED_AT - 2 * HOURS,
     mock: true,
   },
   {
@@ -50,6 +60,7 @@ export const MOCK_CHECKINS: Checkin[] = [
     area: "中環",
     position: { lat: 22.2819, lng: 114.1577 },
     cheers: 8,
+    checkedInAt: SEED_AT - 5 * HOURS,
     mock: true,
   },
   {
@@ -62,6 +73,8 @@ export const MOCK_CHECKINS: Checkin[] = [
     area: "尖沙咀",
     position: { lat: 22.2976, lng: 114.1722 },
     cheers: 21,
+    // 故意放过期（26h）：证明 24h 窗口真的会过滤，不是摆设。
+    checkedInAt: SEED_AT - 26 * HOURS,
     mock: true,
   },
   {
@@ -74,6 +87,7 @@ export const MOCK_CHECKINS: Checkin[] = [
     area: "旺角",
     position: { lat: 22.3193, lng: 114.1694 },
     cheers: 5,
+    checkedInAt: SEED_AT - 0.5 * HOURS,
     mock: true,
   },
 ];

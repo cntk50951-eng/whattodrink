@@ -349,7 +349,71 @@
   }
 }
 
+/* UR2.5 摇一摇声纳：中心一点软闪＋两圈先后扩散就收（JS 定 950ms 卸载）。
+ * 三层都只动 transform／opacity；pointer-events 交给调用方关
+ * （声纳绝不能挡地图操作）。第二圈 0.28s 出发＋0.9s 走完，
+ * JS 须 1250ms 后再卸载（见 runShakeFlow）。 */
+.shakeRipple {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border-radius: 9999px;
+  border: 3px solid var(--doodle-red);
+  animation: shake-ring 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.shakeRipple::before,
+.shakeRipple::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* 中心软闪：快起快收，定一下圆心。 */
+.shakeRipple::before {
+  background: var(--doodle-red);
+  animation: shake-flash 0.45s ease-out forwards;
+}
+
+/* 第二圈：慢 0.28 秒出发，制造追逐感。 */
+.shakeRipple::after {
+  border: 2px solid var(--doodle-red);
+  animation: shake-ring 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.28s forwards;
+  opacity: 0;
+}
+
+@keyframes shake-ring {
+  from {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(7);
+    opacity: 0;
+  }
+}
+
+@keyframes shake-flash {
+  from {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  to {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .shakeRipple,
+  .shakeRipple::before,
+  .shakeRipple::after {
+    animation: none;
+    opacity: 0;
+  }
   .pin,
   .pinAlt,
   .liveDot {
