@@ -364,6 +364,35 @@
   }
 }
 
+/* UR2.9 触发 rattle：横向衰减抖，像被人抓住猛晃两下（和 idle nudge 的
+ * 旋转区分开）。只动 transform，一次 0.5s，reduced-motion 全关（见文末）。
+ * 调用方用 key 重挂重播，和 fabShake 三元互斥（同一元素单动画，UR2.5 教训）。 */
+.fabRattle {
+  animation: fab-rattle 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1;
+}
+
+@keyframes fab-rattle {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  15% {
+    transform: translateX(-7px) rotate(-6deg);
+  }
+  30% {
+    transform: translateX(6px) rotate(5deg);
+  }
+  45% {
+    transform: translateX(-5px) rotate(-4deg);
+  }
+  60% {
+    transform: translateX(4px) rotate(3deg);
+  }
+  75% {
+    transform: translateX(-2px) rotate(-1deg);
+  }
+}
+
 /* Idle comic bubble after 20s of no taps — spring pop-in plus a tail
  * pointing down at the beer. Supersedes the small hint pill. */
 .fabBubblePop {
@@ -516,6 +545,7 @@
     opacity: 0;
   }
   .fabShake,
+  .fabRattle,
   .fabBubblePop {
     animation: none;
   }
