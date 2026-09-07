@@ -6,6 +6,9 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import type * as Leaflet from "leaflet";
 import { useLocale, useTranslations } from "next-intl";
 import { Clock, Dices, MapPin, Plus, X } from "lucide-react";
+import { resolveCityCode } from "@/lib/city";
+
+import { CityIcon } from "./CityIcon";
 import { MapFab } from "@/components/map/MapFab";
 
 import { useGeolocation } from "@/hooks/useGeolocation";
@@ -17,6 +20,12 @@ import {
   BUZZ_PRIME,
   buzz,
 } from "@/lib/haptics";
+import {
+  patchVisitArea,
+  shouldShowLastPlace,
+  touchVisit,
+} from "@/lib/visit";
+import type { LastVisit } from "@/lib/visit";
 import {
   canCheers,
   cheersRemaining,
@@ -330,15 +339,40 @@ export function DrinkMap({
   const [reducedMotion, setReducedMotion] = useState(false);
   // UR3.3 在线判定用的 now 快照（render 里禁 Date.now.，mount 取一次；
   // 5min 窗口相对 mock 种子同代，整会话不漂移，够 mock 用）。
+  // UR3.5 上次访问同批取出（读完即写 now，首访回 null）。
   const [nowMs, setNowMs] = useState(0);
+  const [lastVisit, setLastVisit] = useState<LastVisit | null>(null);
+  const [currentArea, setCurrentArea] = useState<string | null>(null);
   useEffect(() => {
     void Promise.resolve().then(() => {
       setReducedMotion(
         window.matchMedia("(prefers-reduced-motion: reduce)").matches,
       );
-      setNowMs(Date.now());
+      const now = Date.now();
+      setNowMs(now);
+      setLastVisit(touchVisit(now));
     });
   }, []);
+  // UR3.5 当前区：geo 成功即反查（内置 memo 去重），回来补进本次访问戳。
+  useEffect(() => {
+    if (
+      geoStatus !== "success" ||
+      geoPosition === null ||
+      !isWithinHongKong(geoPosition)
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void resolvePlaceName(geoPosition, locale).then((name) => {
+      if (cancelled || name === null) return;
+      setCurrentArea(name);
+      patchVisitArea(name);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [geoStatus, geoPosition, locale]);
+
   const toastTimer = useRef<number | null>(null);
   useEffect(() => {
     const timer = toastTimer.current;
@@ -471,6 +505,20 @@ export function DrinkMap({
     geoStatus === "success" && geoPosition !== null
       ? !isWithinHongKong(geoPosition)
       : false;
+  // UR3.5 登录态三色（色块走 CSS module／标准 muted，圆点跟 currentColor）。
+  const meStatusTone =
+    geoStatus === "success"
+      ? styles.inviteOk
+      : geoFailed
+        ? styles.meOffline
+        : "text-muted-foreground";
+  const meStatusText =
+    geoStatus === "success"
+      ? t("meOnline")
+      : geoFailed
+        ? t("meOffline")
+        : t("meLocating");
+
   /**
    * UR1.6 live self fix for the card distance. Render-time plain value —
    * every watch update re-renders, so the distance stays dynamic with no
@@ -478,6 +526,10 @@ export function DrinkMap({
    */
   const selfFix =
     geoStatus === "success" && geoPosition !== null ? geoPosition : null;
+  // UR3.5+ 城市图形：真 GPS＋真区名才出码，无码回退 Building2（不编造）。
+  const cityCode = resolveCityCode(selfFix, currentArea);
+  const cityLabelKey =
+    cityCode === null ? "cityName" : (`cityName_${cityCode}` as const);
 
   /* ---- UR2.1 anchored card ----
    * React 19 forbids ref reads during render, so the pin's screen point
@@ -1161,11 +1213,43 @@ export function DrinkMap({
         aria-label={t("mapLabel")}
       />
 
-      {/* UR1.3 floating title — the retired slim hero lives on here. */}
+      {/* UR3.5 左上城市状态卡（顶双 pill 已删，此处是唯一的顶卡）：
+          城市大字＋登录状态＋上次在线＋条件上次地点，图形 tile 复 tile 行。 */}
       <div
-        className={`${styles.above} font-hand pointer-events-none absolute top-3 left-1/2 max-w-[38%] -translate-x-1/2 truncate rounded-full border-2 bg-card/90 px-3 py-1 text-center text-sm font-bold backdrop-blur-sm`}
+        className={`${styles.above} absolute top-3 left-3 flex items-center gap-2.5 rounded-2xl border-2 bg-card/95 py-2 pr-3 pl-2 shadow-[3px_3px_0_var(--border)] backdrop-blur-sm`}
       >
-        {heroT("title")}
+        <span
+          aria-hidden
+          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 bg-accent text-accent-foreground"
+        >
+          <CityIcon code={cityCode} size={54} />
+        </span>
+        <span className="min-w-0">
+          <span className="font-hand block text-xl leading-none font-bold">
+            {t(cityLabelKey)}
+          </span>
+          <span
+            className={`mt-1 flex items-center gap-1 text-xs font-bold ${meStatusTone}`}
+          >
+            <span
+              aria-hidden
+              className="inline-block h-2 w-2 rounded-full bg-current"
+            />
+            {meStatusText}
+          </span>
+          {lastVisit !== null && (
+            <span className="text-muted-foreground mt-0.5 block text-xs">
+              {t("lastSeenAt", {
+                time: formatWantTime(lastVisit.at, locale),
+              })}
+            </span>
+          )}
+          {shouldShowLastPlace(lastVisit, currentArea) && (
+            <span className="text-muted-foreground block max-w-36 truncate text-xs">
+              {t("lastPlaceAt", { place: lastVisit?.area ?? "" })}
+            </span>
+          )}
+        </span>
       </div>
 
       {/* Notebook dot-grid over the tiles */}
@@ -1374,13 +1458,7 @@ export function DrinkMap({
         onFootprints={() => setTrailMode((v) => !v)}
       />
 
-      {/* MOCK badge — top-left now; bottom-left belongs to the beer dial. */}
-      <p
-        className={`${styles.above} absolute top-3 left-3 flex items-center gap-1.5 rounded-full border-2 bg-card/95 px-3 py-1 text-xs font-bold`}
-      >
-        <span aria-hidden className={styles.liveDot} />
-        {t("mockBadge")}
-      </p>
+
       {/* UR3.4 足迹模式浮条：标题＋显式返回（toggle 同动作可退）；
           空足迹（真后端）给空文案＋去记录 CTA，mock 恒有站只走主分支。 */}
       {trailMode &&

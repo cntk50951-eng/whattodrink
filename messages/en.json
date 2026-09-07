@@ -202,6 +202,17 @@
     "footprints": "Footprints",
     "trailTitle": "My trail · {n} stops",
     "trailBack": "Back",
-    "trailEmpty": "No stops yet. Go log one!"
+    "trailEmpty": "No stops yet. Go log one!",
+    "cityName": "Hong Kong",
+    "meOnline": "Online",
+    "meLocating": "Locating…",
+    "meOffline": "Offline",
+    "lastSeenAt": "Last seen {time}",
+    "lastPlaceAt": "Last time at {place}",
+    "cityName_hk": "Hong Kong",
+    "cityName_bj": "Beijing",
+    "cityName_sh": "Shanghai",
+    "cityName_gz": "Guangzhou",
+    "cityName_sz": "Shenzhen"
   }
 }

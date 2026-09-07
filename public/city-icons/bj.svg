@@ -1,0 +1,32 @@
+<!-- 北京 · 天壇祈年殿 v3（实拍复核重搭）：三层之间用红 tier 相连、
+     金顶坐到上檐上，檐不再悬空；红墙加高到接下檐。 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img">
+  <title>北京天壇祈年殿</title>
+  <g fill="none" stroke="#3a3129" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 葫芦金顶坐檐上 -->
+    <circle cx="32" cy="7.5" r="2.6" fill="#e8a93d" stroke-width="2" />
+    <circle cx="32" cy="3.6" r="1.5" fill="#e8a93d" stroke-width="1.8" />
+    <path d="M30 10.5 L30 13.5 L34 13.5 L34 10.5 Z" fill="#1c2f4d" stroke-width="1.8" />
+    <!-- 上檐＋红 tier -->
+    <path d="M22 20 Q32 13 42 20 L38.5 20 Q32 15.5 25.5 20 Z" fill="#274b73" stroke-width="2.5" />
+    <path d="M28 20 L28 23.5 L36 23.5 L36 20 Z" fill="#c0392b" stroke-width="2" />
+    <!-- 中檐＋红 tier -->
+    <path d="M16.5 27.5 Q32 19.5 47.5 27.5 L44 27.5 Q32 22.5 20 27.5 Z" fill="#274b73" stroke-width="2.5" />
+    <path d="M16.5 27.5 L15 25.5 M47.5 27.5 L49 25.5" stroke-width="2" />
+    <path d="M26 27.5 L26 31 L38 31 L38 27.5 Z" fill="#c0392b" stroke-width="2" />
+    <!-- 下檐 -->
+    <path d="M11 35.5 Q32 26.5 53 35.5 L49 35.5 Q32 29.5 15 35.5 Z" fill="#274b73" stroke-width="2.5" />
+    <path d="M11 35.5 L9 33 M53 35.5 L55 33" stroke-width="2" />
+    <!-- 檐下彩画线 -->
+    <path d="M20 25.8 Q32 21 44 25.8" stroke="#3f8f8b" stroke-width="1.8" />
+    <path d="M15 33.8 Q32 28 49 33.8" stroke="#3f8f8b" stroke-width="1.8" />
+    <!-- 红墙接到下檐＋三门 -->
+    <path d="M23 35.5 L23 48 L41 48 L41 35.5 Z" fill="#c0392b" stroke-width="2.5" />
+    <path d="M26 39 L26 48 L29.5 48 L29.5 39 Z M30.25 39 L30.25 48 L33.75 48 L33.75 39 Z M34.5 39 L34.5 48 L38 48 L38 39 Z" fill="#8e2a22" stroke-width="1.5" />
+    <!-- 白石栏杆基 -->
+    <path d="M19 48 L45 48" stroke-width="2" />
+    <path d="M23 48 L23 51.5 M29 48 L29 51.5 M35 48 L35 51.5 M41 48 L41 51.5" stroke-width="1.8" />
+    <path d="M17 51.5 L47 51.5 L47 55 L17 55 Z" fill="#f1ece1" stroke-width="2.5" />
+    <path d="M12 58.5 L52 58.5" stroke-width="2" />
+  </g>
+</svg>

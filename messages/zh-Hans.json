@@ -202,6 +202,17 @@
     "footprints": "足迹",
     "trailTitle": "我的足迹 · {n} 站",
     "trailBack": "返回",
-    "trailEmpty": "还没有足迹，去喝一杯吧！"
+    "trailEmpty": "还没有足迹，去喝一杯吧！",
+    "cityName": "香港",
+    "meOnline": "在线",
+    "meLocating": "定位中…",
+    "meOffline": "离线",
+    "lastSeenAt": "上次在线 {time}",
+    "lastPlaceAt": "上次在{place}",
+    "cityName_hk": "香港",
+    "cityName_bj": "北京",
+    "cityName_sh": "上海",
+    "cityName_gz": "广州",
+    "cityName_sz": "深圳"
   }
 }

@@ -666,3 +666,11 @@
 - 2026-09-07（用户再纠正：我的足迹只有 1 个点）：删光编的站——足迹＝`trailStops(wantRecord)`（现在最多 1 站：当前想喝钉；无则空态，不编数据）；单站聚光圈＋酒名签＋飞过去（≥2 站才连虚线，留给以后）；`lib/footprints.ts` 整文件删，死类 `trailStop` 同删
 - 2026-09-07（用户报 bug：加推荐酒清旧数据，足迹永只有一站）：单槽改史槽——`wtd-want-history` 数组（上限 30，坏条过滤，legacy 单键迁移后删）；pin 层一史一钉（最新带圈，点旧钉回看）；`trailStops` 改吃数组；`wantAt` 状态退役
 - 2026-09-07（用户报 bug：同位置重复打卡叠钉）：`upsertWantHistory` 同店顶替（10m 内算同一位置，GPS 漂移也拦；`handleWant` 唯一写入口）；3 单测（远追加／同位替／漂移替）
+
+**UR 3.5　左上城市状态卡（删顶双 pill＋手绘城市图标）** [✓]（用户已验收，merged）
+
+在这个需求当中，我需要你在主页地图的左上角显示你当前的城市的名称以及上次在线的时间，还有当前的登录状态，如果上次登录了地点和当前登录的地点不一样，则显示上一次登录的地点，否则不需要显示，上一次登录的地点。除了文字之外，我需要你用比较精美的舒适的图形去显示这个信息。同时在主页地图上部的今晚喝咩的文字label和试玩假数据的label都可以删除了，它没有任何的作用。
+
+- 2026-09-07（用户已验收）：`lib/visit.ts`（`wtd-last-visit` 本地 mock：`touchVisit`／`patchVisitArea`／`shouldShowLastPlace`，2 单测）＋左上城市卡（城市名／上次在线／登录态三色＋条件上次地点行）＋删 hero 顶双 pill（三语 `cityName`／`meOnline`／`meLocating`／`meOffline`／`lastSeenAt`／`lastPlaceAt`）；tsc clean、lint 0 error、test 82 passed。
+- 2026-09-07（追加工，用户决策先港＋北上广深、墨线涂鸦风，用户已验收）：`public/city-icons/` 5 枚 SVG（固定墨＋扁平品牌色，禁滤镜／文字／CSS 变量，三端直用，见 `docs/city-icons.md`）＋`lib/city.ts`（GPS bounds＋区名判定，无码回退，5 单测）＋`CityIcon` 按需 `<img>`（失败回退）；`cityName_<code>` ×5 三语；82→87 tests／tsc 净／lint 0 error（3 旧 warning）；9b：无数据模型变化。
+- 2026-09-07（返工，用户：凭印象画全错＋香港换维港＋图标压过字）：实拍对照 v2→v3＋香港维港 96 格＋瓷砖 64px；用户浏览器亲眼验收通过。

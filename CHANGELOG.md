@@ -54,6 +54,11 @@
 - **UR 2.7 — 结果面板插畫主角化（[✓] 用户已验收，含 pins 追加＋想喝 pin 修漏，merged）**
 - **UR 2.8 — 睇全港视图防挤＋数据点动态适应（[✓] 用户已验收，merged）**
 - **UR 2.9 — 摇一摇手感：触发 rattle＋prime tick＋真震动（[WIP]，待手机验收）**
+- **UR 3.5 — 左上城市状态卡（[✓] 用户已验收，merged）**
+  - `lib/visit.ts`（`wtd-last-visit` 本地 mock：`touchVisit`／`patchVisitArea`／`shouldShowLastPlace`＋5 单测）＋左上城市卡（Building2 瓷砖＋城市名／上次在线／登录态三色＋条件上次地点行）＋删 hero 顶双 pill；`cityName`／`meOnline`／`meLocating`／`meOffline`／`lastSeenAt`／`lastPlaceAt` 三语
+  - 80→82 tests（visit 2 单测）／tsc 全绿、lint 0 error（3 旧 warning）；sandbox 禁监听 dev server 跑不起来，待用户本地 `npm run dev` 亲眼验收后再 commit
+  - 追加工（用户要手绘城市图标＋三端资源）：`public/city-icons/` 港京沪穗深 5 枚＋`lib/city.ts` 判定＋`CityIcon` 按需加载＋`docs/city-icons.md` 规范；82→87 tests／tsc 净／lint 0 error；`npm run build` 本机 sandbox 被拦（老问题，tsc／lint／test 全绿照常合）
+  - 返工（用户：凭印象画全错）：Wikimedia 实拍对照重绘 v2→v3（中銀退台 X 撑／祈年殿红 tier 相连／明珠大下球三足／小蠻腰极瘦銀針／春筍竖肋倒 V 撑）；香港改维港全景（96 格：太平山＋天際線＋海＋天星小輪）＋瓷砖放大到 64px 压过字；门不变
 - **UR 3.0 — 碰杯特效＋乾杯双边记录（[✓] 用户已验收含 v2 返工，merged）**
 - **UR 3.1 — 摇一摇毛玻璃晃杯时刻（[✓] 用户已验收含溢泡 v2，merged）**
 - **UR 3.2 — 每日乾杯 15 次上限（[✓] 用户已验收，merged）**
