@@ -464,6 +464,20 @@
   color: var(--doodle-red);
 }
 
+/* UR3.6 水彩洗＋和纸胶带：他人卡头像的“手绘水彩”担当。
+ * 固定粉彩 hex（纸上颜色，不跟主题走，沿品牌定色先例）；
+ * 有机圆角 blob 是水彩边，胶带半透明压住头像顶角当贴纸。 */
+.waterWash {
+  background:
+    radial-gradient(circle at 32% 28%, #fdf0d5 0%, #fde2e4 52%, #e2ece9 100%);
+  border-radius: 58% 42% 55% 45% / 48% 55% 45% 52%;
+}
+.tape {
+  background: rgb(246 216 107 / 0.85);
+  border-left: 1px dashed rgb(255 255 255 / 0.7);
+  border-right: 1px dashed rgb(255 255 255 / 0.7);
+}
+
 /* UR3.3 邀约：省略号有限跳（3s mock 等待对齐三拍后停，元素随收据卸载，
  * 非永动）；成局条一次 pop 入场（站内曲线族）。 */
 .inviteDots {

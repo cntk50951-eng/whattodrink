@@ -54,6 +54,8 @@
 - **UR 2.7 — 结果面板插畫主角化（[✓] 用户已验收，含 pins 追加＋想喝 pin 修漏，merged）**
 - **UR 2.8 — 睇全港视图防挤＋数据点动态适应（[✓] 用户已验收，merged）**
 - **UR 2.9 — 摇一摇手感：触发 rattle＋prime tick＋真震动（[WIP]，待手机验收）**
+- **UR 3.6 — 他人打卡面板重构（[✓] 用户已验收，merged）**
+  - 根因：X 绝对定位右上＋名字行 flex 不换行无右避让；X 升级贴纸＋名字/meta 行 `pr-10`＋flex-wrap＋在线态下沉 meta 行；头像水彩 blob（`.waterWash`）＋和纸胶带（`.tape`）＋波浪分隔线；约喝酒副钮降级＋动作区换行；纯排版零新逻辑、无新单测；tsc 净／lint 0 error／87 tests；`npm run build` sandbox 老问题
 - **UR 3.5 — 左上城市状态卡（[✓] 用户已验收，merged）**
   - `lib/visit.ts`（`wtd-last-visit` 本地 mock：`touchVisit`／`patchVisitArea`／`shouldShowLastPlace`＋5 单测）＋左上城市卡（Building2 瓷砖＋城市名／上次在线／登录态三色＋条件上次地点行）＋删 hero 顶双 pill；`cityName`／`meOnline`／`meLocating`／`meOffline`／`lastSeenAt`／`lastPlaceAt` 三语
   - 80→82 tests（visit 2 单测）／tsc 全绿、lint 0 error（3 旧 warning）；sandbox 禁监听 dev server 跑不起来，待用户本地 `npm run dev` 亲眼验收后再 commit

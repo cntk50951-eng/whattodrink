@@ -674,3 +674,9 @@
 - 2026-09-07（用户已验收）：`lib/visit.ts`（`wtd-last-visit` 本地 mock：`touchVisit`／`patchVisitArea`／`shouldShowLastPlace`，2 单测）＋左上城市卡（城市名／上次在线／登录态三色＋条件上次地点行）＋删 hero 顶双 pill（三语 `cityName`／`meOnline`／`meLocating`／`meOffline`／`lastSeenAt`／`lastPlaceAt`）；tsc clean、lint 0 error、test 82 passed。
 - 2026-09-07（追加工，用户决策先港＋北上广深、墨线涂鸦风，用户已验收）：`public/city-icons/` 5 枚 SVG（固定墨＋扁平品牌色，禁滤镜／文字／CSS 变量，三端直用，见 `docs/city-icons.md`）＋`lib/city.ts`（GPS bounds＋区名判定，无码回退，5 单测）＋`CityIcon` 按需 `<img>`（失败回退）；`cityName_<code>` ×5 三语；82→87 tests／tsc 净／lint 0 error（3 旧 warning）；9b：无数据模型变化。
 - 2026-09-07（返工，用户：凭印象画全错＋香港换维港＋图标压过字）：实拍对照 v2→v3＋香港维港 96 格＋瓷砖 64px；用户浏览器亲眼验收通过。
+
+**UR 3.6　他人打卡面板重構（水彩手繪＋修重疊＋副鈕降級）** [✓]（用户已验收，merged）
+
+UR3.6現在點擊其他人的打卡記錄彈出的面板，裡面的UI排版簡直是災難。在線上（狀態文字）和X（關閉按鈕）重疊。約喝酒的按鈕畸形（很大），整個面板的設計毫無水彩手繪風格，也沒有現代美感，需要重構。
+
+- 2026-09-07（用户已验收，merged）：根因 X 绝对定位右上＋名字行 flex 不换行无右避让；修法：X 升级贴纸（白底＋硬阴影）＋名字/meta 行 `pr-10`＋flex-wrap＋在线态下沉 meta 行（区·距离·在线）；头像加水彩 blob（`.waterWash` 固定粉彩）＋和纸胶带（`.tape` 模块类，避扫描器）；波浪分隔线；约喝酒副钮降级 px-3 py-1 text-sm＋动作区 flex-wrap；tsc 净／lint 0 error／87 tests；纯排版零新逻辑，`npm run build` sandbox 老问题。
