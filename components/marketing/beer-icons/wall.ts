@@ -39,6 +39,11 @@ export type BeerWallEntry = {
   cn: string;
   /** Short CN style tag — must match the icon file's typeLabel prop. */
   type: string;
+  /**
+   * UR2.6 随机推荐目录 id（`BEERS` 的 id）。有它结果卡才渲染本 icon，
+   * 没有就还是 emoji —— 加一行即可接入，无需改面板。
+   */
+  pickId?: string;
   Icon: BeerIconComponent;
 };
 
@@ -48,12 +53,12 @@ export type BeerWallEntry = {
  * this list — never enumerate icons anywhere else. Append new batches here.
  */
 export const BEER_WALL: BeerWallEntry[] = [
-  { en: "Asahi Super Dry", cn: "銀罐", type: "乾拉格", Icon: AsahiIcon },
+  { en: "Asahi Super Dry", cn: "銀罐", pickId: "asahi", type: "乾拉格", Icon: AsahiIcon },
   { en: "Corona Extra", cn: "透明瓶＋青檸", type: "淡拉格", Icon: CoronaIcon },
-  { en: "Tsingtao Classic", cn: "綠瓶", type: "淡拉格", Icon: TsingtaoIcon },
+  { en: "Tsingtao Classic", cn: "綠瓶", pickId: "tsingtao", type: "淡拉格", Icon: TsingtaoIcon },
   { en: "Blue Girl", cn: "藍妹", type: "皮爾森", Icon: BlueGirlIcon },
   { en: "Hoegaarden", cn: "六角杯", type: "小麥白啤", Icon: HoegaardenIcon },
-  { en: "Heineken", cn: "綠瓶紅星", type: "淡拉格", Icon: HeinekenIcon },
+  { en: "Heineken", cn: "綠瓶紅星", pickId: "heineken", type: "淡拉格", Icon: HeinekenIcon },
   { en: "Kirin Ichiban", cn: "一番搾", type: "淡拉格", Icon: KirinIcon },
   { en: "Yebisu", cn: "金罐", type: "拉格", Icon: YebisuIcon },
   { en: "Young Master", cn: "少爺", type: "淡艾", Icon: YoungMasterIcon },
@@ -86,4 +91,12 @@ export function beerSlug(en: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
+}
+
+/**
+ * UR2.6 按推荐目录 id 取 icon。命中返回组件，未命中返回 null（调用方保留
+ * emoji 默认）。同一 pickId 出现多次取 BEER_WALL 第一顺位。
+ */
+export function iconForPickId(pickId: string): BeerIconComponent | null {
+  return BEER_WALL.find((e) => e.pickId === pickId)?.Icon ?? null;
 }

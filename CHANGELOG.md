@@ -50,6 +50,8 @@
 - **UR 2.4 — 品牌去重＋手绘 icon（[✓] 用户已验收，merged＋pushed `b7aad54`）**
 - **UR 2.5 — 搖一搖找附近酒友（[✓] 用户已验收）**
   - `lib/shake.ts` 纯函数选中（haversine＋24h 窗口，mock 加 `checkedInAt`）＋4 单测；`hooks/useShake` 双跃变判定＋3s 冷却＋iOS 权限；MapFab 卫星圆钮（card 底＋品牌色图标）＋5min 抖（独立 quiet key）；声纳三层（软闪＋双环追逐，1250ms 卸载）＋toast 三态；设计返工走 design-taste-frontend（redesign-preserve）；44→48 tests／tsc 全绿、lint 0 error
+- **UR 2.6 — 随机推荐面板接入品牌插畫（[✓] 用户已验收）**
+  - `BEER_WALL` 加 `pickId`＋`iconForPickId()`（第一顺位，无则 null）；结果卡命中（heineken／asahi／tsingtao）渲染 h-16 手绘图，其余 12 种原 emoji；`BEERS` 不增删，pin marker 和想喝行不动；`wall.test.ts` 3 命中＋唯一性；48→51 tests／tsc 全绿、lint 0 error
   - 去重：脚本掃 18 簇＋人工判定，真重复 4 组（Asahi／Suntory／Harbin 小麦／Wusu 残行）合并，7 个错文件真品牌转正归位；全库 1144，脚本复核归零，标题数＝实际行
   - icon：`beer-icons/` 手绘 SVG 10 品 v3（共享框＋独立 filter id，墨线主题色＋品牌定色填色）＋临时预览路由 `/preview-beer-icons`（[locale] 段内）；v1 凭印象失真，v2 起逐品看真实产品图重画（Wikimedia 9＋官网 packshot 1，看完删参照）：Asahi 巨黑字生字八角框／藍妹米白罐椭圆章／Corona 对开标金章／青島椭圆章栈桥徽／Hoegaarden 刻面杯／Heineken 颈星椭圆绿标／Kirin 银罐金麒麟／Yebisu 金罐／少爺红功夫裤／茅台红标白斜带；画法沉淀为 skill `beer-icon`；44 tests／tsc 全绿、lint 0 error
   - icon batch1＋2（各 10，预览墙共 30）：按目录顺序＋家族去重（1144－25＝1119 待画，台账 `11-icon-progress.md`）；batch1 拉格组／batch2 墨巴组，逐品看图；frame 加类型 caption 条（`typeLabel`，BEER_WALL `type` 同步，manifest 带类型）；`npm run export:icons` 顺带产移动端（纯 SVG＋iOS 三件套＋Android 五密度＋manifest，resvg＋sips，无需浏览器）；44 tests／tsc 全绿、lint 0 error
