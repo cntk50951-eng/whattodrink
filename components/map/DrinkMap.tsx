@@ -50,6 +50,7 @@ import {
   isWithinHongKong,
 } from "@/lib/geo";
 import { BeerMugDoodle } from "@/components/marketing/BeerMugDoodle";
+import { iconForPickId } from "@/components/marketing/beer-icons/wall";
 import styles from "./drink-map.module.css";
 
 /**
@@ -873,9 +874,17 @@ export function DrinkMap({
             // of two half-width buttons — reachable without inner scroll.
             <div className="mt-3">
               <div className="flex items-center gap-3">
-                <p className="text-4xl" aria-hidden>
-                  {picked.emoji}
-                </p>
+                {(() => {
+                  // UR2.6 有专属插畫就上图，没图保持 emoji 默认。
+                  const PickIcon = iconForPickId(picked.id);
+                  return PickIcon !== null ? (
+                    <PickIcon className="h-16 w-auto shrink-0" />
+                  ) : (
+                    <p className="text-4xl" aria-hidden>
+                      {picked.emoji}
+                    </p>
+                  );
+                })()}
                 <div className="min-w-0">
                   <p className="truncate font-bold">{picked.name}</p>
                   <p className="text-muted-foreground truncate text-sm">

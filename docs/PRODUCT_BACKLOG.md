@@ -488,4 +488,26 @@
 - 后端"最近＋最近打卡"匹配算法换源（`pickNearestRecentCheckin` 换实现）
 - 抖动间隔／冷却时长按真实数据调优
 
-UR 2.6 在UR 2.4中，你做了一些酒類品牌的POC，現在我希望你把部分的設計使用到隨機酒類推薦的面板讓我看到效果，如果其他酒類還沒有繪圖設計，先保留當前默認的。
+**UR 2.6　随机推荐面板接入品牌插畫** [✓]
+
+> 用戶已驗收，merged＋pushed。AC1－AC3 全过（3 命中＋12 默认）。
+
+作為用户，我点随机推荐时，抽中有专属插畫的品牌能看到手绘图而不是 emoji，
+让我直观感受到插畫管线的效果；没图的保持现状。
+
+*範圍*
+- 结果卡：`iconForPickId(beer.id)` 命中（heineken／asahi／tsingtao）→ 渲染
+  对应手绘 icon（h-16，替代 emoji 位）；未命中 → 原 emoji 不动
+- 映射住在 `BEER_WALL`（`pickId` 字段，单源），`wall.test.ts` 覆盖映射
+- 不动：`BEERS` 目录不增删（不为接线加新酒）、地图 pin marker 仍用 emoji
+  （divIcon 塞 React SVG 另开 UR）、想喝记录行保持 emoji＋名
+*邊界情況／失敗處理*
+- 同一品牌多 icon（以后）→ 取 BEER_WALL 第一顺位，不抛错
+- 深色模式／reduced-motion：icon 本体已兼容（UR2.4），面板不另处理
+*驗收標準（Acceptance Criteria）*
+- AC1：连点随到 heineken／asahi／tsingtao 时卡片显示对应手绘图
+- AC2：抽到其他 12 种时仍是原 emoji，无布局错乱
+- AC3：单测覆盖映射（命中 3＋未命中 null）
+*後續（不在本 UR）*
+- pin marker／想喝记录行接入 icon → 另開 UR
+- 更多品牌有图后映射自然生效（加 `pickId` 一行即可）
