@@ -576,3 +576,22 @@
 - AC4：`haptics.test.ts` 3 单测（无 API／透传／抛错）；reduced-motion 下 rattle 关
 *改動記錄*
 - 2026-09-07：手感方案落地；修 React 19 refs  lint（cleanup 读过的 ref 别处不许写，burst 归零改 effect 自清理）；`npm run build` 本机 sandbox 仍被拦，待用户侧复核
+
+**UR 3.0　碰杯特效＋乾杯双边记录** [✓]（用户已验收含 v2 返工，merged）
+
+在这一个ur中，我们需要考虑的是用户在点击干杯的时候的一个效果，现在你卡片的设计是当我点击干杯的时候，你就直接发送了一个干杯的请求，這樣的設計沒有任何的互動感，我需要做到的是一個真實的乾杯體驗特效。
+同時在點擊乾杯之後你和對方都會新增一個乾杯紀錄，這個是數據層面的需求，你可以紀錄到數據需求文檔中之後我們再去實現。
+
+*範圍*（卡内碰杯时刻，不开全屏 overlay；只动 transform／opacity）
+- 特效层：两杯摆入碰杯＋冲击环＋泡沫粒＋“乾杯！”大字，1.3s 收进收据态＋计数乐观＋1；BUZZ_CHEERS 双叮震；reduced-motion 直接收据
+- 数据：future-schema `cheers` 加 `to_user_id`，一行双读（双方各＋一条，不做镜像双行），EPIC 3.0 实现
+*驗收標準（Acceptance Criteria）*
+- AC1：点乾杯先播碰杯特效（杯／环／泡沫／大字齐全），1.3s 后变“已送出”＋数＋1
+- AC2：连点不重复提交；Android 有双叮震；iPhone 只有动画（预期内）
+- AC3：reduced-motion 下点即收据，无特效层
+- AC4：数据文档有双边口径（future-schema＋home-map 行）
+*改動記錄*
+- 2026-09-07：碰杯方案落地＋数据口径记文档；修 mount effect 同步写 state 撞 lint（microtask 包）
+- 2026-09-07（用户验收返工 v2）：更大（杯 w-20→w-28＋星形冲击＋速度线＋大字 4xl→5xl）、更久（1.3s→2.2s，结尾整层淡出不硬切）、更手绘（抖动星形＋速度线＋5 粒泡沫＋碰杯颤动＋大字硬阴影贴纸化）
+
+UR
