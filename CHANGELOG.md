@@ -57,6 +57,13 @@
 - **UR 3.0 — 碰杯特效＋乾杯双边记录（[✓] 用户已验收含 v2 返工，merged）**
 - **UR 3.1 — 摇一摇毛玻璃晃杯时刻（[✓] 用户已验收含溢泡 v2，merged）**
 - **UR 3.2 — 每日乾杯 15 次上限（[✓] 用户已验收，merged）**
+- **UR 3.3 — 附近在线＋约喝酒（[✓] 用户已验收含在线去 pill 化，merged）**
+  - 在线：`lib/nearby.ts`＋4 单测（5min 窗＋5km，含未来心跳 skew）；`Checkin` 加 `onlineAt`＋`declinesInvite`；pin／头像绿点＋在线 pill；`checkins.test.ts` 循环断言补两行，`shake.test.ts` fixture 补字段
+  - 邀约四态：副按钮→已发出（有限跳）→成局条＋震／婉拒条＋可再约（Mandy 拒）；`onlineNow`／`inviteCta`／`inviteSent`／`inviteAccepted(+Detail)`／`inviteDeclined` 三语
+  - 数据文档：`users.last_seen_at`＋`drink_invites` 同行状态机＋替换清单；home-map 三行同步
+  - 68→72 tests／tsc 全绿、lint 0 error（3 旧 warning）；`npm run build` 本机 sandbox 被拦（老问题，待用户侧复核）
+  - fix：render 内 `Date.now()` impure→now 快照＋调用点传参；en ICU 单引号坑（It's→Deal!）
+  - fix（用户验收返工）：在线 pill 去 pill 化（区名后绿点＋绿字）；门禁不变
   - `lib/cheers.ts`＋5 单测（HK 日期键／上限／剩余额／服务端无 window）；DrinkMap 按天 hydrate＋提交持久化＋额度小字＋满额 disabled＋守卫；`cheersLeft`／`cheersLimitReached` 三语
   - 数据文档：future-schema 服务端按天拒绝口径（429＋created_at 索引＋不加计数列）；home-map `sentIds` 行同步按天
   - 63→68 tests／tsc 全绿、lint 0 error（3 旧 warning）；`npm run build` 本机 sandbox 被拦（老问题，待用户侧复核）

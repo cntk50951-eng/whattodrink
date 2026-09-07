@@ -40,6 +40,9 @@
 | `position` | pin 位置、双人同框、实时距离 | `LatLng` | 同上 | `checkins.lat`／`lng` |
 | `cheers`（被乾杯数） | 乾杯卡计数 | `number` | 同上 | `count(cheers where checkin_id=…)`（不存数，实时算） |
 | `checkedInAt`（打卡毫秒戳，UR2.5） | 摇一摇 24h 窗口过滤（不直接展示） | `number`（种子相对模块加载时） | 同上 | `checkins.created_at` |
+| `onlineAt`（上线毫秒戳，UR3.3） | pin 绿点、在线 pill、邀约按钮显隐 | `number`（种子相对模块加载时，全员 5min 窗口内） | 同上 | `users.last_seen_at`（心跳，建索引） |
+| `declinesInvite`（mock 剧本，UR3.3） | 决定 mock 接受／婉拒（Mandy 婉拒） | `boolean` | 同上 | 无（真后端由对方点按钮，字段不迁移） |
+| `invites`＋`inviteFx`（邀约态，UR3.3） | 按钮四态＋结果条 | `Record<id, sent／accepted／declined>`＋`{id,key}｜null` | state，会话 | `drink_invites` 行（sent／accepted／declined／expired 同行更新） |
 | `sentIds`（我已乾杯 id 表，UR3.2 按天） | “已送出”态＋额度 UI | `string[]` | state＋localStorage（`wtd-cheers-daily`＝{day（HK 日期键）, ids}，跨天归零，坏数据归零） | `cheers(from_user_id, to_user_id, checkin_id, created_at)`（UR3.0 加 `to_user_id`，一行双读；UR3.2 加服务端按天 15 次拒绝口径） |
 | `cheersFx`（碰杯特效中，UR3.0） | 特效层显隐＋计数乐观＋1 | `{id,key}｜null` | state，会话 | UI 纯状态，不进库（1.3s 后提交 `sentIds` 即拆） |
 

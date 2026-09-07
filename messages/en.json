@@ -192,6 +192,12 @@
     "clusterTitle": "Zoom in to see {n} drinkers",
     "shakeSearching": "Shaking up nearby drinkers…",
     "cheersLeft": "{n} cheers left today",
-    "cheersLimitReached": "Daily cheers used up (15). Come back tomorrow!"
+    "cheersLimitReached": "Daily cheers used up (15). Come back tomorrow!",
+    "onlineNow": "Online",
+    "inviteCta": "Invite",
+    "inviteSent": "Sent, waiting…",
+    "inviteAccepted": "Deal!",
+    "inviteAcceptedDetail": "Deal! See you at {area}!",
+    "inviteDeclined": "Busy tonight, rain check!"
   }
 }

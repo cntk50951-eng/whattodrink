@@ -192,6 +192,12 @@
     "clusterTitle": "放大睇 {n} 位酒友",
     "shakeSearching": "搖緊附近酒友…",
     "cheersLeft": "今日仲剩 {n} 次乾杯",
-    "cheersLimitReached": "今日 15 次乾杯用完啦，聽日再嚟！"
+    "cheersLimitReached": "今日 15 次乾杯用完啦，聽日再嚟！",
+    "onlineNow": "在線上",
+    "inviteCta": "約喝酒",
+    "inviteSent": "已發出，等緊對方…",
+    "inviteAccepted": "約咗啦！",
+    "inviteAcceptedDetail": "約咗啦！{area}見！",
+    "inviteDeclined": "對方今晚唔得閒，改天再約"
   }
 }

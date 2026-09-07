@@ -26,6 +26,7 @@ import {
 import { markShakeUsed } from "@/components/map/MapFab";
 import { pickNearestRecentCheckin } from "@/lib/shake";
 import { clusterPoints } from "@/lib/clusters";
+import { isOnline } from "@/lib/nearby";
 import {
   ANDROID_LOCATION_SETTINGS_INTENT,
   detectBrowser,
@@ -129,6 +130,11 @@ const SHAKE_SEARCH_MS = 1250;
  * 掉进这个半径即视觉重叠，合成一簇。
  */
 const OTHERS_CLUSTER_PX = 64;
+/**
+ * UR3.3 mock 对方回话延迟（ms）：已发出 3s 后按该人剧本接受／婉拒。
+ * 真后端由对方点按钮，无此定时。
+ */
+const INVITE_MOCK_MS = 3000;
 export function DrinkMap({
   initialPickOpen = false,
 }: {
@@ -237,7 +243,11 @@ export function DrinkMap({
    * 只读 refs＋模块常量，init effect 闭包首实例调用无 stale 问题（同
    * handleFocusPerson 口径，见 UR2.1 memory）。
    */
-  function renderOthersPins(map: Leaflet.Map, L: typeof Leaflet): void {
+  function renderOthersPins(
+    map: Leaflet.Map,
+    L: typeof Leaflet,
+    now: number,
+  ): void {
     othersLayerRef.current?.remove();
     const pixels = MOCK_CHECKINS.map((c) => {
       const p = map.latLngToContainerPoint([c.position.lat, c.position.lng]);
@@ -252,18 +262,24 @@ export function DrinkMap({
         const idx = cluster.members[0] as number;
         const c = MOCK_CHECKINS[idx] as Checkin;
         // UR2.7 原样：有图方形设计钉，无图 emoji 圆钉（奇偶错峰倾斜保留）。
+        // UR3.3 在线绿点缀右上角（两款钉同挂，簇不挂——簇是多人的）。
+        const onlineDot = isOnline(c, now)
+          ? `<span class="${styles.pinOnline}"></span>`
+          : "";
         const ArtIcon = iconForDrinkName(c.drinkName);
         const artHtml =
           ArtIcon === null
             ? null
-            : `<div class="${styles.pinArt}">${renderToStaticMarkup(<ArtIcon />)}</div>`;
+            : `<div class="${styles.pinArt}">${renderToStaticMarkup(<ArtIcon />)}${onlineDot}</div>`;
         const pinClass =
           idx % 2 === 0 ? styles.pin : `${styles.pin} ${styles.pinAlt}`;
         const marker = L.marker([c.position.lat, c.position.lng], {
           title: c.nickname,
           icon: L.divIcon({
             className: "",
-            html: artHtml ?? `<div class="${pinClass}">${c.drinkEmoji}</div>`,
+            html:
+              artHtml ??
+              `<div class="${pinClass}">${c.drinkEmoji}${onlineDot}</div>`,
             iconSize: artHtml === null ? [40, 40] : [56, 56],
             iconAnchor: artHtml === null ? [20, 38] : [28, 52],
           }),
@@ -307,11 +323,15 @@ export function DrinkMap({
   // UR3.0 reduced-motion 开关（mount 量一次，SSR 首帧 false 反正无特效可播；
   // 写入走 microtask，同步写撞 set-state-in-effect，见 UR1.8 memory）。
   const [reducedMotion, setReducedMotion] = useState(false);
+  // UR3.3 在线判定用的 now 快照（render 里禁 Date.now.，mount 取一次；
+  // 5min 窗口相对 mock 种子同代，整会话不漂移，够 mock 用）。
+  const [nowMs, setNowMs] = useState(0);
   useEffect(() => {
     void Promise.resolve().then(() => {
       setReducedMotion(
         window.matchMedia("(prefers-reduced-motion: reduce)").matches,
       );
+      setNowMs(Date.now());
     });
   }, []);
   const toastTimer = useRef<number | null>(null);
@@ -578,10 +598,11 @@ export function DrinkMap({
       });
       // UR2.8: 他人 pin 层走聚合重建（首帧＋每次 zoomend），街区 zoom
       // 下全是单成员＝和原来一模一样的钉，全港 zoom 下近点合成簇。
-      renderOthersPins(map, L);
+      // now 取调用时刻（effect／事件上下文可调 impure，render 内不行）。
+      renderOthersPins(map, L, Date.now());
       map.on("zoomend", () => {
         if (mapRef.current !== null && leafletRef.current !== null) {
-          renderOthersPins(mapRef.current, leafletRef.current);
+          renderOthersPins(mapRef.current, leafletRef.current, Date.now());
         }
       });
       holder.dataset.ready = "1";
@@ -961,6 +982,41 @@ export function DrinkMap({
     }, CHEERS_FX_MS);
     return () => window.clearTimeout(timer);
   }, [cheersFx]);
+
+  // UR3.3 卡内邀约四态（mock）：idle→sent（3s 等对方）→accepted／declined
+  //（按该人 declinesInvite 剧本，Mandy 婉拒其余接受）。真后端由对方点按钮，
+  // effect 定时整段删，换 realtime 回调。
+  type InvitePhase = "sent" | "accepted" | "declined";
+  const [inviteFx, setInviteFx] = useState<{ id: string } | null>(null);
+  const [invites, setInvites] = useState<Partial<Record<string, InvitePhase>>>(
+    {},
+  );
+  function handleInvite(id: string): void {
+    const c = MOCK_CHECKINS.find((m) => m.id === id);
+    if (
+      c === undefined ||
+      !isOnline(c, nowMs) ||
+      invites[id] === "sent" ||
+      invites[id] === "accepted" ||
+      inviteFx !== null
+    ) {
+      return;
+    }
+    setInviteFx({ id });
+  }
+  useEffect(() => {
+    if (inviteFx === null) return;
+    const fx = inviteFx;
+    const timer = window.setTimeout(() => {
+      const c = MOCK_CHECKINS.find((m) => m.id === fx.id);
+      const phase: InvitePhase =
+        c?.declinesInvite === true ? "declined" : "accepted";
+      if (phase === "accepted") buzz(BUZZ_FOUND);
+      setInvites((prev) => ({ ...prev, [fx.id]: phase }));
+      setInviteFx(null);
+    }, INVITE_MOCK_MS);
+    return () => window.clearTimeout(timer);
+  }, [inviteFx]);
 
   /**
    * Android-only: jump straight into the system Location settings.
@@ -1411,6 +1467,11 @@ export function DrinkMap({
               <div className="flex items-center gap-4">
                 {(() => {
                   const DrinkIcon = iconForDrinkName(card.drinkName);
+                  // UR3.3 在线绿点：头像（或角标）右下角，和 pin 同款。
+                  const online = isOnline(card, nowMs);
+                  const onlineDot = online ? (
+                    <span aria-hidden className={styles.pinOnline} />
+                  ) : null;
                   return DrinkIcon !== null ? (
                     <span className="relative shrink-0">
                       <span
@@ -1423,14 +1484,16 @@ export function DrinkMap({
                         aria-hidden
                       >
                         {card.avatarEmoji}
+                        {onlineDot}
                       </span>
                     </span>
                   ) : (
                     <span
-                      className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 text-3xl"
+                      className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 text-3xl"
                       aria-hidden
                     >
                       {card.avatarEmoji}
+                      {onlineDot}
                     </span>
                   );
                 })()}
@@ -1441,6 +1504,19 @@ export function DrinkMap({
                     <span className="font-hand rounded-full border-2 bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">
                       {t(GENDER_KEY[card.gender])}
                     </span>
+                    {/* UR3.3 在线态（返工：去 pill 化——双 pill 并排打架，
+                        只留性别 pill；在线退成区名后的绿点＋绿字）。 */}
+                    {isOnline(card, nowMs) && (
+                      <span
+                        className={`${styles.inviteOk} inline-flex items-center gap-1 text-sm font-normal`}
+                      >
+                        <span
+                          aria-hidden
+                          className={`${styles.onlineDot} inline-block h-2 w-2 rounded-full`}
+                        />
+                        {t("onlineNow")}
+                      </span>
+                    )}
                   </p>
                   <p className="text-muted-foreground text-sm">
                     {card.drinkEmoji}{" "}
@@ -1471,21 +1547,82 @@ export function DrinkMap({
                         : 0),
                   })}
                 </p>
-                {sentIds.includes(card.id) ? (
-                  <p role="status" className="font-hand text-lg font-bold">
-                    {t("cheersSent")}
-                  </p>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleCheers(card.id)}
-                    disabled={cheersFx !== null || !canCheers(sentIds)}
-                    className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-primary px-4 py-1.5 font-bold text-primary-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none disabled:opacity-60"
-                  >
-                    {t("cheers")}
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {sentIds.includes(card.id) ? (
+                    <p role="status" className="font-hand text-lg font-bold">
+                      {t("cheersSent")}
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleCheers(card.id)}
+                      disabled={cheersFx !== null || !canCheers(sentIds)}
+                      className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-primary px-4 py-1.5 font-bold text-primary-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none disabled:opacity-60"
+                    >
+                      {t("cheers")}
+                    </button>
+                  )}
+                  {/* UR3.3 约喝酒（副按钮，白底 ink 边）：只给在线人挂；
+                      乾杯是主按钮，两者独立，互不锁。 */}
+                  {isOnline(card, nowMs) &&
+                    (() => {
+                      const phase = invites[card.id];
+                      const pending = inviteFx?.id === card.id;
+                      if (phase === "accepted") {
+                        return (
+                          <p
+                            role="status"
+                            className={`${styles.inviteOk} font-hand text-lg font-bold`}
+                          >
+                            {t("inviteAccepted")}
+                          </p>
+                        );
+                      }
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => handleInvite(card.id)}
+                          disabled={pending}
+                          className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-card px-4 py-1.5 font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none disabled:opacity-60"
+                        >
+                          {pending ? (
+                            <>
+                              {t("inviteSent")}
+                              <span
+                                aria-hidden
+                                className={styles.inviteDots}
+                              >
+                                …
+                              </span>
+                            </>
+                          ) : (
+                            t("inviteCta")
+                          )}
+                        </button>
+                      );
+                    })()}
+                </div>
               </div>
+              {/* UR3.3 邀约结果条：成局 accent 条＋成功震（effect 里已 buzz），
+                  婉拒灰条＋按钮恢复可再约（上行回到 idle）。 */}
+              {invites[card.id] === "accepted" && (
+                <p
+                  key={`${card.id}-accepted`}
+                  role="status"
+                  className={`${styles.inviteDone} font-hand mt-2 rounded-xl border-2 bg-accent px-3 py-1.5 text-sm font-bold text-accent-foreground`}
+                >
+                  {t("inviteAcceptedDetail", { area: card.area })}
+                </p>
+              )}
+              {invites[card.id] === "declined" && (
+                <p
+                  key={`${card.id}-declined`}
+                  role="status"
+                  className={`${styles.inviteDone} text-muted-foreground mt-2 text-sm`}
+                >
+                  {t("inviteDeclined")}
+                </p>
+              )}
               {/* UR3.2 每日额度：剩余额常显（mock 跨天，localStorage），
                   用完变满额句＋按钮 disabled，handleCheers 内同守卫。 */}
               <p className="text-muted-foreground mt-1 text-xs">

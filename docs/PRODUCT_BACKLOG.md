@@ -627,3 +627,20 @@
 - AC4：`cheers.test.ts` 5 单测；数据文档有服务端限额口径
 *改動記錄*
 - 2026-09-07：限额 mock 落地＋服务端口径记文档；hydrate／ref 沿 UR1.8／UR2.5 配方，零 lint 债
+
+**UR 3.3　附近在线＋约喝酒（先 UI mock，后端记文档）** [✓]（用户已验收含在线去 pill 化，merged）
+
+这一个功能很有趣，我想做到的是当有其他的用户打开APP并且上线的时候写距离5KM之内，那么就会显示该用户的在线提示，你可以点击这个用户，并且邀请他一起去喝酒。 请先思考这个功能应该怎么样去实现是否需要有后端的功能和数据库。 如果是的话，你可以先实现UI的部分。关于如何去邀请其他用户一起喝酒的UI交互，你需要调用agent skill去思考UI的设计再去实现。 你需要向我确认。
+
+*範圍*（用户拍板 A 卡内邀约四态；design skill 深度思考已做，子代理结论印证）
+- 在线：`lib/nearby.ts` 纯函数（5min 心跳窗＋5km，`isOnline`／`isNearbyOnline`，4 单测）；`Checkin` 加 `onlineAt`＋`declinesInvite`（Mandy 婉拒）；pin 绿点＋头像绿点＋在线 pill（只在线挂）
+- 邀约：副按钮（白底 ink 边）idle→已发出（省略号有限跳 3s）→成局条（accent＋成功震）／婉拒灰条（按钮恢复可再约）；接受按人确定（Mandy 拒其余收）；乾杯独立互不锁；`INVITE_MOCK_MS = 3000`
+- 后端（EPIC 3.0）：`users.last_seen_at` 心跳＋`drink_invites` 同行状态机（sent／accepted／declined／expired，24h 扫过期）；mock（剧本＋定时）届时整块删
+*驗收標準（Acceptance Criteria）*
+- AC1：在线人 pin／头像有绿点＋在线 pill；不在线不占位
+- AC2：点约喝酒→已发出…→3s 后成局条＋震（阿怡／Kelvin／大佬明）；Mandy→婉拒条＋可再约
+- AC3：成局／婉拒三语正确；reduced-motion 下无省略号跳动（静态字）
+- AC4：`nearby.test.ts` 4 单测；数据文档有心跳＋invites 表＋替换清单
+*改動記錄*
+- 2026-09-07：四态落地；修 render 内 `Date.now()` impure 错（now 快照 mount 取＋调用点传参）；修 shake fixture 缺新字段；en `It's` ICU 单引号坑改词（Deal!）
+- 2026-09-07（用户验收返工：在线 pill 丑）：去 pill 化——双 pill 打架，只留性别 pill；在线退成区名后绿点＋绿字（`.onlinePill` 删干净）
