@@ -32,6 +32,11 @@ function needsPermission(): boolean {
 export function useShake(
   onShake: () => void,
   cooldownMs: number = 3000,
+  /**
+   * UR2.9 prime：第一晃的确认（按钮 tick＋轻震），让物理摇动手感不断档。
+   * 可选，冷却期内不触发。
+   */
+  onPrime?: () => void,
 ): {
   supported: boolean;
   needsPermission: boolean;
@@ -40,9 +45,11 @@ export function useShake(
 } {
   const [permission, setPermission] = useState<ShakePermission>("unknown");
   const cbRef = useRef(onShake);
+  const primeRef = useRef(onPrime);
   // 每 render 同步最新回调（effect 里写 ref，render 里只读）。
   useEffect(() => {
     cbRef.current = onShake;
+    primeRef.current = onPrime;
   });
   const needPerm = needsPermission();
   const supported =
@@ -85,6 +92,7 @@ export function useShake(
             cbRef.current();
           } else {
             firstJerkAt = t;
+            if (t >= coolingUntil) primeRef.current?.();
           }
         }
       }

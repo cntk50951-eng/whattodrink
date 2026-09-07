@@ -10,6 +10,7 @@ import { MapFab } from "@/components/map/MapFab";
 
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useShake } from "@/hooks/useShake";
+import { BUZZ_FOUND, BUZZ_MISS, BUZZ_PRIME, buzz } from "@/lib/haptics";
 import { markShakeUsed } from "@/components/map/MapFab";
 import { pickNearestRecentCheckin } from "@/lib/shake";
 import { clusterPoints } from "@/lib/clusters";
@@ -297,20 +298,38 @@ export function DrinkMap({
     toastTimer.current = window.setTimeout(() => setShakeToast(null), 3500);
   }
 
+  // UR2.9 触发计数：每次触发（含 prime tick）＋1 重播卫星钮 rattle。
+  // 归零走下面的 effect（shakeBurst 变化即重布防，连击自动顺延；async
+  // continuation 写 state，refs 规则安全）。
+  const [shakeBurst, setShakeBurst] = useState(0);
+  function bumpBurst(): void {
+    setShakeBurst((b) => b + 1);
+  }
+  useEffect(() => {
+    if (shakeBurst === 0) return;
+    const id = window.setTimeout(() => setShakeBurst(0), 600);
+    return () => window.clearTimeout(id);
+  }, [shakeBurst]);
+
   function runShakeFlow(): void {
     markShakeUsed();
+    bumpBurst();
     const geo = geoRef.current;
     const self =
       geo.status === "success" && geo.position !== null ? geo.position : null;
     if (self === null) {
+      buzz(BUZZ_MISS);
       showShakeToast(t("shakeNoGeo"));
       return;
     }
     const pick = pickNearestRecentCheckin(self, MOCK_CHECKINS, Date.now());
     if (pick === null) {
+      buzz(BUZZ_MISS);
       showShakeToast(t("shakeNoneNearby"));
       return;
     }
+    // 有结果：成功震型和 rattle＋声纳同步走；无 API（iPhone）时静默只剩动画。
+    buzz(BUZZ_FOUND);
     const map = mapRef.current;
     const reduced =
       typeof window !== "undefined" &&
@@ -329,8 +348,15 @@ export function DrinkMap({
   }
 
   // useShake 回调走内部 ref（和 geoRef 同一 stale-closure 解法），直接传即可。
-  const { needsPermission, permission, requestPermission } =
-    useShake(runShakeFlow);
+  // UR2.9 prime：第一晃 tick 确认（按钮抖一下＋轻震），手感不断档。
+  const { needsPermission, permission, requestPermission } = useShake(
+    runShakeFlow,
+    3000,
+    () => {
+      bumpBurst();
+      buzz(BUZZ_PRIME);
+    },
+  );
 
   /** 摇摇按钮：iOS 先要动作权限（必须在点击手势里），再走同一流程。 */
   function handleShakeRequest(): void {
@@ -1097,6 +1123,7 @@ export function DrinkMap({
         onZoomIn={() => handleZoom(1)}
         onZoomOut={() => handleZoom(-1)}
         onShake={handleShakeRequest}
+        shakeBurst={shakeBurst}
       />
 
       {/* MOCK badge — top-left now; bottom-left belongs to the beer dial. */}

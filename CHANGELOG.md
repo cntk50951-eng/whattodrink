@@ -53,6 +53,10 @@
 - **UR 2.6 — 随机推荐面板接入品牌插畫（[✓] 用户已验收）**
 - **UR 2.7 — 结果面板插畫主角化（[✓] 用户已验收，含 pins 追加＋想喝 pin 修漏，merged）**
 - **UR 2.8 — 睇全港视图防挤＋数据点动态适应（[✓] 用户已验收，merged）**
+- **UR 2.9 — 摇一摇手感：触发 rattle＋prime tick＋真震动（[WIP]，待浏览器验收）**
+  - 卫星钮 `.fabRattle` 0.5s 横向衰减抖（`shakeBurst` 计数＋key 重挂，600ms 归零还槽位给 idle wobble）；`useShake` 加可选 `onPrime` 第一晃确认；`lib/haptics.ts`＋3 单测（成功／失败两套震型，无 API 回 false）
+  - 59→62 tests／tsc 全绿、lint 0 error（3 旧 warning）；`npm run build` 本机 sandbox 被拦（老问题，待用户侧复核）；Step 9b：零新增数据字段，数据文档无需更新
+  - fix（lint）：React 19 refs 规则——cleanup 读过的 ref 别处不许写，burst 归零改 `shakeBurst` effect 自清理；注意 iPhone Safari 无 vibrate API，只能动画补偿
   - 聚合优先（用户定方向）：`lib/clusters.ts` 纯函数 `clusterPoints`＋`clusters.test.ts` 4 单测；他人 pin 层 `renderOthersPins` 首帧＋zoomend 重建，单成员原样单钉、多成员 `.pinCluster` 数字簇（点之 zoom＋2 散开，reduced-motion 降级）；`clusterTitle` 三语；`OTHERS_CLUSTER_PX = 64`
   - 55→59 tests／tsc 全绿、lint 0 error（3 旧 warning）；`npm run build` 本机 sandbox 被拦（老问题，待用户侧复核）；Step 9b：聚合是纯视图派生、零新增数据字段，数据文档无需更新
   - fix（工具链踩雷）：JSON 脚本 `json.dump` 参数写反把 `messages/en.json` 截断归零——`git checkout` 恢复后重做，diff 逐文件验干净

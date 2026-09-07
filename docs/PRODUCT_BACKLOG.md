@@ -556,3 +556,23 @@
 - AC4：`clusterPoints` 单测（远点独立／近点合＋质心／边界归属稳定／空＋单点）
 *改動記錄*
 - 2026-09-07：聚合优先方案落地（上文范围）；`npm run build` 本机 sandbox 仍被拦（老问题），待用户侧复核
+
+**UR 2.9　摇一摇手感：触发 rattle＋prime tick＋真震动** [WIP]
+
+搖一搖功能的UI動畫效果設計讓我無法感受到這個是搖一搖的感覺，手機也沒有震動的效果，請設計和優化
+
+*範圍*（design read：redesign-preserve，doodle 语言沿用，无新依赖；新动效只动 transform，reduced-motion 全关）
+- 触发 rattle：卫星钮 0.5s 横向衰减抖（`.fabRattle`，和 idle 旋转 nudge 区分），调用方 `shakeBurst` 计数＋key 重挂重播，600ms 归零把槽位还给 idle wobble
+- prime tick：`useShake` 加可选 `onPrime`（第一晃确认，冷却期内不触发）——按钮抖一下＋`BUZZ_PRIME` 轻震，物理摇动手感不断档
+- 真震动：`lib/haptics.ts` 薄封装 `buzz()`（无 API／抛错回 false，不分支）；成功 `BUZZ_FOUND`［60,80,140］、失败 `BUZZ_MISS` 两下轻点 toast 同步
+- 诚实限制：iPhone Safari 全系无 navigator.vibrate，只能动画补偿；Android Chrome 真震
+*邊界情況／失敗處理*
+- 失败路径（无定位／附近无人）也给 MISS 震型＋原 toast，rattle 照播（手感不断）
+- 冷却期内晃动不 prime 不触发（hook 原逻辑不动）
+*驗收標準（Acceptance Criteria）*
+- AC1：点按钮／真摇时卫星钮明显横向抖一下，随后声纳＋结果卡（原流程不动）
+- AC2：真摇第一晃按钮即给 tick 确认，不等结果
+- AC3：Android 真机成功／失败震感不同；iPhone 只看动画（预期内）
+- AC4：`haptics.test.ts` 3 单测（无 API／透传／抛错）；reduced-motion 下 rattle 关
+*改動記錄*
+- 2026-09-07：手感方案落地；修 React 19 refs  lint（cleanup 读过的 ref 别处不许写，burst 归零改 effect 自清理）；`npm run build` 本机 sandbox 仍被拦，待用户侧复核

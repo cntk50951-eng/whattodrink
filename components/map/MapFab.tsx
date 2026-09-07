@@ -39,6 +39,11 @@ type MapFabProps = {
   onZoomOut: () => void;
   /** UR2.5 摇摇：按钮点击＝程序化摇一摇（权限申请由调用方包办）。 */
   onShake: () => void;
+  /**
+   * UR2.9 触发计数（调用方每次触发＋1，含 prime tick）：卫星钮 key 重挂
+   * 重播 rattle，和 idle wobble 三元互斥（同一元素单动画）。
+   */
+  shakeBurst: number;
 };
 
 /** 上一次点开啤酒按钮的时间戳（ms）。12 小时内不再做任何闲置提示。 */
@@ -128,6 +133,7 @@ export function MapFab({
   onZoomIn,
   onZoomOut,
   onShake,
+  shakeBurst,
 }: MapFabProps) {
   const t = useTranslations("map");
   // 静默期走外部 store（ hydration 安全，见上面注释）。
@@ -339,10 +345,15 @@ export function MapFab({
           <span className="inline-flex items-center gap-2">
             <button
               type="button"
+              key={shakeBurst}
               onClick={onShake}
               aria-label={t("shakeHint")}
               className={`bg-card text-primary flex h-12 w-12 items-center justify-center rounded-full border-2 shadow-[3px_3px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none ${
-                shakeWobble ? styles.fabShake : ""
+                shakeBurst > 0
+                  ? styles.fabRattle
+                  : shakeWobble
+                    ? styles.fabShake
+                    : ""
               }`}
             >
               <Vibrate size={20} aria-hidden strokeWidth={2.5} />
