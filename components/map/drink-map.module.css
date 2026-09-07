@@ -491,6 +491,31 @@
   }
 }
 
+/* UR3.4 足迹模式：序号钉（白底 ink 边＋手写体序号，和簇的 accent 底
+ * 区分——簇是别人的，序号是我走过的）；他人层整层置灰（wtd-others 钩子，
+ * trail 钉和线不在此层，不受影响）；酒名签盖掉 Leaflet 默认白签
+ * （双类名提权，不动 leaflet.css）。 */
+.trailDim :global(.wtd-others) {
+  opacity: 0.3;
+  transition: opacity 0.3s ease-out;
+}
+
+.trailTip.trailTip {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 2px 2px 0 var(--border);
+  color: var(--foreground);
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 1px 8px;
+}
+
+.trailTip.trailTip::before {
+  display: none;
+}
+
 .pinCluster {
   background: var(--accent);
   border: 2.5px solid var(--border);

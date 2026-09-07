@@ -27,6 +27,7 @@ import { markShakeUsed } from "@/components/map/MapFab";
 import { pickNearestRecentCheckin } from "@/lib/shake";
 import { clusterPoints } from "@/lib/clusters";
 import { isOnline } from "@/lib/nearby";
+import { trailStops } from "@/lib/trail";
 import {
   ANDROID_LOCATION_SETTINGS_INTENT,
   detectBrowser,
@@ -43,9 +44,10 @@ import { MOCK_ME } from "@/lib/me";
 import {
   formatWantCoords,
   formatWantTime,
-  loadWantRecord,
+  loadWantHistory,
   resolvePlaceName,
-  saveWantRecord,
+  saveWantHistory,
+  upsertWantHistory,
 } from "@/lib/wantRecord";
 import {
   ANCHOR_PANEL_W,
@@ -157,6 +159,7 @@ export function DrinkMap({
   const selfMarkerRef = useRef<Leaflet.Marker | null>(null);
   const wantLayerRef = useRef<Leaflet.LayerGroup | null>(null);
   const othersLayerRef = useRef<Leaflet.LayerGroup | null>(null);
+  const trailLayerRef = useRef<Leaflet.LayerGroup | null>(null);
   const settledRef = useRef(false);
 
   const [mapReady, setMapReady] = useState(false);
@@ -276,7 +279,8 @@ export function DrinkMap({
         const marker = L.marker([c.position.lat, c.position.lng], {
           title: c.nickname,
           icon: L.divIcon({
-            className: "",
+            // UR3.4 wtd-others：足迹模式置灰整层（CSS .trailDim）。
+            className: "wtd-others",
             html:
               artHtml ??
               `<div class="${pinClass}">${c.drinkEmoji}${onlineDot}</div>`,
@@ -293,7 +297,8 @@ export function DrinkMap({
       const badge = L.marker(at, {
         title: t("clusterTitle", { n }),
         icon: L.divIcon({
-          className: "",
+          // UR3.4 wtd-others：簇也是他人的，一起置灰。
+          className: "wtd-others",
           html: `<div class="${styles.pinCluster}">${n}</div>`,
           iconSize: [48, 48],
           iconAnchor: [24, 24],
@@ -432,7 +437,6 @@ export function DrinkMap({
     });
   }, []);
   const [picked, setPicked] = useState<Beer | null>(null);
-  const [wantAt, setWantAt] = useState<LatLng | null>(null);
   const [wantSaved, setWantSaved] = useState(false);
   // UR1.8 frozen drop snapshot (null until the first 想喝, or after reset).
   const [wantRecord, setWantRecord] = useState<WantRecord | null>(null);
@@ -599,6 +603,7 @@ export function DrinkMap({
       // UR2.8: 他人 pin 层走聚合重建（首帧＋每次 zoomend），街区 zoom
       // 下全是单成员＝和原来一模一样的钉，全港 zoom 下近点合成簇。
       // now 取调用时刻（effect／事件上下文可调 impure，render 内不行）。
+      // UR3.4 他人钉挂全局类 wtd-others：足迹模式下整层置灰（CSS 见 trailDim）。
       renderOthersPins(map, L, Date.now());
       map.on("zoomend", () => {
         if (mapRef.current !== null && leafletRef.current !== null) {
@@ -620,6 +625,7 @@ export function DrinkMap({
       selfMarkerRef.current = null;
       wantLayerRef.current = null;
       othersLayerRef.current = null;
+      trailLayerRef.current = null;
     };
     // init-once：renderOthersPins 只读 refs／模块常量／挂载时 locale 的 t
     //（同 handleFocusPerson 闭包口径，locale 切换是整树 remount）。
@@ -690,17 +696,24 @@ export function DrinkMap({
 
   /* ---- UR1.8: resurrect the persisted snapshot after mount ----
    * State starts null on both server and client (no hydration split);
-   * the stored record — pin included — returns in one effect pass. */
+   * the stored record — pin included — returns in one effect pass.
+   * UR3.4 bug 修：单槽改史槽（加推荐酒不再清旧数据， legacy 单键自动迁移）。 */
+  const [wantHistory, setWantHistory] = useState<WantRecord[]>([]);
+  const wantHistoryRef = useRef<WantRecord[]>([]);
+  useEffect(() => {
+    wantHistoryRef.current = wantHistory;
+  });
   useEffect(() => {
     // Microtask wrapper: the set-state-in-effect rule only allows setState
     // in an async continuation (same pattern as useGeolocation mount — see
     // .memory/2026-09-05-toolchain-pits.md).
     void Promise.resolve().then(() => {
-      const saved = loadWantRecord();
-      if (saved === null) return;
-      setWantRecord(saved);
-      setPicked(saved.beer);
-      setWantAt(saved.position);
+      const history = loadWantHistory();
+      if (history.length === 0) return;
+      const latest = history[history.length - 1] as WantRecord;
+      setWantHistory(history);
+      setWantRecord(latest);
+      setPicked(latest.beer);
       setWantSaved(true);
     });
   }, []);
@@ -718,7 +731,13 @@ export function DrinkMap({
       setFetchedPlace({ at: wantRecord.at, name });
       const patched: WantRecord = { ...wantRecord, placeName: name };
       setWantRecord(patched);
-      saveWantRecord(patched);
+      // UR3.4 史槽：同 at 条目一起补地名（旧的单键 save 已退役）。
+      const next = wantHistoryRef.current.map((r) =>
+        r.at === patched.at ? patched : r,
+      );
+      wantHistoryRef.current = next;
+      setWantHistory(next);
+      saveWantHistory(next);
     });
     return () => {
       cancelled = true;
@@ -782,14 +801,16 @@ export function DrinkMap({
     marker.setLatLng([geoPosition.lat, geoPosition.lng]);
   }, [mapReady, geoPosition]);
 
-  /* ---- 「想喝」 pin layer ---- */
+  /* ---- 「想喝」 pin layer ----
+   * UR3.4 bug 修：一枚钉改一史一钉（最新带圈，旧钉保留可点回看）。
+   * 点任意史钉＝切 wantRecord 开卡（卡片代码零改，只换数据源）。 */
   useEffect(() => {
     const map = mapRef.current;
     const L = leafletRef.current;
     if (!mapReady || map === null || L === null) return;
     wantLayerRef.current?.remove();
     wantLayerRef.current = null;
-    if (wantAt === null || picked === null) return;
+    if (wantHistory.length === 0) return;
 
     const ink =
       window
@@ -799,38 +820,48 @@ export function DrinkMap({
     // UR1.8: the 想喝 pin opens its frozen snapshot card.
     // UR2.7 追加：和他人 pin 同构 —— 推荐酒有专属插畫就画设计稿（红色款
     // 方形钉＋声纳圈），没图才回 emoji 圆钉。
-    const WantArt = iconForPickId(picked.id);
-    const wantArtHtml =
-      WantArt === null
-        ? null
-        : `<div class="${styles.pinArtWant}">${renderToStaticMarkup(<WantArt />)}</div>`;
-    const pin = L.marker([wantAt.lat, wantAt.lng], {
-      title: picked.name,
-      icon: L.divIcon({
-        className: "",
-        html:
-          wantArtHtml ??
-          `<div class="${styles.pinWant}">${picked.emoji}</div>`,
-        iconSize: wantArtHtml === null ? [48, 48] : [56, 56],
-        iconAnchor: wantArtHtml === null ? [24, 44] : [28, 52],
-      }),
-    });
-    pin.on("click", () => setSelectedId(WANT_ID));
-    const layer = L.layerGroup([
-      L.circle([wantAt.lat, wantAt.lng], {
-        radius: 350,
-        color: ink,
-        weight: 2.5,
-        dashArray: "8 6",
-        fillColor: ink,
-        fillOpacity: 0.08,
-      }),
-      pin,
-    ]);
+    const layer = L.layerGroup();
+    const latest = wantHistory[wantHistory.length - 1] as WantRecord;
+    for (const entry of wantHistory) {
+      const Art = iconForPickId(entry.beer.id);
+      const html =
+        Art === null
+          ? `<div class="${styles.pinWant}">${entry.beer.emoji}</div>`
+          : `<div class="${styles.pinArtWant}">${renderToStaticMarkup(<Art />)}</div>`;
+      const isLatest = entry.at === latest.at;
+      const size: [number, number] = Art === null ? [48, 48] : [56, 56];
+      const pin = L.marker([entry.position.lat, entry.position.lng], {
+        title: entry.beer.name,
+        icon: L.divIcon({
+          className: "",
+          html,
+          iconSize: size,
+          iconAnchor: [size[0] / 2, size[1] - 4],
+        }),
+      });
+      pin.on("click", () => {
+        setWantRecord(entry);
+        setSelectedId(WANT_ID);
+      });
+      pin.addTo(layer);
+      if (isLatest) {
+        L.circle([entry.position.lat, entry.position.lng], {
+          radius: 350,
+          color: ink,
+          weight: 2.5,
+          dashArray: "8 6",
+          fillColor: ink,
+          fillOpacity: 0.08,
+        }).addTo(layer);
+      }
+    }
     layer.addTo(map);
     wantLayerRef.current = layer;
-    map.setView([wantAt.lat, wantAt.lng], Math.max(map.getZoom(), 14));
-  }, [mapReady, wantAt, picked]);
+    map.setView(
+      [latest.position.lat, latest.position.lng],
+      Math.max(map.getZoom(), 14),
+    );
+  }, [mapReady, wantHistory]);
 
   function handlePick(): void {
     // Rolling a new beer touches ONLY the candidate — the old pin and its
@@ -926,13 +957,17 @@ export function DrinkMap({
         : map !== null
           ? { lat: map.getCenter().lat, lng: map.getCenter().lng }
           : DEFAULT_CENTER;
-    setWantAt(at);
     setWantSaved(true);
     // UR1.8: freeze the drop moment — beer, clock, and fix travel together
     // from here on; the pin and the card only ever read this snapshot.
+    // UR3.4 bug 修：追加进史（旧的不清），上限截尾保最新。
     const record: WantRecord = { beer: picked, at: Date.now(), position: at };
+    // UR3.4 同店顶替：10m 内算同一位置（GPS 漂移），旧条让位，不叠钉。
+    const next = upsertWantHistory(wantHistoryRef.current, record);
+    wantHistoryRef.current = next;
+    setWantHistory(next);
+    saveWantHistory(next);
     setWantRecord(record);
-    saveWantRecord(record);
     // UR1.2: dropping the pin collapses the sheet into a chip — the map
     // must never stay buried under the drawer on small screens.
     setSheetOpen(false);
@@ -1018,6 +1053,73 @@ export function DrinkMap({
     return () => window.clearTimeout(timer);
   }, [inviteFx]);
 
+  // UR3.4 足迹模式（返工后口径）：足迹＝我自己的打卡（现在只有当前
+  // 想喝钉，以后是列表）。同图叠层：聚光圈＋永久酒名签，他人层走 CSS
+  // 置灰（wtd-others＋trailDim）；2 站以上才连虚线（现在走不到，留给以后）。
+  const [trailMode, setTrailMode] = useState(false);
+  useEffect(() => {
+    const map = mapRef.current;
+    const L = leafletRef.current;
+    if (!mapReady || map === null || L === null) return;
+    trailLayerRef.current?.remove();
+    trailLayerRef.current = null;
+    if (!trailMode) return;
+    const stops = trailStops(wantHistory);
+    if (stops.length === 0) return;
+    const ink =
+      window
+        .getComputedStyle(document.documentElement)
+        .getPropertyValue("--doodle-red")
+        .trim() || "#b3261e";
+    const pts = stops.map(
+      (s) => [s.position.lat, s.position.lng] as [number, number],
+    );
+    const layer = L.layerGroup();
+    if (pts.length > 1) {
+      L.polyline(pts, {
+        color: ink,
+        weight: 3,
+        dashArray: "2 7",
+        lineCap: "round",
+      }).addTo(layer);
+    }
+    stops.forEach((s, i) => {
+      // 我的钉本体已在图上（想喝钉），这里只加聚光圈＋酒名签。
+      const halo = L.circle([s.position.lat, s.position.lng], {
+        radius: 150,
+        color: ink,
+        weight: 3,
+        dashArray: "6 6",
+        fill: false,
+      });
+      halo.bindTooltip(
+        pts.length > 1 ? `${i + 1} · ${s.beerName}` : s.beerName,
+        {
+          permanent: true,
+          direction: "top",
+          offset: [0, -20],
+          className: styles.trailTip,
+        },
+      );
+      halo.addTo(layer);
+    });
+    layer.addTo(map);
+    trailLayerRef.current = layer;
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    if (pts.length === 1) {
+      const at = pts[0] as [number, number];
+      if (reduced) map.setView(at, Math.max(map.getZoom(), 15));
+      else map.flyTo(at, Math.max(map.getZoom(), 15), { duration: 1 });
+    } else if (reduced) map.fitBounds(pts, { padding: [40, 40], animate: false });
+    else map.flyToBounds(pts, { padding: [40, 40], duration: 1 });
+    return () => {
+      layer.remove();
+      if (trailLayerRef.current === layer) trailLayerRef.current = null;
+    };
+  }, [trailMode, mapReady, wantHistory]);
+
   /**
    * Android-only: jump straight into the system Location settings.
    * Must run in a tap handler; Chrome resolves the intent scheme, other
@@ -1046,7 +1148,9 @@ export function DrinkMap({
 
   return (
     <div
-      className={`${styles.frame} relative overflow-hidden rounded-2xl border-2 bg-card shadow-[4px_4px_0_var(--border)]`}
+      className={`${styles.frame} relative overflow-hidden rounded-2xl border-2 bg-card shadow-[4px_4px_0_var(--border)] ${
+        trailMode ? styles.trailDim : ""
+      }`}
     >
       <div
         ref={holderRef}
@@ -1267,6 +1371,7 @@ export function DrinkMap({
         onZoomOut={() => handleZoom(-1)}
         onShake={handleShakeRequest}
         shakeBurst={shakeBurst}
+        onFootprints={() => setTrailMode((v) => !v)}
       />
 
       {/* MOCK badge — top-left now; bottom-left belongs to the beer dial. */}
@@ -1276,6 +1381,44 @@ export function DrinkMap({
         <span aria-hidden className={styles.liveDot} />
         {t("mockBadge")}
       </p>
+      {/* UR3.4 足迹模式浮条：标题＋显式返回（toggle 同动作可退）；
+          空足迹（真后端）给空文案＋去记录 CTA，mock 恒有站只走主分支。 */}
+      {trailMode &&
+        (() => {
+          // 足迹站＝我自己的打卡史（无则空态）。
+          const stops = trailStops(wantHistory);
+          return (
+        <div
+          className={`${styles.above} absolute top-3 left-1/2 flex w-max max-w-[92%] -translate-x-1/2 items-center gap-2 rounded-full border-2 bg-card/95 py-1 pr-1 pl-4 shadow-[3px_3px_0_var(--border)]`}
+        >
+          <p className="font-hand text-base font-bold whitespace-nowrap">
+            {stops.length === 0
+              ? t("trailEmpty")
+              : t("trailTitle", { n: stops.length })}
+          </p>
+          {stops.length === 0 ? (
+            <button
+              type="button"
+              onClick={() => {
+                setTrailMode(false);
+                setSheetOpen(true);
+              }}
+              className="font-hand rounded-full border-2 bg-primary px-3 py-1 text-sm font-bold text-primary-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+            >
+              {t("pickCta")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setTrailMode(false)}
+              className="font-hand rounded-full border-2 bg-card px-3 py-1 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+            >
+              {t("trailBack")}
+            </button>
+          )}
+        </div>
+          );
+        })()}
 
       {/* Slim status pill: locating, outside-HK, or a dismissed failure.
           Tapping the dismissed pill retries and reopens the guide. */}

@@ -11,6 +11,7 @@ import {
   Camera,
   Dices,
   Expand,
+  Footprints,
   LocateFixed,
   Minus,
   Plus,
@@ -39,6 +40,8 @@ type MapFabProps = {
   onZoomOut: () => void;
   /** UR2.5 摇摇：按钮点击＝程序化摇一摇（权限申请由调用方包办）。 */
   onShake: () => void;
+  /** UR3.4 足迹：进足迹模式（调用方再点一次退出，toggle 语义）。 */
+  onFootprints: () => void;
   /**
    * UR2.9 触发计数（调用方每次触发＋1，含 prime tick）：卫星钮 key 重挂
    * 重播 rattle，和 idle wobble 三元互斥（同一元素单动画）。
@@ -134,6 +137,7 @@ export function MapFab({
   onZoomOut,
   onShake,
   shakeBurst,
+  onFootprints,
 }: MapFabProps) {
   const t = useTranslations("map");
   // 静默期走外部 store（ hydration 安全，见上面注释）。
@@ -217,6 +221,8 @@ export function MapFab({
     { key: "recenter", label: t("recenter"), icon: LocateFixed, run: onRecenter, keepOpen: true },
     { key: "photo", label: t("photo"), icon: Camera, run: onPhoto, keepOpen: false, hot: true },
     { key: "pick", label: t("pickCta"), icon: Dices, run: onPick, keepOpen: false },
+    // UR3.4 足迹：和睇全港同级（地图视角类），放 pick 上面，点后收扇形进模式。
+    { key: "trail", label: t("footprints"), icon: Footprints, run: onFootprints, keepOpen: false },
   ];
 
   // 卡片展开时整个 dial 藏起来 —— 啤酒只住左下角，不浮半空。

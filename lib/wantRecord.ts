@@ -9,6 +9,7 @@
 
 import type { Beer } from "./beers";
 import type { LatLng } from "./geo";
+import { haversineMeters } from "./geo";
 
 /** Frozen the moment a 想喝 pin drops — never follows you afterwards. */
 export type WantRecord = {
@@ -98,6 +99,89 @@ export function saveWantRecord(record: WantRecord): void {
 
 export function clearWantRecord(): void {
   try {
+    window.localStorage.removeItem(WANT_STORAGE_KEY);
+  } catch {
+    // Nothing to clear anyway.
+  }
+}
+
+/**
+ * UR3.4 bug 修（加推荐酒清掉旧数据）：单槽改史槽。
+ * - 新键 `wtd-want-history` 存数组（按 at 升序，上限截尾保最新）。
+ * - 迁移：history 缺席但 legacy 单键在→收编为首条并删 legacy（旧存档零丢失）。
+ * - 条目逐个过 parseWantRecord，坏条丢弃（UR1.8 口径）。
+ */
+
+/** 史槽上限：够画轨迹，又不让 localStorage 无限长。 */
+export const MAX_WANT_HISTORY = 30;
+
+export const WANT_HISTORY_KEY = "wtd-want-history";
+
+/**
+ * 同店半径（米）：新打卡落在这个距离内＝同一位置，顶掉旧条而非叠钉。
+ * GPS 本来就有漂移，卡坐标百分百相等反而拦不住真重复。
+ */
+export const SAME_SPOT_M = 10;
+
+/**
+ * Pure upsert：同店（10m 内）顶替，无同店追加；结果按 at 升序＋截尾。
+ * handleWant 唯一写入口（存储＋state 同调它）。
+ */
+export function upsertWantHistory(
+  prev: readonly WantRecord[],
+  record: WantRecord,
+): WantRecord[] {
+  const rest = prev.filter(
+    (r) => haversineMeters(r.position, record.position) >= SAME_SPOT_M,
+  );
+  return [...rest, record]
+    .sort((a, b) => a.at - b.at)
+    .slice(-MAX_WANT_HISTORY);
+}
+
+/** Pure validator for the history array — bad entries are dropped. */
+export function parseWantHistory(raw: unknown): WantRecord[] {
+  if (!Array.isArray(raw)) return [];
+  const out: WantRecord[] = [];
+  for (const item of raw) {
+    const record = parseWantRecord(item);
+    if (record !== null) out.push(record);
+  }
+  out.sort((a, b) => a.at - b.at);
+  return out.slice(-MAX_WANT_HISTORY);
+}
+
+export function loadWantHistory(): WantRecord[] {
+  try {
+    if (typeof window === "undefined") return [];
+    const raw = window.localStorage.getItem(WANT_HISTORY_KEY);
+    if (raw !== null) return parseWantHistory(JSON.parse(raw) as unknown);
+    // Legacy migration (one-time): single slot → history, then drop the key.
+    const legacy = loadWantRecord();
+    if (legacy === null) return [];
+    const migrated = [legacy];
+    saveWantHistory(migrated);
+    clearWantRecord();
+    return migrated;
+  } catch {
+    return [];
+  }
+}
+
+export function saveWantHistory(records: readonly WantRecord[]): void {
+  try {
+    window.localStorage.setItem(
+      WANT_HISTORY_KEY,
+      JSON.stringify([...records].slice(-MAX_WANT_HISTORY)),
+    );
+  } catch {
+    // Private mode — degrades to session-only, harmless.
+  }
+}
+
+export function clearWantHistory(): void {
+  try {
+    window.localStorage.removeItem(WANT_HISTORY_KEY);
     window.localStorage.removeItem(WANT_STORAGE_KEY);
   } catch {
     // Nothing to clear anyway.

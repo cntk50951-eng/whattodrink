@@ -633,14 +633,36 @@
 这一个功能很有趣，我想做到的是当有其他的用户打开APP并且上线的时候写距离5KM之内，那么就会显示该用户的在线提示，你可以点击这个用户，并且邀请他一起去喝酒。 请先思考这个功能应该怎么样去实现是否需要有后端的功能和数据库。 如果是的话，你可以先实现UI的部分。关于如何去邀请其他用户一起喝酒的UI交互，你需要调用agent skill去思考UI的设计再去实现。 你需要向我确认。
 
 *範圍*（用户拍板 A 卡内邀约四态；design skill 深度思考已做，子代理结论印证）
-- 在线：`lib/nearby.ts` 纯函数（5min 心跳窗＋5km，`isOnline`／`isNearbyOnline`，4 单测）；`Checkin` 加 `onlineAt`＋`declinesInvite`（Mandy 婉拒）；pin 绿点＋头像绿点＋在线 pill（只在线挂）
+- 在线：`lib/nearby.ts` 纯函数（5min 心跳窗＋5km，`isOnline`／`isNearbyOnline`，4 单测）；`Checkin` 加 `onlineAt`＋`declinesInvite`（Mandy 婉拒）；pin 绿点＋头像绿点＋区名后在线 inline 态（pill 版返工已删，只在线挂）
 - 邀约：副按钮（白底 ink 边）idle→已发出（省略号有限跳 3s）→成局条（accent＋成功震）／婉拒灰条（按钮恢复可再约）；接受按人确定（Mandy 拒其余收）；乾杯独立互不锁；`INVITE_MOCK_MS = 3000`
 - 后端（EPIC 3.0）：`users.last_seen_at` 心跳＋`drink_invites` 同行状态机（sent／accepted／declined／expired，24h 扫过期）；mock（剧本＋定时）届时整块删
 *驗收標準（Acceptance Criteria）*
-- AC1：在线人 pin／头像有绿点＋在线 pill；不在线不占位
+- AC1：在线人 pin／头像有绿点＋区名后在线 inline 态；不在线不占位
 - AC2：点约喝酒→已发出…→3s 后成局条＋震（阿怡／Kelvin／大佬明）；Mandy→婉拒条＋可再约
 - AC3：成局／婉拒三语正确；reduced-motion 下无省略号跳动（静态字）
 - AC4：`nearby.test.ts` 4 单测；数据文档有心跳＋invites 表＋替换清单
 *改動記錄*
 - 2026-09-07：四态落地；修 render 内 `Date.now()` impure 错（now 快照 mount 取＋调用点传参）；修 shake fixture 缺新字段；en `It's` ICU 单引号坑改词（Deal!）
 - 2026-09-07（用户验收返工：在线 pill 丑）：去 pill 化——双 pill 打架，只留性别 pill；在线退成区名后绿点＋绿字（`.onlinePill` 删干净）
+
+**UR 3.4　我的足迹模式（转盘入口＋轨迹高亮＋显式返回）** [✓]（用户已验收含史槽＋同店顶替，merged）
+
+這個UR是一個極其重要又複雜的功能，你可以考慮深度調研、設計並且拆分成自任務： 这个功能可以让用户点击录按钮之后看到他所有的喝酒的足迹在地图上高亮你需要设计这个UI如何显示和交互。1）这个按钮放在什么位置？2）点击之后出现的视图如何有的map；3）用户如何从主机的地图返回现有的map；
+对于我的要求是一定要符合现代化的设计和最佳的实践。
+
+*範圍*（用户拍板：转盘入口＋同图模式，拆 4 子任务；redesign-preserve，doodle 语言沿用）
+- 3.4.1 数据：`lib/footprints.ts` MOCK 6 站（`beerId` 落目录是单测锁，按时间升序）＋3 单测；未来 `checkins where user_id＝我`，无新表
+- 3.4.2 入口：MapFab 转盘第 7 动作（Footprints 图标，和睇全港同级，点后收扇形）
+- 3.4.3 模式：同图叠层——品牌红虚线＋序号钉（白底，和簇 accent 底区分）＋永久酒名签（doodle 化 tooltip）；他人钉挂 `wtd-others` 整层置灰；进模式飞全轨迹（reduced-motion 走 fitBounds 无动画）；浮条“我的足迹 · N 站”＋显式返回
+- 3.4.4 返回＋空态：返回按钮／转盘 toggle 双退路；空足迹（真后端）空文案＋去记录 CTA
+*驗收標準（Acceptance Criteria）*
+- AC1：点转盘足迹→他人变灰＋红线＋1～6 序号钉＋酒名签＋浮条，进场飞全轨迹
+- AC2：点返回（或再点转盘）→图层全拆＋他人恢复＋镜头不动（不强制飞回）
+- AC3：空态分支可达（mock 恒有站，代码分支备真后端）；三语标题／返回／空文案正确
+- AC4：`footprints.test.ts` 3 单测；数据文档有七、我的足迹节
+*改動記錄*
+- 2026-09-07：四子任务落地；附带修 home-map 六节涟漪残留行（UR3.1 退役时漏的）
+- 2026-09-07（用户纠正：足迹用了别人坐标）：6 站全换我自己的 venue（上环／金钟／天后／太子／佐敦／跑马地，离他人钉均 300m＋，单测锁死）
+- 2026-09-07（用户再纠正：我的足迹只有 1 个点）：删光编的站——足迹＝`trailStops(wantRecord)`（现在最多 1 站：当前想喝钉；无则空态，不编数据）；单站聚光圈＋酒名签＋飞过去（≥2 站才连虚线，留给以后）；`lib/footprints.ts` 整文件删，死类 `trailStop` 同删
+- 2026-09-07（用户报 bug：加推荐酒清旧数据，足迹永只有一站）：单槽改史槽——`wtd-want-history` 数组（上限 30，坏条过滤，legacy 单键迁移后删）；pin 层一史一钉（最新带圈，点旧钉回看）；`trailStops` 改吃数组；`wantAt` 状态退役
+- 2026-09-07（用户报 bug：同位置重复打卡叠钉）：`upsertWantHistory` 同店顶替（10m 内算同一位置，GPS 漂移也拦；`handleWant` 唯一写入口）；3 单测（远追加／同位替／漂移替）

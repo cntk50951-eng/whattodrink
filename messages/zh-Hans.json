@@ -198,6 +198,10 @@
     "inviteSent": "已发出，等对方…",
     "inviteAccepted": "约好啦！",
     "inviteAcceptedDetail": "约好啦！{area}见！",
-    "inviteDeclined": "对方今晚没空，改天再约"
+    "inviteDeclined": "对方今晚没空，改天再约",
+    "footprints": "足迹",
+    "trailTitle": "我的足迹 · {n} 站",
+    "trailBack": "返回",
+    "trailEmpty": "还没有足迹，去喝一杯吧！"
   }
 }

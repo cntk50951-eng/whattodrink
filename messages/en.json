@@ -198,6 +198,10 @@
     "inviteSent": "Sent, waiting…",
     "inviteAccepted": "Deal!",
     "inviteAcceptedDetail": "Deal! See you at {area}!",
-    "inviteDeclined": "Busy tonight, rain check!"
+    "inviteDeclined": "Busy tonight, rain check!",
+    "footprints": "Footprints",
+    "trailTitle": "My trail · {n} stops",
+    "trailBack": "Back",
+    "trailEmpty": "No stops yet. Go log one!"
   }
 }
