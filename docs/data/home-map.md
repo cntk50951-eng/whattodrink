@@ -20,7 +20,7 @@
 
 | 字段 | 页面位置 | 类型 | 当前来源 | 未来表映射 |
 |---|---|---|---|---|
-| `beer`（酒快照，含 emoji＋名） | 想喝 pin、回看卡片 | `Beer` | `localStorage("wtd-want-record")` | `checkins.beer_id` |
+| `beer`（酒快照，含 emoji＋名） | 想喝 pin、回看卡片 | `Beer` | `localStorage("wtd-want-history")` 数组（UR3.4 单槽改史槽，上限 30，legacy `wtd-want-record` 自动迁移后删） | `checkins.beer_id` |
 | `at`（打卡毫秒戳） | 回看卡片时间行 | `number` | 同上 | `checkins.created_at` |
 | `position.lat`／`lng`（打卡瞬间定位，冻结） | pin 位置、回看卡片坐标行 | `LatLng` | 同上 | `checkins.lat`／`checkins.lng` |
 | `placeName`（逆地理地名，异步回填） | 回看卡片地名行 | `string?` | 同上（无则在线查 Nominatim＋memoize） | `checkins.place_name` |
@@ -57,5 +57,12 @@
 | 字段 | 页面位置 | 类型 | 当前来源 | 未来表映射 |
 |---|---|---|---|---|
 | `wtd-shake-used`（上次有效摇动戳） | 摇摇 pill 5 分钟抖动的静默开关 | 时间戳 `string` | `localStorage`（`markShakeUsed()` 写，按钮和真机共用） | 不进库（UI 节流偏好；用户级可进 `users` 偏好，待定） |
-| 涟漪坐标＋toast 文案（`ripple`／`shakeToast`） | 地图声纳／顶部提示 | 会话 state（1.25s／3.5s 自散） | render 现算＋定时器 | 不进库（运行时态） |
+| 涟漪坐标＋toast 文案（`ripple`／`shakeToast`） | 地图声纳／顶部提示 | 会话 state（1.25s／3.5s 自散） | render 现算＋定时器 | 不进库（运行时态；UR3.1 涟漪退役，换 `shakeSearch` 晃杯罩，时序不变） |
 | 动作权限态（`permission`） | iOS 首次点摇摇按钮的系统弹窗 | `ShakePermission`（unknown／granted／denied，`hooks/useShake.ts`） | state，会话（拒绝只剩按钮触发） | 不进库（运行时态） |
+
+## 七、我的足迹（UR3.4，MOCK，EPIC 3.0 替换）
+
+| 字段 | 页面位置 | 类型 | 当前来源 | 未来表映射 |
+|---|---|---|---|---|
+| 我的足迹站（`trailStops(wantHistory)`，UR3.4 返工后） | 聚光圈＋酒名签＋浮条计数（≥2 站连虚线） | `TrailStop[]`（`lib/trail.ts`，想喝史即足迹，无则空态） | render 现算（无记录不编数据） | `checkins where user_id＝我 order by created_at`（字段直迁，无新表） |
+| `trailMode`（足迹模式开关） | 他人置灰＋浮条＋返回 | `boolean` | state，会话 | 不进库（运行时态） |

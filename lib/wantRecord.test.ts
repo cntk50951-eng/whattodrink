@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  MAX_WANT_HISTORY,
+  SAME_SPOT_M,
   formatPlaceName,
   formatWantCoords,
   formatWantTime,
+  parseWantHistory,
   parseWantRecord,
   resolvePlaceName,
+  upsertWantHistory,
 } from "./wantRecord";
 
 const GOOD = {
@@ -62,6 +66,66 @@ describe("parseWantRecord", () => {
     });
     expect(record?.beer.category).toBe("");
     expect(record?.beer.tagline).toBe("");
+  });
+});
+
+describe("parseWantHistory (UR3.4)", () => {
+  it("sorts oldest-first and drops bad entries", () => {
+    const late = { ...GOOD, at: GOOD.at + 1000 };
+    const out = parseWantHistory([late, null, GOOD, { nope: 1 }]);
+    expect(out.map((r) => r.at)).toEqual([GOOD.at, GOOD.at + 1000]);
+  });
+
+  it("rejects non-arrays", () => {
+    expect(parseWantHistory(null)).toEqual([]);
+    expect(parseWantHistory(GOOD)).toEqual([]);
+  });
+
+  it("caps at MAX_WANT_HISTORY keeping the newest", () => {
+    const many = Array.from({ length: MAX_WANT_HISTORY + 5 }, (_, i) => ({
+      ...GOOD,
+      at: GOOD.at + i,
+    }));
+    const out = parseWantHistory(many);
+    expect(out).toHaveLength(MAX_WANT_HISTORY);
+    expect(out[0]?.at).toBe(GOOD.at + 5);
+  });
+});
+
+describe("upsertWantHistory (UR3.4)", () => {
+  const base = {
+    beer: GOOD.beer,
+    at: GOOD.at,
+    position: { ...GOOD.position },
+  };
+
+  it("appends a far-away drop", () => {
+    const far = { ...base, at: GOOD.at + 1, position: { lat: 23, lng: 115 } };
+    const out = upsertWantHistory([base], far);
+    expect(out).toHaveLength(2);
+    expect(out[1]).toEqual(far);
+  });
+
+  it("replaces the same spot instead of stacking pins", () => {
+    const same = {
+      ...base,
+      at: GOOD.at + 1,
+      position: { ...GOOD.position },
+    };
+    const out = upsertWantHistory([base], same);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toEqual(same);
+  });
+
+  it("treats GPS drift inside SAME_SPOT_M as the same spot", () => {
+    expect(SAME_SPOT_M).toBe(10);
+    // 约 5m 漂移（0.000045 纬度≈5m）照样顶替。
+    const drifted = {
+      ...base,
+      at: GOOD.at + 1,
+      position: { lat: GOOD.position.lat + 0.000045, lng: GOOD.position.lng },
+    };
+    expect(upsertWantHistory([base], drifted)).toHaveLength(1);
   });
 });
 

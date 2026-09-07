@@ -58,6 +58,14 @@
 - **UR 3.1 — 摇一摇毛玻璃晃杯时刻（[✓] 用户已验收含溢泡 v2，merged）**
 - **UR 3.2 — 每日乾杯 15 次上限（[✓] 用户已验收，merged）**
 - **UR 3.3 — 附近在线＋约喝酒（[✓] 用户已验收含在线去 pill 化，merged）**
+- **UR 3.4 — 我的足迹模式（[✓] 用户已验收含史槽＋同店顶替，merged）**
+  - 四子任务：`lib/footprints.ts` MOCK 6 站＋3 单测；MapFab 第 7 动作（Footprints）；同图叠层（红虚线＋序号钉＋永久酒名签，他人 `wtd-others` 置灰，进场飞全轨迹）；浮条＋显式返回＋空态 CTA；`footprints`／`trailTitle`／`trailBack`／`trailEmpty` 三语
+  - 数据文档：home-map 七、我的足迹节＋六节涟漪残留行修正；未来直读 `checkins`，无新表
+  - 72→75 tests／tsc 全绿、lint 0 error（3 旧 warning）；`npm run build` 本机 sandbox 被拦（老问题，待用户侧复核）
+  - fix（用户纠正）：足迹 6 站换我自己的 venue（离他人钉 300m＋，单测锁死）；75→76 tests
+  - fix（用户再纠正：只有 1 个点）：删编造站，足迹直读 `wantRecord`（`lib/trail.ts`＋2 单测，无则空态）；74 tests／门禁全绿
+  - fix（用户报 bug：加酒清旧数据）：`wtd-want-history` 史槽（上限 30＋迁移＋3 单测），pin 层一史一钉可点回看，`trailStops` 改吃数组；77 tests／tsc／lint 0 error
+  - fix（用户报 bug：同位置叠钉）：`upsertWantHistory` 10m 同店顶替（新替旧，不叠）；80 tests／门禁全绿
   - 在线：`lib/nearby.ts`＋4 单测（5min 窗＋5km，含未来心跳 skew）；`Checkin` 加 `onlineAt`＋`declinesInvite`；pin／头像绿点＋在线 pill；`checkins.test.ts` 循环断言补两行，`shake.test.ts` fixture 补字段
   - 邀约四态：副按钮→已发出（有限跳）→成局条＋震／婉拒条＋可再约（Mandy 拒）；`onlineNow`／`inviteCta`／`inviteSent`／`inviteAccepted(+Detail)`／`inviteDeclined` 三语
   - 数据文档：`users.last_seen_at`＋`drink_invites` 同行状态机＋替换清单；home-map 三行同步
