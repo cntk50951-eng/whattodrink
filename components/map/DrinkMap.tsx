@@ -12,6 +12,7 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { useShake } from "@/hooks/useShake";
 import { markShakeUsed } from "@/components/map/MapFab";
 import { pickNearestRecentCheckin } from "@/lib/shake";
+import { clusterPoints } from "@/lib/clusters";
 import {
   ANDROID_LOCATION_SETTINGS_INTENT,
   detectBrowser,
@@ -99,6 +100,11 @@ const FOCUS_CARD_CLEAR_PX = 240;
  * bound, so fall back to a plain fly-to instead.
  */
 const MIN_FOCUS_SEPARATION_M = 50;
+/**
+ * UR2.8 聚合半径（像素）：略大于单钉最大尺寸（56px）——两钉投影中心距
+ * 掉进这个半径即视觉重叠，合成一簇。
+ */
+const OTHERS_CLUSTER_PX = 64;
 export function DrinkMap({
   initialPickOpen = false,
 }: {
@@ -120,6 +126,7 @@ export function DrinkMap({
   const leafletRef = useRef<typeof Leaflet | null>(null);
   const selfMarkerRef = useRef<Leaflet.Marker | null>(null);
   const wantLayerRef = useRef<Leaflet.LayerGroup | null>(null);
+  const othersLayerRef = useRef<Leaflet.LayerGroup | null>(null);
   const settledRef = useRef(false);
 
   const [mapReady, setMapReady] = useState(false);
@@ -198,6 +205,73 @@ export function DrinkMap({
         paddingBottomRight: [24, FOCUS_CARD_CLEAR_PX],
       });
     }
+  }
+  /**
+   * UR2.8 他人 pin 层重建（init＋每次 zoomend 调）：当前 zoom 下投影到
+   * 像素，按 OTHERS_CLUSTER_PX 贪心聚合。单成员＝原样单 pin（UR2.7 的
+   * art／emoji 两款原封不动）；多成员＝一个 doodle 数字簇，点之放大散开。
+   * 只读 refs＋模块常量，init effect 闭包首实例调用无 stale 问题（同
+   * handleFocusPerson 口径，见 UR2.1 memory）。
+   */
+  function renderOthersPins(map: Leaflet.Map, L: typeof Leaflet): void {
+    othersLayerRef.current?.remove();
+    const pixels = MOCK_CHECKINS.map((c) => {
+      const p = map.latLngToContainerPoint([c.position.lat, c.position.lng]);
+      return { x: p.x, y: p.y };
+    });
+    const layer = L.layerGroup();
+    for (const [i, cluster] of clusterPoints(
+      pixels,
+      OTHERS_CLUSTER_PX,
+    ).entries()) {
+      if (cluster.members.length === 1) {
+        const idx = cluster.members[0] as number;
+        const c = MOCK_CHECKINS[idx] as Checkin;
+        // UR2.7 原样：有图方形设计钉，无图 emoji 圆钉（奇偶错峰倾斜保留）。
+        const ArtIcon = iconForDrinkName(c.drinkName);
+        const artHtml =
+          ArtIcon === null
+            ? null
+            : `<div class="${styles.pinArt}">${renderToStaticMarkup(<ArtIcon />)}</div>`;
+        const pinClass =
+          idx % 2 === 0 ? styles.pin : `${styles.pin} ${styles.pinAlt}`;
+        const marker = L.marker([c.position.lat, c.position.lng], {
+          title: c.nickname,
+          icon: L.divIcon({
+            className: "",
+            html: artHtml ?? `<div class="${pinClass}">${c.drinkEmoji}</div>`,
+            iconSize: artHtml === null ? [40, 40] : [56, 56],
+            iconAnchor: artHtml === null ? [20, 38] : [28, 52],
+          }),
+        });
+        marker.on("click", () => handleFocusPerson(c));
+        marker.addTo(layer);
+        continue;
+      }
+      const at = map.containerPointToLatLng([cluster.centroid.x, cluster.centroid.y]);
+      const n = cluster.members.length;
+      const badge = L.marker(at, {
+        title: t("clusterTitle", { n }),
+        icon: L.divIcon({
+          className: "",
+          html: `<div class="${styles.pinCluster}">${n}</div>`,
+          iconSize: [48, 48],
+          iconAnchor: [24, 24],
+        }),
+        zIndexOffset: 100 + i,
+      });
+      badge.on("click", () => {
+        const reduced = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+        const z = Math.min(map.getZoom() + 2, ZOOM_MAX);
+        if (reduced) map.setView(at, z);
+        else map.flyTo(at, z, { duration: 0.8 });
+      });
+      badge.addTo(layer);
+    }
+    layer.addTo(map);
+    othersLayerRef.current = layer;
   }
   /**
    * UR2.5 摇一摇流程：有效触发 → 24h 内最近 → 用户位置声纳 ~1.2s →
@@ -436,28 +510,14 @@ export function DrinkMap({
         setFabOpen(false);
         setSelectedId(null);
       });
-      for (const [i, c] of MOCK_CHECKINS.entries()) {
-        // UR2.7 追加：有专属插畫的酒名 → pin 直接画设计稿（方形钉贴瓶形，
-        // 尺寸放大到 56px 当"放大显示"）；没匹配的保持原 emoji 圆钉。
-        const ArtIcon = iconForDrinkName(c.drinkName);
-        const artHtml =
-          ArtIcon === null
-            ? null
-            : `<div class="${styles.pinArt}">${renderToStaticMarkup(<ArtIcon />)}</div>`;
-        const pinClass =
-          i % 2 === 0 ? styles.pin : `${styles.pin} ${styles.pinAlt}`;
-        const marker = L.marker([c.position.lat, c.position.lng], {
-          title: c.nickname,
-          icon: L.divIcon({
-            className: "",
-            html: artHtml ?? `<div class="${pinClass}">${c.drinkEmoji}</div>`,
-            iconSize: artHtml === null ? [40, 40] : [56, 56],
-            iconAnchor: artHtml === null ? [20, 38] : [28, 52],
-          }),
-        });
-        marker.on("click", () => handleFocusPerson(c));
-        marker.addTo(map);
-      }
+      // UR2.8: 他人 pin 层走聚合重建（首帧＋每次 zoomend），街区 zoom
+      // 下全是单成员＝和原来一模一样的钉，全港 zoom 下近点合成簇。
+      renderOthersPins(map, L);
+      map.on("zoomend", () => {
+        if (mapRef.current !== null && leafletRef.current !== null) {
+          renderOthersPins(mapRef.current, leafletRef.current);
+        }
+      });
       holder.dataset.ready = "1";
       mapRef.current = map;
       leafletRef.current = L;
@@ -472,7 +532,11 @@ export function DrinkMap({
       leafletRef.current = null;
       selfMarkerRef.current = null;
       wantLayerRef.current = null;
+      othersLayerRef.current = null;
     };
+    // init-once：renderOthersPins 只读 refs／模块常量／挂载时 locale 的 t
+    //（同 handleFocusPerson 闭包口径，locale 切换是整树 remount）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ---- settle the initial view once geo resolves (or fails) ---- */
