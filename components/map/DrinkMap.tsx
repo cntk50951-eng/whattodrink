@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type * as Leaflet from "leaflet";
 import { useLocale, useTranslations } from "next-intl";
-import { Clock, Dices, MapPin, Plus, X } from "lucide-react";
+import { Clock, Dices, MapPin, Plus, Trash2, X } from "lucide-react";
 import { resolveCityCode } from "@/lib/city";
 
 import { CityIcon } from "./CityIcon";
@@ -54,8 +54,10 @@ import {
   formatWantCoords,
   formatWantTime,
   loadWantHistory,
+  removeWantAt,
   resolvePlaceName,
   saveWantHistory,
+  swapWantBeer,
   upsertWantHistory,
 } from "@/lib/wantRecord";
 import {
@@ -474,6 +476,8 @@ export function DrinkMap({
   const [wantSaved, setWantSaved] = useState(false);
   // UR1.8 frozen drop snapshot (null until the first 想喝, or after reset).
   const [wantRecord, setWantRecord] = useState<WantRecord | null>(null);
+  // UR3.7 删除两段确认：只对正在看的 at 武装，换条看自动解除，无需 effect。
+  const [confirmAt, setConfirmAt] = useState<number | null>(null);
   // Place name fetched for the snapshot. Keyed by drop timestamp so a new
   // drop never flashes the previous name while its lookup is in flight.
   const [fetchedPlace, setFetchedPlace] = useState<{
@@ -1025,6 +1029,42 @@ export function DrinkMap({
     setSheetOpen(false);
   }
 
+  /* ---- UR3.7 我的打卡可编辑 ----
+   * 换酒：同条目只换 beer（at／位置／地名不动，pin 不挪位）；
+   * 新酒随机摇到和当前不同为止（10 次兜底）；存储＋state 同调。
+   * 删除：按 at 丢条；删的是正在看的→改看最新，删光→清状态关卡。 */
+  function handleSwapBeer(): void {
+    if (wantRecord === null) return;
+    let beer = pickRandomBeer();
+    for (let i = 0; beer.id === wantRecord.beer.id && i < 10; i++) {
+      beer = pickRandomBeer();
+    }
+    const record: WantRecord = { ...wantRecord, beer };
+    const next = swapWantBeer(wantHistoryRef.current, record.at, beer);
+    wantHistoryRef.current = next;
+    setWantHistory(next);
+    saveWantHistory(next);
+    setWantRecord(record);
+    setPicked(beer);
+  }
+  function handleDeleteWant(): void {
+    if (wantRecord === null) return;
+    const next = removeWantAt(wantHistoryRef.current, wantRecord.at);
+    wantHistoryRef.current = next;
+    setWantHistory(next);
+    saveWantHistory(next);
+    setConfirmAt(null);
+    if (next.length === 0) {
+      setWantRecord(null);
+      setPicked(null);
+      setWantSaved(false);
+      setSelectedId(null);
+      return;
+    }
+    const latest = next[next.length - 1] as WantRecord;
+    setWantRecord(latest);
+    setPicked(latest.beer);
+  }
   function handleSelfPick(): void {
     // From your own pin: close the card, roll, and OPEN the sheet — the
     // result must land somewhere visible. The old comment claimed the
@@ -1678,6 +1718,37 @@ export function DrinkMap({
                   <p className="text-muted-foreground text-xs">
                     {t("wantFrozenNote")}
                   </p>
+                </div>
+                {/* UR3.7 编辑行：换酒（副钮）＋删除（两段确认，武装只认
+                    正在看的 at，误触不丢数据）。 */}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSwapBeer}
+                    className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-card px-3 py-1 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                  >
+                    <Dices size={15} aria-hidden />
+                    {t("swapBeer")}
+                  </button>
+                  {confirmAt === wantRecord.at ? (
+                    <button
+                      type="button"
+                      onClick={handleDeleteWant}
+                      className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 border-red-700 bg-card px-3 py-1 text-sm font-bold text-red-700 shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none dark:border-red-400 dark:text-red-400"
+                    >
+                      <Trash2 size={15} aria-hidden />
+                      {t("confirmDelete")}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmAt(wantRecord.at)}
+                      className="font-hand text-muted-foreground inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-sm font-bold transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                    >
+                      <Trash2 size={15} aria-hidden />
+                      {t("deleteEntry")}
+                    </button>
+                  )}
                 </div>
               </div>
             ) : null

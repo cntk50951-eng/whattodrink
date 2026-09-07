@@ -680,3 +680,9 @@
 UR3.6現在點擊其他人的打卡記錄彈出的面板，裡面的UI排版簡直是災難。在線上（狀態文字）和X（關閉按鈕）重疊。約喝酒的按鈕畸形（很大），整個面板的設計毫無水彩手繪風格，也沒有現代美感，需要重構。
 
 - 2026-09-07（用户已验收，merged）：根因 X 绝对定位右上＋名字行 flex 不换行无右避让；修法：X 升级贴纸（白底＋硬阴影）＋名字/meta 行 `pr-10`＋flex-wrap＋在线态下沉 meta 行（区·距离·在线）；头像加水彩 blob（`.waterWash` 固定粉彩）＋和纸胶带（`.tape` 模块类，避扫描器）；波浪分隔线；约喝酒副钮降级 px-3 py-1 text-sm＋动作区 flex-wrap；tsc 净／lint 0 error／87 tests；纯排版零新逻辑，`npm run build` sandbox 老问题。
+
+**UR 3.7　我的打卡可编辑（换酒＋删记录）** [✓]（用户已验收，merged）
+
+UR3.7 增強我的打卡记录的时候，在彈出的面板中，这个时候可以让我编辑我所打卡的记录，包括更换随机推荐的酒类、删除打卡记录。
+
+- 2026-09-07（用户已验收，merged）：`swapWantBeer`（同条只换 beer）＋`removeWantAt`（按 at 删）纯函数＋3 单测；面板编辑行：换酒副钮＋删除两段确认（删后看最新、删光关卡）；`swapBeer`／`deleteEntry`／`confirmDelete` 三语；87→90 tests／tsc 净／lint 0 error；`npm run build` sandbox 老问题。

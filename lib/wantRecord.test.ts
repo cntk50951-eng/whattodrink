@@ -8,7 +8,9 @@ import {
   formatWantTime,
   parseWantHistory,
   parseWantRecord,
+  removeWantAt,
   resolvePlaceName,
+  swapWantBeer,
   upsertWantHistory,
 } from "./wantRecord";
 
@@ -247,5 +249,31 @@ describe("resolvePlaceName", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe("swapWantBeer / removeWantAt", () => {
+  const NEW_BEER = {
+    id: "tsingtao",
+    emoji: "🍺",
+    name: "青島啤酒",
+    category: "lager",
+    tagline: "配滷水一流的選擇",
+  };
+  const SECOND = { ...GOOD, at: GOOD.at + 1000, beer: NEW_BEER };
+  it("换酒只换 beer，时间位置顺序不动", () => {
+    const next = swapWantBeer([GOOD, SECOND], GOOD.at, NEW_BEER);
+    expect(next[0].beer).toEqual(NEW_BEER);
+    expect(next[0].at).toBe(GOOD.at);
+    expect(next[0].position).toEqual(GOOD.position);
+    expect(next[1]).toEqual(SECOND);
+  });
+  it("对不上 at 原样返回", () => {
+    expect(swapWantBeer([GOOD], 1, NEW_BEER)).toEqual([GOOD]);
+  });
+  it("按 at 删条目", () => {
+    expect(removeWantAt([GOOD, SECOND], GOOD.at)).toEqual([SECOND]);
+    expect(removeWantAt([GOOD], GOOD.at)).toEqual([]);
+    expect(removeWantAt([GOOD], 1)).toEqual([GOOD]);
   });
 });

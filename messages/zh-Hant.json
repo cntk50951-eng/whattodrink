@@ -213,6 +213,9 @@
     "cityName_bj": "北京",
     "cityName_sh": "上海",
     "cityName_gz": "廣州",
-    "cityName_sz": "深圳"
+    "cityName_sz": "深圳",
+    "swapBeer": "換酒",
+    "deleteEntry": "刪除",
+    "confirmDelete": "確認刪除"
   }
 }
