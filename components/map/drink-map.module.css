@@ -459,6 +459,11 @@
   color: #15803d;
 }
 
+/* UR3.5 城市卡离线态（品牌红 token；在线复 inviteOk 绿，定位中走 muted）。 */
+.meOffline {
+  color: var(--doodle-red);
+}
+
 /* UR3.3 邀约：省略号有限跳（3s mock 等待对齐三拍后停，元素随收据卸载，
  * 非永动）；成局条一次 pop 入场（站内曲线族）。 */
 .inviteDots {
