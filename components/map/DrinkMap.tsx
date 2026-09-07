@@ -17,6 +17,12 @@ import {
   BUZZ_PRIME,
   buzz,
 } from "@/lib/haptics";
+import {
+  canCheers,
+  cheersRemaining,
+  loadSentToday,
+  saveSentToday,
+} from "@/lib/cheers";
 import { markShakeUsed } from "@/components/map/MapFab";
 import { pickNearestRecentCheckin } from "@/lib/shake";
 import { clusterPoints } from "@/lib/clusters";
@@ -113,6 +119,11 @@ const MIN_FOCUS_SEPARATION_M = 50;
  * 淡出，不硬切。reduced-motion 下直接收据（特效层不渲染）。
  */
 const CHEERS_FX_MS = 2200;
+/**
+ * UR3.1 晃杯时刻定长（ms）：和 CSS 摆荡 1.25s 对齐，到点拆罩聚焦。
+ * UR2.5 起就是这个数（原声纳 1250ms），行为不变，只换皮。
+ */
+const SHAKE_SEARCH_MS = 1250;
 /**
  * UR2.8 聚合半径（像素）：略大于单钉最大尺寸（56px）——两钉投影中心距
  * 掉进这个半径即视觉重叠，合成一簇。
@@ -287,14 +298,11 @@ export function DrinkMap({
     othersLayerRef.current = layer;
   }
   /**
-   * UR2.5 摇一摇流程：有效触发 → 24h 内最近 → 用户位置声纳 ~1.2s →
+   * UR2.5 摇一摇流程：有效触发 → 24h 内最近 → 晃杯时刻 ~1.25s →
    * 复用 handleFocusPerson 开卡聚焦。按钮和真机摇动都走这里。
+   * UR3.1 雷达涟漪退役，换毛玻璃晃杯罩（shakeSearch）。
    */
-  const [ripple, setRipple] = useState<{
-    x: number;
-    y: number;
-    key: number;
-  } | null>(null);
+  const [shakeSearch, setShakeSearch] = useState<{ key: number } | null>(null);
   const [shakeToast, setShakeToast] = useState<string | null>(null);
   // UR3.0 reduced-motion 开关（mount 量一次，SSR 首帧 false 反正无特效可播；
   // 写入走 microtask，同步写撞 set-state-in-effect，见 UR1.8 memory）。
@@ -350,21 +358,17 @@ export function DrinkMap({
       showShakeToast(t("shakeNoneNearby"));
       return;
     }
-    // 有结果：成功震型和 rattle＋声纳同步走；无 API（iPhone）时静默只剩动画。
+    // 有结果：成功震型和 rattle＋晃杯罩同步走；无 API（iPhone）时静默只剩动画。
     buzz(BUZZ_FOUND);
-    const map = mapRef.current;
-    const reduced =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (map !== null && !reduced) {
-      const pt = map.latLngToContainerPoint([self.lat, self.lng]);
-      setRipple({ x: pt.x, y: pt.y, key: Date.now() });
+    // UR3.1 晃杯时刻定长（CSS 摆荡 1.25s 对齐，到点拆罩聚焦）。
+    if (!reducedMotion) {
+      setShakeSearch({ key: Date.now() });
       window.setTimeout(() => {
-        setRipple(null);
+        setShakeSearch(null);
         handleFocusPerson(pick);
-      }, 1250);
+      }, SHAKE_SEARCH_MS);
     } else {
-      // reduced-motion：跳过涟漪直接聚焦（handleFocusPerson 内走 setView）。
+      // reduced-motion：跳过晃杯罩直接聚焦（handleFocusPerson 内走 setView）。
       handleFocusPerson(pick);
     }
   }
@@ -392,7 +396,21 @@ export function DrinkMap({
     runShakeFlow();
   }
 
+  // UR3.2 每日 15 次乾杯上限（mock 持久化：localStorage 按 HK 自然天）。
+  // 首帧 [] 两端一致，mount 后 hydrate 当日记录（UR1.8 配方）；提交走
+  // sentIdsRef 读最新（effect 闭包 stale-safe，UR2.5 口径）。
   const [sentIds, setSentIds] = useState<string[]>([]);
+  const sentIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    sentIdsRef.current = sentIds;
+  });
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const restored = loadSentToday(new Date());
+      sentIdsRef.current = restored;
+      setSentIds(restored);
+    });
+  }, []);
   const [picked, setPicked] = useState<Beer | null>(null);
   const [wantAt, setWantAt] = useState<LatLng | null>(null);
   const [wantSaved, setWantSaved] = useState(false);
@@ -917,7 +935,14 @@ export function DrinkMap({
   );
   function handleCheers(id: string): void {
     // MOCK — local state only. EPIC 3 sends a real cheers via Supabase.
-    if (sentIds.includes(id) || cheersFx !== null) return;
+    // UR3.2 限额守卫：满 15 即拦（按钮同 disabled，双保险）。
+    if (
+      sentIdsRef.current.includes(id) ||
+      cheersFx !== null ||
+      !canCheers(sentIdsRef.current)
+    ) {
+      return;
+    }
     buzz(BUZZ_CHEERS);
     setCheersFx({ id, key: Date.now() });
   }
@@ -926,7 +951,12 @@ export function DrinkMap({
     const fx = cheersFx;
     const timer = window.setTimeout(() => {
       // MOCK optimistic commit — EPIC 3.0 写 cheers 双边行（见 future-schema）。
-      setSentIds((prev) => (prev.includes(fx.id) ? prev : [...prev, fx.id]));
+      const next = sentIdsRef.current.includes(fx.id)
+        ? sentIdsRef.current
+        : [...sentIdsRef.current, fx.id];
+      sentIdsRef.current = next;
+      setSentIds(next);
+      saveSentToday(next, new Date());
       setCheersFx(null);
     }, CHEERS_FX_MS);
     return () => window.clearTimeout(timer);
@@ -1124,15 +1154,33 @@ export function DrinkMap({
         </svg>
       </div>
 
-      {/* UR2.5 摇一摇声纳：盖在瓦片上但 pointer-events 关死，
-          1250ms 后卸载并聚焦，绝不挡地图操作。 */}
-      {ripple !== null && (
-        <span
-          key={ripple.key}
+      {/* UR3.1 晃杯时刻：毛玻璃罩盖全图（背后地图可见，pointer-events
+          关死不挡操作），大杯左右猛晃＋速度线＋飞沫＋小字，
+          1250ms 后卸载并聚焦。reduced-motion 下不渲染。 */}
+      {shakeSearch !== null && (
+        <div
+          key={shakeSearch.key}
           aria-hidden
-          className={`${styles.above} ${styles.shakeRipple} pointer-events-none`}
-          style={{ left: ripple.x, top: ripple.y }}
-        />
+          className={`${styles.above} pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-card/40 backdrop-blur-sm`}
+        >
+          {/* 杯体慢晃（内层转），溢泡贴杯口淌（外层不转，顺重力往下），
+              两层分离才像液体在动。 */}
+          <span className="relative block w-40 shrink-0">
+            <span className={`${styles.shakeMug} block`}>
+              <BeerMugDoodle cheersLabel="…" />
+            </span>
+            <span
+              className={`${styles.shakeSpill} ${styles.shakeSpillL} absolute top-[6%] left-[13%] h-4 w-4 rounded-full`}
+            />
+            <span
+              className={`${styles.shakeSpill} ${styles.shakeSpillR} absolute top-[6%] right-[13%] h-3.5 w-3.5 rounded-full`}
+            />
+            <span
+              className={`${styles.shakeSpill} ${styles.shakeSpillC} absolute top-[2%] left-1/2 h-5 w-5 rounded-full`}
+            />
+          </span>
+          <p className="font-hand text-xl font-bold">{t("shakeSearching")}</p>
+        </div>
       )}
       {/* UR2.5 摇摇 toast：空结果／无定位／权限拒绝的唯一出口，3.5 秒自散。 */}
       {shakeToast !== null && (
@@ -1431,13 +1479,20 @@ export function DrinkMap({
                   <button
                     type="button"
                     onClick={() => handleCheers(card.id)}
-                    disabled={cheersFx !== null}
+                    disabled={cheersFx !== null || !canCheers(sentIds)}
                     className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-primary px-4 py-1.5 font-bold text-primary-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none disabled:opacity-60"
                   >
                     {t("cheers")}
                   </button>
                 )}
               </div>
+              {/* UR3.2 每日额度：剩余额常显（mock 跨天，localStorage），
+                  用完变满额句＋按钮 disabled，handleCheers 内同守卫。 */}
+              <p className="text-muted-foreground mt-1 text-xs">
+                {canCheers(sentIds)
+                  ? t("cheersLeft", { n: cheersRemaining(sentIds) })
+                  : t("cheersLimitReached")}
+              </p>
               {/* UR3.0 碰杯特效层：卡内绝对覆盖（面板即定位祖先），播完自动拆。
                   两杯摆入碰杯＋冲击环＋泡沫粒＋大字，纯 transform／opacity；
                   reduced-motion 下不渲染，直接收据。 */}

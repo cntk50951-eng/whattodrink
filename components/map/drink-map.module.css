@@ -740,68 +740,113 @@
     opacity: 1;
   }
 }
-.shakeRipple {
-  position: absolute;
-  width: 28px;
-  height: 28px;
-  margin: -14px 0 0 -14px;
-  border-radius: 9999px;
-  border: 3px solid var(--doodle-red);
-  animation: shake-ring 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+/* UR3.1 晃杯时刻 v2（用户返工：去速度线，要慢晃＋泡沫溢出）：
+ * 杯体 1.25s 内慢摆 3 下（±16° 重摆，杯底为轴）；三股溢泡锚在杯口，
+ * 不跟杯转、顺重力往下淌——两层分离才像液体在动。左右股错峰（跟摆向：
+ * 左摆左淌、右摆右淌），中股是涌起的泡顶。
+ * 全只动 transform／opacity；reduced-motion 下罩子不渲染（tsx 守卫）。 */
+.shakeMug {
+  transform-origin: 50% 88%;
+  animation: shake-mug 1.25s ease-in-out 1;
 }
 
-.shakeRipple::before,
-.shakeRipple::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
+@keyframes shake-mug {
+  0%,
+  100% {
+    transform: rotate(0deg) translateX(0);
+  }
+  18% {
+    transform: rotate(-16deg) translateX(-7px);
+  }
+  38% {
+    transform: rotate(13deg) translateX(6px);
+  }
+  58% {
+    transform: rotate(-12deg) translateX(-6px);
+  }
+  78% {
+    transform: rotate(7deg) translateX(3px);
+  }
+  90% {
+    transform: rotate(-2deg) translateX(-1px);
+  }
 }
 
-/* 中心软闪：快起快收，定一下圆心。 */
-.shakeRipple::before {
-  background: var(--doodle-red);
-  animation: shake-flash 0.45s ease-out forwards;
-}
-
-/* 第二圈：慢 0.28 秒出发，制造追逐感。 */
-.shakeRipple::after {
-  border: 2px solid var(--doodle-red);
-  animation: shake-ring 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.28s forwards;
+.shakeSpill {
+  background: var(--card);
+  border: 2px solid var(--border);
   opacity: 0;
 }
 
-@keyframes shake-ring {
-  from {
-    transform: scale(0.6);
-    opacity: 0.9;
+.shakeSpillL {
+  animation: shake-spill-l 1.25s ease-in 1;
+}
+
+.shakeSpillR {
+  animation: shake-spill-r 1.25s ease-in 1;
+}
+
+.shakeSpillC {
+  margin-left: -10px;
+  animation: shake-spill-c 1.25s ease-out 1;
+}
+
+/* 左股：杯左摆到底（18%）时冒头，顺杯壁淌下 46px 后化掉。 */
+@keyframes shake-spill-l {
+  0%,
+  14% {
+    transform: translate(0, 0) scale(0.3);
+    opacity: 0;
   }
-  to {
-    transform: scale(7);
+  26% {
+    transform: translate(-2px, 8px) scale(0.9);
+    opacity: 1;
+  }
+  60%,
+  100% {
+    transform: translate(-6px, 46px) scale(1.05);
     opacity: 0;
   }
 }
 
-@keyframes shake-flash {
-  from {
-    transform: scale(1);
-    opacity: 0.55;
+/* 右股：错半拍（杯右摆 38% 处冒头），同路淌下。 */
+@keyframes shake-spill-r {
+  0%,
+  34% {
+    transform: translate(0, 0) scale(0.3);
+    opacity: 0;
   }
-  to {
-    transform: scale(2.6);
+  46% {
+    transform: translate(2px, 8px) scale(0.9);
+    opacity: 1;
+  }
+  78%,
+  100% {
+    transform: translate(6px, 42px) scale(1.05);
+    opacity: 0;
+  }
+}
+
+/* 中股：杯口涌起的泡顶，长大后坐回去，不外淌。 */
+@keyframes shake-spill-c {
+  0%,
+  10% {
+    transform: translateY(6px) scale(0.5);
+    opacity: 0;
+  }
+  30% {
+    transform: translateY(-4px) scale(1.15);
+    opacity: 1;
+  }
+  55%,
+  100% {
+    transform: translateY(0) scale(1);
     opacity: 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shakeRipple,
-  .shakeRipple::before,
-  .shakeRipple::after {
-    animation: none;
-    opacity: 0;
-  }
-  /* 入场动效关掉时图必须直接可见（不能和声纳一样归零）。 */
+  /* 入场动效关掉时图必须直接可见（不能和旧声纳一样归零）。 */
   .pickArtIn {
     animation: none;
     opacity: 1;

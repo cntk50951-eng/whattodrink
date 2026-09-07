@@ -189,6 +189,9 @@
     "recenter": "回到我的位置",
     "fabMenu": "地图操作",
     "deniedGuide": "多数是之前点了不允许，或者手机根本没开定位。逐样查：1）系统总开关：iPhone 去设置 → 隐私与安全性 → 定位服务要开；安卓去设置 → 位置要开。2）浏览器网站权限：Chrome 点地址栏锁头 → 位置 → 允许。3）微信／IG 里面打开的，转用 Safari／Chrome 打开这条链接。",
-    "clusterTitle": "放大看 {n} 位酒友"
+    "clusterTitle": "放大看 {n} 位酒友",
+    "shakeSearching": "正在摇出附近酒友…",
+    "cheersLeft": "今日还剩 {n} 次干杯",
+    "cheersLimitReached": "今日 15 次干杯用完了，明天再来！"
   }
 }
