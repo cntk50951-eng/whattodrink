@@ -50,7 +50,11 @@ import {
   isWithinHongKong,
 } from "@/lib/geo";
 import { BeerMugDoodle } from "@/components/marketing/BeerMugDoodle";
-import { iconForPickId } from "@/components/marketing/beer-icons/wall";
+import {
+  iconForDrinkName,
+  iconForPickId,
+} from "@/components/marketing/beer-icons/wall";
+import { renderToStaticMarkup } from "react-dom/server";
 import styles from "./drink-map.module.css";
 
 /**
@@ -433,15 +437,22 @@ export function DrinkMap({
         setSelectedId(null);
       });
       for (const [i, c] of MOCK_CHECKINS.entries()) {
+        // UR2.7 追加：有专属插畫的酒名 → pin 直接画设计稿（方形钉贴瓶形，
+        // 尺寸放大到 56px 当"放大显示"）；没匹配的保持原 emoji 圆钉。
+        const ArtIcon = iconForDrinkName(c.drinkName);
+        const artHtml =
+          ArtIcon === null
+            ? null
+            : `<div class="${styles.pinArt}">${renderToStaticMarkup(<ArtIcon />)}</div>`;
         const pinClass =
           i % 2 === 0 ? styles.pin : `${styles.pin} ${styles.pinAlt}`;
         const marker = L.marker([c.position.lat, c.position.lng], {
           title: c.nickname,
           icon: L.divIcon({
             className: "",
-            html: `<div class="${pinClass}">${c.drinkEmoji}</div>`,
-            iconSize: [40, 40],
-            iconAnchor: [20, 38],
+            html: artHtml ?? `<div class="${pinClass}">${c.drinkEmoji}</div>`,
+            iconSize: artHtml === null ? [40, 40] : [56, 56],
+            iconAnchor: artHtml === null ? [20, 38] : [28, 52],
           }),
         });
         marker.on("click", () => handleFocusPerson(c));
@@ -635,13 +646,22 @@ export function DrinkMap({
         .getPropertyValue("--doodle-red")
         .trim() || "#b3261e";
     // UR1.8: the 想喝 pin opens its frozen snapshot card.
+    // UR2.7 追加：和他人 pin 同构 —— 推荐酒有专属插畫就画设计稿（红色款
+    // 方形钉＋声纳圈），没图才回 emoji 圆钉。
+    const WantArt = iconForPickId(picked.id);
+    const wantArtHtml =
+      WantArt === null
+        ? null
+        : `<div class="${styles.pinArtWant}">${renderToStaticMarkup(<WantArt />)}</div>`;
     const pin = L.marker([wantAt.lat, wantAt.lng], {
       title: picked.name,
       icon: L.divIcon({
         className: "",
-        html: `<div class="${styles.pinWant}">${picked.emoji}</div>`,
-        iconSize: [48, 48],
-        iconAnchor: [24, 44],
+        html:
+          wantArtHtml ??
+          `<div class="${styles.pinWant}">${picked.emoji}</div>`,
+        iconSize: wantArtHtml === null ? [48, 48] : [56, 56],
+        iconAnchor: wantArtHtml === null ? [24, 44] : [28, 52],
       }),
     });
     pin.on("click", () => setSelectedId(WANT_ID));
@@ -1208,15 +1228,34 @@ export function DrinkMap({
             ) : null
           ) : (
             <>
-              {/* UR2.7 别人卡同构 hero 槽：用户拍板用放大头像（不猜酒），
-                  和想喝卡／结果卡同一左图右信息骨架。 */}
+              {/* UR2.7 追加同构 hero 槽：酒名命中已画品牌 → 设计稿放主角位
+                  （头像缩成角标保身份）；没命中保持原放大头像，不硬凑。 */}
               <div className="flex items-center gap-4">
-                <span
-                  className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 text-3xl"
-                  aria-hidden
-                >
-                  {card.avatarEmoji}
-                </span>
+                {(() => {
+                  const DrinkIcon = iconForDrinkName(card.drinkName);
+                  return DrinkIcon !== null ? (
+                    <span className="relative shrink-0">
+                      <span
+                        className={`${styles.pickArtIn} block h-24 w-auto [&>svg]:h-full [&>svg]:w-auto`}
+                      >
+                        <DrinkIcon />
+                      </span>
+                      <span
+                        className="absolute -right-2 -bottom-2 flex h-9 w-9 items-center justify-center rounded-full border-2 bg-card text-xl"
+                        aria-hidden
+                      >
+                        {card.avatarEmoji}
+                      </span>
+                    </span>
+                  ) : (
+                    <span
+                      className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 text-3xl"
+                      aria-hidden
+                    >
+                      {card.avatarEmoji}
+                    </span>
+                  );
+                })()}
                 <div>
                   <p className="flex items-center gap-2 font-bold">
                     {card.nickname} · {card.area}
