@@ -512,7 +512,7 @@
 - pin marker／想喝记录行接入 icon → 另開 UR
 - 更多品牌有图后映射自然生效（加 `pickId` 一行即可）
 
-**UR 2.7　结果面板插畫主角化** [WIP]
+**UR 2.7　结果面板插畫主角化** [✓]（用户已验收含 pins 追加＋想喝 pin 修漏，merged）
 
 作為用户，我在展开面板里首先看到大大的手绘酒图而不是小 icon，
 信息（名字／位置／时间）排在图右边；我的记录和别人的记录都一样。
@@ -532,4 +532,9 @@
 - AC3：换结果时有一次入场动效；reduced-motion 下静止
 *後續（不在本 UR）*
 - 更多品牌有图后三处自然生效
+*追加（用户 follow-up：默认视图 pins＋别人卡酒图，仍属本 UR）*
+- 他人 pins：`iconForDrinkName(drinkName)` 命中→方形 `.pinArt` 钉（56px 放大显示设计稿，`renderToStaticMarkup` 内联进 divIcon）；未命中→原 emoji 圆钉（Highball／Mojito／IPA 暂无设计稿，诚实回 null）
+- 别人打卡卡 hero：命中→设计稿 h-24 主角位＋头像缩角标保身份；未命中→原放大头像
+- `BRAND_ALIASES` 别名表（拉丁整词＋中文子串，别名长度全局优先，长 alias 先比；修 "Negra Modelo" 曾被 `modelo` 错配 Modelo Especial，加 `negra modelo` 最长 alias）；slug 连字符统一（beerSlug 产下划线，建表 replace）
+- AC4：有图酒名的 pin 是放大方形设计钉，无图保持圆钉；AC5：别人卡有图时酒图主角＋头像角标；AC6：matcher 单测（命中／最长优先／未命中 null／词内不误配）
 

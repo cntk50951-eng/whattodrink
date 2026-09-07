@@ -51,12 +51,13 @@
 - **UR 2.5 — 搖一搖找附近酒友（[✓] 用户已验收）**
   - `lib/shake.ts` 纯函数选中（haversine＋24h 窗口，mock 加 `checkedInAt`）＋4 单测；`hooks/useShake` 双跃变判定＋3s 冷却＋iOS 权限；MapFab 卫星圆钮（card 底＋品牌色图标）＋5min 抖（独立 quiet key）；声纳三层（软闪＋双环追逐，1250ms 卸载）＋toast 三态；设计返工走 design-taste-frontend（redesign-preserve）；44→48 tests／tsc 全绿、lint 0 error
 - **UR 2.6 — 随机推荐面板接入品牌插畫（[✓] 用户已验收）**
-- **UR 2.7 — 结果面板插畫主角化（WIP，用户已看过效果）**
+- **UR 2.7 — 结果面板插畫主角化（[✓] 用户已验收，含 pins 追加＋想喝 pin 修漏，merged）**
   - design-taste-frontend redesign-preserve：结果卡／想喝卡／别人卡同构左图右信息（有图 h-28／h-24 主角＋key 入场，无图保持默认；别人卡头像 h-16）；`.pickArtIn` 300ms 唯一动效，reduced-motion 回显；tsc 全绿、lint 0 error、51 tests
   - `BEER_WALL` 加 `pickId`＋`iconForPickId()`（第一顺位，无则 null）；结果卡命中（heineken／asahi／tsingtao）渲染 h-16 手绘图，其余 12 种原 emoji；`BEERS` 不增删，pin marker 和想喝行不动；`wall.test.ts` 3 命中＋唯一性；48→51 tests／tsc 全绿、lint 0 error
   - 去重：脚本掃 18 簇＋人工判定，真重复 4 组（Asahi／Suntory／Harbin 小麦／Wusu 残行）合并，7 个错文件真品牌转正归位；全库 1144，脚本复核归零，标题数＝实际行
   - icon：`beer-icons/` 手绘 SVG 10 品 v3（共享框＋独立 filter id，墨线主题色＋品牌定色填色）＋临时预览路由 `/preview-beer-icons`（[locale] 段内）；v1 凭印象失真，v2 起逐品看真实产品图重画（Wikimedia 9＋官网 packshot 1，看完删参照）：Asahi 巨黑字生字八角框／藍妹米白罐椭圆章／Corona 对开标金章／青島椭圆章栈桥徽／Hoegaarden 刻面杯／Heineken 颈星椭圆绿标／Kirin 银罐金麒麟／Yebisu 金罐／少爺红功夫裤／茅台红标白斜带；画法沉淀为 skill `beer-icon`；44 tests／tsc 全绿、lint 0 error
   - icon batch1＋2（各 10，预览墙共 30）：按目录顺序＋家族去重（1144－25＝1119 待画，台账 `11-icon-progress.md`）；batch1 拉格组／batch2 墨巴组，逐品看图；frame 加类型 caption 条（`typeLabel`，BEER_WALL `type` 同步，manifest 带类型）；`npm run export:icons` 顺带产移动端（纯 SVG＋iOS 三件套＋Android 五密度＋manifest，resvg＋sips，无需浏览器）；44 tests／tsc 全绿、lint 0 error
+  - 追加（用户 follow-up，待浏览器验收）：他人 pins 有图→方形 `.pinArt` 放大钉（56px，设计稿内联 divIcon）无图→原 emoji 圆钉；别人卡有图→酒图 h-24 主角＋头像角标；`iconForDrinkName`＋`BRAND_ALIASES`（最长优先，修 Negra Modelo 错配）；`wall.test.ts` 加 4 matcher 单测；51→55 tests／tsc 全绿、lint 0 error；fix（用户验收：自己选青島 pin 仍是 emoji）——想喝 pin 从未接映射，补 `iconForPickId(picked.id)` 有图款（`.pinArtWant` 红框＋声纳圈，和他人墨色钉区分），想喝卡存的就是 picked 本体映射本就对；`npm run build` 在本机 sandbox 被 Turbopack 起子进程绑端口拦掉（CSS 经 postcss 独立校验通过），待用户侧 build 复核
   - `docs/data/beer-catalog/`：分类总纲 12 大类（`00-taxonomy.md`，用户修订：类别先行）＋品牌 10 文件合计 1148 条（官网首页 logo 来源，`待验证` 隔离存疑）
   - 抽查 12 条：9 个 200（含 4 个正典域名纠正），3 个奢侈品牌 403 反爬已注行内；lint 0 error；未提交
   - 同架构进化：icon tile＋大字＋右箭头，行高 56px；行 stagger cascade（CSS 变量错峰，避扫描坑）；触发钮 Menu↔X 变形；零新文案、无 backdrop、z-1100 不动

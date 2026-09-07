@@ -100,3 +100,68 @@ export function beerSlug(en: string): string {
 export function iconForPickId(pickId: string): BeerIconComponent | null {
   return BEER_WALL.find((e) => e.pickId === pickId)?.Icon ?? null;
 }
+
+type BrandAlias = {
+  slug: string;
+  /** 拉丁别名整词匹配（大小写不敏感），中文别名子串匹配。 */
+  latin: string[];
+  cjk: string[];
+};
+
+/**
+ * UR2.7 追加：自由文本酒名 → 已画品牌。按表顺序＋别名长度优先，
+ * 长别名先比（"百威淡啤" 必须先于 "百威"，"莫德罗黑啤" 先于 "莫德罗"）。
+ * 猜不到返回 null —— pin／卡片保持默认，不硬凑。
+ */
+const BRAND_ALIASES: BrandAlias[] = [
+  { slug: "bud-light", latin: ["bud light"], cjk: ["百威淡啤"] },
+  { slug: "negra-modelo", latin: ["negra modelo", "negra"], cjk: ["莫德罗黑啤", "莫德羅黑啤"] },
+  { slug: "coors-light", latin: ["coors"], cjk: ["酷姿"] },
+  { slug: "miller-lite", latin: ["miller"], cjk: ["米勒"] },
+  { slug: "young-master", latin: ["young master"], cjk: ["少爺", "少爷"] },
+  { slug: "blue-girl", latin: ["blue girl"], cjk: ["藍妹", "蓝妹"] },
+  { slug: "kirin-ichiban", latin: ["kirin", "ichiban"], cjk: ["麒麟", "一番搾", "一番榨"] },
+  { slug: "moutai-flying-fairy", latin: ["moutai", "maotai"], cjk: ["茅台", "飞天", "飛天"] },
+  { slug: "asahi-super-dry", latin: ["asahi", "super dry"], cjk: ["朝日"] },
+  { slug: "corona-extra", latin: ["corona"], cjk: ["科罗娜"] },
+  { slug: "tsingtao-classic", latin: ["tsingtao"], cjk: ["青島", "青岛"] },
+  { slug: "hoegaarden", latin: ["hoegaarden"], cjk: ["豪格登"] },
+  { slug: "heineken", latin: ["heineken"], cjk: ["喜力"] },
+  { slug: "yebisu", latin: ["yebisu"], cjk: ["惠比寿", "惠比壽"] },
+  { slug: "budweiser", latin: ["budweiser", "bud"], cjk: ["百威"] },
+  { slug: "carlsberg", latin: ["carlsberg"], cjk: ["嘉士伯"] },
+  { slug: "sapporo", latin: ["sapporo"], cjk: ["札幌"] },
+  { slug: "snow", latin: ["snow"], cjk: ["雪花", "勇闯天涯", "勇闖天涯"] },
+  { slug: "yanjing", latin: ["yanjing"], cjk: ["燕京"] },
+  { slug: "harbin", latin: ["harbin"], cjk: ["哈尔滨", "哈爾濱", "哈啤"] },
+  { slug: "modelo-especial", latin: ["modelo", "especial"], cjk: ["莫德罗", "莫德羅"] },
+  { slug: "pacifico", latin: ["pacifico", "pacific"], cjk: ["太平洋"] },
+  { slug: "tecate", latin: ["tecate"], cjk: ["特卡特"] },
+  { slug: "dos-equis", latin: ["dos equis"], cjk: ["双X", "雙X"] },
+  { slug: "sol", latin: ["sol"], cjk: ["太阳", "太陽"] },
+  { slug: "bohemia", latin: ["bohemia"], cjk: ["波西米亚", "波希米亞"] },
+  { slug: "victoria", latin: ["victoria"], cjk: ["维多利亚", "維多利亞"] },
+  { slug: "indio", latin: ["indio"], cjk: ["印第欧", "印第歐"] },
+  { slug: "skol", latin: ["skol"], cjk: ["斯库尔", "斯庫爾"] },
+  { slug: "brahma", latin: ["brahma"], cjk: ["布拉马", "布拉瑪"] },
+];
+
+// beerSlug 产下划线（asahi_super_dry），别名表用连字符书写，建表时统一。
+const slugToIcon = new Map(
+  BEER_WALL.map((e) => [beerSlug(e.en).replace(/_/g, "-"), e.Icon]),
+);
+
+export function iconForDrinkName(drinkName: string): BeerIconComponent | null {
+  const lower = drinkName.toLowerCase();
+  const flat = BRAND_ALIASES.flatMap((b) => [
+    ...b.latin.map((a) => ({ alias: a, latin: true, slug: b.slug })),
+    ...b.cjk.map((a) => ({ alias: a, latin: false, slug: b.slug })),
+  ]).sort((x, y) => y.alias.length - x.alias.length);
+  for (const { alias, latin, slug } of flat) {
+    const hit = latin
+      ? new RegExp(`(?<![a-z])${alias.replace(/ /g, "\\s+")}(?![a-z])`).test(lower)
+      : drinkName.includes(alias);
+    if (hit) return slugToIcon.get(slug) ?? null;
+  }
+  return null;
+}
