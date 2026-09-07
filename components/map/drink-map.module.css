@@ -353,6 +353,23 @@
  * 三层都只动 transform／opacity；pointer-events 交给调用方关
  * （声纳绝不能挡地图操作）。第二圈 0.28s 出发＋0.9s 走完，
  * JS 须 1250ms 后再卸载（见 runShakeFlow）。 */
+
+/* UR2.7 结果主角入场：换结果时缩放淡入一次（只动 transform／opacity，
+ * MOTION 3 的唯一动效，key 换 id 触发）。 */
+.pickArtIn {
+  animation: pick-art-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pick-art-in {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
 .shakeRipple {
   position: absolute;
   width: 28px;
@@ -413,6 +430,11 @@
   .shakeRipple::after {
     animation: none;
     opacity: 0;
+  }
+  /* 入场动效关掉时图必须直接可见（不能和声纳一样归零）。 */
+  .pickArtIn {
+    animation: none;
+    opacity: 1;
   }
   .pin,
   .pinAlt,

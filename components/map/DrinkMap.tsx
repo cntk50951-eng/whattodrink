@@ -873,12 +873,18 @@ export function DrinkMap({
             // UR1.3 compact result: one row (emoji + name/tagline) + one row
             // of two half-width buttons — reachable without inner scroll.
             <div className="mt-3">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 {(() => {
-                  // UR2.6 有专属插畫就上图，没图保持 emoji 默认。
+                  // UR2.7 有专属插畫就是主角（h-28 左图右信息），
+                  // 没图保持原 emoji 紧凑行，不硬凑。
                   const PickIcon = iconForPickId(picked.id);
                   return PickIcon !== null ? (
-                    <PickIcon className="h-16 w-auto shrink-0" />
+                    <span
+                      key={picked.id}
+                      className={`${styles.pickArtIn} block h-28 w-auto shrink-0 [&>svg]:h-full [&>svg]:w-auto`}
+                    >
+                      <PickIcon />
+                    </span>
                   ) : (
                     <p className="text-4xl" aria-hidden>
                       {picked.emoji}
@@ -1148,21 +1154,34 @@ export function DrinkMap({
             // UR1.8 frozen snapshot — beer, clock, and fix from drop time.
             wantRecord !== null ? (
               <div>
-                <div className="flex items-center gap-3">
-                  <span
-                    className="flex h-11 w-11 items-center justify-center rounded-full border-2 text-2xl"
-                    aria-hidden
-                  >
-                    {MOCK_ME.avatarEmoji}
-                  </span>
-                  <div>
+                <div className="flex items-center gap-4">
+                  {(() => {
+                    // UR2.7 想喝卡同构：有图上主角位，没图保持原 emoji 行。
+                    const WantIcon = iconForPickId(wantRecord.beer.id);
+                    return WantIcon !== null ? (
+                      <span
+                        key={wantRecord.beer.id}
+                        className={`${styles.pickArtIn} block h-24 w-auto shrink-0 [&>svg]:h-full [&>svg]:w-auto`}
+                      >
+                        <WantIcon />
+                      </span>
+                    ) : (
+                      <span
+                        className="flex h-11 w-11 items-center justify-center rounded-full border-2 text-2xl"
+                        aria-hidden
+                      >
+                        {wantRecord.beer.emoji}
+                      </span>
+                    );
+                  })()}
+                  <div className="min-w-0">
                     <p className="flex items-center gap-2 font-bold">
                       {t("wantTitle")}
                       <span className="font-hand rounded-full border-2 bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">
                         {t(GENDER_KEY[MOCK_ME.gender])}
                       </span>
                     </p>
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-muted-foreground truncate text-sm">
                       {wantRecord.beer.emoji} {wantRecord.beer.name}
                     </p>
                   </div>
@@ -1189,9 +1208,11 @@ export function DrinkMap({
             ) : null
           ) : (
             <>
-              <div className="flex items-center gap-3">
+              {/* UR2.7 别人卡同构 hero 槽：用户拍板用放大头像（不猜酒），
+                  和想喝卡／结果卡同一左图右信息骨架。 */}
+              <div className="flex items-center gap-4">
                 <span
-                  className="flex h-11 w-11 items-center justify-center rounded-full border-2 text-2xl"
+                  className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 text-3xl"
                   aria-hidden
                 >
                   {card.avatarEmoji}
