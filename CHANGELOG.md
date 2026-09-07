@@ -52,6 +52,10 @@
   - `lib/shake.ts` 纯函数选中（haversine＋24h 窗口，mock 加 `checkedInAt`）＋4 单测；`hooks/useShake` 双跃变判定＋3s 冷却＋iOS 权限；MapFab 卫星圆钮（card 底＋品牌色图标）＋5min 抖（独立 quiet key）；声纳三层（软闪＋双环追逐，1250ms 卸载）＋toast 三态；设计返工走 design-taste-frontend（redesign-preserve）；44→48 tests／tsc 全绿、lint 0 error
 - **UR 2.6 — 随机推荐面板接入品牌插畫（[✓] 用户已验收）**
 - **UR 2.7 — 结果面板插畫主角化（[✓] 用户已验收，含 pins 追加＋想喝 pin 修漏，merged）**
+- **UR 2.8 — 睇全港视图防挤＋数据点动态适应（[✓] 用户已验收，merged）**
+  - 聚合优先（用户定方向）：`lib/clusters.ts` 纯函数 `clusterPoints`＋`clusters.test.ts` 4 单测；他人 pin 层 `renderOthersPins` 首帧＋zoomend 重建，单成员原样单钉、多成员 `.pinCluster` 数字簇（点之 zoom＋2 散开，reduced-motion 降级）；`clusterTitle` 三语；`OTHERS_CLUSTER_PX = 64`
+  - 55→59 tests／tsc 全绿、lint 0 error（3 旧 warning）；`npm run build` 本机 sandbox 被拦（老问题，待用户侧复核）；Step 9b：聚合是纯视图派生、零新增数据字段，数据文档无需更新
+  - fix（工具链踩雷）：JSON 脚本 `json.dump` 参数写反把 `messages/en.json` 截断归零——`git checkout` 恢复后重做，diff 逐文件验干净
   - design-taste-frontend redesign-preserve：结果卡／想喝卡／别人卡同构左图右信息（有图 h-28／h-24 主角＋key 入场，无图保持默认；别人卡头像 h-16）；`.pickArtIn` 300ms 唯一动效，reduced-motion 回显；tsc 全绿、lint 0 error、51 tests
   - `BEER_WALL` 加 `pickId`＋`iconForPickId()`（第一顺位，无则 null）；结果卡命中（heineken／asahi／tsingtao）渲染 h-16 手绘图，其余 12 种原 emoji；`BEERS` 不增删，pin marker 和想喝行不动；`wall.test.ts` 3 命中＋唯一性；48→51 tests／tsc 全绿、lint 0 error
   - 去重：脚本掃 18 簇＋人工判定，真重复 4 组（Asahi／Suntory／Harbin 小麦／Wusu 残行）合并，7 个错文件真品牌转正归位；全库 1144，脚本复核归零，标题数＝实际行

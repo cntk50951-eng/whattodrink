@@ -538,3 +538,21 @@
 - `BRAND_ALIASES` 别名表（拉丁整词＋中文子串，别名长度全局优先，长 alias 先比；修 "Negra Modelo" 曾被 `modelo` 错配 Modelo Especial，加 `negra modelo` 最长 alias）；slug 连字符统一（beerSlug 产下划线，建表 replace）
 - AC4：有图酒名的 pin 是放大方形设计钉，无图保持圆钉；AC5：别人卡有图时酒图主角＋头像角标；AC6：matcher 单测（命中／最长优先／未命中 null／词内不误配）
 
+**UR 2.8　睇全港视图防挤＋数据点动态适应** [✓]（用户已验收，merged）
+
+當顯示看全香港的時候，地圖縮小的太小了，導致所有香港的紀錄點都擠在了一起，你需要優化map在選擇“看香港”的時候的地圖顯示比例以及數據點的大小，我希望你做到大小動態適應以及更佳的用戶體驗
+
+*範圍*（用户定方向：聚合优先；design read：redesign-preserve，doodle 贴纸语言沿用，不引入 markercluster 依赖）
+- 他人 pin 层走聚合重建：`lib/clusters.ts` 纯函数 `clusterPoints`（像素空间贪心聚合，质心增量，单测覆盖）＋`renderOthersPins`（首帧＋每次 zoomend 重建，`othersLayerRef` 管理，teardown 清空）
+- 单成员簇＝原样单 pin（UR2.7 art／emoji 两款＋奇偶倾斜原封不动）；多成员＝`.pinCluster` doodle 数字簇（accent 底＋手写体人数＋硬阴影，静态无常动），点之 zoom＋2 散开（flyTo，reduced-motion 走 setView）
+- `clusterTitle` 三语文案（en／zh-Hans／zh-Hant）；`OTHERS_CLUSTER_PX = 64`（略大于单钉 56px）
+*邊界情況／失敗處理*
+- 想喝 pin／self 点／声纳圈不进聚合（只有他人层重建）
+- zoom 到顶（ZOOM_MAX）仍同簇：保持簇可点，不强制散（点位真重合时散不开是诚实的）
+*驗收標準（Acceptance Criteria）*
+- AC1：睇全港下近点合成数字簇，无重叠不可点
+- AC2：点簇放大散开；街区 zoom 下恢复原来一模一样的单钉
+- AC3：reduced-motion 下散开无飞行动画；三语 title 正确
+- AC4：`clusterPoints` 单测（远点独立／近点合＋质心／边界归属稳定／空＋单点）
+*改動記錄*
+- 2026-09-07：聚合优先方案落地（上文范围）；`npm run build` 本机 sandbox 仍被拦（老问题），待用户侧复核
