@@ -7,7 +7,15 @@ import {
   type CSSProperties,
 } from "react";
 import { useTranslations } from "next-intl";
-import { Camera, Dices, Expand, LocateFixed, Minus, Plus } from "lucide-react";
+import {
+  Camera,
+  Dices,
+  Expand,
+  LocateFixed,
+  Minus,
+  Plus,
+  Vibrate,
+} from "lucide-react";
 
 import styles from "./drink-map.module.css";
 
@@ -29,11 +37,20 @@ type MapFabProps = {
   onFitHk: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
+  /** UR2.5 摇摇：按钮点击＝程序化摇一摇（权限申请由调用方包办）。 */
+  onShake: () => void;
 };
 
 /** 上一次点开啤酒按钮的时间戳（ms）。12 小时内不再做任何闲置提示。 */
 const TAP_KEY = "wtd-fab-tap";
 const QUIET_MS = 12 * 3600 * 1000;
+/**
+ * UR2.5 上一次用过摇摇的时间戳（ms）。啤酒点得多不算数 —— 只有真用过摇摇，
+ * 12 小时内才停抖；否则"每几分钟抖一次"的发现机制会被啤酒点击杀死。
+ */
+const SHAKE_USED_KEY = "wtd-shake-used";
+/** 摇摇 pill 的抖动周期：5 分钟一次（用户原话"每隔几分钟"）。 */
+const SHAKE_WOBBLE_EVERY_MS = 5 * 60 * 1000;
 
 /**
  * localStorage 必须走 useSyncExternalStore：lazy useState initializer 在
@@ -58,6 +75,31 @@ function readFabQuiet(): boolean {
 
 function serverFabQuiet(): boolean {
   return false;
+}
+
+/** UR2.5 摇摇用过就 12 小时不抖（和啤酒静默同一套 hydration 安全写法）。 */
+function subscribeShakeUsed(cb: () => void): () => void {
+  window.addEventListener("storage", cb);
+  return () => window.removeEventListener("storage", cb);
+}
+
+function readShakeQuiet(): boolean {
+  try {
+    const raw = window.localStorage.getItem(SHAKE_USED_KEY);
+    const n = raw === null ? NaN : Number(raw);
+    return Number.isFinite(n) && n > 0 && Date.now() - n < QUIET_MS;
+  } catch {
+    return false;
+  }
+}
+
+/** 触发一次有效摇动（按钮或真机）就调 —— 同 tab 靠父级重渲染带出新快照。 */
+export function markShakeUsed(): void {
+  try {
+    window.localStorage.setItem(SHAKE_USED_KEY, String(Date.now()));
+  } catch {
+    // 隐私模式 —— 下次再停抖，无害。
+  }
 }
 /** 3 秒无操作 → 摇晃一下；20 秒无操作 → 冒泡提示。 */
 const SHAKE_AFTER_MS = 3000;
@@ -85,6 +127,7 @@ export function MapFab({
   onFitHk,
   onZoomIn,
   onZoomOut,
+  onShake,
 }: MapFabProps) {
   const t = useTranslations("map");
   // 静默期走外部 store（ hydration 安全，见上面注释）。
@@ -96,6 +139,24 @@ export function MapFab({
   const suppressed = quiet;
   // 0 = 刚操作过／活跃中，1 = 3 秒闲置（摇过），2 = 20 秒闲置（冒泡）。
   const [idleLevel, setIdleLevel] = useState(0);
+  // UR2.5 摇摇 pill：用过 12h 内不抖，否则每 5 分钟抖 0.65 秒。
+  const shakeQuiet = useSyncExternalStore(
+    subscribeShakeUsed,
+    readShakeQuiet,
+    serverFabQuiet,
+  );
+  const [shakeWobble, setShakeWobble] = useState(false);
+  useEffect(() => {
+    if (shakeQuiet) return;
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      setShakeWobble(true);
+      window.setTimeout(() => setShakeWobble(false), 650);
+    }, SHAKE_WOBBLE_EVERY_MS);
+    return () => window.clearInterval(id);
+  }, [shakeQuiet]);
+  // 首屏新人先看啤酒引导（旧 hint），之后这个槽位归摇摇按钮。
+  const showOldHint = !suppressed && !open && idleLevel < 2;
 
   // 闲置计时：任意点击都重置。点开过 12 小时内直接不布防。
   useEffect(() => {
@@ -265,11 +326,30 @@ export function MapFab({
             <circle cx="16.8" cy="26.5" r="0.9" fill="var(--card)" className={`${styles.beerBubble} ${styles.b3}`} />
           </svg>
         </button>
-        {!suppressed && !open && idleLevel < 2 && (
+        {showOldHint ? (
           <span
             className={`${styles.fabHint} font-hand rounded-full border-2 bg-card px-3 py-1.5 text-sm font-bold whitespace-nowrap shadow-[2px_2px_0_var(--border)]`}
           >
             {t("fabHint")}
+          </span>
+        ) : (
+          // UR2.5 摇摇：啤酒的卫星钮 —— 同一圆钮家族（圆＋ink 边＋硬阴影），
+          // 反转为 card 底＋品牌色图标，尺寸卡在啤酒（64）和扇形钮（44）之间。
+          // 右边小字只做静态说明，动作只发生在钮上（按压＋5 分钟一抖）。
+          <span className="inline-flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onShake}
+              aria-label={t("shakeHint")}
+              className={`bg-card text-primary flex h-12 w-12 items-center justify-center rounded-full border-2 shadow-[3px_3px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none ${
+                shakeWobble ? styles.fabShake : ""
+              }`}
+            >
+              <Vibrate size={20} aria-hidden strokeWidth={2.5} />
+            </button>
+            <span className="font-hand rounded-full border-2 bg-card px-2.5 py-1 text-xs font-bold whitespace-nowrap shadow-[2px_2px_0_var(--border)]">
+              {t("shakeHint")}
+            </span>
           </span>
         )}
       </div>

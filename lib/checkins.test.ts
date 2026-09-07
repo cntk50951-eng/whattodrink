@@ -24,6 +24,7 @@ describe("MOCK_CHECKINS seed data", () => {
       expect(c.drinkName.trim().length).toBeGreaterThan(0);
       expect(c.area.trim().length).toBeGreaterThan(0);
       expect(c.cheers).toBeGreaterThanOrEqual(0);
+      expect(typeof c.checkedInAt).toBe("number");
       expect(c.mock).toBe(true);
     }
   });
