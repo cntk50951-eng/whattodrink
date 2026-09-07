@@ -213,6 +213,9 @@
     "cityName_bj": "Beijing",
     "cityName_sh": "Shanghai",
     "cityName_gz": "Guangzhou",
-    "cityName_sz": "Shenzhen"
+    "cityName_sz": "Shenzhen",
+    "swapBeer": "Swap",
+    "deleteEntry": "Delete",
+    "confirmDelete": "Confirm delete"
   }
 }

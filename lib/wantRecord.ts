@@ -139,6 +139,26 @@ export function upsertWantHistory(
     .slice(-MAX_WANT_HISTORY);
 }
 
+/**
+ * UR3.7 纯换酒：按 at 换掉条目的 beer，时间／位置／地名原样保留
+ * （pin 不动，只换酒）；对不上 at 原样返回。
+ */
+export function swapWantBeer(
+  prev: readonly WantRecord[],
+  at: number,
+  beer: WantRecord["beer"],
+): WantRecord[] {
+  return prev.map((r) => (r.at === at ? { ...r, beer } : r));
+}
+
+/** UR3.7 纯删除：按 at 丢条目；调用方定删后看哪条／关卡。 */
+export function removeWantAt(
+  prev: readonly WantRecord[],
+  at: number,
+): WantRecord[] {
+  return prev.filter((r) => r.at !== at);
+}
+
 /** Pure validator for the history array — bad entries are dropped. */
 export function parseWantHistory(raw: unknown): WantRecord[] {
   if (!Array.isArray(raw)) return [];
