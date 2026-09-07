@@ -22,6 +22,14 @@ UI 全确定后按此开工 EPIC 3.0 真表设计。
 - `users(id, nickname, avatar_url, gender, created_at)` —— 头像＋性别
   **UR2.0 已落定**：`MOCK_ME`（`lib/me.ts`）占位，`gender` enum 三值
   （male／female／secret）与本草图同名，直迁无改名
+  **UR3.3 加 `last_seen_at`**：APP 前台心跳（~30s 写一次），查 5km 内
+  `last_seen_at >= now - 5min` 即在线（口径与前端 `isNearbyOnline` 一致，
+  mock 用 `Checkin.onlineAt` 相对时间戳占位）；建索引（范围查）
+- `drink_invites(id, from_user_id, to_user_id, checkin_id, status, created_at)` ——
+  **UR3.3 新增（EPIC 3.0 实现，UI 先行 mock）**：`status` enum
+  （sent／accepted／declined／expired），发出写 sent 行，对方点接受／拒绝
+  更新同行（不另起行）；过期由定时任务扫（sent 超 24h→expired）。前端
+  mock（`invites` state＋`declinesInvite` 剧本＋3s 定时）届时整块删
 - `beers(id, emoji, name, category, tagline)` —— 现 15 条静态直迁
 - `checkins(id, user_id, beer_id, lat, lng, place_name, photo_url, audio_url, audio_seconds, note, transcript, created_at)` —— 想喝／拍照／心情三流归一
 - `cheers(id, from_user_id, to_user_id, checkin_id, created_at)` —— 计数不存列，实时 `count`

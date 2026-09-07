@@ -192,6 +192,12 @@
     "clusterTitle": "放大看 {n} 位酒友",
     "shakeSearching": "正在摇出附近酒友…",
     "cheersLeft": "今日还剩 {n} 次干杯",
-    "cheersLimitReached": "今日 15 次干杯用完了，明天再来！"
+    "cheersLimitReached": "今日 15 次干杯用完了，明天再来！",
+    "onlineNow": "在线",
+    "inviteCta": "约喝酒",
+    "inviteSent": "已发出，等对方…",
+    "inviteAccepted": "约好啦！",
+    "inviteAcceptedDetail": "约好啦！{area}见！",
+    "inviteDeclined": "对方今晚没空，改天再约"
   }
 }

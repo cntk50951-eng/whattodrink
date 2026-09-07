@@ -18,6 +18,8 @@ function fake(id: string, lat: number, hoursAgo: number): Checkin {
     position: { lat, lng: 114.17 },
     cheers: 0,
     checkedInAt: NOW - hoursAgo * H,
+    onlineAt: NOW,
+    declinesInvite: false,
     mock: true,
   };
 }

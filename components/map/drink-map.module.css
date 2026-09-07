@@ -84,6 +84,7 @@
 /* ---- Doodle pins (rendered by Leaflet divIcon, so plain classes) ---- */
 
 .pin {
+  position: relative;
   width: 40px;
   height: 40px;
   border-radius: 9999px;
@@ -110,6 +111,7 @@
  * 但换成贴着瓶形的方形卡（圆钉装不下高瓶），和 emoji 圆钉一眼区分。
  * svg 自带 width=100% 属性，这里用 CSS 盖掉定高，viewBox 保比例。 */
 .pinArt {
+  position: relative;
   background: var(--card);
   border: 2.5px solid var(--border);
   border-radius: 12px;
@@ -427,6 +429,64 @@
   42%,
   100% {
     transform: scale(1) rotate(-3deg);
+    opacity: 1;
+  }
+}
+
+/* UR3.3 在线绿点：钉右上角＋头像右下角，同一样式（描边＋白环）。
+ * 绿色无 token，用固定 hex（在线绿是通用语义，沿 UR2.4 品牌定色先例）。
+ * 纯展示，tsx 里按 isOnline 挂载。 */
+.pinOnline {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 13px;
+  height: 13px;
+  border-radius: 9999px;
+  background: #22c55e;
+  border: 2px solid var(--card);
+  box-shadow: 0 0 0 1.5px var(--border);
+}
+
+/* UR3.3 在线 inline 点＋绿字（和钉上绿点同色；返工后 pill 已删，
+ * 只剩名字行后的轻量状态，不和性别 pill 打架）。 */
+.onlineDot {
+  background: #22c55e;
+}
+
+/* UR3.3 成局收据绿字（和在线同色）。 */
+.inviteOk {
+  color: #15803d;
+}
+
+/* UR3.3 邀约：省略号有限跳（3s mock 等待对齐三拍后停，元素随收据卸载，
+ * 非永动）；成局条一次 pop 入场（站内曲线族）。 */
+.inviteDots {
+  display: inline-block;
+  animation: invite-dots 1s ease-in-out 3;
+}
+
+@keyframes invite-dots {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.inviteDone {
+  animation: invite-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) 1;
+}
+
+@keyframes invite-pop {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
     opacity: 1;
   }
 }
@@ -874,5 +934,11 @@
   .fabRattle,
   .fabBubblePop {
     animation: none;
+  }
+  /* UR3.3 邀约：等待省略号静止（字还在），成局条直接可见。 */
+  .inviteDots,
+  .inviteDone {
+    animation: none;
+    opacity: 1;
   }
 }
