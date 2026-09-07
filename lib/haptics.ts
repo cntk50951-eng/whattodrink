@@ -13,6 +13,8 @@ export const BUZZ_FOUND: readonly number[] = [60, 80, 140];
 export const BUZZ_MISS: readonly number[] = [25, 60, 25];
 /** Prime：物理摇第一晃的确认 tick，越轻越好。 */
 export const BUZZ_PRIME: readonly number[] = [20];
+/** UR3.0 碰杯：叮—叮两下（杯碰杯），随后是长长的干杯余韵。 */
+export const BUZZ_CHEERS: readonly number[] = [40, 60, 40, 60, 160];
 
 /**
  * 震一次。返回 true＝已交 vibrate 调度，false＝无 API／被拒（调用方

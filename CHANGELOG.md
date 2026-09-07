@@ -53,7 +53,13 @@
 - **UR 2.6 — 随机推荐面板接入品牌插畫（[✓] 用户已验收）**
 - **UR 2.7 — 结果面板插畫主角化（[✓] 用户已验收，含 pins 追加＋想喝 pin 修漏，merged）**
 - **UR 2.8 — 睇全港视图防挤＋数据点动态适应（[✓] 用户已验收，merged）**
-- **UR 2.9 — 摇一摇手感：触发 rattle＋prime tick＋真震动（[WIP]，待浏览器验收）**
+- **UR 2.9 — 摇一摇手感：触发 rattle＋prime tick＋真震动（[WIP]，待手机验收）**
+- **UR 3.0 — 碰杯特效＋乾杯双边记录（[✓] 用户已验收含 v2 返工，merged）**
+  - 卡内碰杯时刻：两杯摆入＋冲击环＋泡沫粒＋“乾杯！”大字（1.3s＝CHEERS_FX_MS，纯 transform／opacity，reduced-motion 不渲染直接收据）＋BUZZ_CHEERS 双叮震；提交走 `cheersFx` effect 定时，计数乐观＋1，连点守卫＋按钮 disabled
+  - 数据文档（以后实现）：future-schema `cheers` 加 `to_user_id`＋一行双读口径（发送方 sent／接收方 inbox 各＋一条，不做镜像双行）；home-map `sentIds` 行同步＋`cheersFx` UI 纯状态行
+  - 62→63 tests／tsc 全绿、lint 0 error（3 旧 warning）；`npm run build` 本机 sandbox 被拦（老问题，待用户侧复核）
+  - fix（lint）：mount effect 同步读 matchMedia 写 state 撞 set-state-in-effect，包 microtask（UR1.8 配方）
+  - fix（用户验收返工 v2）：特效更大更久更手绘——杯放大＋星形冲击＋速度线＋5 泡沫＋碰杯颤动＋贴纸大字，1.3s→2.2s 结尾淡出；门禁不变（63 tests／tsc／lint 0 error）
   - 卫星钮 `.fabRattle` 0.5s 横向衰减抖（`shakeBurst` 计数＋key 重挂，600ms 归零还槽位给 idle wobble）；`useShake` 加可选 `onPrime` 第一晃确认；`lib/haptics.ts`＋3 单测（成功／失败两套震型，无 API 回 false）
   - 59→62 tests／tsc 全绿、lint 0 error（3 旧 warning）；`npm run build` 本机 sandbox 被拦（老问题，待用户侧复核）；Step 9b：零新增数据字段，数据文档无需更新
   - fix（lint）：React 19 refs 规则——cleanup 读过的 ref 别处不许写，burst 归零改 `shakeBurst` effect 自清理；注意 iPhone Safari 无 vibrate API，只能动画补偿

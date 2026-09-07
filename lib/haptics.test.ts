@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BUZZ_FOUND, BUZZ_MISS, BUZZ_PRIME, buzz } from "./haptics";
+import {
+  BUZZ_CHEERS,
+  BUZZ_FOUND,
+  BUZZ_MISS,
+  BUZZ_PRIME,
+  buzz,
+} from "./haptics";
 
 describe("buzz (UR2.9)", () => {
   afterEach(() => {
@@ -26,5 +32,12 @@ describe("buzz (UR2.9)", () => {
       },
     });
     expect(buzz(BUZZ_PRIME)).toBe(false);
+  });
+
+  it("plays the cheers double-clink through the same gate (UR3.0)", () => {
+    const vibrate = vi.fn().mockReturnValue(true);
+    vi.stubGlobal("navigator", { vibrate });
+    expect(buzz(BUZZ_CHEERS)).toBe(true);
+    expect(vibrate).toHaveBeenCalledWith([...BUZZ_CHEERS]);
   });
 });

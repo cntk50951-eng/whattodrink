@@ -10,7 +10,13 @@ import { MapFab } from "@/components/map/MapFab";
 
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useShake } from "@/hooks/useShake";
-import { BUZZ_FOUND, BUZZ_MISS, BUZZ_PRIME, buzz } from "@/lib/haptics";
+import {
+  BUZZ_CHEERS,
+  BUZZ_FOUND,
+  BUZZ_MISS,
+  BUZZ_PRIME,
+  buzz,
+} from "@/lib/haptics";
 import { markShakeUsed } from "@/components/map/MapFab";
 import { pickNearestRecentCheckin } from "@/lib/shake";
 import { clusterPoints } from "@/lib/clusters";
@@ -101,6 +107,12 @@ const FOCUS_CARD_CLEAR_PX = 240;
  * bound, so fall back to a plain fly-to instead.
  */
 const MIN_FOCUS_SEPARATION_M = 50;
+/**
+ * UR3.0 碰杯特效时长（ms）：两杯摆入 0.5s＋碰杯颤动＋星形冲击＋泡沫＋
+ * 大字，2.2s 收进“已乾杯”收据态（用户嫌 1.3s 消失太快）。结尾 0.2s 整层
+ * 淡出，不硬切。reduced-motion 下直接收据（特效层不渲染）。
+ */
+const CHEERS_FX_MS = 2200;
 /**
  * UR2.8 聚合半径（像素）：略大于单钉最大尺寸（56px）——两钉投影中心距
  * 掉进这个半径即视觉重叠，合成一簇。
@@ -284,6 +296,16 @@ export function DrinkMap({
     key: number;
   } | null>(null);
   const [shakeToast, setShakeToast] = useState<string | null>(null);
+  // UR3.0 reduced-motion 开关（mount 量一次，SSR 首帧 false 反正无特效可播；
+  // 写入走 microtask，同步写撞 set-state-in-effect，见 UR1.8 memory）。
+  const [reducedMotion, setReducedMotion] = useState(false);
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      setReducedMotion(
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      );
+    });
+  }, []);
   const toastTimer = useRef<number | null>(null);
   useEffect(() => {
     const timer = toastTimer.current;
@@ -888,10 +910,27 @@ export function DrinkMap({
     setSheetOpen(true);
   }
 
+  // UR3.0 碰杯时刻：点乾杯先播 1.3s 特效（杯碰杯＋震），再提交收据。
+  // 定时提交走 effect（timeout continuation 写 state，lint 安全）；连点守卫。
+  const [cheersFx, setCheersFx] = useState<{ id: string; key: number } | null>(
+    null,
+  );
   function handleCheers(id: string): void {
     // MOCK — local state only. EPIC 3 sends a real cheers via Supabase.
-    setSentIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    if (sentIds.includes(id) || cheersFx !== null) return;
+    buzz(BUZZ_CHEERS);
+    setCheersFx({ id, key: Date.now() });
   }
+  useEffect(() => {
+    if (cheersFx === null) return;
+    const fx = cheersFx;
+    const timer = window.setTimeout(() => {
+      // MOCK optimistic commit — EPIC 3.0 写 cheers 双边行（见 future-schema）。
+      setSentIds((prev) => (prev.includes(fx.id) ? prev : [...prev, fx.id]));
+      setCheersFx(null);
+    }, CHEERS_FX_MS);
+    return () => window.clearTimeout(timer);
+  }, [cheersFx]);
 
   /**
    * Android-only: jump straight into the system Location settings.
@@ -1374,7 +1413,15 @@ export function DrinkMap({
               </div>
               <div className="mt-3 flex items-center justify-between gap-2">
                 <p className="text-muted-foreground text-sm">
-                  {t("cheersCount", { n: card.cheers })}
+                  {t("cheersCount", {
+                    // MOCK 乐观＋1：碰杯（特效中）即算数，EPIC 3.0 以 count 为准。
+                    n:
+                      card.cheers +
+                      (sentIds.includes(card.id) ||
+                      cheersFx?.id === card.id
+                        ? 1
+                        : 0),
+                  })}
                 </p>
                 {sentIds.includes(card.id) ? (
                   <p role="status" className="font-hand text-lg font-bold">
@@ -1384,12 +1431,81 @@ export function DrinkMap({
                   <button
                     type="button"
                     onClick={() => handleCheers(card.id)}
-                    className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-primary px-4 py-1.5 font-bold text-primary-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                    disabled={cheersFx !== null}
+                    className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-primary px-4 py-1.5 font-bold text-primary-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none disabled:opacity-60"
                   >
                     {t("cheers")}
                   </button>
                 )}
               </div>
+              {/* UR3.0 碰杯特效层：卡内绝对覆盖（面板即定位祖先），播完自动拆。
+                  两杯摆入碰杯＋冲击环＋泡沫粒＋大字，纯 transform／opacity；
+                  reduced-motion 下不渲染，直接收据。 */}
+              {cheersFx !== null &&
+                cheersFx.id === card.id &&
+                !reducedMotion && (
+                  <div
+                    key={cheersFx.key}
+                    aria-hidden
+                    className={`${styles.cheersFx} pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden rounded-2xl bg-card/70`}
+                  >
+                    <span className={`${styles.cheersMugL} w-28 shrink-0`}>
+                      <BeerMugDoodle cheersLabel="!" />
+                    </span>
+                    {/* 手绘星形冲击＋速度线：碰杯那一下的“哐”。 */}
+                    <svg
+                      viewBox="0 0 100 100"
+                      className={`${styles.cheersStar} absolute w-28`}
+                    >
+                      <polygon
+                        points="50,4 60,33 93,30 68,52 80,86 50,66 22,88 31,53 6,33 40,36"
+                        fill="var(--mustard-soft)"
+                        stroke="var(--border)"
+                        strokeWidth="3"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    <svg
+                      viewBox="0 0 120 60"
+                      className={`${styles.cheersLines} absolute w-44`}
+                      fill="none"
+                      stroke="var(--border)"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                    >
+                      <path d="M 4 10 L 34 22" />
+                      <path d="M 2 30 L 36 30" />
+                      <path d="M 4 50 L 34 38" />
+                      <path d="M 116 10 L 86 22" />
+                      <path d="M 118 30 L 84 30" />
+                      <path d="M 116 50 L 86 38" />
+                    </svg>
+                    <span className={`${styles.cheersBurst} absolute`} />
+                    <span
+                      className={`${styles.cheersFoam} ${styles.cheersF1} absolute h-2.5 w-2.5 rounded-full`}
+                    />
+                    <span
+                      className={`${styles.cheersFoam} ${styles.cheersF2} absolute h-2 w-2 rounded-full`}
+                    />
+                    <span
+                      className={`${styles.cheersFoam} ${styles.cheersF3} absolute h-3 w-3 rounded-full`}
+                    />
+                    <span
+                      className={`${styles.cheersFoam} ${styles.cheersF4} absolute h-2 w-2 rounded-full`}
+                    />
+                    <span
+                      className={`${styles.cheersFoam} ${styles.cheersF5} absolute h-2.5 w-2.5 rounded-full`}
+                    />
+                    <span className={`${styles.cheersMugR} w-28 shrink-0`}>
+                      <BeerMugDoodle cheersLabel="!" />
+                    </span>
+                    <span
+                      className={`${styles.cheersLabel} font-hand absolute text-5xl font-bold`}
+                    >
+                      {t("cheers")}
+                    </span>
+                  </div>
+                )}
             </>
           )}
         </div>

@@ -10,7 +10,7 @@ UI 全确定后按此开工 EPIC 3.0 真表设计。
 | 我在哪 | 定位七态＋实时经纬 | 会话 watch | 实时位：原则上不存；足迹位：`checkins` |
 | 喝什么 | 酒目录 15 条＋候选 1 条 | 静态＋会话 | `beers`＋`checkins.beer_id` |
 | 想喝 | 快照（酒／时间／经纬／地名） | localStorage | `checkins` 一行 |
-| 别人 | 4 条 MOCK（人／酒／区／位／赞数） | 写死 | `checkins` join `users`＋`beers`，赞数实时算 |
+| 别人 | 4 条 MOCK（人／酒／区／位／赞数／打卡时刻） | 写死 | `checkins` join `users`＋`beers`，赞数实时算，打卡时刻进 `created_at` |
 | 乾杯 | 我已送出的 id 表 | 会话 | `cheers` 行 |
 | 拍照 | 照片／来源／备注／语音／转录／回执 | 会话（他人 WIP） | `checkins` 列（媒体存对象存储，库只存 URL） |
 | 心情 | 无（stub） | — | 输入进 `mood_logs`，结果沿用 `checkins` |
@@ -24,7 +24,12 @@ UI 全确定后按此开工 EPIC 3.0 真表设计。
   （male／female／secret）与本草图同名，直迁无改名
 - `beers(id, emoji, name, category, tagline)` —— 现 15 条静态直迁
 - `checkins(id, user_id, beer_id, lat, lng, place_name, photo_url, audio_url, audio_seconds, note, transcript, created_at)` —— 想喝／拍照／心情三流归一
-- `cheers(id, from_user_id, checkin_id, created_at)` —— 计数不存列，实时 `count`
+- `cheers(id, from_user_id, to_user_id, checkin_id, created_at)` —— 计数不存列，实时 `count`
+  **UR3.0 双边记录口径（EPIC 3.0 实现，UI 先行 mock）**：点一次乾杯只写**一行**，
+  但双方记录各＋一条——发送方 sent 列表多一条（`from_user_id = 我`），接收方
+  inbox 多一条（`to_user_id = 对方` 的这同一行）。不做镜像双行（一行双读足够，
+  计数 `count(cheers where checkin_id=…)` 不变）。`to_user_id` 为 UR3.0 新增列
+  （原草图只有 from）。前端 `sentIds`＋乐观＋1 届时改读“`from_user_id = 我` 的行”。
 - `mood_logs(id, user_id, mood_text, created_at)` —— 心情输入流
 - （暂缓）`bars`、`friendships`、`game_*` —— EPIC 4.0 前不设计
 
