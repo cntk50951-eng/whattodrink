@@ -58,6 +58,12 @@
   - `lib/beers.ts` 精簡七大類＋`BEERS.category` 映射（`BEER_CATEGORIES`／`beersInCategory`／`categoryOfBeer`／`pickRandomBeerIn`，rand 可注入）＋`lib/beers.test.ts` 8 單測（映射全覆蓋無孤兒／類內抽取／未知類 null）；`pickCategoriesTitle`／`pickSameCategory`／`pickChangeCategory`／`pickDirectWant`／類名×7 三語
   - 面板三態：CTA → L1 七類二列貼紙格（主鈕進 L2＋每類＋鈕直接想喝＝隱性補全，背後抽真品牌走同一 `dropWant`）→ L2 品牌結果（大類眉題＋有圖手繪主角位沿 UR2.7＋想喝／同類換一款／換品種三鈕）；`handleWant` 拆 `dropWant(beer)` 核心，UR3.7 換酒維持全域不動，`handleSelfPick` 改開 L1
   - 90→98 tests／tsc 淨／lint 0 error（3 舊 warning）；`npm run build` 本機 sandbox 被攔（老問題，待用戶側復核）；數據文檔無需更新（`WantRecord` 形狀不變，零新增持久化）
+- **UR 3.9 — 批量推薦網格（[✓] 用户已验收，merged）**
+  - `lib/beers.ts` 新增 `pickRandomBatch(categoryId, count, rand)`（Fisher-Yates 洗牌取前 N，未知類回退全局，不重複，不改原數組）＋ `lib/beers.test.ts` ＋5 單測（批量去重／長度 capped／未知回退／可注入／不改源）；`pickNextBatch` 三語
+  - 面板 L2 單品牌結果改批量網格：進 L2 即見一批（默認 6＝3 列×2 行，小類如紅酒 1 款就顯示全部）＋「換下一批」同類內重洗（查重試 3 次盡量不全等）／「換品種」回 L1；點格即 `handleBatchWant`→`dropWant` 落真品牌釘（RAW：不再有單獨想喝按鈕，L2 內點即落釘）；沿塗鴉 border-2＋硬陰影卡片，有圖 h-16 手繪／無圖 emoji
+  - 98→103 tests／tsc 淨／lint 0 error（3 舊 warning）；`npm run build` 本機 sandbox 被攔（老問題，待用戶側復核）；數據文檔無需更新（`WantRecord` 形狀不變，零新增持久化）
+  - fix v2（用戶返工：L1 類別列改橫向手繪輪詢卡＋自己紀錄換酒改批次自選）：`shuffleTake` 共用核心＋`pickSwapBatch`＋2 單測，`laneCount` 三語；103→105 tests／tsc 淨／lint 0 error
+  - fix v3（用戶返工：開板空 CTA／輪詢無滑動感／打卡卡被下緣遮擋）：`openPickSheet` 直達 L1（啤酒鈕／深鏈／空足跡 CTA，空 CTA 留兜底）；L2 批量改照片輪詢（主角卡＋peek＋箭頭／點點＋`batchIn`／`laneIn` 進場，reduced-motion 關）；錨定卡 `ResizeObserver` 量高＋內層 `maxHeight` 滾動兜底（根因：開批後高度變了錨點仍用舊值）；`pickPrev`／`pickNext` 三語；105 tests／tsc 淨／lint 0 error
 - **UR 3.7 — 我的打卡可编辑（[✓] 用户已验收，merged）**
   - `swapWantBeer`（同条只换 beer，时间位置不动）＋`removeWantAt`（按 at 删）＋3 单测；面板编辑行：换酒副钮（摇到不同为止）＋删除两段确认（删后看最新、删光关卡清状态）；`swapBeer`／`deleteEntry`／`confirmDelete` 三语；87→90 tests／tsc 净／lint 0 error；`npm run build` sandbox 老问题
 - **UR 3.6 — 他人打卡面板重构（[✓] 用户已验收，merged）**

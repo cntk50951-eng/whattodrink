@@ -5,7 +5,9 @@ import {
   BEER_CATEGORIES,
   beersInCategory,
   categoryOfBeer,
+  pickRandomBatch,
   pickRandomBeerIn,
+  pickSwapBatch,
 } from "./beers";
 
 describe("BEER_CATEGORIES mapping", () => {
@@ -72,5 +74,58 @@ describe("pickRandomBeerIn", () => {
 
   it("returns null for an unknown lane so callers fall back to global pick", () => {
     expect(pickRandomBeerIn("nope", () => 0)).toBeNull();
+  });
+});
+
+describe("pickRandomBatch", () => {
+  it("returns up to count, no duplicates, only lane members", () => {
+    const batch = pickRandomBatch("beer", 6, () => 0.3);
+    expect(batch.length).toBe(Math.min(6, beersInCategory("beer").length));
+    expect(new Set(batch.map((b) => b.id)).size).toBe(batch.length);
+    for (const b of batch) {
+      expect(beersInCategory("beer").map((x) => x.id)).toContain(b.id);
+    }
+  });
+
+  it("caps at pool size when the lane is smaller than count (single-item lane)", () => {
+    expect(pickRandomBatch("red", 6, () => 0.5).length).toBe(1);
+    expect(pickRandomBatch("sake", 6, () => 0.5).length).toBe(1);
+  });
+
+  it("falls back to the global pool for an unknown lane", () => {
+    const batch = pickRandomBatch("nope", 6, () => 0.2);
+    expect(batch.length).toBe(6);
+    expect(batch.every((b) => BEERS.some((x) => x.id === b.id))).toBe(true);
+  });
+
+  it("is deterministic with an injected rand (shuffle)", () => {
+    const a = pickRandomBatch("cocktail", 3, () => 0);
+    const b = pickRandomBatch("cocktail", 3, () => 0);
+    expect(a.map((x) => x.id)).toEqual(b.map((x) => x.id));
+  });
+
+  it("does not mutate the source pool", () => {
+    const before = beersInCategory("beer").map((b) => b.id);
+    pickRandomBatch("beer", 6, () => 0.7);
+    expect(beersInCategory("beer").map((b) => b.id)).toEqual(before);
+  });
+});
+
+describe("pickSwapBatch", () => {
+  it("excludes the current beer and stays in-lane when possible", () => {
+    const cur = beersInCategory("beer")[0] as (typeof BEERS)[number];
+    const batch = pickSwapBatch(cur, 6, () => 0.4);
+    expect(batch.map((b) => b.id)).not.toContain(cur.id);
+    expect(new Set(batch.map((b) => b.id)).size).toBe(batch.length);
+    for (const b of batch) {
+      expect(beersInCategory("beer").map((x) => x.id)).toContain(b.id);
+    }
+  });
+
+  it("falls back to global-minus-current for a single-item lane", () => {
+    const cur = beersInCategory("red")[0] as (typeof BEERS)[number];
+    const batch = pickSwapBatch(cur, 6, () => 0.4);
+    expect(batch.length).toBeGreaterThan(0);
+    expect(batch.map((b) => b.id)).not.toContain(cur.id);
   });
 });
