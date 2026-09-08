@@ -54,6 +54,10 @@
 - **UR 2.7 — 结果面板插畫主角化（[✓] 用户已验收，含 pins 追加＋想喝 pin 修漏，merged）**
 - **UR 2.8 — 睇全港视图防挤＋数据点动态适应（[✓] 用户已验收，merged）**
 - **UR 2.9 — 摇一摇手感：触发 rattle＋prime tick＋真震动（[WIP]，待手机验收）**
+- **UR 3.8 — 随机推荐两层面板（[✓] 用户已验收，merged）**
+  - `lib/beers.ts` 精簡七大類＋`BEERS.category` 映射（`BEER_CATEGORIES`／`beersInCategory`／`categoryOfBeer`／`pickRandomBeerIn`，rand 可注入）＋`lib/beers.test.ts` 8 單測（映射全覆蓋無孤兒／類內抽取／未知類 null）；`pickCategoriesTitle`／`pickSameCategory`／`pickChangeCategory`／`pickDirectWant`／類名×7 三語
+  - 面板三態：CTA → L1 七類二列貼紙格（主鈕進 L2＋每類＋鈕直接想喝＝隱性補全，背後抽真品牌走同一 `dropWant`）→ L2 品牌結果（大類眉題＋有圖手繪主角位沿 UR2.7＋想喝／同類換一款／換品種三鈕）；`handleWant` 拆 `dropWant(beer)` 核心，UR3.7 換酒維持全域不動，`handleSelfPick` 改開 L1
+  - 90→98 tests／tsc 淨／lint 0 error（3 舊 warning）；`npm run build` 本機 sandbox 被攔（老問題，待用戶側復核）；數據文檔無需更新（`WantRecord` 形狀不變，零新增持久化）
 - **UR 3.7 — 我的打卡可编辑（[✓] 用户已验收，merged）**
   - `swapWantBeer`（同条只换 beer，时间位置不动）＋`removeWantAt`（按 at 删）＋3 单测；面板编辑行：换酒副钮（摇到不同为止）＋删除两段确认（删后看最新、删光关卡清状态）；`swapBeer`／`deleteEntry`／`confirmDelete` 三语；87→90 tests／tsc 净／lint 0 error；`npm run build` sandbox 老问题
 - **UR 3.6 — 他人打卡面板重构（[✓] 用户已验收，merged）**

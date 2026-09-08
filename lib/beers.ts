@@ -44,3 +44,57 @@ export function pickRandomBeer(): Beer {
   const idx = Math.floor(Math.random() * BEERS.length);
   return BEERS[idx];
 }
+
+/* ---- UR3.8 品種分層 ----
+ * L1 精簡大類＋到 BEERS.category 的映射。映射住在這裡（單源），面板只讀它：
+ * 新增品牌／新 category 時補 match 行即可，L1／L2／隱性補全自然生效。
+ * 每個 BEERS.category 必須恰好屬於一個大類（beers.test.ts 鎖死無孤兒、無重疊）。 */
+
+export type BeerCategory = {
+  /** Stable lane id. */
+  id: string;
+  /** Lane glyph for the L1 grid. */
+  emoji: string;
+  /** i18n key for the lane name (e.g. "catBeer"). */
+  labelKey: string;
+  /** BEERS.category values that belong to this lane. */
+  match: readonly string[];
+};
+
+export const BEER_CATEGORIES: readonly BeerCategory[] = [
+  { id: "beer", emoji: "🍺", labelKey: "catBeer", match: ["lager", "draft", "craft beer", "stout"] },
+  { id: "red", emoji: "🍷", labelKey: "catRed", match: ["red wine"] },
+  { id: "white", emoji: "🥂", labelKey: "catWhite", match: ["white wine", "rosé"] },
+  { id: "whisky", emoji: "🥃", labelKey: "catWhisky", match: ["whisky", "highball"] },
+  { id: "sake", emoji: "🍶", labelKey: "catSake", match: ["sake"] },
+  { id: "cocktail", emoji: "🍸", labelKey: "catCocktail", match: ["cocktail"] },
+  { id: "liqueur", emoji: "🍹", labelKey: "catLiqueur", match: ["liqueur"] },
+];
+
+/** All beers in a lane. Unknown lane id → [] (caller falls back to global pick). */
+export function beersInCategory(categoryId: string): Beer[] {
+  const lane = BEER_CATEGORIES.find((c) => c.id === categoryId);
+  if (lane === undefined) return [];
+  return BEERS.filter((b) => lane.match.includes(b.category));
+}
+
+/** The lane a beer belongs to. Unmapped category → null (never throw). */
+export function categoryOfBeer(beer: Beer): BeerCategory | null {
+  return (
+    BEER_CATEGORIES.find((c) => c.match.includes(beer.category)) ?? null
+  );
+}
+
+/**
+ * Random pick constrained to one lane. `rand` is injectable for tests.
+ * Unknown lane → null so the caller can fall back to pickRandomBeer().
+ */
+export function pickRandomBeerIn(
+  categoryId: string,
+  rand: () => number = Math.random,
+): Beer | null {
+  const pool = beersInCategory(categoryId);
+  if (pool.length === 0) return null;
+  const pick = pool[Math.floor(rand() * pool.length)] as Beer | undefined;
+  return pick ?? null;
+}

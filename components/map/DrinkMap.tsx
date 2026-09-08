@@ -5,7 +5,15 @@ import { useRouter } from "next/navigation";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type * as Leaflet from "leaflet";
 import { useLocale, useTranslations } from "next-intl";
-import { Clock, Dices, MapPin, Plus, Trash2, X } from "lucide-react";
+import {
+  ChevronLeft,
+  Clock,
+  Dices,
+  MapPin,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import { resolveCityCode } from "@/lib/city";
 
 import { CityIcon } from "./CityIcon";
@@ -45,7 +53,12 @@ import {
 import type { DeviceBrowser, DevicePlatform } from "@/lib/device";
 import { MOCK_CHECKINS } from "@/lib/checkins";
 import type { Checkin } from "@/lib/checkins";
-import { pickRandomBeer } from "@/lib/beers";
+import {
+  BEER_CATEGORIES,
+  categoryOfBeer,
+  pickRandomBeer,
+  pickRandomBeerIn,
+} from "@/lib/beers";
 import type { Beer } from "@/lib/beers";
 import type { LatLng } from "@/lib/geo";
 import type { WantRecord } from "@/lib/wantRecord";
@@ -474,6 +487,10 @@ export function DrinkMap({
   }, []);
   const [picked, setPicked] = useState<Beer | null>(null);
   const [wantSaved, setWantSaved] = useState(false);
+  /* UR3.8 兩層面板：pickLanes 為 true 即 L1 品種層（此時 picked 若有舊結果，
+   * L1 優先顯示）；pickLaneId 記住 L2 結果所屬大類（「換一款」不出類）。 */
+  const [pickLanes, setPickLanes] = useState(false);
+  const [pickLaneId, setPickLaneId] = useState<string | null>(null);
   // UR1.8 frozen drop snapshot (null until the first 想喝, or after reset).
   const [wantRecord, setWantRecord] = useState<WantRecord | null>(null);
   // UR3.7 删除两段确认：只对正在看的 at 武装，换条看自动解除，无需 effect。
@@ -919,12 +936,37 @@ export function DrinkMap({
     );
   }, [mapReady, wantHistory]);
 
-  function handlePick(): void {
-    // Rolling a new beer touches ONLY the candidate — the old pin and its
-    // snapshot stay alive until a new 想喝 actually drops (handleWant
-    // overwrites both). Retiring them here wiped the last check-in the
-    // moment the user re-rolled (UR1.8 bug report).
-    setPicked(pickRandomBeer());
+  /* UR3.8 L2 入口：選定大類 → 該類內隨機抽品牌（映射缺類回退全域，
+   * 不白屏）。Rolling touches ONLY the candidate — 舊釘＋快照留到真正落
+   * 「想喝」才換（UR1.8 bug report 同理）。 */
+  function handlePickLane(laneId: string): void {
+    const beer = pickRandomBeerIn(laneId) ?? pickRandomBeer();
+    setPicked(beer);
+    setPickLaneId(laneId);
+    setPickLanes(false);
+  }
+
+  /* UR3.8 「換一款」：同類內重抽（搖到不同為止，10 次兜底沿 UR3.7 pattern；
+   * 單品牌類兜底後保持原品牌，不死循環）。 */
+  function handlePickSameLane(): void {
+    if (picked === null) return;
+    const laneId = pickLaneId ?? categoryOfBeer(picked)?.id ?? null;
+    if (laneId === null) {
+      setPicked(pickRandomBeer());
+      return;
+    }
+    let beer = pickRandomBeerIn(laneId) ?? pickRandomBeer();
+    for (let i = 0; beer.id === picked.id && i < 10; i++) {
+      beer = pickRandomBeerIn(laneId) ?? pickRandomBeer();
+    }
+    setPicked(beer);
+    setPickLaneId(laneId);
+  }
+
+  /* UR3.8 隱性補全：L1 每類直打 —— 按下瞬間背後抽該類具體品牌再落釘，
+   * 之後與 L2 想喝走完全同一條 dropWant，面板代碼零特判。 */
+  function handleLaneWant(laneId: string): void {
+    dropWant(pickRandomBeerIn(laneId) ?? pickRandomBeer());
   }
 
   /**
@@ -1002,8 +1044,16 @@ export function DrinkMap({
   }
 
   function handleWant(): void {
-    const map = mapRef.current;
     if (picked === null) return;
+    dropWant(picked);
+  }
+
+  /**
+   * Shared drop core — L2 想喝 and UR3.8 L1 隱性補全 both land here with a
+   * concrete brand, so pins / cards / trail never see lane-only check-ins.
+   */
+  function dropWant(beer: Beer): void {
+    const map = mapRef.current;
     // Prefer the real position; otherwise drop the pin at the map centre.
     const at =
       geoStatus === "success" &&
@@ -1017,7 +1067,7 @@ export function DrinkMap({
     // UR1.8: freeze the drop moment — beer, clock, and fix travel together
     // from here on; the pin and the card only ever read this snapshot.
     // UR3.4 bug 修：追加进史（旧的不清），上限截尾保最新。
-    const record: WantRecord = { beer: picked, at: Date.now(), position: at };
+    const record: WantRecord = { beer, at: Date.now(), position: at };
     // UR3.4 同店顶替：10m 内算同一位置（GPS 漂移），旧条让位，不叠钉。
     const next = upsertWantHistory(wantHistoryRef.current, record);
     wantHistoryRef.current = next;
@@ -1066,13 +1116,11 @@ export function DrinkMap({
     setPicked(latest.beer);
   }
   function handleSelfPick(): void {
-    // From your own pin: close the card, roll, and OPEN the sheet — the
-    // result must land somewhere visible. The old comment claimed the
-    // panel was "now visible", true in UR1.1 (always-open panel) but false
-    // since UR1.2 turned it into a default-closed sheet; this path has
-    // silently done nothing visible ever since (UR1.8 bug report).
+    // From your own pin: close the card and OPEN the sheet at the L1 lanes —
+    // the user picks a lane first (UR3.8), so there is no blind global roll
+    // here anymore. (UR1.8 bug report: this path must land somewhere visible.)
     setSelectedId(null);
-    handlePick();
+    setPickLanes(true);
     setSheetOpen(true);
   }
 
@@ -1323,10 +1371,48 @@ export function DrinkMap({
           <p className="font-hand pr-10 text-2xl leading-none font-bold">
             {t("pickTitle")}
           </p>
-          {picked === null ? (
+          {pickLanes ? (
+            // UR3.8 L1 品種層：七大類二列貼紙格；主鈕進 L2 看品牌，
+            // 右側＋鈕是該類直接想喝（隱性補全，背後抽真品牌再落釘）。
+            <div className="mt-3">
+              <p className="text-muted-foreground text-sm">
+                {t("pickCategoriesTitle")}
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {BEER_CATEGORIES.map((lane) => (
+                  <div
+                    key={lane.id}
+                    className="flex items-stretch gap-1 rounded-2xl border-2 bg-card shadow-[2px_2px_0_var(--border)]"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handlePickLane(lane.id)}
+                      className="font-hand flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-base font-bold"
+                    >
+                      <span className="text-2xl" aria-hidden>
+                        {lane.emoji}
+                      </span>
+                      <span className="truncate">{t(lane.labelKey)}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleLaneWant(lane.id)}
+                      aria-label={t("pickDirectWant", {
+                        cat: t(lane.labelKey),
+                      })}
+                      title={t("pickDirectWant", { cat: t(lane.labelKey) })}
+                      className="m-1 inline-flex w-10 items-center justify-center rounded-xl border-2 bg-accent text-accent-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                    >
+                      <Plus size={15} aria-hidden />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : picked === null ? (
             <button
               type="button"
-              onClick={handlePick}
+              onClick={() => setPickLanes(true)}
               className="font-hand mt-3 inline-flex items-center gap-2 rounded-full border-2 bg-primary px-4 py-2 text-base font-bold text-primary-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
             >
               <Dices size={18} aria-hidden />
@@ -1355,6 +1441,17 @@ export function DrinkMap({
                   );
                 })()}
                 <div className="min-w-0">
+                  {(() => {
+                    // UR3.8 L2 眉題：點明結果所屬大類（用戶先定方向的回音）。
+                    const lane =
+                      BEER_CATEGORIES.find((c) => c.id === pickLaneId) ??
+                      categoryOfBeer(picked);
+                    return lane === null ? null : (
+                      <p className="text-muted-foreground truncate text-xs">
+                        {lane.emoji} {t(lane.labelKey)}
+                      </p>
+                    );
+                  })()}
                   <p className="truncate font-bold">{picked.name}</p>
                   <p className="text-muted-foreground truncate text-sm">
                     {picked.tagline}
@@ -1372,12 +1469,21 @@ export function DrinkMap({
                 </button>
                 <button
                   type="button"
-                  onClick={handlePick}
-                  className="rounded-full border-2 px-3 py-1.5 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                  onClick={handlePickSameLane}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
                 >
-                  {t("pickAgain")}
+                  <Dices size={15} aria-hidden />
+                  {t("pickSameCategory")}
                 </button>
               </div>
+              <button
+                type="button"
+                onClick={() => setPickLanes(true)}
+                className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-full border-2 px-3 py-1.5 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+              >
+                <ChevronLeft size={15} aria-hidden />
+                {t("pickChangeCategory")}
+              </button>
               {wantSaved && (
                 <p className="text-muted-foreground mt-2 text-xs">
                   {t("wantSaved")}
