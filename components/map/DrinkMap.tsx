@@ -11,7 +11,6 @@ import {
   Clock,
   Dices,
   MapPin,
-  Plus,
   RefreshCw,
   Trash2,
   X,
@@ -59,11 +58,11 @@ import {
   BEER_CATEGORIES,
   beersInCategory,
   categoryOfBeer,
+  laneCardSize,
   pickRandomBatch,
-  pickRandomBeer,
-  pickRandomBeerIn,
   pickSwapBatch,
 } from "@/lib/beers";
+import { CATEGORY_ART } from "@/components/marketing/beer-icons/category-art";
 import type { Beer } from "@/lib/beers";
 import type { LatLng } from "@/lib/geo";
 import type { WantRecord } from "@/lib/wantRecord";
@@ -102,6 +101,19 @@ import {
 } from "@/components/marketing/beer-icons/wall";
 import { renderToStaticMarkup } from "react-dom/server";
 import styles from "./drink-map.module.css";
+
+/* UR3.9 v4 拼貼定妝：旋轉（±3–6°）＋膠帶位全由 index 定死，同卡每次
+ * 同妝（重刷不亂跳）；大小另走 laneCardSize（款數），見 lib/beers.ts。 */
+const LANE_SPIN = [-5, 4, -3, 6, -4, 3, -6];
+const LANE_TAPE = [
+  "left-3 -rotate-6",
+  "right-3 rotate-6",
+  "left-1/2 -translate-x-1/2 rotate-2",
+  "left-6 rotate-3",
+  "right-6 -rotate-3",
+  "left-1/3 -rotate-2",
+  "right-1/3 rotate-6",
+];
 
 /**
  * UR1.1 homepage drink map — map + drink-pick entry as ONE component.
@@ -1031,12 +1043,6 @@ export function DrinkMap({
     dropWant(beer);
   }
 
-  /* UR3.8 隱性補全：L1 每類直打 —— 按下瞬間背後抽該類具體品牌再落釘，
-   * 之後與 L2 想喝走完全同一條 dropWant，面板代碼零特判。 */
-  function handleLaneWant(laneId: string): void {
-    dropWant(pickRandomBeerIn(laneId) ?? pickRandomBeer());
-  }
-
   /**
    * Fly the camera so the target clears the open sheet (shifted up by
    * SHEET_OFFSET_PX). Plain centring when the sheet is closed.
@@ -1461,59 +1467,64 @@ export function DrinkMap({
               <p className="text-muted-foreground text-sm">
                 {t("pickCategoriesTitle")}
               </p>
-              <div className="mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth overscroll-x-contain pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {BEER_CATEGORIES.map((lane, i) => {
                   const laneBeers = beersInCategory(lane.id);
-                  const artBeer =
-                    laneBeers.find((b) => iconForPickId(b.id) !== null) ??
-                    laneBeers[0];
-                  const Art =
-                    artBeer === undefined
-                      ? null
-                      : iconForPickId(artBeer.id);
+                  const Art = CATEGORY_ART[lane.id];
+                  const size = laneCardSize(laneBeers.length);
+                  // v4 拼貼：大小跟款數走；旋轉＋膠帶＋高低錯落全由 index
+                  // 定死（同卡每次同妝，不重刷亂跳）；整卡即入口（＋號退役）。
+                  const spin = LANE_SPIN[i % LANE_SPIN.length] as number;
+                  const cardW =
+                    size === "lg" ? "w-44" : size === "md" ? "w-40" : "w-32";
+                  const artH =
+                    size === "lg"
+                      ? "h-28 [&>svg]:h-28"
+                      : size === "md"
+                        ? "h-24 [&>svg]:h-24"
+                        : "h-20 [&>svg]:h-20";
+                  const tape = LANE_TAPE[i % LANE_TAPE.length] as string;
                   return (
                     <div
                       key={lane.id}
-                      style={{ animationDelay: `${Math.min(i, 6) * 60}ms` }}
-                      className={`${styles.laneIn} relative w-36 shrink-0 snap-center rounded-2xl border-2 bg-card pt-4 shadow-[2px_2px_0_var(--border)] ${
-                        i % 2 === 0 ? "-rotate-1" : "rotate-1"
+                      style={{
+                        animationDelay: `${Math.min(i, 6) * 60}ms`,
+                        rotate: `${spin}deg`,
+                      }}
+                      className={`${styles.laneIn} relative shrink-0 snap-center rounded-2xl border-2 bg-card pt-4 shadow-[2px_2px_0_var(--border)] ${cardW} ${
+                        i % 2 === 0 ? "" : "mt-2"
                       }`}
                     >
                       <span
                         aria-hidden
-                        className={`${styles.tape} absolute -top-2 left-1/2 h-4 w-12 -translate-x-1/2 -rotate-3`}
+                        className={`${styles.tape} absolute -top-2 h-4 w-12 ${tape}`}
                       />
                       <button
                         type="button"
                         onClick={() => handlePickLane(lane.id)}
-                        className="flex w-full flex-col items-center gap-1 px-2 pb-2"
+                        aria-label={`${t(lane.labelKey)}`}
+                        className="flex w-full flex-col items-center gap-1 px-2 pb-2 transition-transform duration-150 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.04] hover:shadow-[4px_4px_0_var(--border)] active:scale-95"
                       >
-                        {Art !== null ? (
-                          <span className="block h-24 w-auto shrink-0 [&>svg]:h-24 [&>svg]:w-auto">
+                        <span
+                          style={{
+                            animationDelay: `-${(i * 0.9).toFixed(1)}s`,
+                          }}
+                          className={`${styles.laneFloat} block w-auto shrink-0 ${artH} [&>svg]:w-auto`}
+                        >
+                          {Art !== undefined ? (
                             <Art />
-                          </span>
-                        ) : (
-                          <span className="text-5xl" aria-hidden>
-                            {lane.emoji}
-                          </span>
-                        )}
+                          ) : (
+                            <span className="text-5xl" aria-hidden>
+                              {lane.emoji}
+                            </span>
+                          )}
+                        </span>
                         <span className="font-hand text-base leading-tight font-bold">
                           {t(lane.labelKey)}
                         </span>
                         <span className="text-muted-foreground text-xs">
                           {t("laneCount", { n: laneBeers.length })}
                         </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleLaneWant(lane.id)}
-                        aria-label={t("pickDirectWant", {
-                          cat: t(lane.labelKey),
-                        })}
-                        title={t("pickDirectWant", { cat: t(lane.labelKey) })}
-                        className="absolute top-2 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full border-2 bg-accent text-accent-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-                      >
-                        <Plus size={14} aria-hidden />
                       </button>
                     </div>
                   );
@@ -1560,28 +1571,25 @@ export function DrinkMap({
                       type="button"
                       onClick={() => handleBatchWant(beer)}
                       aria-label={`${i + 1}/${pickBatch.length} ${beer.name}`}
-                      className={`relative flex w-[78%] shrink-0 snap-center flex-col items-center gap-1 rounded-2xl border-2 bg-card p-3 pt-4 shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none ${
+                      className={`relative flex w-[70%] shrink-0 snap-center flex-col items-center gap-0.5 rounded-2xl border-2 bg-card p-2 pt-2.5 shadow-[2px_2px_0_var(--border)] transition-transform duration-150 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.02] active:scale-95 ${
                         i % 2 === 0 ? "-rotate-1" : "rotate-1"
                       }`}
                     >
                       <span
                         aria-hidden
-                        className={`${styles.tape} absolute -top-2 left-1/2 h-4 w-12 -translate-x-1/2 rotate-2`}
+                        className={`${styles.tape} absolute -top-2 left-1/2 h-3 w-8 -translate-x-1/2 rotate-2`}
                       />
                       {Icon !== null ? (
-                        <span className="block h-36 w-auto shrink-0 [&>svg]:h-36 [&>svg]:w-auto">
+                        <span className="block h-20 w-auto shrink-0 [&>svg]:h-20 [&>svg]:w-auto">
                           <Icon />
                         </span>
                       ) : (
-                        <span className="text-6xl" aria-hidden>
+                        <span className="text-4xl" aria-hidden>
                           {beer.emoji}
                         </span>
                       )}
-                      <span className="font-hand w-full truncate text-center text-lg leading-tight font-bold">
+                      <span className="font-hand w-full truncate text-center text-sm leading-tight font-bold">
                         {beer.name}
-                      </span>
-                      <span className="text-muted-foreground w-full truncate text-center text-xs">
-                        {beer.tagline}
                       </span>
                     </button>
                   );
@@ -1621,7 +1629,7 @@ export function DrinkMap({
                   <ChevronRight size={15} aria-hidden />
                 </button>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-2 grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={handleRefreshBatch}
@@ -2027,7 +2035,7 @@ export function DrinkMap({
                             key={beer.id}
                             type="button"
                             onClick={() => handleSwapTo(beer)}
-                            className="flex flex-col items-center gap-1 rounded-2xl border-2 bg-card p-2 shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                            className="flex flex-col items-center gap-1 rounded-2xl border-2 bg-card p-2 shadow-[2px_2px_0_var(--border)] transition-transform duration-150 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.04] active:scale-95"
                           >
                             {Icon !== null ? (
                               <span className="block h-16 w-auto shrink-0 [&>svg]:h-16 [&>svg]:w-auto">
