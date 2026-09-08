@@ -7,10 +7,12 @@ import type * as Leaflet from "leaflet";
 import { useLocale, useTranslations } from "next-intl";
 import {
   ChevronLeft,
+  ChevronRight,
   Clock,
   Dices,
   MapPin,
   Plus,
+  RefreshCw,
   Trash2,
   X,
 } from "lucide-react";
@@ -55,9 +57,12 @@ import { MOCK_CHECKINS } from "@/lib/checkins";
 import type { Checkin } from "@/lib/checkins";
 import {
   BEER_CATEGORIES,
+  beersInCategory,
   categoryOfBeer,
+  pickRandomBatch,
   pickRandomBeer,
   pickRandomBeerIn,
+  pickSwapBatch,
 } from "@/lib/beers";
 import type { Beer } from "@/lib/beers";
 import type { LatLng } from "@/lib/geo";
@@ -489,8 +494,17 @@ export function DrinkMap({
   const [wantSaved, setWantSaved] = useState(false);
   /* UR3.8 兩層面板：pickLanes 為 true 即 L1 品種層（此時 picked 若有舊結果，
    * L1 優先顯示）；pickLaneId 記住 L2 結果所屬大類（「換一款」不出類）。 */
-  const [pickLanes, setPickLanes] = useState(false);
+  const [pickLanes, setPickLanes] = useState(initialPickOpen);
   const [pickLaneId, setPickLaneId] = useState<string | null>(null);
+  const [pickBatch, setPickBatch] = useState<Beer[]>([]);
+  /* UR3.9 v2 own-record swap batch: null = collapsed. Keyed by record `at`
+   * so switching records auto-hides a stale batch (no effect needed). */
+  const [swapOpenFor, setSwapOpenFor] = useState<number | null>(null);
+  const [swapBatch, setSwapBatch] = useState<Beer[]>([]);
+  /* UR3.9 v3 L2 照片輪詢：當前高亮格序號（點點＋箭頭用）；strip 滾動時
+   * 由 onScroll 回寫，箭頭按卡寬步進。 */
+  const [batchIndex, setBatchIndex] = useState(0);
+  const batchStripRef = useRef<HTMLDivElement | null>(null);
   // UR1.8 frozen drop snapshot (null until the first 想喝, or after reset).
   const [wantRecord, setWantRecord] = useState<WantRecord | null>(null);
   // UR3.7 删除两段确认：只对正在看的 at 武装，换条看自动解除，无需 effect。
@@ -598,13 +612,22 @@ export function DrinkMap({
     };
   }, [mapReady, card, focusAt]);
   // Real panel height for the flip decision. Callback ref (not an effect)
-  // so the set-state-in-effect rule stays quiet; the panel remounts per
-  // card (key below), re-measuring on every content swap.
+  // so the set-state-in-effect rule stays quiet; ResizeObserver re-measures
+  // on every content swap (swap batch open, delete-confirm toggle, cheers
+  // receipt) — mount-once measuring left tall cards clipped by the map edge
+  // (UR3.9 v3 report). Rounded ints avoid subpixel observe→set loops.
   const [panelH, setPanelH] = useState(0);
   const measureRef = useCallback((el: HTMLDivElement | null) => {
     if (el === null) return;
-    const h = el.getBoundingClientRect().height;
-    if (h > 0) setPanelH(h);
+    const measure = (): void => {
+      const h = Math.round(el.getBoundingClientRect().height);
+      if (h > 0) setPanelH((prev) => (prev === h ? prev : h));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
   const anchor =
     card !== null && view !== null && view.cw > 0
@@ -842,6 +865,7 @@ export function DrinkMap({
       // Sheet open = the dial hides itself per the UR1.3 rule, exactly
       // like tapping the fan pick entry by hand.
       setSheetOpen(true);
+      setPickLanes(true);
       setFabOpen(true);
     }
     const map = mapRef.current;
@@ -936,31 +960,75 @@ export function DrinkMap({
     );
   }, [mapReady, wantHistory]);
 
+  /* UR3.9 v3 開板即見酒：啤酒鈕／深鏈／空足跡 CTA 都直達 L1 輪詢，
+   * 不再停空 CTA（RAW：一開始面板加載就有酒類圖片）。 */
+  function openPickSheet(): void {
+    setPickLanes(true);
+    setSheetOpen(true);
+  }
+
   /* UR3.8 L2 入口：選定大類 → 該類內隨機抽品牌（映射缺類回退全域，
    * 不白屏）。Rolling touches ONLY the candidate — 舊釘＋快照留到真正落
    * 「想喝」才換（UR1.8 bug report 同理）。 */
   function handlePickLane(laneId: string): void {
-    const beer = pickRandomBeerIn(laneId) ?? pickRandomBeer();
-    setPicked(beer);
+    const batch = pickRandomBatch(laneId, 6);
+    setPickBatch(batch);
+    setBatchIndex(0);
     setPickLaneId(laneId);
     setPickLanes(false);
+    // Keep picked in sync for MapFab red-dot; L2 UI now reads batch.
+    setPicked(batch[0] ?? null);
   }
 
-  /* UR3.8 「換一款」：同類內重抽（搖到不同為止，10 次兜底沿 UR3.7 pattern；
-   * 單品牌類兜底後保持原品牌，不死循環）。 */
-  function handlePickSameLane(): void {
-    if (picked === null) return;
-    const laneId = pickLaneId ?? categoryOfBeer(picked)?.id ?? null;
-    if (laneId === null) {
-      setPicked(pickRandomBeer());
-      return;
+  /* UR3.9 換下一批：同類內重洗，盡量不與上一批完全重疊（最多重試 3 次；
+   * 小類如紅酒僅 1 款，重疊不可避免，不算錯）。 */
+  function handleRefreshBatch(): void {
+    const laneId = pickLaneId;
+    if (laneId === null) return;
+    const prevKey = pickBatch.map((b) => b.id).join(",");
+    let next = pickRandomBatch(laneId, 6);
+    for (
+      let i = 0;
+      i < 3 && next.map((b) => b.id).join(",") === prevKey && next.length > 1;
+      i += 1
+    ) {
+      next = pickRandomBatch(laneId, 6);
     }
-    let beer = pickRandomBeerIn(laneId) ?? pickRandomBeer();
-    for (let i = 0; beer.id === picked.id && i < 10; i++) {
-      beer = pickRandomBeerIn(laneId) ?? pickRandomBeer();
-    }
+    setPickBatch(next);
+    setBatchIndex(0);
+    setPicked(next[0] ?? null);
+  }
+
+  /** 輪詢步進寬＝首卡寬＋gap（gap-3＝12px）；點點由 onScroll 回寫。 */
+  function batchStep(): number {
+    const el = batchStripRef.current;
+    if (el === null) return 220;
+    const card = el.querySelector("[data-batch-card]");
+    return (card instanceof HTMLElement ? card.offsetWidth : 208) + 12;
+  }
+  function scrollBatch(dir: 1 | -1): void {
+    const el = batchStripRef.current;
+    if (el === null) return;
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    el.scrollBy({ left: dir * batchStep(), behavior: reduced ? "auto" : "smooth" });
+  }
+  function handleBatchScroll(): void {
+    const el = batchStripRef.current;
+    if (el === null) return;
+    const idx = Math.max(
+      0,
+      Math.min(pickBatch.length - 1, Math.round(el.scrollLeft / batchStep())),
+    );
+    setBatchIndex((prev) => (prev === idx ? prev : idx));
+  }
+
+  /* UR3.9 點格即落釘：無需單獨「想喝」按鈕（RAW：不希望用戶手動點想喝）。
+   * 與 L1 隱性補全同走 dropWant，pin／卡／足跡只見真品牌。 */
+  function handleBatchWant(beer: Beer): void {
     setPicked(beer);
-    setPickLaneId(laneId);
+    dropWant(beer);
   }
 
   /* UR3.8 隱性補全：L1 每類直打 —— 按下瞬間背後抽該類具體品牌再落釘，
@@ -1043,13 +1111,8 @@ export function DrinkMap({
     if (drag !== null && drag.dy > SHEET_DISMISS_DY) setSheetOpen(false);
   }
 
-  function handleWant(): void {
-    if (picked === null) return;
-    dropWant(picked);
-  }
-
   /**
-   * Shared drop core — L2 想喝 and UR3.8 L1 隱性補全 both land here with a
+   * Shared drop core — L1 隱性補全 and UR3.9 批量格 both land here with a
    * concrete brand, so pins / cards / trail never see lane-only check-ins.
    */
   function dropWant(beer: Beer): void {
@@ -1067,6 +1130,7 @@ export function DrinkMap({
     // UR1.8: freeze the drop moment — beer, clock, and fix travel together
     // from here on; the pin and the card only ever read this snapshot.
     // UR3.4 bug 修：追加进史（旧的不清），上限截尾保最新。
+    // eslint-disable-next-line react-hooks/purity -- dropWant is an event handler (click), not render
     const record: WantRecord = { beer, at: Date.now(), position: at };
     // UR3.4 同店顶替：10m 内算同一位置（GPS 漂移），旧条让位，不叠钉。
     const next = upsertWantHistory(wantHistoryRef.current, record);
@@ -1079,16 +1143,34 @@ export function DrinkMap({
     setSheetOpen(false);
   }
 
-  /* ---- UR3.7 我的打卡可编辑 ----
-   * 换酒：同条目只换 beer（at／位置／地名不动，pin 不挪位）；
-   * 新酒随机摇到和当前不同为止（10 次兜底）；存储＋state 同调。
+  /* ---- UR3.7 我的打卡可编辑（UR3.9 v2 改批次自选） ----
+   * 换酒：同条目只换 beer（at／位置／地名不动，pin 不挪位）；候选是同类
+   * 批次（`pickSwapBatch`，当前除外），点格即换，不再盲摇；存储＋state 同调。
    * 删除：按 at 丢条；删的是正在看的→改看最新，删光→清状态关卡。 */
-  function handleSwapBeer(): void {
+  function handleSwapToggle(): void {
     if (wantRecord === null) return;
-    let beer = pickRandomBeer();
-    for (let i = 0; beer.id === wantRecord.beer.id && i < 10; i++) {
-      beer = pickRandomBeer();
+    if (swapOpenFor === wantRecord.at) {
+      setSwapOpenFor(null);
+      return;
     }
+    setSwapBatch(pickSwapBatch(wantRecord.beer, 6));
+    setSwapOpenFor(wantRecord.at);
+  }
+  function handleSwapRefresh(): void {
+    if (wantRecord === null || swapOpenFor !== wantRecord.at) return;
+    const prevKey = swapBatch.map((b) => b.id).join(",");
+    let next = pickSwapBatch(wantRecord.beer, 6);
+    for (
+      let i = 0;
+      i < 3 && next.map((b) => b.id).join(",") === prevKey && next.length > 1;
+      i += 1
+    ) {
+      next = pickSwapBatch(wantRecord.beer, 6);
+    }
+    setSwapBatch(next);
+  }
+  function handleSwapTo(beer: Beer): void {
+    if (wantRecord === null) return;
     const record: WantRecord = { ...wantRecord, beer };
     const next = swapWantBeer(wantHistoryRef.current, record.at, beer);
     wantHistoryRef.current = next;
@@ -1096,6 +1178,7 @@ export function DrinkMap({
     saveWantHistory(next);
     setWantRecord(record);
     setPicked(beer);
+    setSwapOpenFor(null);
   }
   function handleDeleteWant(): void {
     if (wantRecord === null) return;
@@ -1104,6 +1187,7 @@ export function DrinkMap({
     setWantHistory(next);
     saveWantHistory(next);
     setConfirmAt(null);
+    setSwapOpenFor(null);
     if (next.length === 0) {
       setWantRecord(null);
       setPicked(null);
@@ -1120,8 +1204,7 @@ export function DrinkMap({
     // the user picks a lane first (UR3.8), so there is no blind global roll
     // here anymore. (UR1.8 bug report: this path must land somewhere visible.)
     setSelectedId(null);
-    setPickLanes(true);
-    setSheetOpen(true);
+    openPickSheet();
   }
 
   // UR3.0 碰杯时刻：点乾杯先播 1.3s 特效（杯碰杯＋震），再提交收据。
@@ -1372,41 +1455,69 @@ export function DrinkMap({
             {t("pickTitle")}
           </p>
           {pickLanes ? (
-            // UR3.8 L1 品種層：七大類二列貼紙格；主鈕進 L2 看品牌，
-            // 右側＋鈕是該類直接想喝（隱性補全，背後抽真品牌再落釘）。
+            // UR3.9 v2 L1 品種輪詢：橫向 snap 卡（代表酒手繪大圖＋膠帶貼紙，
+            // 點卡進 L2 看整批，角落＋鈕是該類直接想喝）。
             <div className="mt-3">
               <p className="text-muted-foreground text-sm">
                 {t("pickCategoriesTitle")}
               </p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                {BEER_CATEGORIES.map((lane) => (
-                  <div
-                    key={lane.id}
-                    className="flex items-stretch gap-1 rounded-2xl border-2 bg-card shadow-[2px_2px_0_var(--border)]"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handlePickLane(lane.id)}
-                      className="font-hand flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-base font-bold"
+              <div className="mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {BEER_CATEGORIES.map((lane, i) => {
+                  const laneBeers = beersInCategory(lane.id);
+                  const artBeer =
+                    laneBeers.find((b) => iconForPickId(b.id) !== null) ??
+                    laneBeers[0];
+                  const Art =
+                    artBeer === undefined
+                      ? null
+                      : iconForPickId(artBeer.id);
+                  return (
+                    <div
+                      key={lane.id}
+                      style={{ animationDelay: `${Math.min(i, 6) * 60}ms` }}
+                      className={`${styles.laneIn} relative w-36 shrink-0 snap-center rounded-2xl border-2 bg-card pt-4 shadow-[2px_2px_0_var(--border)] ${
+                        i % 2 === 0 ? "-rotate-1" : "rotate-1"
+                      }`}
                     >
-                      <span className="text-2xl" aria-hidden>
-                        {lane.emoji}
-                      </span>
-                      <span className="truncate">{t(lane.labelKey)}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleLaneWant(lane.id)}
-                      aria-label={t("pickDirectWant", {
-                        cat: t(lane.labelKey),
-                      })}
-                      title={t("pickDirectWant", { cat: t(lane.labelKey) })}
-                      className="m-1 inline-flex w-10 items-center justify-center rounded-xl border-2 bg-accent text-accent-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-                    >
-                      <Plus size={15} aria-hidden />
-                    </button>
-                  </div>
-                ))}
+                      <span
+                        aria-hidden
+                        className={`${styles.tape} absolute -top-2 left-1/2 h-4 w-12 -translate-x-1/2 -rotate-3`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handlePickLane(lane.id)}
+                        className="flex w-full flex-col items-center gap-1 px-2 pb-2"
+                      >
+                        {Art !== null ? (
+                          <span className="block h-24 w-auto shrink-0 [&>svg]:h-24 [&>svg]:w-auto">
+                            <Art />
+                          </span>
+                        ) : (
+                          <span className="text-5xl" aria-hidden>
+                            {lane.emoji}
+                          </span>
+                        )}
+                        <span className="font-hand text-base leading-tight font-bold">
+                          {t(lane.labelKey)}
+                        </span>
+                        <span className="text-muted-foreground text-xs">
+                          {t("laneCount", { n: laneBeers.length })}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleLaneWant(lane.id)}
+                        aria-label={t("pickDirectWant", {
+                          cat: t(lane.labelKey),
+                        })}
+                        title={t("pickDirectWant", { cat: t(lane.labelKey) })}
+                        className="absolute top-2 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full border-2 bg-accent text-accent-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                      >
+                        <Plus size={14} aria-hidden />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ) : picked === null ? (
@@ -1419,71 +1530,115 @@ export function DrinkMap({
               {t("pickCta")}
             </button>
           ) : (
-            // UR1.3 compact result: one row (emoji + name/tagline) + one row
-            // of two half-width buttons — reachable without inner scroll.
+            // UR3.9 v3 照片輪詢：一次一主角（peek 下一張），滑動／箭頭／點點
+            // 切換，點卡即想喝，無單獨想喝鈕。
             <div className="mt-3">
-              <div className="flex items-center gap-4">
-                {(() => {
-                  // UR2.7 有专属插畫就是主角（h-28 左图右信息），
-                  // 没图保持原 emoji 紧凑行，不硬凑。
-                  const PickIcon = iconForPickId(picked.id);
-                  return PickIcon !== null ? (
-                    <span
-                      key={picked.id}
-                      className={`${styles.pickArtIn} block h-28 w-auto shrink-0 [&>svg]:h-full [&>svg]:w-auto`}
-                    >
-                      <PickIcon />
-                    </span>
-                  ) : (
-                    <p className="text-4xl" aria-hidden>
-                      {picked.emoji}
-                    </p>
-                  );
-                })()}
-                <div className="min-w-0">
-                  {(() => {
-                    // UR3.8 L2 眉題：點明結果所屬大類（用戶先定方向的回音）。
-                    const lane =
-                      BEER_CATEGORIES.find((c) => c.id === pickLaneId) ??
-                      categoryOfBeer(picked);
-                    return lane === null ? null : (
-                      <p className="text-muted-foreground truncate text-xs">
-                        {lane.emoji} {t(lane.labelKey)}
-                      </p>
-                    );
-                  })()}
-                  <p className="truncate font-bold">{picked.name}</p>
-                  <p className="text-muted-foreground truncate text-sm">
-                    {picked.tagline}
+              {(() => {
+                const lane =
+                  BEER_CATEGORIES.find((c) => c.id === pickLaneId) ??
+                  (pickBatch[0] !== undefined
+                    ? categoryOfBeer(pickBatch[0])
+                    : null);
+                return lane === null ? null : (
+                  <p className="text-muted-foreground truncate text-xs">
+                    {lane.emoji} {t(lane.labelKey)}
                   </p>
+                );
+              })()}
+              <div
+                key={pickBatch.map((b) => b.id).join(",")}
+                ref={batchStripRef}
+                onScroll={handleBatchScroll}
+                className={`${styles.batchIn} mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+              >
+                {pickBatch.map((beer, i) => {
+                  const Icon = iconForPickId(beer.id);
+                  return (
+                    <button
+                      key={beer.id}
+                      data-batch-card=""
+                      type="button"
+                      onClick={() => handleBatchWant(beer)}
+                      aria-label={`${i + 1}/${pickBatch.length} ${beer.name}`}
+                      className={`relative flex w-[78%] shrink-0 snap-center flex-col items-center gap-1 rounded-2xl border-2 bg-card p-3 pt-4 shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none ${
+                        i % 2 === 0 ? "-rotate-1" : "rotate-1"
+                      }`}
+                    >
+                      <span
+                        aria-hidden
+                        className={`${styles.tape} absolute -top-2 left-1/2 h-4 w-12 -translate-x-1/2 rotate-2`}
+                      />
+                      {Icon !== null ? (
+                        <span className="block h-36 w-auto shrink-0 [&>svg]:h-36 [&>svg]:w-auto">
+                          <Icon />
+                        </span>
+                      ) : (
+                        <span className="text-6xl" aria-hidden>
+                          {beer.emoji}
+                        </span>
+                      )}
+                      <span className="font-hand w-full truncate text-center text-lg leading-tight font-bold">
+                        {beer.name}
+                      </span>
+                      <span className="text-muted-foreground w-full truncate text-center text-xs">
+                        {beer.tagline}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-1 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => scrollBatch(-1)}
+                  aria-label={t("pickPrev")}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border-2 shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                >
+                  <ChevronLeft size={15} aria-hidden />
+                </button>
+                <div
+                  className="flex items-center gap-1.5"
+                  aria-hidden
+                >
+                  {pickBatch.map((beer, i) => (
+                    <span
+                      key={beer.id}
+                      className={`h-1.5 rounded-full transition-all ${
+                        i ===
+                        Math.max(0, Math.min(batchIndex, pickBatch.length - 1))
+                          ? "w-4 bg-primary"
+                          : "w-1.5 bg-(--border)"
+                      }`}
+                    />
+                  ))}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => scrollBatch(1)}
+                  aria-label={t("pickNext")}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border-2 shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                >
+                  <ChevronRight size={15} aria-hidden />
+                </button>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={handleWant}
-                  className="font-hand inline-flex items-center justify-center gap-1.5 rounded-full border-2 bg-accent px-3 py-1.5 text-sm font-bold text-accent-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                  onClick={handleRefreshBatch}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
                 >
-                  <Plus size={15} aria-hidden />
-                  {t("wantToDrink")}
+                  <RefreshCw size={15} aria-hidden />
+                  {t("pickNextBatch")}
                 </button>
                 <button
                   type="button"
-                  onClick={handlePickSameLane}
+                  onClick={() => setPickLanes(true)}
                   className="inline-flex items-center justify-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
                 >
-                  <Dices size={15} aria-hidden />
-                  {t("pickSameCategory")}
+                  <ChevronLeft size={15} aria-hidden />
+                  {t("pickChangeCategory")}
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setPickLanes(true)}
-                className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-full border-2 px-3 py-1.5 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-              >
-                <ChevronLeft size={15} aria-hidden />
-                {t("pickChangeCategory")}
-              </button>
               {wantSaved && (
                 <p className="text-muted-foreground mt-2 text-xs">
                   {t("wantSaved")}
@@ -1593,7 +1748,7 @@ export function DrinkMap({
           sheetOpen || card !== null || (geoFailed && !guideDismissed)
         }
         hasWant={picked !== null && wantSaved}
-        onPick={() => setSheetOpen(true)}
+        onPick={openPickSheet}
         onPhoto={() => router.push("/camera")}
         onRecenter={handleRecenter}
         onFitHk={handleFitHk}
@@ -1625,7 +1780,7 @@ export function DrinkMap({
               type="button"
               onClick={() => {
                 setTrailMode(false);
-                setSheetOpen(true);
+                openPickSheet();
               }}
               className="font-hand rounded-full border-2 bg-primary px-3 py-1 text-sm font-bold text-primary-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
             >
@@ -1755,6 +1910,12 @@ export function DrinkMap({
           >
             <X size={16} aria-hidden />
           </button>
+          {/* UR3.9 v3 內層滾動兜底：卡再高也不頂出地圖下緣（外層量高＋錨定，
+              內層超高時自己滾；X 貼紙與尾巴留在外層不動）。 */}
+          <div
+            className="overflow-y-auto"
+            style={{ maxHeight: Math.max(160, (view?.ch ?? 600) - 24 - 32) }}
+          >
           {card === "self" ? (
             <div>
               <p className="font-hand text-2xl leading-none font-bold">
@@ -1825,12 +1986,12 @@ export function DrinkMap({
                     {t("wantFrozenNote")}
                   </p>
                 </div>
-                {/* UR3.7 编辑行：换酒（副钮）＋删除（两段确认，武装只认
-                    正在看的 at，误触不丢数据）。 */}
+                {/* UR3.7 编辑行（UR3.9 v2 换酒改批次自选）：换酒钮只展開同类
+                    候选批，点格即换；删除沿两段确认，武装只认正在看的 at。 */}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={handleSwapBeer}
+                    onClick={handleSwapToggle}
                     className="font-hand inline-flex items-center gap-1.5 rounded-full border-2 bg-card px-3 py-1 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
                   >
                     <Dices size={15} aria-hidden />
@@ -1856,6 +2017,44 @@ export function DrinkMap({
                     </button>
                   )}
                 </div>
+                {swapOpenFor === wantRecord.at && (
+                  <div key={swapBatch.map((b) => b.id).join(",")} className={`${styles.batchIn} mt-3`}>
+                    <div className="grid grid-cols-3 gap-2">
+                      {swapBatch.map((beer) => {
+                        const Icon = iconForPickId(beer.id);
+                        return (
+                          <button
+                            key={beer.id}
+                            type="button"
+                            onClick={() => handleSwapTo(beer)}
+                            className="flex flex-col items-center gap-1 rounded-2xl border-2 bg-card p-2 shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                          >
+                            {Icon !== null ? (
+                              <span className="block h-16 w-auto shrink-0 [&>svg]:h-16 [&>svg]:w-auto">
+                                <Icon />
+                              </span>
+                            ) : (
+                              <span className="text-3xl" aria-hidden>
+                                {beer.emoji}
+                              </span>
+                            )}
+                            <span className="w-full truncate text-center text-xs font-bold">
+                              {beer.name}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSwapRefresh}
+                      className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                    >
+                      <RefreshCw size={15} aria-hidden />
+                      {t("pickNextBatch")}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : null
           ) : (
@@ -2136,6 +2335,7 @@ export function DrinkMap({
                 )}
             </>
           )}
+          </div>
         </div>
       )}
     </div>

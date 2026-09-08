@@ -98,3 +98,57 @@ export function pickRandomBeerIn(
   const pick = pool[Math.floor(rand() * pool.length)] as Beer | undefined;
   return pick ?? null;
 }
+
+/**
+ * Shared shuffle-take core (Fisher-Yates). Never mutates the source array.
+ * `rand` is injectable for tests.
+ */
+export function shuffleTake(
+  pool: readonly Beer[],
+  count: number,
+  rand: () => number = Math.random,
+): Beer[] {
+  const copy = [...pool];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rand() * (i + 1));
+    const tmp = copy[i] as Beer;
+    copy[i] = copy[j] as Beer;
+    copy[j] = tmp;
+  }
+  const n = Math.min(Math.max(0, count), copy.length);
+  return copy.slice(0, n);
+}
+
+/**
+ * UR3.9 batch — shuffle within a lane and take `count`. Unknown lane
+ * falls back to the global pool. Never mutates the source array.
+ * `rand` is injectable for tests (Fisher-Yates).
+ */
+export function pickRandomBatch(
+  categoryId: string,
+  count: number = 6,
+  rand: () => number = Math.random,
+): Beer[] {
+  const lanePool = beersInCategory(categoryId);
+  const source = lanePool.length > 0 ? lanePool : BEERS;
+  return shuffleTake(source, count, rand);
+}
+
+/**
+ * UR3.9 v2 own-record swap batch — same lane as the current beer, current
+ * excluded. Single-item lane falls back to global-minus-current (never empty
+ * while the catalog has >1 beer, never loops forever).
+ */
+export function pickSwapBatch(
+  current: Beer,
+  count: number = 6,
+  rand: () => number = Math.random,
+): Beer[] {
+  const lane = categoryOfBeer(current);
+  const pool = (lane !== null ? beersInCategory(lane.id) : BEERS).filter(
+    (b) => b.id !== current.id,
+  );
+  const source =
+    pool.length > 0 ? pool : BEERS.filter((b) => b.id !== current.id);
+  return shuffleTake(source, count, rand);
+}

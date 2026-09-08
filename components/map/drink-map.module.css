@@ -833,6 +833,28 @@
 .pickArtIn {
   animation: pick-art-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
+/* UR3.9 v3 輪詢進場：整條淡入上浮（from-only keyframes，結束後回到元素
+ * 自然 transform，不吃掉卡片的 rotate 妝）。 */
+.batchIn {
+  animation: batch-in 0.35s ease-out backwards;
+}
+.laneIn {
+  animation: lane-in 0.3s ease-out backwards;
+}
+
+@keyframes batch-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes lane-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
 
 @keyframes pick-art-in {
   from {
@@ -976,7 +998,9 @@
   }
   .fabShake,
   .fabRattle,
-  .fabBubblePop {
+  .fabBubblePop,
+  .batchIn,
+  .laneIn {
     animation: none;
   }
   /* UR3.3 邀约：等待省略号静止（字还在），成局条直接可见。 */
