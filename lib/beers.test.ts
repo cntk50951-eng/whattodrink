@@ -5,6 +5,7 @@ import {
   BEER_CATEGORIES,
   beersInCategory,
   categoryOfBeer,
+  laneCardSize,
   pickRandomBatch,
   pickRandomBeerIn,
   pickSwapBatch,
@@ -108,6 +109,24 @@ describe("pickRandomBatch", () => {
     const before = beersInCategory("beer").map((b) => b.id);
     pickRandomBatch("beer", 6, () => 0.7);
     expect(beersInCategory("beer").map((b) => b.id)).toEqual(before);
+  });
+});
+
+describe("laneCardSize", () => {
+  it("scales with lane depth (deep lanes browse bigger)", () => {
+    expect(laneCardSize(5)).toBe("lg");
+    expect(laneCardSize(4)).toBe("lg");
+    expect(laneCardSize(3)).toBe("md");
+    expect(laneCardSize(2)).toBe("md");
+    expect(laneCardSize(1)).toBe("sm");
+    expect(laneCardSize(0)).toBe("sm");
+  });
+
+  it("covers the current catalog extremes", () => {
+    const counts = BEER_CATEGORIES.map((c) => beersInCategory(c.id).length);
+    expect(Math.max(...counts)).toBeGreaterThanOrEqual(4);
+    expect(laneCardSize(Math.max(...counts))).toBe("lg");
+    expect(laneCardSize(Math.min(...counts))).toBe("sm");
   });
 });
 

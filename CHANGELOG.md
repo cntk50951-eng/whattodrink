@@ -64,6 +64,9 @@
   - 98→103 tests／tsc 淨／lint 0 error（3 舊 warning）；`npm run build` 本機 sandbox 被攔（老問題，待用戶側復核）；數據文檔無需更新（`WantRecord` 形狀不變，零新增持久化）
   - fix v2（用戶返工：L1 類別列改橫向手繪輪詢卡＋自己紀錄換酒改批次自選）：`shuffleTake` 共用核心＋`pickSwapBatch`＋2 單測，`laneCount` 三語；103→105 tests／tsc 淨／lint 0 error
   - fix v3（用戶返工：開板空 CTA／輪詢無滑動感／打卡卡被下緣遮擋）：`openPickSheet` 直達 L1（啤酒鈕／深鏈／空足跡 CTA，空 CTA 留兜底）；L2 批量改照片輪詢（主角卡＋peek＋箭頭／點點＋`batchIn`／`laneIn` 進場，reduced-motion 關）；錨定卡 `ResizeObserver` 量高＋內層 `maxHeight` 滾動兜底（根因：開批後高度變了錨點仍用舊值）；`pickPrev`／`pickNext` 三語；105 tests／tsc 淨／lint 0 error
+  - fix v4（設計師評審＋用户确认＋號退役）：`category-art` 七類手繪代表圖（L1 零 emoji；品牌級缺口待 UR2.3／2.4 管線）＋`laneCardSize`＋定妝旋轉／膠帶＋彈簧按壓／交錯進場／待機浮動＋＋號退役（刪 `handleLaneWant`／`pickDirectWant`）；105→107 tests／tsc 淨／lint 0 error
+  - fix v5（用戶返工：L2 卡太大頂出面板）：卡面壓小＋間距收緊，整組落回一屏；107 tests／tsc 淨／lint 0 error
+  - fix v6（用戶返工：二級格子還是太大）：再壓一檔（w-70%／h-20／去 tagline 行）；107 tests／tsc 淨／lint 0 error
 - **UR 3.7 — 我的打卡可编辑（[✓] 用户已验收，merged）**
   - `swapWantBeer`（同条只换 beer，时间位置不动）＋`removeWantAt`（按 at 删）＋3 单测；面板编辑行：换酒副钮（摇到不同为止）＋删除两段确认（删后看最新、删光关卡清状态）；`swapBeer`／`deleteEntry`／`confirmDelete` 三语；87→90 tests／tsc 净／lint 0 error；`npm run build` sandbox 老问题
 - **UR 3.6 — 他人打卡面板重构（[✓] 用户已验收，merged）**

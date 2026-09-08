@@ -839,7 +839,21 @@
   animation: batch-in 0.35s ease-out backwards;
 }
 .laneIn {
-  animation: lane-in 0.3s ease-out backwards;
+  animation: lane-in 0.35s cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
+}
+/* UR3.9 v4 待機浮動：極輕上下漂（±2px，5s 一個來回，交錯相位），只動
+ * transform；進場動畫播完才接上（delay 蓋過 stagger＋進場時長）。 */
+.laneFloat {
+  animation: lane-float 5s ease-in-out infinite alternate;
+}
+
+@keyframes lane-float {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: 0 -2px;
+  }
 }
 
 @keyframes batch-in {
@@ -1000,7 +1014,8 @@
   .fabRattle,
   .fabBubblePop,
   .batchIn,
-  .laneIn {
+  .laneIn,
+  .laneFloat {
     animation: none;
   }
   /* UR3.3 邀约：等待省略号静止（字还在），成局条直接可见。 */

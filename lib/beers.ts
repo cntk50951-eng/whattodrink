@@ -135,6 +135,19 @@ export function pickRandomBatch(
 }
 
 /**
+ * UR3.9 v4 collage rhythm — card size follows lane depth (designer review:
+ * uniform grids read as mechanical). Big lanes invite browsing, small ones
+ * stay quiet. Thresholds locked by test (current max is 5).
+ */
+export type LaneCardSize = "lg" | "md" | "sm";
+
+export function laneCardSize(memberCount: number): LaneCardSize {
+  if (memberCount >= 4) return "lg";
+  if (memberCount >= 2) return "md";
+  return "sm";
+}
+
+/**
  * UR3.9 v2 own-record swap batch — same lane as the current beer, current
  * excluded. Single-item lane falls back to global-minus-current (never empty
  * while the catalog has >1 beer, never loops forever).
