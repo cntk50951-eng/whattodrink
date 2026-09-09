@@ -9,12 +9,17 @@ import { CameraFlow } from "@/components/camera/camera-flow";
  * The full state machine lives in <CameraFlow/> (client); this page only
  * provides chrome + a way back. Photo review / text / voice input is UR2.2.
  */
-export default async function CameraPage() {
+export default async function CameraPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ auto?: string }>;
+}) {
   const t = await getTranslations("stubs");
+  const sp = await searchParams;
 
   return (
     <Container className="py-10 md:py-16">
-      <CameraFlow />
+      <CameraFlow autoStart={sp.auto === "1"} />
       <div className="mx-auto mt-8 w-full max-w-xl">
         <Button
           size="sm"

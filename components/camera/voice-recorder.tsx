@@ -3,6 +3,7 @@ import { useTranslations } from "next-intl";
 import { Mic, Pause, Play, RotateCcw, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { buildRecordingBlob } from "@/lib/audio";
 import { MAX_VOICE_SECONDS, formatClock } from "@/lib/camera";
 
 /**
@@ -20,18 +21,19 @@ export function VoiceRecorder({
   onComplete,
   onClear,
 }: {
-  onComplete: (audioUrl: string, seconds: number) => void;
+  onComplete: (audioUrl: string, seconds: number, blob: Blob) => void;
   onClear: () => void;
 }) {
   const t = useTranslations("camera");
   const [status, setStatus] = useState<
-    "idle" | "recording" | "denied" | "no-mic" | "done"
+    "idle" | "recording" | "denied" | "no-mic" | "empty" | "done"
   >("idle");
   const [seconds, setSeconds] = useState(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const mimeRef = useRef("");
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<number | null>(null);
   const startedAtRef = useRef(0);
@@ -50,11 +52,11 @@ export function VoiceRecorder({
   useEffect(() => stopTracks, [stopTracks]);
 
   const finish = useCallback(
-    (recorder: MediaRecorder, url: string, secs: number) => {
+    (recorder: MediaRecorder, url: string, secs: number, blob: Blob) => {
       stopTracks();
       setAudioUrl(url);
       setStatus("done");
-      onComplete(url, secs);
+      onComplete(url, secs, blob);
     },
     [onComplete, stopTracks],
   );
@@ -68,11 +70,17 @@ export function VoiceRecorder({
     );
     setSeconds(elapsed);
     recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, {
-        type: recorder.mimeType || "audio/webm",
-      });
+      const blob = buildRecordingBlob(
+        chunksRef.current,
+        mimeRef.current || recorder.mimeType,
+      );
       chunksRef.current = [];
-      finish(recorder, URL.createObjectURL(blob), elapsed);
+      if (blob === null) {
+        // 極端失敗（驅動／權限中途被收）誠實報錯，不給啞播放鈕。
+        setStatus("empty");
+        return;
+      }
+      finish(recorder, URL.createObjectURL(blob), elapsed, blob);
     };
     recorder.stop();
   }, [finish]);
@@ -88,7 +96,12 @@ export function VoiceRecorder({
         return;
       }
       const recorder = new MediaRecorder(stream);
+      mimeRef.current = recorder.mimeType;
       chunksRef.current = [];
+      // 沒這句，stop 拼出來就是 0-byte 空包——之前「錄完播不出」的真因。
+      recorder.ondataavailable = (e: BlobEvent) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
       recorderRef.current = recorder;
       streamRef.current = stream;
       startedAtRef.current = Date.now();
@@ -154,9 +167,9 @@ export function VoiceRecorder({
             onClick={togglePlay}
             aria-label={playing ? t("pauseAudio") : t("playAudio")}
             className={cn(
-              "flex size-16 shrink-0 items-center justify-center rounded-full",
-              "bg-(--foreground) text-(--background) transition-transform",
-              "motion-safe:active:scale-95",
+              "flex size-16 shrink-0 items-center justify-center rounded-full border-2",
+              "bg-accent text-accent-foreground shadow-[3px_3px_0_var(--border)] transition-transform",
+              "motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-95 motion-safe:active:shadow-none",
               "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--ring)",
             )}
           >
@@ -255,10 +268,16 @@ export function VoiceRecorder({
         />
       )}
 
-      {(status === "denied" || status === "no-mic") && (
+      {(status === "denied" || status === "no-mic" || status === "empty") && (
         <div className="mt-3 flex flex-col gap-3 border-t-2 border-dashed pt-3">
           <p className="text-muted-foreground text-sm">
-            {t(status === "denied" ? "micDenied" : "micNoDevice")}
+            {t(
+              status === "denied"
+                ? "micDenied"
+                : status === "empty"
+                  ? "recordEmpty"
+                  : "micNoDevice",
+            )}
           </p>
           <div>
             <Button size="sm" variant="outline" onClick={() => void start()}>

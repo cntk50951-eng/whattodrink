@@ -44,6 +44,11 @@ UI 全确定后按此开工 EPIC 3.0 真表设计。
   （按天范围查），不另加计数列（计数实时算，沿本表既有原则）。前端 mock
   （`wtd-cheers-daily`／HK 日期键）届时整块删，换读服务端剩余额度。
 - `mood_logs(id, user_id, mood_text, created_at)` —— 心情输入流
+- `post_likes(post_id, user_id, created_at)` —— UR4.1 公開牆讚（唯一鍵防重讚，
+  計數實時 `count`，不存列；24h 熱門＝`created_at` 範圍查＋索引）。前端
+  mock（`wtd-wall-my-posts`＋`wtd-wall-overrides`）屆時整塊刪
+- `post_reports(post_id, reporter_id, reason, created_at)` —— UR4.1 檢舉
+  （V1 口徑：被檢舉即前端隱藏；多檢舉升級走 EPIC 3.0 審核隊列，不在 V1 設計）
 - （暂缓）`bars`、`friendships`、`game_*` —— EPIC 4.0 前不设计
 
 ## 三、MOCK→真替换清单（EPIC 3.0 开工即执行）

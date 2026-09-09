@@ -1,0 +1,36 @@
+/* UR4.1 公開牆＋詳情：輕讚 150ms 蹦一下（快而有力，明確比乾杯 1.3s
+ * 重儀式更快更輕，兩者份量不撞）；reduced-motion 下直接出現。 */
+.likePop {
+  animation: like-pop 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) 1;
+}
+
+@keyframes like-pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 進牆縮圖交錯淡入（from-only，結束回自然位，不吃旋轉妝）。 */
+.wallIn {
+  animation: wall-in 0.3s ease-out backwards;
+}
+
+@keyframes wall-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .likePop,
+  .wallIn {
+    animation: none;
+  }
+}
