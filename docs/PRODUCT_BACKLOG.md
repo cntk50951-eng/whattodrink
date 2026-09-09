@@ -876,3 +876,4 @@ UR3.7 增強我的打卡记录的时候，在彈出的面板中，这个时候�
 - 2026-09-09 v5（用戶回報：錄音 crash＋發布窗無出口＋圖標土）：缺 `camera.rerecord` key 炸整樹（補三語＋審計）、review 全屏加 X、成功頁加返回主頁、發布頭像／播放鈕／🎙塗鴉化（`closeReview`／`backHome` 三語）
 - 2026-09-09 v6（用戶返工＋回報：錄音仍播不出＋拍照分享也要留地圖）：錄音真因＝`VoiceRecorder` 從未設 `ondataavailable`，stop 拼出 0-byte 空包（`buildRecordingBlob` 純函數＋空包 `recordEmpty` 誠實報錯＋4 單測）；拍照分享搬上地圖——`/?shoot=1` 蓋 `CameraOverlay`（地圖常駐底下，沿 `?pick=1` 配方），`CameraFlow` 加可選 `onClose`（各階段 X＋成功頁回家走它，overlay 成功留在層內不跳牆），扇形／選單／空牆三入口改道，`/camera` 保留 fallback
 - 2026-09-09 v7（用戶回報：榜看全部跳頁＋牆頁語音 416＋榜詳情要圖文音）：榜去跳轉——「看全部」改下拉內下滑加載更多（初顯 3＋每次 5，`loadMore` 三語），`/wall` 路由保留；416 雙兇手——v5 空包已持久化（`parseWallPost` 中和空 dataURL，秒數歸 null）＋已發表 URL 被重錄／再來一張 revoke 牽連（`ownPostAudioUrl` 牆自有 URL＋submit 空包守衛），`VoicePlayer` 加 onError 降級鏈（會話→持久→秒數章）；榜詳情加轉錄行（圖文音齊，有才顯示）
+- 2026-09-09 hotfix（用戶回報：點自己帖子榜炸 `wall.deleteOwn` 缺 key）：v4 三個新 key（deleteOwn／deleteConfirm／reportConfirm）只審計了 camera 漏 wall；榜改用詳情頁現成 key（delete／reportYes），零新 key，全文件審計三語 PASS

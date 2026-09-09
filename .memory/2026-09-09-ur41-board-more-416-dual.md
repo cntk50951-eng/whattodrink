@@ -21,3 +21,7 @@
 - object URL 跨組件共用即埋 revoke 牽連：誰消費誰擁有（ownPostAudioUrl），生產者隨便 revoke。
 - 播放器是最後一道防線：onError 降級鏈以後寫播放器就帶上，不給死按鈕。
 - 用戶說「看不到 X」先核代碼有沒有（v4 已有），再解釋是被上游 bug 蓋住，不要急著重做一遍。
+
+## 追記（合併後 hotfix：wall.deleteOwn 缺 key）
+- v4 在榜詳情寫了 `t("deleteOwn"／"deleteConfirm"／"reportConfirm")` 卻只審計了 camera——點自己帖子即炸整棵榜（功能看似正常是因為報錯只炸該次 render）。修：榜改用 PostDetail 同款現成 key（`delete`／`reportYes`），零新 key；審計腳本擴到 wall＋camera 全文件，三語 PASS。
+- 教訓：審計範圍＝本輪動過的所有 namespace，不是剛修的那一個。

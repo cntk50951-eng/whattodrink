@@ -17,6 +17,7 @@
   - fix v5（用戶回報：錄音 crash＋發布窗無出口＋圖標土）：`camera.rerecord` 缺 key（全三語補；審計腳本確認唯一缺口——MISSING_MESSAGE 炸整棵樹才是「播不出」真因）＋review 全屏加 X（`restart` 退出）＋成功頁加返回主頁（`router.push("/")`，localePrefix never）＋發布頭像 😎 改手繪徽章（UserRound＋accent＋硬陰影）＋錄音播放鈕改塗鴉風＋`VoicePlayer` 無源 🎙 改 Mic 圖標；`closeReview`／`backHome` 三語；123 綠／tsc 淨／lint 0 error
   - fix v6（用戶返工＋回報：錄音仍播不出＋拍照分享留地圖）：錄音真因＝`VoiceRecorder` 缺 `ondataavailable` 致 0-byte 空包——`lib/audio.ts` 加 `buildRecordingBlob`（空包回 null）＋`lib/audio.test.ts` 4 單測＋空包 `recordEmpty` 三語；拍照分享上地圖——新 `CameraOverlay`（`/?shoot=1` 全屏層，地圖不卸載）＋`CameraFlow` 可選 `onClose`（X／成功回家；overlay 成功留層內，獨立頁照跳詳情）＋扇形／選單／空牆三入口改道＋`/camera` 保留；127 綠／tsc 淨／lint 0 error（build 照例被 sandbox bind-port 攔，非代碼錯）
   - fix v7（用戶回報：榜看全部跳頁＋牆語音 416＋榜詳情圖文音）：榜「看全部」改下拉內加載更多（`loadMore` 三語，初顯 3＋每次 5）；416＝v5 空包已落盤（`parseWallPost` 中和空 dataURL，`isEmptyAudioDataUrl`）＋已發表 URL 被 composer revoke 牽連（`ownPostAudioUrl`＋submit 空包守衛）＋`VoicePlayer` onError 降級鏈；榜詳情加轉錄行；131 綠／tsc 淨／lint 0 error
+  - hotfix（用戶回報：點自己帖子榜炸 `wall.deleteOwn` 缺 key）：榜改用現成 `delete`／`reportYes`，零新 key；wall＋camera 全文件審計三語 PASS；131 綠／tsc 淨／lint 0 error
 - **UR 1.1 — 首頁互動式頁面重構（WIP，待用戶側 build＋瀏覽器驗收）**
   - 新依賴：`leaflet@1.9.4`（真實地理底圖＋免費 CARTO Voyager 瓦片，免 key）、`vitest@^3`（`@types/node@20` 與 vitest 5 互斥，只能用 v3）＋ `npm test` 腳本
   - `components/map/DrinkMap.tsx` — 地圖＋推薦入口同一組件：geolocation 狀態機、拒絕／失敗→全港視圖、塗鴉 pins（自己／MOCK 他人／「想喝」虛線圈）、自訂縮放＋睇全港按鈕、乾杯卡（本地 mock）、`prefers-reduced-motion` 降級
