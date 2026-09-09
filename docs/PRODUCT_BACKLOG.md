@@ -877,3 +877,20 @@ UR3.7 增強我的打卡记录的时候，在彈出的面板中，这个时候�
 - 2026-09-09 v6（用戶返工＋回報：錄音仍播不出＋拍照分享也要留地圖）：錄音真因＝`VoiceRecorder` 從未設 `ondataavailable`，stop 拼出 0-byte 空包（`buildRecordingBlob` 純函數＋空包 `recordEmpty` 誠實報錯＋4 單測）；拍照分享搬上地圖——`/?shoot=1` 蓋 `CameraOverlay`（地圖常駐底下，沿 `?pick=1` 配方），`CameraFlow` 加可選 `onClose`（各階段 X＋成功頁回家走它，overlay 成功留在層內不跳牆），扇形／選單／空牆三入口改道，`/camera` 保留 fallback
 - 2026-09-09 v7（用戶回報：榜看全部跳頁＋牆頁語音 416＋榜詳情要圖文音）：榜去跳轉——「看全部」改下拉內下滑加載更多（初顯 3＋每次 5，`loadMore` 三語），`/wall` 路由保留；416 雙兇手——v5 空包已持久化（`parseWallPost` 中和空 dataURL，秒數歸 null）＋已發表 URL 被重錄／再來一張 revoke 牽連（`ownPostAudioUrl` 牆自有 URL＋submit 空包守衛），`VoicePlayer` 加 onError 降級鏈（會話→持久→秒數章）；榜詳情加轉錄行（圖文音齊，有才顯示）
 - 2026-09-09 hotfix（用戶回報：點自己帖子榜炸 `wall.deleteOwn` 缺 key）：v4 三個新 key（deleteOwn／deleteConfirm／reportConfirm）只審計了 camera 漏 wall；榜改用詳情頁現成 key（delete／reportYes），零新 key，全文件審計三語 PASS
+
+EPIC 2 API and Database
+這個是一個新的EPIC，負責實現API和Database的設計
+
+UR A.1 API的架構設計 [✓]（用户已验收，merged）
+當前的頁面都是mock數據，我們需要推進到下一步去實現前端和API的集成。
+根據當前系統的功能，思考API的設計實現。
+1. 哪些功能所訪問的API是public的，不需要登陸之後才可以去請求？
+2. 哪些功能所訪問的API是需要登陸之後才可以請求的？
+3. 如何實現public、如何實現登陸之後的請求認證？現在行業的標準做法是什麼？jwt？
+4. 如果真實上線，可以使用什麼API的框架和架構去實現？
+5. 我希望API可以兼容、支持web、ios、aos
+這個UR是從架構和設計的角度去思考API的項目，我打算之後也部署到vercel，這一步很關鍵，我們要把架構搭好才可以繼續往下。請設計出API的架構文檔，同時需要考慮後續如何和下游DB集成。
+
+*改動記錄*
+- 2026-09-09：設計稿 `docs/api-architecture.md`（10 節：目標／總覽／端點清單／認證／框架／三端／DB／Vercel／演進／未決 5 問），開工置 [WIP]
+- 2026-09-09 分析師 review 合併：checkins 加 `type`＋`visibility`（行級可見性，want 預設 private 不上牆）＋檢舉 1／3 門檻＋境外揭露併入 A.3 同意流程＋語音上限按 endpoint 分層；§10 五問＋三加題全定案；`future-schema.md` checkins 行同步
