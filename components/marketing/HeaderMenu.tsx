@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import {
   Camera,
   ChevronRight,
   Dices,
+  Images,
   Menu as MenuIcon,
   Sparkles,
   X,
 } from "lucide-react";
+import { hasUnseenWall, loadWall, loadWallSeenAt } from "@/lib/posts";
 
 import {
   DropdownMenu,
@@ -31,9 +33,17 @@ import styles from "./header-menu.module.css";
 export function HeaderMenu() {
   const t = useTranslations("nav");
   const [open, setOpen] = useState(false);
+  /* UR4.1 牆紅點：掛載看一次有無未讀（進牆即滅，見 WallGrid）。 */
+  const [wallDot, setWallDot] = useState(false);
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      setWallDot(hasUnseenWall(loadWall(), loadWallSeenAt()));
+    });
+  }, []);
   const items = [
     { key: "random", href: "/?pick=1", label: t("randomPick"), Icon: Dices },
-    { key: "photo", href: "/camera", label: t("photoPick"), Icon: Camera },
+    { key: "photo", href: "/?shoot=1", label: t("photoPick"), Icon: Camera },
+    { key: "wall", href: "/wall", label: t("wallPick"), Icon: Images },
     { key: "mood", href: "/mood", label: t("moodPick"), Icon: Sparkles },
   ] as const;
 
@@ -71,10 +81,13 @@ export function HeaderMenu() {
           >
             <span
               aria-hidden
-              className="flex h-10 w-10 items-center justify-center rounded-xl border-2 bg-secondary text-secondary-foreground"
+              className="relative flex h-10 w-10 items-center justify-center rounded-xl border-2 bg-secondary text-secondary-foreground"
             >
               {/* size-* class dodges the shadcn svg-size override. */}
               <Icon size={19} aria-hidden className="size-[19px]" />
+              {key === "wall" && wallDot && (
+                <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full border-2 border-(--border) bg-(--doodle-red)" />
+              )}
             </span>
             {label}
             <ChevronRight size={16} aria-hidden className="ml-auto opacity-60" />

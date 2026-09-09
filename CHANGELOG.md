@@ -5,6 +5,18 @@
 ## [Unreleased]
 
 ### Added
+- **UR 4.1 — 拍照分享排行榜（[WIP]，待用戶本地 build＋瀏覽器驗收）**
+  - `lib/posts.ts`（`WallPost`＋6 篇 SVG 種子＋`parseWallPost` 校驗＋`toggleLike`／`sortHot`／`sortLatest`／`hasUnseenWall`／`persistPost`＋15 單測，localStorage stub 沿 node 環境缺口）＋`lib/posts.test.ts`；`post_likes`／`post_reports` 記入 future-schema，`photo-mood.md` 加第三節
+  - 相機：`?auto=1` 直達（首用說明卡＋`wtd-camera-consent`，回頭客直開鏡頭）＋預覽改全螢幕拍立得＋拍攝／上傳下採樣 ≤1024px（HEIC 退回 object URL，會話可用 reload 丟）＋分享落盤直達詳情；扇形＋選單拍照入口改 `?auto=1`
+  - `/wall`＋`/wall/[id]`：拍立得散牆（定妝旋轉＋獎章＋讚徽章＋類型角標＋新章）＋熱門／最新貼紙頁籤＋首訪守則浮層＋進牆滅紅點（選單牆項紅點）；詳情大拍立得＋正文無襯線＋語音圓鈕波形條＋150ms 輕讚＋檢舉／自刪兩段確認；`wall`＋`nav.wallPick`＋camera 同意／分享三語
+  - 107→120 tests／tsc 淨／lint 0 error（3 舊 warning）；`npm run build` 本機 sandbox 被攔（老問題，待用戶側復核）；camera-flow／voice-recorder 內他人未提交轉錄 hunks 原樣保留，提交時另議
+  - fix v2（用戶返工：主頁互動榜＋社交 composer）：主頁熱門三卡（行內讚＋回焦重讀）＋分享重排（hero 角落鈕／caption 列／語音 chip／黏底條）；`homeTitle`／`viewAll` 三語；門不變
+  - fix v3（用戶返工：互動榜推倒重來）：刪下方區塊改地圖右上收折浮卡 `MapHotBoard`（live 點＋下拉三名＋行內讚＋sheet 自動收；`expandBoard`／`collapseBoard` 三語）；／wall 不動；門不變
+  - fix（用戶回報黑屏＋錄音播不出）：雙流 race 三閘＋種子啞徽章退役＋`audioDataUrl` 持久（400KB cap＋配額退化）＋播放器回退鏈；120→123 tests／tsc 淨／lint 0 error
+  - fix v4（用戶返工：榜操作留地圖）：`MapHotBoard` 下拉內列表／詳情雙視圖——點貼文切詳情（大圖＋正文＋小尺寸 `VoicePlayer`＋讚＋檢舉／自刪兩段），全程不跳 `/wall/[id]`；`VoicePlayer` 加 `small` 檔；詳情面板 `max-h-[46vh]` 滾動；門不變
+  - fix v5（用戶回報：錄音 crash＋發布窗無出口＋圖標土）：`camera.rerecord` 缺 key（全三語補；審計腳本確認唯一缺口——MISSING_MESSAGE 炸整棵樹才是「播不出」真因）＋review 全屏加 X（`restart` 退出）＋成功頁加返回主頁（`router.push("/")`，localePrefix never）＋發布頭像 😎 改手繪徽章（UserRound＋accent＋硬陰影）＋錄音播放鈕改塗鴉風＋`VoicePlayer` 無源 🎙 改 Mic 圖標；`closeReview`／`backHome` 三語；123 綠／tsc 淨／lint 0 error
+  - fix v6（用戶返工＋回報：錄音仍播不出＋拍照分享留地圖）：錄音真因＝`VoiceRecorder` 缺 `ondataavailable` 致 0-byte 空包——`lib/audio.ts` 加 `buildRecordingBlob`（空包回 null）＋`lib/audio.test.ts` 4 單測＋空包 `recordEmpty` 三語；拍照分享上地圖——新 `CameraOverlay`（`/?shoot=1` 全屏層，地圖不卸載）＋`CameraFlow` 可選 `onClose`（X／成功回家；overlay 成功留層內，獨立頁照跳詳情）＋扇形／選單／空牆三入口改道＋`/camera` 保留；127 綠／tsc 淨／lint 0 error（build 照例被 sandbox bind-port 攔，非代碼錯）
+  - fix v7（用戶回報：榜看全部跳頁＋牆語音 416＋榜詳情圖文音）：榜「看全部」改下拉內加載更多（`loadMore` 三語，初顯 3＋每次 5）；416＝v5 空包已落盤（`parseWallPost` 中和空 dataURL，`isEmptyAudioDataUrl`）＋已發表 URL 被 composer revoke 牽連（`ownPostAudioUrl`＋submit 空包守衛）＋`VoicePlayer` onError 降級鏈；榜詳情加轉錄行；131 綠／tsc 淨／lint 0 error
 - **UR 1.1 — 首頁互動式頁面重構（WIP，待用戶側 build＋瀏覽器驗收）**
   - 新依賴：`leaflet@1.9.4`（真實地理底圖＋免費 CARTO Voyager 瓦片，免 key）、`vitest@^3`（`@types/node@20` 與 vitest 5 互斥，只能用 v3）＋ `npm test` 腳本
   - `components/map/DrinkMap.tsx` — 地圖＋推薦入口同一組件：geolocation 狀態機、拒絕／失敗→全港視圖、塗鴉 pins（自己／MOCK 他人／「想喝」虛線圈）、自訂縮放＋睇全港按鈕、乾杯卡（本地 mock）、`prefers-reduced-motion` 降級

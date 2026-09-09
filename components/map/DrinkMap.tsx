@@ -19,6 +19,7 @@ import { resolveCityCode } from "@/lib/city";
 
 import { CityIcon } from "./CityIcon";
 import { MapFab } from "@/components/map/MapFab";
+import { MapHotBoard } from "@/components/wall/MapHotBoard";
 
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useShake } from "@/hooks/useShake";
@@ -1432,6 +1433,9 @@ export function DrinkMap({
       {/* Notebook dot-grid over the tiles */}
       <div aria-hidden className={styles.paper} />
 
+      {/* UR4.1 v3 地圖互動榜：右上浮卡（收折式），sheet 蓋上自動收回。 */}
+      <MapHotBoard sheetOpen={sheetOpen} />
+
       {/* Pick entry lives in the speed-dial now (single entry point) —
           the sheet opens from there or from the self-pin card. */}
       {sheetOpen && (
@@ -1757,7 +1761,7 @@ export function DrinkMap({
         }
         hasWant={picked !== null && wantSaved}
         onPick={openPickSheet}
-        onPhoto={() => router.push("/camera")}
+        onPhoto={() => router.push("/?shoot=1")}
         onRecenter={handleRecenter}
         onFitHk={handleFitHk}
         onZoomIn={() => handleZoom(1)}

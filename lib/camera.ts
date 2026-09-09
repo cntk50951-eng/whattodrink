@@ -42,6 +42,29 @@ export function classifyGetUserMediaError(name: string): CameraErrorKind {
   }
 }
 
+/**
+ * UR4.1 first-use consent flag (?auto=1 skips intro; first-timers still see
+ * one explainer card, returners go straight to the lens). Session-surviving
+ * localStorage, same untrusted-storage rules as wantRecord (boolean only).
+ */
+export const CAMERA_CONSENT_KEY = "wtd-camera-consent";
+
+export function loadCameraConsent(): boolean {
+  try {
+    return localStorage.getItem(CAMERA_CONSENT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function saveCameraConsent(): void {
+  try {
+    localStorage.setItem(CAMERA_CONSENT_KEY, "1");
+  } catch {
+    /* 記不住而已，下次再問一次，不擋路。 */
+  }
+}
+
 /** True when the environment can even attempt getUserMedia (AC4 gate). */
 export function hasMediaDevices(
   nav?: Pick<Navigator, "mediaDevices">,
