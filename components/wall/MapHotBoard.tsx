@@ -282,7 +282,7 @@ export function MapHotBoard({ sheetOpen }: { sheetOpen: boolean }) {
                           onClick={() => doDelete(detail.id)}
                           className="rounded-full border-2 bg-(--doodle-red) px-2 py-0.5 text-white"
                         >
-                          {t("deleteConfirm")}
+                          {t("delete")}
                         </button>
                         <button
                           type="button"
@@ -296,7 +296,7 @@ export function MapHotBoard({ sheetOpen }: { sheetOpen: boolean }) {
                       <button
                         type="button"
                         onClick={() => setConfirm("delete")}
-                        aria-label={t("deleteOwn")}
+                        aria-label={t("delete")}
                         className="inline-flex items-center gap-1 rounded-full border-2 bg-card px-2 py-0.5 text-[11px] font-bold"
                       >
                         <Trash2 size={11} aria-hidden />
@@ -310,7 +310,7 @@ export function MapHotBoard({ sheetOpen }: { sheetOpen: boolean }) {
                         onClick={() => doReport(detail)}
                         className="rounded-full border-2 bg-(--doodle-red) px-2 py-0.5 text-white"
                       >
-                        {t("reportConfirm")}
+                        {t("reportYes")}
                       </button>
                       <button
                         type="button"
