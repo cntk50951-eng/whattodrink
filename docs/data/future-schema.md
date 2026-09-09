@@ -31,7 +31,7 @@ UI 全确定后按此开工 EPIC 3.0 真表设计。
   更新同行（不另起行）；过期由定时任务扫（sent 超 24h→expired）。前端
   mock（`invites` state＋`declinesInvite` 剧本＋3s 定时）届时整块删
 - `beers(id, emoji, name, category, tagline)` —— 现 15 条静态直迁
-- `checkins(id, user_id, beer_id, lat, lng, place_name, photo_url, audio_url, audio_seconds, note, transcript, created_at)` —— 想喝／拍照／心情三流归一
+- `checkins(id, user_id, beer_id, lat, lng, place_name, photo_url, audio_url, audio_seconds, note, transcript, type, visibility, created_at)` —— 想喝／拍照／心情三流归一；`type`（want／share／mood）＋`visibility`（private 預設／public，僅 share 行可 public，UR A.1 分析師缺口，行級可見性優先於欄位級）
 - `cheers(id, from_user_id, to_user_id, checkin_id, created_at)` —— 计数不存列，实时 `count`
   **UR3.0 双边记录口径（EPIC 3.0 实现，UI 先行 mock）**：点一次乾杯只写**一行**，
   但双方记录各＋一条——发送方 sent 列表多一条（`from_user_id = 我`），接收方
