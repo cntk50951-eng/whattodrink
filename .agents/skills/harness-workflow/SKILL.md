@@ -22,6 +22,7 @@ At the **start of every development task**, follow these steps strictly:
 - **UI changes**: after development, user MUST verify in browser before commit (Step 10a–10b)
 - **New lib / new version**: look up the latest API first via `web_search` + `web_fetch` (Step 3), never rely on training data
 - **Logic errors**: fix immediately, then re-run Step 3→7
+- **UI design changes**: if Step 3.5 conditions hit (new page / redesign / tokens / animation), load the design skill first via `read_skill` (`stitch-design` / `design-taste-frontend` / `taste`) — brand layer (doodle) is locked, see `workflow.md`
 - **Every fix / user correction / toolchain issue**: write a memory entry (Step 8)
 
 ## Environment
