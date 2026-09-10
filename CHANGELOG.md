@@ -21,6 +21,8 @@
 - **UR A.1 — API 架構設計（[WIP]，設計稿待用戶拍板）**
   - 新 `docs/api-architecture.md`（10 節：public／auth 端點清單 16 條＋Supabase Auth JWT 雙通道＋Route Handlers 單體＋三端同一契約＋RLS 矩陣＋替換對照＋未決 5 問）；backlog 掛 [WIP]＋改動記錄；純文檔零代碼
   - 分析師 review 合併：checkins `type`＋`visibility` 行級可見性＋檢舉 1／3 門檻＋境外揭露接 A.3 UI＋語音上限分層；§10 全定案；`future-schema.md` 同步
+- **UR A.3 — Supabase 地基（[WIP]，腳手架落地待連通冒煙）**
+  - `@supabase/ssr 0.12`＋`lib/supabase/`（env 新舊制兼容／browser／server／middleware）＋proxy 雙中間件＋`/api/v1/health`＋5 單測；136 綠／tsc 淨／lint 0 error
 - **UR 1.1 — 首頁互動式頁面重構（WIP，待用戶側 build＋瀏覽器驗收）**
   - 新依賴：`leaflet@1.9.4`（真實地理底圖＋免費 CARTO Voyager 瓦片，免 key）、`vitest@^3`（`@types/node@20` 與 vitest 5 互斥，只能用 v3）＋ `npm test` 腳本
   - `components/map/DrinkMap.tsx` — 地圖＋推薦入口同一組件：geolocation 狀態機、拒絕／失敗→全港視圖、塗鴉 pins（自己／MOCK 他人／「想喝」虛線圈）、自訂縮放＋睇全港按鈕、乾杯卡（本地 mock）、`prefers-reduced-motion` 降級
