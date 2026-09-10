@@ -42,6 +42,17 @@ ThemeProvider (client component)
   3. ThemePicker 自動出現
 ```
 
+## 建表門禁（schema-from-UI，UR A.3 硬規則）
+
+UI-first 的執行點：每次寫 migration **之前**，先從前端需求倒推 schema，
+不許從 ER 圖正推。步驟固定：
+
+1. **列 UI 面**：本次建表服務哪些 route／component（具名，如 `/wall`＋`MapHotBoard`）。
+2. **逐字段過堂**：每個 column 回答「前端哪裡讀／寫它」（指到 lib type 或 `docs/data/*` 行）。答不出的字段不建（YAGNI）；答得出但表裡沒有的，補上才准寫 SQL。
+3. **合規複核**：visibility 預設／RLS 檔位／精確座標去向／保留期（沿 `api-architecture.md` §7，不複述第二遍）。
+4. **空窗安全**：新表 RLS 全 ENABLE、policy 另批——建完到 policy 落地之間全拒。
+5. **seed 誠實**：只放真實靜態數據（如 beers）；假用戶／假互動不進庫，牆等真分享長出來。
+
 ## 待補 ADR
 
 之後在 `docs/adr/` 建立 Architecture Decision Records，目前用這個檔案暫代。

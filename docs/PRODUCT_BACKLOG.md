@@ -894,3 +894,30 @@ UR A.1 API的架構設計 [✓]（用户已验收，merged）
 *改動記錄*
 - 2026-09-09：設計稿 `docs/api-architecture.md`（10 節：目標／總覽／端點清單／認證／框架／三端／DB／Vercel／演進／未決 5 問），開工置 [WIP]
 - 2026-09-09 分析師 review 合併：checkins 加 `type`＋`visibility`（行級可見性，want 預設 private 不上牆）＋檢舉 1／3 門檻＋境外揭露併入 A.3 同意流程＋語音上限按 endpoint 分層；§10 五問＋三加題全定案；`future-schema.md` checkins 行同步
+
+---
+
+UR A.3 Supabase 地基（建 project＋連通＋health） [WIP]
+
+作為開發者，我要一個能連上 Supabase 的本地＋線上環境（project＋三組 key＋
+health 冒煙），後面 A.2-1 建表才有地方落。
+
+### 範圍（只做 A.2-0，不多做）
+1. 用戶在 supabase.com 建 project（區域 Singapore／ap-southeast-1），拿三值：
+   Project URL＋anon key＋service_role key
+2. 三值進本地 `.env.local`（照 `.env.example` 分組抄，不提交）＋ Vercel Dashboard（部署時填，現在可先不填）
+3. 我方腳手架：裝 `@supabase/ssr`、`lib/supabase/*`（browser／server／middleware 三 client）、缺 key 啟動即報錯、`/api/v1/health`（`{ok:true}`）、middleware session 刷新、冒煙（web＋curl 匿名讀 beers 空表）
+
+### AC
+- `/api/v1/health` 回 `{ok:true}`；缺任一 key 時 dev 啟動即紅字報錯，不靜默跑
+- anon key 經 RLS 讀得到公開表、讀不到私有行（A.2-2 的事，先只驗連通）
+
+*改動記錄*
+- 2026-09-09：開工置 [WIP]（to-do 第一項 A.2-0），等用戶建 project 給 key
+- 2026-09-09：腳手架落地（`@supabase/ssr 0.12`＋`lib/supabase/*`＋proxy 雙中間件＋`/api/v1/health`＋env 新舊制兼容＋5 單測；136 綠／tsc 淨／lint 0 error；連通冒煙待用戶本地 dev）
+- 2026-09-09：用戶本地 health 回 `configured:true`，A.2-0 閉環，進 A.2-1 建表
+- 2026-09-09：`supabase/migrations/0001_init.sql`（九表＋RLS 全拒空窗安全）＋`supabase/seed.sql`（beers 15 條直遷；牆種子不進庫）寫好待執行；to-do A.2-0 打勾
+- 2026-09-09：harness 新增「建表門禁（schema-from-UI）」；倒審 0001 六路 UI 全對上，補兩索引（checkins_created／users_last_seen）
+- 2026-09-09：第一個 API（`GET /api/v1/beers`）過堂＋實現（過堂：五字段四有主＋tagline 預留照回；`0002_beers_policy.sql`＋route＋envelope＋mapper＋5 單測；141 綠／tsc 淨／lint 0 error；待用戶執行三段 SQL＋curl 驗）
+- 2026-09-09：A.4-1 閉環（三段 SQL 落庫＋匿名讀 15 行＋匿名寫 401＋用戶 curl 通；排障：PGRST205＝表沒進庫、seed 報喜不報行、探針誤讀聯合主鍵）
+- 2026-09-09：酒圖標上線（`beer-icons` 公開 bucket＋30 SVG＋`0003` 加 `icon_url`＋heineken 回填＋API 出 `icon_url` 可空＋1 單測；142 綠／tsc 淨／lint 0 error；匿名驗 15 行／1 有圖 14 NULL）
