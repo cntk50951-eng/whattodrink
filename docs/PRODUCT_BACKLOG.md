@@ -917,7 +917,7 @@ health 冒煙），後面 A.2-1 建表才有地方落。
 
 ---
 
-UR A.4 前端接 beers API（數據＋圖標，離線降級） [WIP]
+UR A.4 前端接 beers API（數據＋圖標，離線降級） [✓]（用户回 OK，已合併 main 並 push）
 
 作為用戶，我希望選酒面板看到我們自己設計的酒圖標；沒網／API 掛時自動退回 emoji，體感不斷。
 
@@ -936,6 +936,27 @@ UR A.4 前端接 beers API（數據＋圖標，離線降級） [WIP]
 - 2026-09-09 rev2 本地圖退場（用户要求）：`BeerIcon` 去 tsx 只剩 API＞emoji；想喝／他人 pins＋他人卡头改 `icon_url`（mock 按名對目錄）；`beerByName`＋1 單測＋pin img CSS；145 綠／tsc 淨／lint 0 error；視覺驗收待用戶親眼
 - 2026-09-09 fix 刷新掉圖（用户回報：想喝 Heineken 刷新後圖沒了）：`parseWantRecord` 白名單漏 `icon_url`（A.4 加鍵沒同步解析器）；補上＋regression 單測；146 綠／tsc 淨／lint 0 error
 - 2026-09-09：腳手架落地（`@supabase/ssr 0.12`＋`lib/supabase/*`＋proxy 雙中間件＋`/api/v1/health`＋env 新舊制兼容＋5 單測；136 綠／tsc 淨／lint 0 error；連通冒煙待用戶本地 dev）
+- 2026-09-10：牌子 26 行進目錄（`0004`＋seed 同步；41 行全驗；茅台 excluded；Hoegaarden 暫進 lager）；用户回 OK，`b0c91a1`＋`32c3922` 合併 main 並 push，置 [✓]
+
+---
+
+UR A.5 啤酒類別「換一批」無反應 [✓]（用户親眼驗收，merged）
+
+作為用戶，我在推薦裡選了啤酒後點換一批，永遠只能看到一開始的那幾個，換不出新酒。
+
+### 範圍
+1. 只修換批邏輯（`pickSwapBatch`／按鈕接線／批次狀態），不動目錄與 API
+2. 修完加 regression 單測
+
+### AC
+- 同類別連點換一批，每次結果都變（池子夠大時不重複上一批）
+- 池子見底時有明確態（如禁用或提示），不假裝換了
+
+*改動記錄*
+- 2026-09-10：開工置 [WIP]（用户回報換批無反應；澄清非想喝換酒面板，是推薦 L2 啤酒批的換一批）
+- 2026-09-10：讀完鏈路（L1 傳 `beer` 正確／`handleRefreshBatch` 重洗＋防連相同／渲染直讀 `pickBatch`／envelope 裸包／0004＋seed 41 行形狀乾淨），邏輯面無死結；待瀏覽器實證定分支
+- 2026-09-10：用户澄清看到的是牌子行（目錄 41 活著）＋重開會換新，缺的是可用的換批鈕；考古 `pickNextBatch` 鈕自 UR3.9 就在（比 `fetchBeers` 老），斷定鈕被 sheet 50% 限高折疊＋舊語義只重排不給新臉。修：`pickNextBatch`（扣當前批優先取新，不夠回退重洗）＋6 單測＋L2 接線＋鈕搬 header＋池見底置灰；152 綠／tsc 淨／lint 0 error；視覺驗收待用戶親眼
+- 2026-09-10：用户親眼驗收通過（header 換下一批可見＋連點出新臉＋小池置灰），合併 main 並 push，置 [✓]
 - 2026-09-09：用戶本地 health 回 `configured:true`，A.2-0 閉環，進 A.2-1 建表
 - 2026-09-09：`supabase/migrations/0001_init.sql`（九表＋RLS 全拒空窗安全）＋`supabase/seed.sql`（beers 15 條直遷；牆種子不進庫）寫好待執行；to-do A.2-0 打勾
 - 2026-09-09：harness 新增「建表門禁（schema-from-UI）」；倒審 0001 六路 UI 全對上，補兩索引（checkins_created／users_last_seen）

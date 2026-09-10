@@ -62,6 +62,7 @@ import {
   categoryOfBeer,
   fetchBeers,
   laneCardSize,
+  pickNextBatch,
   pickRandomBatch,
   pickSwapBatch,
 } from "@/lib/beers";
@@ -1000,20 +1001,12 @@ export function DrinkMap({
     setPicked(batch[0] ?? null);
   }
 
-  /* UR3.9 換下一批：同類內重洗，盡量不與上一批完全重疊（最多重試 3 次；
-   * 小類如紅酒僅 1 款，重疊不可避免，不算錯）。 */
+  /* UR A.5 真下一批：優先沒看過的（`pickNextBatch` 扣掉當前批），
+   * 池見底回退整池重洗；池 ≤ 已展示數時按鈕置灰（見 L2 header），不假裝換了。 */
   function handleRefreshBatch(): void {
     const laneId = pickLaneId;
     if (laneId === null) return;
-    const prevKey = pickBatch.map((b) => b.id).join(",");
-    let next = pickRandomBatch(laneId, 6);
-    for (
-      let i = 0;
-      i < 3 && next.map((b) => b.id).join(",") === prevKey && next.length > 1;
-      i += 1
-    ) {
-      next = pickRandomBatch(laneId, 6);
-    }
+    const next = pickNextBatch(pickBatch, laneId, 6);
     setPickBatch(next);
     setBatchIndex(0);
     setPicked(next[0] ?? null);
@@ -1561,10 +1554,30 @@ export function DrinkMap({
                   (pickBatch[0] !== undefined
                     ? categoryOfBeer(pickBatch[0])
                     : null);
+                // UR A.5 換一批放 header：不用翻 sheet 就看得到；池 ≤ 已展示數
+                //（如紅酒僅 1 款）置灰，不假裝換了。
+                const poolSize =
+                  pickLaneId === null
+                    ? 0
+                    : beersInCategory(pickLaneId).length;
+                const exhausted =
+                  pickBatch.length > 0 && poolSize <= pickBatch.length;
                 return lane === null ? null : (
-                  <p className="text-muted-foreground truncate text-xs">
-                    {lane.emoji} {t(lane.labelKey)}
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-muted-foreground truncate text-xs">
+                      {lane.emoji} {t(lane.labelKey)}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleRefreshBatch}
+                      disabled={exhausted}
+                      aria-label={t("pickNextBatch")}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full border-2 px-2.5 py-1 text-xs font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none disabled:opacity-50 disabled:active:translate-x-0 disabled:active:translate-y-0 disabled:active:shadow-[2px_2px_0_var(--border)]"
+                    >
+                      <RefreshCw size={13} aria-hidden />
+                      {t("pickNextBatch")}
+                    </button>
+                  </div>
                 );
               })()}
               <div
@@ -1636,19 +1649,11 @@ export function DrinkMap({
                   <ChevronRight size={15} aria-hidden />
                 </button>
               </div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={handleRefreshBatch}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-                >
-                  <RefreshCw size={15} aria-hidden />
-                  {t("pickNextBatch")}
-                </button>
+              <div className="mt-2">
                 <button
                   type="button"
                   onClick={() => setPickLanes(true)}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-sm font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
                 >
                   <ChevronLeft size={15} aria-hidden />
                   {t("pickChangeCategory")}

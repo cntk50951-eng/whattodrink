@@ -1,15 +1,24 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   BEERS,
   BEER_CATEGORIES,
+  applyBeerCatalog,
   beersInCategory,
   categoryOfBeer,
   laneCardSize,
+  pickNextBatch,
   pickRandomBatch,
   pickRandomBeerIn,
   pickSwapBatch,
+  type Beer,
 } from "./beers";
+
+const PRISTINE = BEERS.map((b) => ({ ...b }));
+
+afterEach(() => {
+  applyBeerCatalog(PRISTINE.map((b) => ({ ...b })));
+});
 
 describe("BEER_CATEGORIES mapping", () => {
   it("covers every BEERS.category exactly once (no orphan, no overlap)", () => {
@@ -127,6 +136,64 @@ describe("laneCardSize", () => {
     expect(Math.max(...counts)).toBeGreaterThanOrEqual(4);
     expect(laneCardSize(Math.max(...counts))).toBe("lg");
     expect(laneCardSize(Math.min(...counts))).toBe("sm");
+  });
+});
+
+describe("pickNextBatch (UR A.5)", () => {
+  function lagerCatalog(n: number): Beer[] {
+    return Array.from({ length: n }, (_, i) => ({
+      id: `lager-${i}`,
+      emoji: "🍺",
+      name: `Lager ${i}`,
+      category: "lager",
+      tagline: "",
+    }));
+  }
+
+  it("serves only unseen faces when the remainder fills count (no overlap)", () => {
+    applyBeerCatalog(lagerCatalog(12));
+    const seen = beersInCategory("beer").slice(0, 6);
+    const next = pickNextBatch(seen, "beer", 6, () => 0.5);
+    expect(next.length).toBe(6);
+    expect(new Set(next.map((b) => b.id)).size).toBe(6);
+    for (const b of next) {
+      expect(seen.map((s) => s.id)).not.toContain(b.id);
+    }
+  });
+
+  it("falls back to a full-pool reshuffle when the remainder is short (never empty)", () => {
+    applyBeerCatalog(lagerCatalog(8));
+    const seen = beersInCategory("beer").slice(0, 6);
+    const next = pickNextBatch(seen, "beer", 6, () => 0.5);
+    expect(next.length).toBe(6);
+    expect(new Set(next.map((b) => b.id)).size).toBe(6);
+  });
+
+  it("excludes seen on the small static lane when fresh suffices", () => {
+    const seen = beersInCategory("beer").slice(0, 2);
+    const next = pickNextBatch(seen, "beer", 2, () => 0.3);
+    expect(next.length).toBe(2);
+    for (const b of next) {
+      expect(seen.map((s) => s.id)).not.toContain(b.id);
+    }
+  });
+
+  it("caps at pool size when the whole lane was seen (pool exhausted)", () => {
+    const seen = beersInCategory("beer");
+    const next = pickNextBatch(seen, "beer", 6, () => 0.3);
+    expect(next.length).toBe(seen.length);
+  });
+
+  it("uses the global pool for an unknown lane", () => {
+    const next = pickNextBatch([], "nope", 3, () => 0.2);
+    expect(next.length).toBe(3);
+    expect(next.every((b) => BEERS.some((x) => x.id === b.id))).toBe(true);
+  });
+
+  it("does not mutate the source pool", () => {
+    const before = beersInCategory("beer").map((b) => b.id);
+    pickNextBatch(beersInCategory("beer").slice(0, 2), "beer", 2, () => 0.7);
+    expect(beersInCategory("beer").map((b) => b.id)).toEqual(before);
   });
 });
 

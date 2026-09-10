@@ -171,6 +171,26 @@ export function pickRandomBatch(
 }
 
 /**
+ * UR A.5 真下一批 — 優先給沒看過的：同類池先扣掉 `seen`（當前批），
+ * 剩的夠 `count` 就只在裡面抽（連點換批不重臉）；不夠（池見底）就回退
+ * 整池重洗，不轉空。池 ≤ 已展示數時呼叫方置灰按鈕（不假裝換了）。
+ * Unknown lane → 全域池同邏輯。`rand` 可注入測，不動源數組。
+ */
+export function pickNextBatch(
+  seen: readonly Beer[],
+  categoryId: string,
+  count: number = 6,
+  rand: () => number = Math.random,
+): Beer[] {
+  const lanePool = beersInCategory(categoryId);
+  const pool = lanePool.length > 0 ? lanePool : BEERS;
+  const seenIds = new Set(seen.map((b) => b.id));
+  const fresh = pool.filter((b) => !seenIds.has(b.id));
+  const source = fresh.length >= count ? fresh : pool;
+  return shuffleTake(source, count, rand);
+}
+
+/**
  * UR3.9 v4 collage rhythm — card size follows lane depth (designer review:
  * uniform grids read as mechanical). Big lanes invite browsing, small ones
  * stay quiet. Thresholds locked by test (current max is 5).
