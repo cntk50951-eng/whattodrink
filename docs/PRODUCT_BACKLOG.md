@@ -914,6 +914,27 @@ health 冒煙），後面 A.2-1 建表才有地方落。
 
 *改動記錄*
 - 2026-09-09：開工置 [WIP]（to-do 第一項 A.2-0），等用戶建 project 給 key
+
+---
+
+UR A.4 前端接 beers API（數據＋圖標，離線降級） [WIP]
+
+作為用戶，我希望選酒面板看到我們自己設計的酒圖標；沒網／API 掛時自動退回 emoji，體感不斷。
+
+### 範圍
+1. `lib/beers.ts`：`Beer` 加 `icon_url` 可空＋`fetchBeers()`（調 API，壞就退靜態）
+2. 選酒面（隨機／批量／拼貼／品牌面板）＋想喝卡：有 `icon_url` 用 `<img>`，壞圖 onError 退 emoji；pins 維持 emoji（小尺寸＋效能）
+3. 不動：API 本體、RLS、seed
+
+### AC
+- 有網：heineken 出自畫圖，其餘 emoji；斷網／500：全 emoji，功能照走
+- 關圖測試：`icon_url` 404 時當格退 emoji，不破版
+
+*改動記錄*
+- 2026-09-09：開工置 [WIP]（A.4-1 的前端半場）
+- 2026-09-09：前端接通（`Beer.icon_url`＋`fetchBeers` 原地換源＋`BeerIcon` 三級 fallback＋批量／想喝／換酒三處＋掛載換源；144 綠／tsc 淨／lint 0 error；視覺驗收待用戶親眼）
+- 2026-09-09 rev2 本地圖退場（用户要求）：`BeerIcon` 去 tsx 只剩 API＞emoji；想喝／他人 pins＋他人卡头改 `icon_url`（mock 按名對目錄）；`beerByName`＋1 單測＋pin img CSS；145 綠／tsc 淨／lint 0 error；視覺驗收待用戶親眼
+- 2026-09-09 fix 刷新掉圖（用户回報：想喝 Heineken 刷新後圖沒了）：`parseWantRecord` 白名單漏 `icon_url`（A.4 加鍵沒同步解析器）；補上＋regression 單測；146 綠／tsc 淨／lint 0 error
 - 2026-09-09：腳手架落地（`@supabase/ssr 0.12`＋`lib/supabase/*`＋proxy 雙中間件＋`/api/v1/health`＋env 新舊制兼容＋5 單測；136 綠／tsc 淨／lint 0 error；連通冒煙待用戶本地 dev）
 - 2026-09-09：用戶本地 health 回 `configured:true`，A.2-0 閉環，進 A.2-1 建表
 - 2026-09-09：`supabase/migrations/0001_init.sql`（九表＋RLS 全拒空窗安全）＋`supabase/seed.sql`（beers 15 條直遷；牆種子不進庫）寫好待執行；to-do A.2-0 打勾
@@ -921,3 +942,5 @@ health 冒煙），後面 A.2-1 建表才有地方落。
 - 2026-09-09：第一個 API（`GET /api/v1/beers`）過堂＋實現（過堂：五字段四有主＋tagline 預留照回；`0002_beers_policy.sql`＋route＋envelope＋mapper＋5 單測；141 綠／tsc 淨／lint 0 error；待用戶執行三段 SQL＋curl 驗）
 - 2026-09-09：A.4-1 閉環（三段 SQL 落庫＋匿名讀 15 行＋匿名寫 401＋用戶 curl 通；排障：PGRST205＝表沒進庫、seed 報喜不報行、探針誤讀聯合主鍵）
 - 2026-09-09：酒圖標上線（`beer-icons` 公開 bucket＋30 SVG＋`0003` 加 `icon_url`＋heineken 回填＋API 出 `icon_url` 可空＋1 單測；142 綠／tsc 淨／lint 0 error；匿名驗 15 行／1 有圖 14 NULL）
+- 2026-09-09：圖標回填收尾（asahi／tsingtao 一併回填；全表 15／3 有圖 12 NULL——剩下 12 條本地無圖可填，等設計）
+- 2026-09-09：牌子進目錄（用户：27 lager 是牌子要能選）：`0004` 插 26 行（英文名／lager＋少爺 craft／茅台 excluded／tagline 空；seed 同步）；REST 灌＋全驗（41 行／分類全落 lane／icon 全 200）；前端零改（fetchBeers 自動帶入，靜態 fallback 續留 15）

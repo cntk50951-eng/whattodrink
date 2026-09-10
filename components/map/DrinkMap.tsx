@@ -57,12 +57,15 @@ import { MOCK_CHECKINS } from "@/lib/checkins";
 import type { Checkin } from "@/lib/checkins";
 import {
   BEER_CATEGORIES,
+  beerByName,
   beersInCategory,
   categoryOfBeer,
+  fetchBeers,
   laneCardSize,
   pickRandomBatch,
   pickSwapBatch,
 } from "@/lib/beers";
+import { BeerIcon } from "./BeerIcon";
 import { CATEGORY_ART } from "@/components/marketing/beer-icons/category-art";
 import type { Beer } from "@/lib/beers";
 import type { LatLng } from "@/lib/geo";
@@ -96,11 +99,6 @@ import {
   isWithinHongKong,
 } from "@/lib/geo";
 import { BeerMugDoodle } from "@/components/marketing/BeerMugDoodle";
-import {
-  iconForDrinkName,
-  iconForPickId,
-} from "@/components/marketing/beer-icons/wall";
-import { renderToStaticMarkup } from "react-dom/server";
 import styles from "./drink-map.module.css";
 
 /* UR3.9 v4 拼貼定妝：旋轉（±3–6°）＋膠帶位全由 index 定死，同卡每次
@@ -306,16 +304,17 @@ export function DrinkMap({
       if (cluster.members.length === 1) {
         const idx = cluster.members[0] as number;
         const c = MOCK_CHECKINS[idx] as Checkin;
-        // UR2.7 原样：有图方形设计钉，无图 emoji 圆钉（奇偶错峰倾斜保留）。
+        // UR A.4-rev2 本地圖退場：mock 酒名對目錄取 icon_url，有圖方形钉，
+        // 无图 emoji 圆钉（奇偶错峰倾斜保留）。
         // UR3.3 在线绿点缀右上角（两款钉同挂，簇不挂——簇是多人的）。
         const onlineDot = isOnline(c, now)
           ? `<span class="${styles.pinOnline}"></span>`
           : "";
-        const ArtIcon = iconForDrinkName(c.drinkName);
+        const icon = beerByName(c.drinkName)?.icon_url ?? null;
         const artHtml =
-          ArtIcon === null
+          icon === null
             ? null
-            : `<div class="${styles.pinArt}">${renderToStaticMarkup(<ArtIcon />)}${onlineDot}</div>`;
+            : `<div class="${styles.pinArt}"><img src="${icon}" alt="" loading="lazy" />${onlineDot}</div>`;
         const pinClass =
           idx % 2 === 0 ? styles.pin : `${styles.pin} ${styles.pinAlt}`;
         const marker = L.marker([c.position.lat, c.position.lng], {
@@ -505,6 +504,14 @@ export function DrinkMap({
   }, []);
   const [picked, setPicked] = useState<Beer | null>(null);
   const [wantSaved, setWantSaved] = useState(false);
+  /* UR A.4 目錄換源重渲染開關：fetchBeers 成功即原地換 BEERS，
+   * 舊 pick 結果留在舊引用上不動（快照語義），新 pick 才吃新目錄。 */
+  const [, setCatalogTick] = useState(0);
+  useEffect(() => {
+    void fetchBeers().then((ok) => {
+      if (ok) setCatalogTick((t) => t + 1);
+    });
+  }, []);
   /* UR3.8 兩層面板：pickLanes 為 true 即 L1 品種層（此時 picked 若有舊結果，
    * L1 優先顯示）；pickLaneId 記住 L2 結果所屬大類（「換一款」不出類）。 */
   const [pickLanes, setPickLanes] = useState(initialPickOpen);
@@ -928,18 +935,18 @@ export function DrinkMap({
         .getPropertyValue("--doodle-red")
         .trim() || "#b3261e";
     // UR1.8: the 想喝 pin opens its frozen snapshot card.
-    // UR2.7 追加：和他人 pin 同构 —— 推荐酒有专属插畫就画设计稿（红色款
-    // 方形钉＋声纳圈），没图才回 emoji 圆钉。
+    // UR A.4-rev2 本地圖退場：有 icon_url 上 API 圖（红色方形钉＋声纳圈），
+    // 没有回 emoji 圆钉。URL 出自 DB（可信），不做轉義。
     const layer = L.layerGroup();
     const latest = wantHistory[wantHistory.length - 1] as WantRecord;
     for (const entry of wantHistory) {
-      const Art = iconForPickId(entry.beer.id);
+      const icon = entry.beer.icon_url ?? null;
       const html =
-        Art === null
+        icon === null
           ? `<div class="${styles.pinWant}">${entry.beer.emoji}</div>`
-          : `<div class="${styles.pinArtWant}">${renderToStaticMarkup(<Art />)}</div>`;
+          : `<div class="${styles.pinArtWant}"><img src="${icon}" alt="" loading="lazy" /></div>`;
       const isLatest = entry.at === latest.at;
-      const size: [number, number] = Art === null ? [48, 48] : [56, 56];
+      const size: [number, number] = icon === null ? [48, 48] : [56, 56];
       const pin = L.marker([entry.position.lat, entry.position.lng], {
         title: entry.beer.name,
         icon: L.divIcon({
@@ -1567,7 +1574,6 @@ export function DrinkMap({
                 className={`${styles.batchIn} mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
               >
                 {pickBatch.map((beer, i) => {
-                  const Icon = iconForPickId(beer.id);
                   return (
                     <button
                       key={beer.id}
@@ -1583,15 +1589,12 @@ export function DrinkMap({
                         aria-hidden
                         className={`${styles.tape} absolute -top-2 left-1/2 h-3 w-8 -translate-x-1/2 rotate-2`}
                       />
-                      {Icon !== null ? (
-                        <span className="block h-20 w-auto shrink-0 [&>svg]:h-20 [&>svg]:w-auto">
-                          <Icon />
-                        </span>
-                      ) : (
-                        <span className="text-4xl" aria-hidden>
-                          {beer.emoji}
-                        </span>
-                      )}
+                      <BeerIcon
+                        key={beer.id}
+                        beer={beer}
+                        imgClassName="h-20 w-auto shrink-0 rounded-xl border-2 object-cover"
+                        emojiClassName="text-4xl"
+                      />
                       <span className="font-hand w-full truncate text-center text-sm leading-tight font-bold">
                         {beer.name}
                       </span>
@@ -1951,21 +1954,14 @@ export function DrinkMap({
                 <div className="flex items-center gap-4">
                   {(() => {
                     // UR2.7 想喝卡同构：有图上主角位，没图保持原 emoji 行。
-                    const WantIcon = iconForPickId(wantRecord.beer.id);
-                    return WantIcon !== null ? (
-                      <span
+                    // UR A.4：三級 fallback 收進 BeerIcon（key 保證換酒重掛）。
+                    return (
+                      <BeerIcon
                         key={wantRecord.beer.id}
-                        className={`${styles.pickArtIn} block h-24 w-auto shrink-0 [&>svg]:h-full [&>svg]:w-auto`}
-                      >
-                        <WantIcon />
-                      </span>
-                    ) : (
-                      <span
-                        className="flex h-11 w-11 items-center justify-center rounded-full border-2 text-2xl"
-                        aria-hidden
-                      >
-                        {wantRecord.beer.emoji}
-                      </span>
+                        beer={wantRecord.beer}
+                        imgClassName={`${styles.pickArtIn} h-24 w-auto shrink-0 rounded-xl border-2 object-cover`}
+                        emojiClassName="flex h-11 w-11 items-center justify-center rounded-full border-2 text-2xl"
+                      />
                     );
                   })()}
                   <div className="min-w-0">
@@ -2033,7 +2029,6 @@ export function DrinkMap({
                   <div key={swapBatch.map((b) => b.id).join(",")} className={`${styles.batchIn} mt-3`}>
                     <div className="grid grid-cols-3 gap-2">
                       {swapBatch.map((beer) => {
-                        const Icon = iconForPickId(beer.id);
                         return (
                           <button
                             key={beer.id}
@@ -2041,15 +2036,12 @@ export function DrinkMap({
                             onClick={() => handleSwapTo(beer)}
                             className="flex flex-col items-center gap-1 rounded-2xl border-2 bg-card p-2 shadow-[2px_2px_0_var(--border)] transition-transform duration-150 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.04] active:scale-95"
                           >
-                            {Icon !== null ? (
-                              <span className="block h-16 w-auto shrink-0 [&>svg]:h-16 [&>svg]:w-auto">
-                                <Icon />
-                              </span>
-                            ) : (
-                              <span className="text-3xl" aria-hidden>
-                                {beer.emoji}
-                              </span>
-                            )}
+                            <BeerIcon
+                              key={beer.id}
+                              beer={beer}
+                              imgClassName="h-16 w-auto shrink-0 rounded-xl border-2 object-cover"
+                              emojiClassName="text-3xl"
+                            />
                             <span className="w-full truncate text-center text-xs font-bold">
                               {beer.name}
                             </span>
@@ -2078,7 +2070,9 @@ export function DrinkMap({
                   meta 行——结构上不再有东西能顶进 X 底下。 */}
               <div className="flex items-center gap-4">
                 {(() => {
-                  const DrinkIcon = iconForDrinkName(card.drinkName);
+                  // UR A.4-rev2 本地圖退場：mock 酒名對目錄取 Beer，
+                  // 主角位走 BeerIcon（API 圖，壞圖退 emoji）。
+                  const drink = beerByName(card.drinkName);
                   // UR3.3 在线绿点：头像（或角标）右下角，和 pin 同款。
                   const online = isOnline(card, nowMs);
                   const onlineDot = online ? (
@@ -2096,14 +2090,19 @@ export function DrinkMap({
                       className={`${styles.waterWash} absolute -inset-2`}
                     />
                   );
-                  return DrinkIcon !== null ? (
+                  return drink !== null && drink.icon_url ? (
                     <span className="relative shrink-0">
                       {wash}
                       {tape}
                       <span
-                        className={`${styles.pickArtIn} relative block h-24 w-auto [&>svg]:h-full [&>svg]:w-auto`}
+                        className={`${styles.pickArtIn} relative block h-24 w-auto shrink-0`}
                       >
-                        <DrinkIcon />
+                        <BeerIcon
+                          key={drink.id}
+                          beer={drink}
+                          imgClassName="h-full w-auto rounded-xl border-2 object-cover"
+                          emojiClassName="text-3xl"
+                        />
                       </span>
                       <span
                         className="absolute -right-2 -bottom-2 z-10 flex h-9 w-9 items-center justify-center rounded-full border-2 bg-card text-xl"

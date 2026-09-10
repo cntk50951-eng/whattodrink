@@ -129,6 +129,14 @@
   display: block;
 }
 
+/* UR A.4 本地圖退場：pin 內 API 圖走同一方形卡骨架（svg 規則照抄一份）。 */
+.pinArt > img {
+  height: 46px;
+  width: auto;
+  display: block;
+  border-radius: 8px;
+}
+
 /* UR2.7 追加：自己的「想喝」钉有图款 —— 同方形卡骨架，换品牌红描边＋
  * 声纳圈（和 pinWant 同一身份语言），和他人的墨色钉一眼区分。 */
 .pinArtWant {

@@ -1,26 +1,10 @@
--- UR A.3 / A.2-1 seed：beers 15 條（lib/beers.ts 逐字直遷，id 穩定）。
--- 牆種子（MOCK_POSTS）故意不進庫：假用戶＋假讚數進真表就是污染，
--- 公開牆等真實分享再長出來。
+-- UR A.3 / 啤酒牌子進目錄（26 行）：BEER_WALL 30 款扣掉已進的
+-- heineken／asahi／tsingtao，再扣茅台（醬香白酒非啤酒，另議）。
+-- 欄位口徑：name 取英文名（中文列是暱稱不能當展示名）／category 全進
+-- 現有 lane（lager；少爺淡艾進 craft beer，Hoegaarden 小麥白啤暫進 lager，
+-- 不同意可刪該行）／emoji 全 🍺／tagline 空等文案／icon_url 指 bucket。
+-- ON CONFLICT DO NOTHING，可重放。
 
-INSERT INTO beers (id, emoji, name, category, tagline) VALUES
-  ('heineken', '🍺', 'Heineken', 'lager', '加班過的救贖'),
-  ('asahi', '🍻', 'Asahi 生啤', 'draft', '週五的快樂開場'),
-  ('malbec-2021', '🍷', 'Malbec 2021', 'red wine', '一個人的儀式感'),
-  ('yamazaki-12', '🥃', '山崎 12 年', 'whisky', '值得為自己慶祝'),
-  ('mojito', '🍹', 'Mojito', 'cocktail', '朋友突然約的夜晚'),
-  ('dasai-45', '🍶', '獺祭 純米大吟釀 45', 'sake', '今晚想對自己好一點'),
-  ('ipa', '🍺', '本地精釀 IPA', 'craft beer', '想試點不一樣的'),
-  ('gin-tonic', '🍸', 'Gin & Tonic', 'cocktail', '簡單但有態度'),
-  ('rose', '🥂', 'Provence Rosé', 'rosé', '夏天傍晚的味道'),
-  ('tsingtao', '🍺', '青島啤酒', 'lager', '配滷水一流的選擇'),
-  ('sauvignon-blanc', '🍾', 'Sauvignon Blanc', 'white wine', '海鮮日的好搭檔'),
-  ('highball', '🥃', '角嗨 Highball', 'highball', '清爽不烈的開胃'),
-  ('stout', '🍺', 'Guinness 健力士', 'stout', '深夜慢飲的首選'),
-  ('plum-wine', '🍶', '梅酒 on the rocks', 'liqueur', '想念家的味道'),
-  ('espresso-martini', '🍸', 'Espresso Martini', 'cocktail', '需要撐到最後一秒')
-ON CONFLICT (id) DO NOTHING;
-
--- 啤酒牌子 26 行（0004 同源，ON CONFLICT 可重放；茅台另議）
 INSERT INTO beers (id, emoji, name, category, tagline, icon_url) VALUES
   ('corona-extra', '🍺', 'Corona Extra', 'lager', '', 'https://aqtyqbjozqldqcpiyejm.supabase.co/storage/v1/object/public/beer-icons/corona-extra.svg'),
   ('blue-girl', '🍺', 'Blue Girl', 'lager', '', 'https://aqtyqbjozqldqcpiyejm.supabase.co/storage/v1/object/public/beer-icons/blue-girl.svg'),

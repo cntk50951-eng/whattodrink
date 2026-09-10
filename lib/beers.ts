@@ -10,12 +10,15 @@
  *   - category: free-form category for filtering / display
  *   - tagline: short marketing line (i18n in future via backend)
  */
+import { toBeersJson } from "./api/beers";
 export type Beer = {
   id: string;
   emoji: string;
   name: string;
   category: string;
   tagline: string;
+  /** 自畫圖標公開 URL（UR A.4：API 回填；缺席＝還沒畫圖，走 emoji）。 */
+  icon_url?: string | null;
 };
 
 export const BEERS: Beer[] = [
@@ -43,6 +46,39 @@ export const BEERS: Beer[] = [
 export function pickRandomBeer(): Beer {
   const idx = Math.floor(Math.random() * BEERS.length);
   return BEERS[idx];
+}
+
+/* ---- UR A.4 前端接 API ----
+ * BEERS 是活目錄：啟動時靜態 15 條保底，`fetchBeers()` 成功即原地換成
+ * API 數據（同 id 全覆蓋，調用方零改——所有 pick 函數讀的都是這個引用）。
+ * 換源失敗（斷網／500／空表／壞行）回 false，靜態照走，體感不斷。
+ * 測試用 `applyBeerCatalog` 直灌＋還原（vitest 檔級隔離，不污染別檔）。 */
+export function applyBeerCatalog(rows: Beer[]): void {
+  BEERS.length = 0;
+  BEERS.push(...rows);
+}
+
+/** 按展示名找酒（他人 mock pin／卡按 drinkName 取 icon_url 用）。精確匹配。 */
+export function beerByName(name: string): Beer | null {
+  return BEERS.find((b) => b.name === name) ?? null;
+}
+
+export async function fetchBeers(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/v1/beers", { cache: "no-store" });
+    if (!res.ok) return false;
+    const data: unknown = await res.json();
+    const rows = toBeersJson(
+      typeof data === "object" && data !== null
+        ? (data as { beers?: unknown }).beers
+        : null,
+    );
+    if (rows === null || rows.length === 0) return false;
+    applyBeerCatalog(rows);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /* ---- UR3.8 品種分層 ----

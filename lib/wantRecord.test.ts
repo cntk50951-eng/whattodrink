@@ -61,6 +61,19 @@ describe("parseWantRecord", () => {
     ).toBeNull();
   });
 
+  it("round-trips icon_url（刷新不掉圖 regression）", () => {
+    const withIcon = {
+      ...GOOD,
+      beer: { ...GOOD.beer, icon_url: "https://x/heineken.svg" },
+    };
+    expect(parseWantRecord(withIcon)).toEqual(withIcon);
+    const badIcon = {
+      ...GOOD,
+      beer: { ...GOOD.beer, icon_url: 42 },
+    };
+    expect(parseWantRecord(badIcon)).toEqual(GOOD);
+  });
+
   it("fills optional beer fields with empty strings", () => {
     const record = parseWantRecord({
       ...GOOD,

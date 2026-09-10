@@ -59,6 +59,9 @@ export function parseWantRecord(raw: unknown): WantRecord | null {
   ) {
     return null;
   }
+  // UR A.4：icon_url 必須帶上——白名單漏新鍵＝刷新掉圖（已踩一次）。
+  const iconUrl =
+    typeof candidate.icon_url === "string" ? candidate.icon_url : null;
   const record: WantRecord = {
     beer: {
       id: candidate.id,
@@ -67,6 +70,7 @@ export function parseWantRecord(raw: unknown): WantRecord | null {
       category:
         typeof candidate.category === "string" ? candidate.category : "",
       tagline: typeof candidate.tagline === "string" ? candidate.tagline : "",
+      ...(iconUrl !== null ? { icon_url: iconUrl } : {}),
     },
     at: outer.at,
     position: outer.position,
