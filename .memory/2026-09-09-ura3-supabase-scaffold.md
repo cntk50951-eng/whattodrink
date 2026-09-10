@@ -29,6 +29,8 @@
 - 用戶：用 Storage API 传图，缺的 emoji 兜底。`exported/beer-icons/svg` 30 張全 lager 系，DB 15 條混合目錄只中 heineken（asahi／tsingtao 模糊待定，其餘 12 無圖）——錯圖不貼，只傳不亂 mapping。
 - 執行：Storage API 建公開 bucket＋30 張 snake→kebab 上傳全 ok；抽查 5 張匿名 200＋image/svg+xml＋`<svg` 開頭。DDL／policy 照規矩寫 `0003_beer-icons.sql` 等用戶跑；回填 URL＋API 出 `icon_url` 等列落地再做（select 不存在的列會 500，不可超前）。
 - 閉環：用戶跑完 0003→heineken 回填（REST PATCH 200 回顯）→API 加 `icon_url` 可空（缺鍵判壞行＋1 單測）→匿名驗 15 行／1 有圖 14 NULL。asahi／tsingtao 模糊匹配未定，12 缺圖等設計。門：142 綠／tsc 淨／lint 0 error。
+- 回填收尾：用戶拍板「本地有的全填」→asahi／tsingtao 回填（200 回顯），全表 15 行／3 有圖 12 NULL。剩下 12 條本地無圖（30 張全 lager 系，紅酒雞尾酒威士忌清酒一張沒有），不是沒傳，是沒得填。
+- 牌子進目錄：用戶糾正 27 lager 是牌子要能選→`0004` 26 行（茅台 excluded 非啤酒；Hoegaarden 暫進 lager 近似，已聲明）。教訓兩筆：①拼接 SQL 別用 index 切（註記里的關鍵詞會截斷，要用 rindex／正則錨定）；②apply 正則尾部 `\),` 漏了分号結尾行（brahma），改 `\),?;` 或逐行 strip 比對。seed 必須同源同步（新環境一致性）。
 
 ## 追記（第一個 API：GET /beers，過堂＋實現）
 - 過堂：UI 面＝DrinkMap 選酒全家＋beer-icons 品牌牆；id／emoji／name／category 有主，tagline 零消費但為結果卡預留（表留、API 照回、前端忽略，將來加列更貴）。
@@ -39,6 +41,23 @@
 - 用戶：建表前先從前端需求看數據要求，結合前端才能建表→已寫入 `.harness/architecture.md`「建表門禁（schema-from-UI）」5 步。
 - 拿新門倒審已寫好的 0001：六路 UI（WantRecord／Checkin／WallPost／cheers／invites／users）字段全對上，無多無少；只補兩個索引（checkins_created／users_last_seen，後者 schema 點名要）；bbox GiST（postgis）留到真有量再加，不提前。
 - 面積外：`area` 手寫區名確認不建表（future-schema 定了以 place_name 為準）。
+
+## 追記（UR A.4-rev2 本地圖退場）
+- 用戶：前端不許再直調項目內圖片（本地 tsx 手繪），一律 API 取圖，壞退 emoji。
+- 改：`BeerIcon` 去 tsx 剩兩級；想喝 pins（entry.beer.icon_url）／他人 pins＋卡头（`beerByName` 按 drinkName 對目錄）改 img；添 pin img CSS（方形卡骨架不動，尺寸不動）；`DrinkMap` 刪 iconForPickId／iconForDrinkName／renderToStaticMarkup 三 import。
+- 保留：CATEGORY_ART lane 頭（品類裝飾非酒圖）、preview 頁（設計管線）、`beer-icons/` 全套（設計源＋export 流程不動）。
+- 誠實點：mock 他人 4 杯全無 icon_url，短期 pins／卡头全退 emoji／頭像——等真數據或圖標補齊才有圖；heineken 有圖但 mock 里沒人喝它，面板暫時也看不到變化。
+- 門：145 綠／tsc 淨／lint 0 error。另：react-compiler「大寫賦值＝render 期建組件」誤報，`createElement`＋小寫持有繞過（沿用）。
+
+## 追記（刷新掉圖：白名單漏新鍵）
+- 用戶：想喝 Heineken 刷新後圖沒了，問是 bug 還是沒做。答：是 bug——本地持久化（`wtd-want-history`）本來就有，存鏈路也通；`parseWantRecord` 重建 beer 用白名單，A.4 加 `icon_url` 時沒同步，刷新即掉圖（記錄還在，看著像沒保存）。
+- 修：解析器帶上 `icon_url`（非字符串丟掉）＋regression 單測。門：146 綠。
+- 教訓：加字段＝存＋取兩端一起改，解析器白名單是第二端；以后加鍵先 grep 所有 parse＊。
+
+## 追記（領域模型糾正：牌子≠品種）
+- 用戶：27 款 lager 是「啤酒分類下的牌子」，不是酒的品種。`beers` 表混了兩層（品種：mojito／malbec…；牌子：heineken／asahi／tsingtao…）。
+- 結論：牌子另起 `brands` 表（掛啤酒分類下），不往 `beers` 硬塞 27 行；現有 3 款牌子味的行（heineken／asahi／tsingtao）暫不動，去重合併等產品定。
+- 教訓：目錄結構先問層級（分類→牌子→品種），不要默認同表。
 
 ## 追記（用戶糾正：不超前做）
 - 用戶：沒下令建表就不要建；一個一個來，先講第一個 API 打算做什麼。

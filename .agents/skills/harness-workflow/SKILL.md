@@ -12,7 +12,7 @@ At the **start of every development task**, follow these steps strictly:
 1. `.harness/workflow.md` — 10-step development process
 2. `.harness/coding-standards.md` — TypeScript / React / file structure / naming
 3. `.memory/` — read latest 3–5 entries (if new entries exist in last 24h, read ALL of them)
-4.依任務性質再讀 `.harness/` sub-files: `testing.md` / `git.md` / `architecture.md`
+4.依任務性質再讀 `.harness/` sub-files: `testing.md` / `git.md` / `architecture.md` / `api-workflow.md`（API 任務必讀，七步一次一個端點）
 
 (Muse tool note: load another skill's full instructions with the `read_skill` tool using its id or path from the skills catalog — never `read_file` a `bundled://` or `plugin://` path.)
 

@@ -65,6 +65,7 @@
 - `npm test` — vitest（如已裝）；純函數 / 邏輯分支必測
 - `npm run lint` — ESLint 無 error
 - **三道 gate 全綠才能進 step 6**
+- API 開發另走 `.harness/api-workflow.md` 七步（一次一個端點，不打包）
 
 ## Step 6 · 瀏覽器測試（具體功能時）
 
@@ -203,7 +204,7 @@ UI 全確定前不建表，但數據文檔（`docs/data/`）必須與前端同�
 □ Step 2 — 疑慮有問完、思考摘要已輸出（≥2 路徑＋取捨＋否決理由）
 □ Step 3 — API 查過最新版本
 □ Step 4 — coding-standards 對齊
-□ Step 5 — build / lint / test 全綠
+□ Step 5 — build / lint / test 全綠（API 任務另檢 `.harness/api-workflow.md` 七步）
 □ Step 6 — UI 功能用瀏覽器實際點過
 □ Step 7 — 看到的錯都修了（root cause 不是 patch）、UR 改動記錄已回寫
 □ Step 8 — memory 有加（如有修正）
