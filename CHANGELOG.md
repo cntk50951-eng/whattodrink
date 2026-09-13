@@ -28,6 +28,12 @@
   - 牌子 26 行進目錄（`0004`＋seed 同步；41 行全驗；茅台 excluded；Hoegaarden 暫進 lager）
 - **UR A.5 — 啤酒換一批無反應（[✓]，用户親眼驗收，merged）**
   - `pickNextBatch`（排除當前批優先取新臉，池不夠回退重洗）＋6 單測；L2 換一批接新語義＋按鈕搬 header 可見處＋池見底置灰（零新 i18n key）；152 綠／tsc 淨／lint 0 error
+- **URC 1.0 — 地圖 CTA 收進地圖組件，喝酒 CTA 獨立乾淨（[✓]，用戶親眼驗收，merged）**
+  - 新 `components/map/MapToolbar.tsx`：6 個地圖動作收編（縮放＋／－／睇全港／回位／足跡／搖一搖），城市卡下同列堆疊（A1），搖一搖 idle hint 沿 UR2.5 配方，零新 i18n key；flex-wrap 手機 2 列 3 行避熱榜
+  - `MapFab` 瘦身為啤酒單鈕（移除 7 個扇形動作＋搖搖衛星＋拍）；拍照入口走頂部菜單沿 UR1.7；`markShakeUsed` 隨搖一搖搬 toolbar
+  - `DrinkMap`：城市卡＋工具列包 `flex flex-col items-start gap-2` 同列容器；`useRouter`／`fabOpen` state 退役；geo pill 從 `top-14` 推到 `top-44` 讓位給工具列
+  - `drink-map.module.css`：加 `.mapToolbar`／`.toolbarBtn`／`.toolbarBtnShake`／響應式 padding＋max-w（邊框 4px 算進去）；`.fabPing`／`.fabShake`／`.fabHint`／`.fabBubblePop` 留 idle 提示
+  - 152 綠（無新增測試）／tsc 淨／lint 0 error（3 舊 warning）；瀏覽器親眼驗收通過（手機 390×844＋桌面 1280×800）
 - **UR 1.1 — 首頁互動式頁面重構（WIP，待用戶側 build＋瀏覽器驗收）**
   - 新依賴：`leaflet@1.9.4`（真實地理底圖＋免費 CARTO Voyager 瓦片，免 key）、`vitest@^3`（`@types/node@20` 與 vitest 5 互斥，只能用 v3）＋ `npm test` 腳本
   - `components/map/DrinkMap.tsx` — 地圖＋推薦入口同一組件：geolocation 狀態機、拒絕／失敗→全港視圖、塗鴉 pins（自己／MOCK 他人／「想喝」虛線圈）、自訂縮放＋睇全港按鈕、乾杯卡（本地 mock）、`prefers-reduced-motion` 降級

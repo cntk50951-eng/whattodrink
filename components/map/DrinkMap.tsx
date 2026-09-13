@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type * as Leaflet from "leaflet";
 import { useLocale, useTranslations } from "next-intl";
@@ -19,6 +18,7 @@ import { resolveCityCode } from "@/lib/city";
 
 import { CityIcon } from "./CityIcon";
 import { MapFab } from "@/components/map/MapFab";
+import { MapToolbar } from "@/components/map/MapToolbar";
 import { MapHotBoard } from "@/components/wall/MapHotBoard";
 
 import { useGeolocation } from "@/hooks/useGeolocation";
@@ -42,7 +42,7 @@ import {
   loadSentToday,
   saveSentToday,
 } from "@/lib/cheers";
-import { markShakeUsed } from "@/components/map/MapFab";
+import { markShakeUsed } from "@/components/map/MapToolbar";
 import { pickNearestRecentCheckin } from "@/lib/shake";
 import { clusterPoints } from "@/lib/clusters";
 import { isOnline } from "@/lib/nearby";
@@ -187,7 +187,6 @@ export function DrinkMap({
   const locale = useLocale();
   const t = useTranslations("map");
   const heroT = useTranslations("hero");
-  const router = useRouter();
   const {
     status: geoStatus,
     position: geoPosition,
@@ -208,7 +207,8 @@ export function DrinkMap({
   // UR1.2 bottom sheet: closed pill <-> open half-sheet. Auto-closes into
   // a chip when the 想喝 pin drops so the map is never buried on small screens.
   const [sheetOpen, setSheetOpen] = useState(initialPickOpen);
-  const [fabOpen, setFabOpen] = useState(initialPickOpen);
+  // URC 1.0：扇形退役，fabOpen 不再有 fan 需要管；留 setFabOpen 給舊調用點
+  // 不報錯即可（這裡實際無副作用）。
   // UR1.7: App Router reuses the client tree when only searchParams change
   // (/ → /?pick=1), so useState-initial alone misses menu clicks from home.
   // This fires only on a false→true transition (direct loads are covered
@@ -710,11 +710,11 @@ export function DrinkMap({
         "pan-y pinch-zoom",
         "important",
       );
-      // A map drag means "I'm navigating" — collapse the dial, no catcher.
+      // A map drag means "I'm navigating" — clear selection, no catcher.
       // UR2.1 (Q1 decision): the anchored card closes too — a navigating
       // user outruns any pin anyway, and re-tapping is one touch away.
+      // URC 1.0: 扇形退役，不再需要 setFabOpen(false)。
       map.on("dragstart", () => {
-        setFabOpen(false);
         setSelectedId(null);
       });
       // UR2.8: 他人 pin 层走聚合重建（首帧＋每次 zoomend），街区 zoom
@@ -883,11 +883,9 @@ export function DrinkMap({
     }
     if (!prevPickOpen.current) {
       prevPickOpen.current = true;
-      // Sheet open = the dial hides itself per the UR1.3 rule, exactly
-      // like tapping the fan pick entry by hand.
+      // URC 1.0：深鏈直接開 sheet + L1 品種層（無扇形；舊 setFabOpen 退役）。
       setSheetOpen(true);
       setPickLanes(true);
-      setFabOpen(true);
     }
     const map = mapRef.current;
     if (
@@ -1391,43 +1389,62 @@ export function DrinkMap({
         aria-label={t("mapLabel")}
       />
 
-      {/* UR3.5 左上城市状态卡（顶双 pill 已删，此处是唯一的顶卡）：
-          城市大字＋登录状态＋上次在线＋条件上次地点，图形 tile 复 tile 行。 */}
+      {/* URC 1.0：城市卡＋工具列同列堆疊（A1），視覺聚合成「地圖組件」
+          單元。城市資訊是上半，地圖操作收進下半工具列。flex-col 容器兩者
+          同列同邊，gap-2 拉開層次。 */}
       <div
-        className={`${styles.above} absolute top-3 left-3 flex items-center gap-2.5 rounded-2xl border-2 bg-card/95 py-2 pr-3 pl-2 shadow-[3px_3px_0_var(--border)] backdrop-blur-sm`}
+        className={`${styles.above} absolute top-3 left-3 flex flex-col items-start gap-2`}
       >
-        <span
-          aria-hidden
-          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 bg-accent text-accent-foreground"
-        >
-          <CityIcon code={cityCode} size={54} />
-        </span>
-        <span className="min-w-0">
-          <span className="font-hand block text-xl leading-none font-bold">
-            {t(cityLabelKey)}
-          </span>
+        {/* UR3.5 左上城市状态卡（顶双 pill 已删，此处是唯一的顶卡）：
+            城市大字＋登录状态＋上次在线＋条件上次地点，图形 tile 复 tile 行。 */}
+        <div className="flex items-center gap-2.5 rounded-2xl border-2 bg-card/95 py-2 pr-3 pl-2 shadow-[3px_3px_0_var(--border)] backdrop-blur-sm">
           <span
-            className={`mt-1 flex items-center gap-1 text-xs font-bold ${meStatusTone}`}
+            aria-hidden
+            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 bg-accent text-accent-foreground"
           >
-            <span
-              aria-hidden
-              className="inline-block h-2 w-2 rounded-full bg-current"
-            />
-            {meStatusText}
+            <CityIcon code={cityCode} size={54} />
           </span>
-          {lastVisit !== null && (
-            <span className="text-muted-foreground mt-0.5 block text-xs">
-              {t("lastSeenAt", {
-                time: formatWantTime(lastVisit.at, locale),
-              })}
+          <span className="min-w-0">
+            <span className="font-hand block text-xl leading-none font-bold">
+              {t(cityLabelKey)}
             </span>
-          )}
-          {shouldShowLastPlace(lastVisit, currentArea) && (
-            <span className="text-muted-foreground block max-w-36 truncate text-xs">
-              {t("lastPlaceAt", { place: lastVisit?.area ?? "" })}
+            <span
+              className={`mt-1 flex items-center gap-1 text-xs font-bold ${meStatusTone}`}
+            >
+              <span
+                aria-hidden
+                className="inline-block h-2 w-2 rounded-full bg-current"
+              />
+              {meStatusText}
             </span>
-          )}
-        </span>
+            {lastVisit !== null && (
+              <span className="text-muted-foreground mt-0.5 block text-xs">
+                {t("lastSeenAt", {
+                  time: formatWantTime(lastVisit.at, locale),
+                })}
+              </span>
+            )}
+            {shouldShowLastPlace(lastVisit, currentArea) && (
+              <span className="text-muted-foreground block max-w-36 truncate text-xs">
+                {t("lastPlaceAt", { place: lastVisit?.area ?? "" })}
+              </span>
+            )}
+          </span>
+        </div>
+        {/* URC 1.0 地圖工具列：6 個地圖操作收編（縮放＋/-, 回位, 睇全港,
+            搖一搖, 足跡），城市卡下同列堆疊。底卡／sheet／指引打開時整組讓位。 */}
+        <MapToolbar
+          hidden={
+            sheetOpen || card !== null || (geoFailed && !guideDismissed)
+          }
+          onZoomIn={() => handleZoom(1)}
+          onZoomOut={() => handleZoom(-1)}
+          onRecenter={handleRecenter}
+          onFitHk={handleFitHk}
+          onShake={handleShakeRequest}
+          shakeBurst={shakeBurst}
+          onFootprints={() => setTrailMode((v) => !v)}
+        />
       </div>
 
       {/* Notebook dot-grid over the tiles */}
@@ -1757,26 +1774,15 @@ export function DrinkMap({
         </p>
       )}
 
-      {/* Speed-dial: every map action consolidated in one button. Hides
-          while any bottom card is open (the beer lives in the corner,
-          nowhere else); closing the card brings it back. */}
+      {/* URC 1.0：MapFab 瘦身為啤酒單鈕——直接開推薦面板，無扇形。
+          地圖操作全部走 MapToolbar（城市卡下同列）。拍照入口走頂部菜單
+          （UR1.7 已存在 photoPick → /?shoot=1）。 */}
       <MapFab
-        open={fabOpen}
-        onToggle={() => setFabOpen((v) => !v)}
-        onClose={() => setFabOpen(false)}
         hidden={
           sheetOpen || card !== null || (geoFailed && !guideDismissed)
         }
         hasWant={picked !== null && wantSaved}
         onPick={openPickSheet}
-        onPhoto={() => router.push("/?shoot=1")}
-        onRecenter={handleRecenter}
-        onFitHk={handleFitHk}
-        onZoomIn={() => handleZoom(1)}
-        onZoomOut={() => handleZoom(-1)}
-        onShake={handleShakeRequest}
-        shakeBurst={shakeBurst}
-        onFootprints={() => setTrailMode((v) => !v)}
       />
 
 
@@ -1821,24 +1827,25 @@ export function DrinkMap({
 
       {/* Slim status pill: locating, outside-HK, or a dismissed failure.
           Tapping the dismissed pill retries and reopens the guide. */}
-      {/* UR1.4：扇形展开时让位隐藏，收起即回来 */}
-      {(geoStatus === "locating" || outsideHk) && !fabOpen && (
+      {/* URC 1.0：城市卡＋工具列同列堆疊後總高 ~165px，pill 從 top-14 推到
+          top-44 避開重疊。 */}
+      {(geoStatus === "locating" || outsideHk) && (
         <p
           role="status"
-          className={`${styles.above} absolute top-14 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-full border-2 bg-card/95 px-4 py-1.5 text-center text-xs font-bold md:text-sm`}
+          className={`${styles.above} absolute top-44 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-full border-2 bg-card/95 px-4 py-1.5 text-center text-xs font-bold md:text-sm`}
         >
           {geoStatus === "locating" && t("locating")}
           {outsideHk && t("outside")}
         </p>
       )}
-      {geoFailed && guideDismissed && !fabOpen && (
+      {geoFailed && guideDismissed && (
         <button
           type="button"
           onClick={() => {
             setGuideDismissed(false);
             handleRetryLocate();
           }}
-          className={`${styles.above} absolute top-14 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-full border-2 bg-card/95 px-4 py-1.5 text-center text-xs font-bold md:text-sm`}
+          className={`${styles.above} absolute top-44 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-full border-2 bg-card/95 px-4 py-1.5 text-center text-xs font-bold md:text-sm`}
         >
           {t("denied")} · {t("retryLocate")}
         </button>

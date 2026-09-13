@@ -1,64 +1,27 @@
 "use client";
 
-import {
-  useEffect,
-  useState,
-  useSyncExternalStore,
-  type CSSProperties,
-} from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
-import {
-  Camera,
-  Dices,
-  Expand,
-  Footprints,
-  LocateFixed,
-  Minus,
-  Plus,
-  Vibrate,
-} from "lucide-react";
 
 import styles from "./drink-map.module.css";
 
 type MapFabProps = {
-  open: boolean;
-  onToggle: () => void;
-  onClose: () => void;
   /**
-   * A bottom card is open — the dial hides entirely instead of floating
+   * A bottom card is open — the beer hides entirely instead of floating
    * mid-map (UR1.4: the beer lives in the corner, nowhere else).
    * Closing the card brings it back.
    */
   hidden: boolean;
   /** True while a 想喝 pin sits on the map — red dot on the main button. */
   hasWant: boolean;
+  /** URC 1.0：地圖操作（縮放／回位／全港／搖一搖／足跡／拍照）全部收進
+   *  MapToolbar，MapFab 只剩啤酒單鈕——直接開推薦面板（無扇形）。 */
   onPick: () => void;
-  onPhoto: () => void;
-  onRecenter: () => void;
-  onFitHk: () => void;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  /** UR2.5 摇摇：按钮点击＝程序化摇一摇（权限申请由调用方包办）。 */
-  onShake: () => void;
-  /** UR3.4 足迹：进足迹模式（调用方再点一次退出，toggle 语义）。 */
-  onFootprints: () => void;
-  /**
-   * UR2.9 触发计数（调用方每次触发＋1，含 prime tick）：卫星钮 key 重挂
-   * 重播 rattle，和 idle wobble 三元互斥（同一元素单动画）。
-   */
-  shakeBurst: number;
 };
 
 /** 上一次点开啤酒按钮的时间戳（ms）。12 小时内不再做任何闲置提示。 */
 const TAP_KEY = "wtd-fab-tap";
 const QUIET_MS = 12 * 3600 * 1000;
-/**
- * UR2.5 上一次用过摇摇的时间戳（ms）。啤酒点得多不算数 —— 只有真用过摇摇，
- * 12 小时内才停抖；否则"每几分钟抖一次"的发现机制会被啤酒点击杀死。
- */
-const SHAKE_USED_KEY = "wtd-shake-used";
-/** 摇摇 pill 的抖动周期：5 分钟一次（用户原话"每隔几分钟"）。 */
-const SHAKE_WOBBLE_EVERY_MS = 5 * 60 * 1000;
 
 /**
  * localStorage 必须走 useSyncExternalStore：lazy useState initializer 在
@@ -85,92 +48,32 @@ function serverFabQuiet(): boolean {
   return false;
 }
 
-/** UR2.5 摇摇用过就 12 小时不抖（和啤酒静默同一套 hydration 安全写法）。 */
-function subscribeShakeUsed(cb: () => void): () => void {
-  window.addEventListener("storage", cb);
-  return () => window.removeEventListener("storage", cb);
-}
-
-function readShakeQuiet(): boolean {
-  try {
-    const raw = window.localStorage.getItem(SHAKE_USED_KEY);
-    const n = raw === null ? NaN : Number(raw);
-    return Number.isFinite(n) && n > 0 && Date.now() - n < QUIET_MS;
-  } catch {
-    return false;
-  }
-}
-
-/** 触发一次有效摇动（按钮或真机）就调 —— 同 tab 靠父级重渲染带出新快照。 */
-export function markShakeUsed(): void {
-  try {
-    window.localStorage.setItem(SHAKE_USED_KEY, String(Date.now()));
-  } catch {
-    // 隐私模式 —— 下次再停抖，无害。
-  }
-}
 /** 3 秒无操作 → 摇晃一下；20 秒无操作 → 冒泡提示。 */
 const SHAKE_AFTER_MS = 3000;
 const BUBBLE_AFTER_MS = 20000;
 
 /**
- * UR1.3 地图 speed-dial —— 所有地图操作的唯一入口，停靠在左下。
+ * URC 1.0 啤酒單鈕 —— 地圖左下的「今晚喝什麼」主入口。
  *
- * 主按钮是一杯手绘啤酒：溢出的酒花泡沫、杯内气泡无限上升。
- * 三层可点性提示（只在“从未点开过、或上次点开已超过 12 小时”时启用）：
- * 1）红色呼吸光环常驻；2）3 秒无任何点击，杯子摇晃一次；
- * 3）20 秒无任何点击，弹出漫画气泡。任意 pointerdown 都重置计时。
- * 相机类操作（缩放／回位／全港）点后扇形保持展开，可连续操作；
- * 只有选酒会收起（要给底部抽屉让位）。
+ * 原本 UR1.3 speed-dial 把 7 個動作（5 地圖 + 2 喝酒）混在一個扇形裡，
+ * 導致喝酒 CTA 被淹沒。URC 1.0 把地圖操作搬到 MapToolbar（城市卡下同列），
+ * MapFab 瘦身為單一啤酒鈕——點即開推薦面板。
+ *
+ * 三層可点性提示保留（沿用 UR1.3 配方）：紅色呼吸環常駐、3 秒無點擊杯子
+ * 搖一次、20 秒無點擊彈漫畫氣泡。任意 pointerdown 都重置計時。
  */
-export function MapFab({
-  open,
-  onToggle,
-  onClose,
-  hidden,
-  hasWant,
-  onPick,
-  onPhoto,
-  onRecenter,
-  onFitHk,
-  onZoomIn,
-  onZoomOut,
-  onShake,
-  shakeBurst,
-  onFootprints,
-}: MapFabProps) {
+export function MapFab({ hidden, hasWant, onPick }: MapFabProps) {
   const t = useTranslations("map");
-  // 静默期走外部 store（ hydration 安全，见上面注释）。
   const quiet = useSyncExternalStore(
     subscribeFabTap,
     readFabQuiet,
     serverFabQuiet,
   );
-  const suppressed = quiet;
   // 0 = 刚操作过／活跃中，1 = 3 秒闲置（摇过），2 = 20 秒闲置（冒泡）。
   const [idleLevel, setIdleLevel] = useState(0);
-  // UR2.5 摇摇 pill：用过 12h 内不抖，否则每 5 分钟抖 0.65 秒。
-  const shakeQuiet = useSyncExternalStore(
-    subscribeShakeUsed,
-    readShakeQuiet,
-    serverFabQuiet,
-  );
-  const [shakeWobble, setShakeWobble] = useState(false);
-  useEffect(() => {
-    if (shakeQuiet) return;
-    const id = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      setShakeWobble(true);
-      window.setTimeout(() => setShakeWobble(false), 650);
-    }, SHAKE_WOBBLE_EVERY_MS);
-    return () => window.clearInterval(id);
-  }, [shakeQuiet]);
-  // 首屏新人先看啤酒引导（旧 hint），之后这个槽位归摇摇按钮。
-  const showOldHint = !suppressed && !open && idleLevel < 2;
-
   // 闲置计时：任意点击都重置。点开过 12 小时内直接不布防。
   useEffect(() => {
-    if (suppressed) return;
+    if (quiet) return;
     let t1: ReturnType<typeof setTimeout> | undefined;
     let t2: ReturnType<typeof setTimeout> | undefined;
     const arm = (reset: boolean): void => {
@@ -188,188 +91,92 @@ export function MapFab({
       clearTimeout(t2);
       window.removeEventListener("pointerdown", onDown);
     };
-  }, [suppressed]);
+  }, [quiet]);
 
-  function handleToggle(): void {
+  function handleTap(): void {
     try {
       window.localStorage.setItem(TAP_KEY, String(Date.now()));
     } catch {
       // 隐私模式等 —— 下次再提示，无害。
     }
-    // 同 tab 无 storage 事件，靠这次重渲染（setIdleLevel＋父级 onToggle）
-    // 让外部 store 读到新快照。
     setIdleLevel(0);
-    onToggle();
+    onPick();
   }
 
-  // Fan rows stack upward from the beer via absolute offsets (row 44px +
-  // 10px gap; pick nearest the thumb). They are OUT of flow so the closed
-  // fan occupies zero space and the beer truly sits in the corner.
-  // keepOpen：地图相机类操作不收扇形，可连点。
-  // hot：主入口 accent 高亮，和工具按钮拉开层级。
-  const actions: {
-    key: string;
-    label: string;
-    icon: typeof Plus;
-    run: () => void;
-    keepOpen: boolean;
-    hot?: boolean;
-  }[] = [
-    { key: "zin", label: t("zoomIn"), icon: Plus, run: onZoomIn, keepOpen: true },
-    { key: "zout", label: t("zoomOut"), icon: Minus, run: onZoomOut, keepOpen: true },
-    { key: "hk", label: t("hkWide"), icon: Expand, run: onFitHk, keepOpen: true },
-    { key: "recenter", label: t("recenter"), icon: LocateFixed, run: onRecenter, keepOpen: true },
-    { key: "photo", label: t("photo"), icon: Camera, run: onPhoto, keepOpen: false, hot: true },
-    { key: "pick", label: t("pickCta"), icon: Dices, run: onPick, keepOpen: false },
-    // UR3.4 足迹：和睇全港同级（地图视角类），放 pick 上面，点后收扇形进模式。
-    { key: "trail", label: t("footprints"), icon: Footprints, run: onFootprints, keepOpen: false },
-  ];
-
-  // 卡片展开时整个 dial 藏起来 —— 啤酒只住左下角，不浮半空。
   if (hidden) return null;
 
   return (
-    <div
-      className={`${styles.above} ${styles.fabDock} absolute left-3`}
-    >
-      {actions.map((action, i) => {
-        const Icon = action.icon;
-        return (
-          // UR1.5：整行单个 button——图标＋文字同一点击区、单个 tab stop。
-          // button 不可嵌套 button，所以圆形图标退为纯视觉 span；
-          // 按压缩放反馈走 group-active 平移过去（点文字时圆形照样压一下）。
-          <button
-            key={action.key}
-            type="button"
-            tabIndex={open ? 0 : -1}
-            aria-label={action.label}
-            onClick={() => {
-              action.run();
-              if (!action.keepOpen) onClose();
-            }}
-            style={
-              {
-                "--fan-rise": `${74 + (actions.length - 1 - i) * 54}px`,
-                "--fan-delay": `${(actions.length - 1 - i) * 50}ms`,
-              } as CSSProperties
-            }
-            className={`${styles.fanItem} group flex cursor-pointer items-center gap-2 text-left transition-all motion-safe:duration-200 ${
-              open
-                ? "translate-y-0 scale-100 opacity-100"
-                : "pointer-events-none translate-y-3 scale-50 opacity-0"
-            }`}
-          >
-            <span
-              aria-hidden
-              className={`flex h-11 w-11 items-center justify-center rounded-full border-2 shadow-[2px_2px_0_var(--border)] transition-transform group-active:translate-x-0.5 group-active:translate-y-0.5 group-active:shadow-none ${
-                action.hot ? "bg-accent text-accent-foreground" : "bg-card"
-              }`}
-            >
-              <Icon size={19} aria-hidden />
-            </span>
-            <span className="rounded-full border-2 bg-card px-2.5 py-1 text-xs font-bold whitespace-nowrap shadow-[2px_2px_0_var(--border)]">
-              {action.label}
-            </span>
-          </button>
-        );
-      })}
-      <div className="relative flex items-center gap-2">
-        {!suppressed && !open && idleLevel >= 2 && (
-          <span
-            role="status"
-            className={`${styles.fabBubblePop} font-hand absolute bottom-[4.5rem] left-0 w-max max-w-44 rounded-2xl border-2 bg-card px-3 py-2 text-sm font-bold whitespace-normal shadow-[3px_3px_0_var(--border)]`}
-          >
-            {t("fabBubble")}
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={handleToggle}
-          aria-expanded={open}
-          aria-label={t("fabMenu")}
-          className={`relative flex h-16 w-16 items-center justify-center rounded-full border-2 bg-primary text-primary-foreground shadow-[4px_4px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none ${
-            !suppressed && !open && idleLevel >= 1 ? styles.fabShake : ""
-          }`}
+    <div className={`${styles.above} ${styles.fabDock} absolute left-3`}>
+      {!quiet && idleLevel >= 2 && (
+        <span
+          role="status"
+          className={`${styles.fabBubblePop} font-hand absolute bottom-[4.5rem] left-0 w-max max-w-44 rounded-2xl border-2 bg-card px-3 py-2 text-sm font-bold whitespace-normal shadow-[3px_3px_0_var(--border)]`}
         >
-          {!suppressed && <span aria-hidden className={styles.fabPing} />}
-          {hasWant && (
-            <span
-              aria-hidden
-              className="absolute top-1 right-1 h-3.5 w-3.5 rounded-full border-2 bg-(--doodle-red)"
-            />
-          )}
-          <svg
-            viewBox="0 0 36 36"
-            width="38"
-            height="38"
-            aria-hidden
-            className="overflow-visible"
-          >
-            <g
-              fill="none"
-              stroke="var(--border)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              {/* 把手 */}
-              <path d="M 25 18 L 28 18 A 4 4 0 0 1 28 27 L 25 27" />
-              {/* 杯身 */}
-              <rect x="9" y="13" width="16" height="17" rx="3" fill="var(--card)" />
-              {/* 酒液 */}
-              <rect x="11" y="19.5" width="12" height="8.5" fill="var(--primary)" stroke="none" />
-              {/* 酒液高光 */}
-              <rect x="12.5" y="21" width="2.5" height="6" rx="1.2" fill="var(--card)" stroke="none" opacity="0.55" />
-              {/* 溢出的酒花泡沫 */}
-              <path
-                d="M 8 14.5 Q 7.5 9.5 12 9.5 Q 13.5 6 17 7 Q 20 4 22.5 7 Q 27 6.5 27.5 11 Q 28.5 14.5 25 15.5 L 11 15.5 Q 8.5 15.5 8 14.5 Z"
-                fill="var(--card)"
-              />
-              {/* 泡沫质感点 */}
-              <circle cx="14" cy="10.5" r="1.1" strokeWidth="1.4" fill="var(--card)" />
-              <circle cx="20.5" cy="9" r="1.3" strokeWidth="1.4" fill="var(--card)" />
-              {/* 顺着杯壁淌下的两道泡沫 */}
-              <path d="M 14.5 15.5 L 14.5 19.5 A 1.5 1.5 0 0 1 11.5 19.5 L 11.5 15.5" fill="var(--card)" strokeWidth="1.6" />
-              <path d="M 23.5 15.5 L 23.5 18.5 A 1.5 1.5 0 0 1 20.5 18.5 L 20.5 15.5" fill="var(--card)" strokeWidth="1.6" />
-            </g>
-            {/* 杯内上升气泡 */}
-            <circle cx="15" cy="23.5" r="1.4" fill="var(--card)" className={`${styles.beerBubble} ${styles.b1}`} />
-            <circle cx="19" cy="25" r="1.1" fill="var(--card)" className={`${styles.beerBubble} ${styles.b2}`} />
-            <circle cx="16.8" cy="26.5" r="0.9" fill="var(--card)" className={`${styles.beerBubble} ${styles.b3}`} />
-          </svg>
-        </button>
-        {showOldHint ? (
+          {t("fabBubble")}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={handleTap}
+        aria-label={t("pickCta")}
+        className={`relative flex h-16 w-16 items-center justify-center rounded-full border-2 bg-primary text-primary-foreground shadow-[4px_4px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none ${
+          !quiet && idleLevel >= 1 ? styles.fabShake : ""
+        }`}
+      >
+        {!quiet && <span aria-hidden className={styles.fabPing} />}
+        {hasWant && (
           <span
-            className={`${styles.fabHint} font-hand rounded-full border-2 bg-card px-3 py-1.5 text-sm font-bold whitespace-nowrap shadow-[2px_2px_0_var(--border)]`}
-          >
-            {t("fabHint")}
-          </span>
-        ) : (
-          // UR2.5 摇摇：啤酒的卫星钮 —— 同一圆钮家族（圆＋ink 边＋硬阴影），
-          // 反转为 card 底＋品牌色图标，尺寸卡在啤酒（64）和扇形钮（44）之间。
-          // 右边小字只做静态说明，动作只发生在钮上（按压＋5 分钟一抖）。
-          <span className="inline-flex items-center gap-2">
-            <button
-              type="button"
-              key={shakeBurst}
-              onClick={onShake}
-              aria-label={t("shakeHint")}
-              className={`bg-card text-primary flex h-12 w-12 items-center justify-center rounded-full border-2 shadow-[3px_3px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none ${
-                shakeBurst > 0
-                  ? styles.fabRattle
-                  : shakeWobble
-                    ? styles.fabShake
-                    : ""
-              }`}
-            >
-              <Vibrate size={20} aria-hidden strokeWidth={2.5} />
-            </button>
-            <span className="font-hand rounded-full border-2 bg-card px-2.5 py-1 text-xs font-bold whitespace-nowrap shadow-[2px_2px_0_var(--border)]">
-              {t("shakeHint")}
-            </span>
-          </span>
+            aria-hidden
+            className="absolute top-1 right-1 h-3.5 w-3.5 rounded-full border-2 bg-(--doodle-red)"
+          />
         )}
-      </div>
+        <svg
+          viewBox="0 0 36 36"
+          width="38"
+          height="38"
+          aria-hidden
+          className="overflow-visible"
+        >
+          <g
+            fill="none"
+            stroke="var(--border)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            {/* 把手 */}
+            <path d="M 25 18 L 28 18 A 4 4 0 0 1 28 27 L 25 27" />
+            {/* 杯身 */}
+            <rect x="9" y="13" width="16" height="17" rx="3" fill="var(--card)" />
+            {/* 酒液 */}
+            <rect x="11" y="19.5" width="12" height="8.5" fill="var(--primary)" stroke="none" />
+            {/* 酒液高光 */}
+            <rect x="12.5" y="21" width="2.5" height="6" rx="1.2" fill="var(--card)" stroke="none" opacity="0.55" />
+            {/* 溢出的酒花泡沫 */}
+            <path
+              d="M 8 14.5 Q 7.5 9.5 12 9.5 Q 13.5 6 17 7 Q 20 4 22.5 7 Q 27 6.5 27.5 11 Q 28.5 14.5 25 15.5 L 11 15.5 Q 8.5 15.5 8 14.5 Z"
+              fill="var(--card)"
+            />
+            {/* 泡沫质感点 */}
+            <circle cx="14" cy="10.5" r="1.1" strokeWidth="1.4" fill="var(--card)" />
+            <circle cx="20.5" cy="9" r="1.3" strokeWidth="1.4" fill="var(--card)" />
+            {/* 顺着杯壁淌下的两道泡沫 */}
+            <path d="M 14.5 15.5 L 14.5 19.5 A 1.5 1.5 0 0 1 11.5 19.5 L 11.5 15.5" fill="var(--card)" strokeWidth="1.6" />
+            <path d="M 23.5 15.5 L 23.5 18.5 A 1.5 1.5 0 0 1 20.5 18.5 L 20.5 15.5" fill="var(--card)" strokeWidth="1.6" />
+          </g>
+          {/* 杯内上升气泡 */}
+          <circle cx="15" cy="23.5" r="1.4" fill="var(--card)" className={`${styles.beerBubble} ${styles.b1}`} />
+          <circle cx="19" cy="25" r="1.1" fill="var(--card)" className={`${styles.beerBubble} ${styles.b2}`} />
+          <circle cx="16.8" cy="26.5" r="0.9" fill="var(--card)" className={`${styles.beerBubble} ${styles.b3}`} />
+        </svg>
+      </button>
+      {!quiet && idleLevel < 2 && (
+        <span
+          className={`${styles.fabHint} font-hand rounded-full border-2 bg-card px-3 py-1.5 text-sm font-bold whitespace-nowrap shadow-[2px_2px_0_var(--border)]`}
+        >
+          {t("fabHint")}
+        </span>
+      )}
     </div>
   );
 }

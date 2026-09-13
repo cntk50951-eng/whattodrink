@@ -1,0 +1,10 @@
+- [URC 1.0 toolbar absolute 跳出 flex 流](2026-09-13-urc1-toolbar-flex.md) — flex 容器的子別用 absolute，會跳脫 gap/堆疊，導致重疊
+- [UR A.5 換一批 bug 教訓](2026-09-10-ura5-next-batch.md) — 先問清用戶看到的具體名字再定分支，省三輪推理
+- [UR4.0 拆正名](2026-09-09-ur40-split.md) — raw 多輪返工收編為獨立 UR，零代碼改動純文檔正名
+- [UR4.1 互動榜推倒重來](2026-09-09-ur41-board-inmap-crash-icons.md) — 推倒重做的設計要直接砍原段不留合併殘留
+- [UR4.1 拍照分享黑屏／錄音播不出](2026-09-09-ur41-camera-black-voice.md) — auto-begin 雙流 race，三閘 autoBegan+reqGen+toLive 重綁
+- [UR4.1 拍照分享 landing](2026-09-09-ur41-photo-wall.md) — 拍立得相框＋塗鴉語言落地，社交 composer 化
+- [UR4.1 榜下拉內詳情＋空包守衛](2026-09-09-ur41-board-more-416-dual.md) — 416 雙兇手：空 dataURL 中和＋已發表 URL 持久
+- [UR4.1 拍照分享搬上地圖](2026-09-09-ur41-voice-empty-blob-map-overlay.md) — overlay 配方沿 `?pick=1`，成功留在層內不跳牆
+- [UR A.1 API 架構](2026-09-09-ura1-api-architecture.md) — 設計稿先寫 10 節再開工，三端兼容＋Vercel 部署
+- [UR A.3 Supabase 地基](2026-09-09-ura3-supabase-scaffold.md) — 缺 key 即紅字報錯，proxy 雙中間件＋health 冒煙
