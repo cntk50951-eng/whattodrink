@@ -672,6 +672,20 @@ export function DrinkMap({
   useEffect(() => {
     let cancelled = false;
     let map: Leaflet.Map | null = null;
+    // URC 1.1：hover 啟用滾輪的 handler 提到外層 closure，cleanup 也要清。
+    // 同時把掛載的 holder 元素快照進 closure，避開 lint：
+    // "ref value will likely have changed by cleanup"。
+    let holderEl: HTMLDivElement | null = null;
+    const enableWheel = (): void => {
+      if (map !== null && !map.scrollWheelZoom.enabled()) {
+        map.scrollWheelZoom.enable();
+      }
+    };
+    const disableWheel = (): void => {
+      if (map !== null && map.scrollWheelZoom.enabled()) {
+        map.scrollWheelZoom.disable();
+      }
+    };
 
     async function init(): Promise<void> {
       const holder = holderRef.current;
@@ -717,6 +731,11 @@ export function DrinkMap({
       map.on("dragstart", () => {
         setSelectedId(null);
       });
+      // URC 1.1 A3：桌面 hover 進入地圖才啟用滾輪縮放，沿 UR1.3 scroll-trap
+      // 行為給頁面其他部分。pointerleave 立刻 disable，免得拖地圖移出框還在吃滾輪。
+      holderEl = holder;
+      holder.addEventListener("pointerenter", enableWheel);
+      holder.addEventListener("pointerleave", disableWheel);
       // UR2.8: 他人 pin 层走聚合重建（首帧＋每次 zoomend），街区 zoom
       // 下全是单成员＝和原来一模一样的钉，全港 zoom 下近点合成簇。
       // now 取调用时刻（effect／事件上下文可调 impure，render 内不行）。
@@ -743,6 +762,11 @@ export function DrinkMap({
       wantLayerRef.current = null;
       othersLayerRef.current = null;
       trailLayerRef.current = null;
+      // URC 1.1：清掉 hover 啟動滾輪的 listener。
+      if (holderEl !== null) {
+        holderEl.removeEventListener("pointerenter", enableWheel);
+        holderEl.removeEventListener("pointerleave", disableWheel);
+      }
     };
     // init-once：renderOthersPins 只读 refs／模块常量／挂载时 locale 的 t
     //（同 handleFocusPerson 闭包口径，locale 切换是整树 remount）。
@@ -1069,11 +1093,6 @@ export function DrinkMap({
   function handleRetryLocate(): void {
     settledRef.current = false;
     retryGeo();
-  }
-
-  /** Zoom step for the speed-dial +/- actions (scroll-wheel stays off). */
-  function handleZoom(delta: 1 | -1): void {
-    mapRef.current?.setZoom(mapRef.current.getZoom() + delta);
   }
 
   /** UR1.2 recenter button: snap back to the latest fix, or request one. */
@@ -1437,8 +1456,6 @@ export function DrinkMap({
           hidden={
             sheetOpen || card !== null || (geoFailed && !guideDismissed)
           }
-          onZoomIn={() => handleZoom(1)}
-          onZoomOut={() => handleZoom(-1)}
           onRecenter={handleRecenter}
           onFitHk={handleFitHk}
           onShake={handleShakeRequest}

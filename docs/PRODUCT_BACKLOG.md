@@ -962,6 +962,64 @@ UR3.7 增強我的打卡记录的时候，在彈出的面板中，这个时候�
 - 2026-09-13：raw 入庫（用戶首次提出方向，待 review），置 []
 - 2026-09-13：實作落地＋用戶親眼驗收通過（桌面 1280×800＋手機 390×844），置 [✓]；改動摘要見 CHANGELOG；bug 教訓入 `2026-09-13-urc1-toolbar-flex.md`
 
+**URC 1.1　縮放按鈕退役，改用雙指捏合** [✓]
+
+作為用戶，我打開地圖想放大／縮小區域時，用 2 指自然地捏合／展開地圖就好，
+不要再去按 toolbar 上的 +／- 按鈕——按鈕是上一代地圖 App 的產物，現在主流
+地圖 App 都靠手勢。這樣手機單手就能完成所有地圖操作，桌面也少兩個 icon。
+
+> 「C」＝Chris（即用戶本人）。URC 系列承 URC 1.0 後續，編號順延 1.1。
+
+*現況（為什麼能直接砍）*
+- 雙指捏合**已可用**：CSS `touch-action: pan-y pinch-zoom`（UR1.3 scroll-trap fix 留下）
+  + Leaflet 默認處理 → 行動裝置本就能雙指縮放
+- 滾輪縮放刻意關閉（`scrollWheelZoom: false`，UR1.3 防 scroll-trap）
+- 雙擊縮放 Leaflet 默認仍可用
+- 鍵盤 +／- 鍵縮放（Leaflet `keyboard: true` 預設就有）
+
+*目標*
+- Toolbar 從 6 鈕變 4 鈕：移除縮放 +／-；保留睇全港／回位／足跡／搖一搖
+- 行動裝置：雙指捏合自然縮放（已可用，不需新邏輯）
+- 桌面：依 A 決策補回縮放 UX（見下方設計決策）
+
+*範圍*
+1. **移除 toolbar 的 +／- 鈕**：toolbar 從 6 鈕變 4 鈕；行動裝置少 2 個 icon 更鬆
+2. **行動裝置**：雙指捏合已可用，不動；按 B 決策看是否加一次性 hint
+3. **桌面縮放策略**：依 A 決策補回（雙擊可放大但無法縮回——若不解決桌面 UX 受影響）
+
+*邊界情況／失敗處理*
+- 雙指縮放 + 拖圖手勢衝突：Leaflet 已處理（UR1.3 同源 touch-action）
+- 雙指 vs 雙擊 vs 滾輪輸入區分：瀏覽器／Leaflet 各自管，無重疊
+- `prefers-reduced-motion`：縮放動畫沿用 `zoomAnimation: !reduced`
+- 鍵盤無障礙：＋／－ 鍵縮放保留（Leaflet 內建）
+
+*設計決策（待拍板）*
+- A. 桌面縮放：
+  - A1. 啟用 `scrollWheelZoom`（犧牲 UR1.3 scroll-trap：滾輪在地圖上會縮放而非滾頁，
+    符合用戶「自然縮放」直覺；用 scroll-trap 換直覺）
+  - A2. 保持 scrollWheelZoom 關（沿 UR1.3 行為；雙擊可放大但無法縮回；桌機 trackpad
+    雙指仍能捏合）
+  - A3. 條件式啟動：滑鼠 hover 到地圖時 enable，移開後 disable（Leaflet
+    `scrollWheelZoom.enable()`／`.disable()` 後切，scroll-trap 只在用戶主動進入地圖時生效）
+- B. 一次性 hint：
+  - B1. 首次未縮放過時浮小提示（3 秒自動消失），用過再不顯示
+  - B2. 砍掉 hint（雙指捏合是常識，不教）
+
+*驗收標準（Acceptance Criteria）*
+- AC1：toolbar 上 +／- 不再出現，其他 4 鈕位置／功能不變
+- AC2：手機／平板雙指捏合可縮放（pinch in 縮、pinch out 放）
+- AC3：依 A 決策：桌面縮放仍可用（方案不限）
+- AC4：鍵盤 +／- 鍵仍可縮放（無障礙）
+- AC5：tsc 淨／lint 0 error；既有單測不退步；地圖操作全集不破
+
+*後續（不在本 UR）*
+- 鍵盤快捷鍵（＋／－ 鍵以外的如 cmd+=）→ 無障礙議題另開 UR
+- 縮放限制細調（maxZoom 18 → 20 看更細）→ 另議
+
+*改動記錄*
+- 2026-09-13：raw 入庫（用戶首次提出，待 review），置 []
+- 2026-09-13：用戶 review 後砍掉 B hint 需求，採 A3 條件啟動，置 [WIP] → 落地 → 視覺＋互動驗收通過（無 +/-／hover 啟用滾輪縮放 z13→z14／無 hover 滾輪不動 z14→z14），置 [✓]
+
 EPIC 2 API and Database
 這個是一個新的EPIC，負責實現API和Database的設計
 

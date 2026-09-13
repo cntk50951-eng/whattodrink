@@ -832,7 +832,7 @@
 }
 
 /* URC 1.0 地圖工具列：城市卡下方同列堆疊（A1），所有地圖操作統一收編。
- * 視覺語言沿衛星圓鈕家族（圓＋ink 邊＋硬陰影），6 鈕一排緊湊排。
+ * 視覺語言沿衛星圓鈕家族（圓＋ink 邊＋硬陰影）。
  * 外層 DrinkMap 用 flex-col 容器包城市卡＋工具列，故 toolbar 用相對定位
  * 留在流內（不能 absolute，會跳脫 flex 流變重疊——bug 教訓）。
  * 寬度由內容撐（不用 w-full，避免吃地圖中央區）。
@@ -845,17 +845,17 @@
   background: color-mix(in srgb, var(--card) 92%, transparent);
   backdrop-filter: blur(6px);
   box-shadow: 3px 3px 0 var(--border);
-  /* 手機 2 列 3 行最大寬：3 個 (36+4 border) 鈕 + 2 個 4px gap + 12.8 padding ≈ 145px。
+  /* URC 1.1：手機 2 列 2 行（4 鈕 36px + gap），避免與右側熱榜搶位。
    * 寬度由內容撐，但 max-w 給上限避免吃地圖中央。 */
-  max-width: calc(3 * 40px + 2 * 4px + 12.8px);
+  max-width: calc(2 * 40px + 1 * 4px + 12.8px);
 }
 
 /* 桌面端工具列稍寬鬆一點：padding 和圓角都更明顯。 */
 @media (min-width: 768px) {
   .mapToolbar {
     padding: 0.4rem 0.5rem;
-    /* 桌面 1 列 6 鈕：6 × 48 (44+4 border) + 5 × 6 + 16 = 334px */
-    max-width: calc(6 * 48px + 5 * 6px + 16px);
+    /* URC 1.1：桌面 1 列 4 鈕：4 × 48 (44+4 border) + 3 × 6 + 16 = 226px */
+    max-width: calc(4 * 48px + 3 * 6px + 16px);
   }
 }
 

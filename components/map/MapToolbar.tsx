@@ -6,8 +6,6 @@ import {
   Expand,
   Footprints,
   LocateFixed,
-  Minus,
-  Plus,
   Vibrate,
 } from "lucide-react";
 
@@ -22,8 +20,6 @@ type MapToolbarProps = {
   shakeBurst: number;
   onRecenter: () => void;
   onFitHk: () => void;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
   /** UR3.4 足迹：进足迹模式（调用方再点一次退出，toggle 语义）。 */
   onFootprints: () => void;
 };
@@ -64,14 +60,15 @@ export function markShakeUsed(): void {
 }
 
 /**
- * URC 1.0 地圖工具列 —— 6 個地圖操作收進地圖組件，跟城市卡同列堆疊
- * （"地圖資訊 + 地圖工具" 視覺合一）。
+ * URC 1.0 / URC 1.1 地圖工具列。
  *
- * 設計：A1 城市卡下擴展；衛星圓鈕家族視覺沿用（圓＋ink 邊＋硬陰影）；
- * 搖一搖 idle 提示用衛星鈕旁 badge（C1，UR2.5 配方）；6 鈕一排緊湊排，
- * 手機小屏不溢出（用 fit-content + 最小 gap）。
+ * URC 1.0：地圖操作收進地圖組件，跟城市卡同列堆疊。
+ * URC 1.1：砍掉 +/- 縮放按鈕（6 鈕變 4 鈕），改用：
+ *   - 行動裝置雙指捏合（CSS `touch-action: pan-y pinch-zoom` + Leaflet 默認）
+ *   - 桌面 hover 地圖才啟用滾輪縮放（URC 1.1 A3，沿 UR1.3 scroll-trap 行為）
+ *   - 鍵盤 +/- 鍵（Leaflet 內建 keyboard: true）
  *
- * 隱藏時機：底卡／sheet／定位指引任一打開，整組讓位（和 MapFab 同語義）。
+ * 隱藏時機：底卡／sheet／定位指引任一打開，整組讓位。
  */
 export function MapToolbar({
   hidden,
@@ -79,8 +76,6 @@ export function MapToolbar({
   shakeBurst,
   onRecenter,
   onFitHk,
-  onZoomIn,
-  onZoomOut,
   onFootprints,
 }: MapToolbarProps) {
   const t = useTranslations("map");
@@ -103,11 +98,9 @@ export function MapToolbar({
 
   if (hidden) return null;
 
-  // UR2.5 衛星鈕家族（圓＋ink 邊＋硬陰影），反轉極性分主次——搖一搖
-  // 是偶爾用，標籤外露作 hint；其他 5 個只露圖標，aria-label 兜底。
+  // URC 1.1：砍 +/- 縮放鈕，4 鈕為睇全港／回位／足跡＋搖一搖衛星。
+  // 縮放走雙指捏合／hover 滾輪／鍵盤 +/- 鍵（見頂部 JSDoc）。
   const mapOps = [
-    { key: "zin", label: t("zoomIn"), icon: Plus, run: onZoomIn },
-    { key: "zout", label: t("zoomOut"), icon: Minus, run: onZoomOut },
     { key: "hk", label: t("hkWide"), icon: Expand, run: onFitHk },
     { key: "recenter", label: t("recenter"), icon: LocateFixed, run: onRecenter },
     { key: "trail", label: t("footprints"), icon: Footprints, run: onFootprints },
@@ -117,8 +110,8 @@ export function MapToolbar({
     <div
       role="toolbar"
       aria-label={t("fabMenu")}
-      // URC 1.0：手機 2 列 3 行（避開右側 hot board 撞），桌面 1 列 6 行；
-      // flex-wrap 自動換行，gap 兩軸一致。
+      // URC 1.1：4 鈕＋搖一搖衛星。手機 flex-wrap（4 鈕＋衛星窄時仍
+      // 可換行防熱榜），桌面單行。
       className={`${styles.above} ${styles.mapToolbar} flex flex-wrap items-center justify-center gap-1 md:flex-nowrap md:gap-1.5`}
     >
       {mapOps.map(({ key, label, icon: Icon, run }) => (
