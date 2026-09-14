@@ -1107,3 +1107,27 @@ UR A.5 啤酒類別「換一批」無反應 [✓]（用户親眼驗收，merged�
 - 2026-09-09：酒圖標上線（`beer-icons` 公開 bucket＋30 SVG＋`0003` 加 `icon_url`＋heineken 回填＋API 出 `icon_url` 可空＋1 單測；142 綠／tsc 淨／lint 0 error；匿名驗 15 行／1 有圖 14 NULL）
 - 2026-09-09：圖標回填收尾（asahi／tsingtao 一併回填；全表 15／3 有圖 12 NULL——剩下 12 條本地無圖可填，等設計）
 - 2026-09-09：牌子進目錄（用户：27 lager 是牌子要能選）：`0004` 插 26 行（英文名／lager＋少爺 craft／茅台 excluded／tagline 空；seed 同步）；REST 灌＋全驗（41 行／分類全落 lane／icon 全 200）；前端零改（fetchBeers 自動帶入，靜態 fallback 續留 15）
+---
+
+UR A.6 公開牆 API（`GET /api/v1/wall`，to-do A.4-2） [WIP]
+
+作為用戶，我要看到別人分享的牆（熱門／最新兩檔），只看公開的，不該看的一行都不能出。
+
+### 範圍（只做 A.4-2，不多做）
+1. `GET /api/v1/wall?sort&limit&cursor`（🌐 免登入）：只回 `visibility=public` 行＋公開列；`hot`＝24h 窗＋讚數倒序（沿 mock `sortHot`），`latest`＝時間倒序 keyset 翻頁
+2. `0005_checkins_wall_policy.sql`（checkins／users／post_likes 公開讀三檔，不多開）
+3. 不動：前端（`WallGrid` 續吃 mock，換源是後續 UR）、寫入（A.4-7 以後才有真分享，牆先空著）、`icon_url` 以外的新列
+
+### AC
+- 匿名读：public 行出、private 行不出、私有列（精確座標外之敏感列）不出
+- `latest` cursor 翻頁無重無漏；`hot` 24h 窗＋讚排序對
+- 壞參（sort 非法／limit 越界）400 包絡；DB 錯 500 包絡＋console 診斷行
+
+### 過堂結論（Phase 1，2026-09-10）
+- UI 面：`WallGrid`（hot／latest 兩 tab）＋`PostDetail`＋`MapHotBoard`＋`camera-flow` 發帖源；`HeaderMenu` 紅點（`hasUnseenWall` 續走本地，不進本端點）
+- 字段去處：id／photo←`photo_url`／note／transcript／audioSeconds←`audio_seconds`／likes←`post_likes` 聚合（匿名 `likedByMe=false`）／createdAt←`created_at`（轉 ms）／author.nickname＋gender←`users`（`avatar_url` 誠實回 URL，mock 的 `avatarEmoji` 差異換源 UR 再收；`me`／`reported` 匿名 false）
+- 誠實點：牆種子不進庫（沿 A.3 決定），真分享長出來前牆是空的，驗收翻頁用 Dashboard SQL 插驗證行
+
+*改動記錄*
+- 2026-09-10：開工置 [WIP]（to-do A.4-2；to-do A.2-1 打勾＋A.2-2／A.2-3／A.2-4 註記實際進度）
+- 2026-09-10：契約拍板＋實現完（`0005` 三檔 policy＋`docs/api-openapi.yaml` 首版＋`lib/api/wall.ts` mapper／cursor／參數＋`app/api/v1/wall/route.ts`＋13 單測；165 綠／tsc 淨／lint 0 error；待用戶跑 0005＋curl 驗）

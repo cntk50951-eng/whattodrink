@@ -8,14 +8,14 @@
 
 - [x] A.2-0 Supabase 建 project（區域 ap-southeast-1 新加坡）＋三組 key 進 Vercel env
   - 功能：DB／Auth／Storage／Realtime 總開關。驗收：Dashboard 連通，`NEXT_PUBLIC_*` 可讀。（2026-09-09 用戶本地 health `configured:true` 閉環）
-- [ ] A.2-1 migrations 落表（`supabase/migrations/*.sql`，沿 `future-schema.md`）
-  - 功能：`users／beers／checkins（含 type＋visibility）／cheers／mood_logs／drink_invites／post_likes／post_reports／devices` 九表一次建好。驗收：migration 可重放，seed 15 條 beers。（SQL 已寫好待執行；牆種子故意不進庫——假用戶數據不污染真表，決定見 migration 註記）
+- [x] A.2-1 migrations 落表（`supabase/migrations/*.sql`，沿 `future-schema.md`）
+  - 功能：`users／beers／checkins（含 type＋visibility）／cheers／mood_logs／drink_invites／post_likes／post_reports／devices` 九表一次建好。驗收：migration 可重放，seed 15 條 beers。（✅ 2026-09-10 補勾：用户已在 Dashboard 依次跑完 0001→seed→0002→0003→0004，表在、41 行 beers 在、PGRST205 已消；牆種子故意不進庫——假用戶數據不污染真表，決定見 migration 註記）
 - [ ] A.2-2 RLS 全表 deny-by-default＋三檔 policy（§7 矩陣逐表寫 Rob policy 測試）
-  - 功能：anon 只讀公開行列／owner 寫刪自己／檢舉審核列。驗收：拿 anon key 打私有行全 403／404。
+  - 功能：anon 只讀公開行列／owner 寫刪自己／檢舉審核列。驗收：拿 anon key 打私有行全 403／404。（進度 2026-09-10：`0002` beers 公開讀已上＋其餘續拒已驗；checkins／users／post_likes 公開讀隨 A.4-2 出 `0005`；完整矩陣每寫端點逐表補）
 - [ ] A.2-3 Storage buckets：`checkin-photos`（公開讀 10MB）＋`voice-clips`（私有 2MB）
-  - 功能：上傳目的地就緒。驗收：簽名上傳→讀取鏈走通。
+  - 功能：上傳目的地就緒。驗收：簽名上傳→讀取鏈走通。（進度 2026-09-10：`beer-icons` 公開 bucket＋30 SVG 已上；本項兩 bucket 待 A.4-14 前建）
 - [ ] A.2-4 Handler 腳手架（`lib/api/*`）：錯誤包絡＋zod 校驗 helper＋auth 取 session helper＋`docs/api-openapi.yaml` 骨架
-  - 功能：後面 16 條端點共用同一寫法。驗收：`/api/v1/health` 回 `{ok:true}`，401／400 包絡長一樣。
+  - 功能：後面 16 條端點共用同一寫法。驗收：`/api/v1/health` 回 `{ok:true}`，401／400 包絡長一樣。（進度 2026-09-10：包絡＋health＋session helper 已上並隨 beers 跑通；zod helper＋openapi 骨架待補，不擋 A.4-2——本端點手寫窄校驗先行）
 
 ## P1 公開讀（免登入，驗收＝匿名 curl 全通）
 

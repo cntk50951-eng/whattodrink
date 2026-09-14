@@ -1,0 +1,127 @@
+openapi: 3.1.0
+info:
+  title: whattodrink API
+  version: 1.0.0
+  description: >
+    三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
+    成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
+    （見 lib/api/envelope.ts）。
+paths:
+  /api/v1/wall:
+    get:
+      operationId: getWall
+      summary: 公開牆（免登入）
+      parameters:
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [hot, latest]
+            default: latest
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: cursor
+          in: query
+          description: 上一頁最后一个帖子的不透明游标（base64url JSON），第一页不传
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 一页公开帖（只含 visibility=public 行＋公开列）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WallPage"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "500":
+          $ref: "#/components/responses/Internal"
+components:
+  schemas:
+    WallAuthor:
+      type: object
+      nullable: true
+      description: 發過公開帖的作者公開列；已刪號用户為 null
+      properties:
+        nickname:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        gender:
+          type: string
+          enum: [male, female, secret]
+    WallPost:
+      type: object
+      required: [id, photo, note, transcript, audioSeconds, audioUrl, likes, likedByMe, createdAt, author]
+      properties:
+        id:
+          type: string
+          format: uuid
+        photo:
+          type: string
+          nullable: true
+          description: checkin-photos 公開 URL（無圖為 null，前端退佔位）
+        note:
+          type: string
+        transcript:
+          type: string
+        audioSeconds:
+          type: integer
+          nullable: true
+        audioUrl:
+          type: string
+          nullable: true
+        likes:
+          type: integer
+          minimum: 0
+        likedByMe:
+          type: boolean
+          description: 公開牆匿名固定 false（登入牆以後版本）
+        createdAt:
+          type: integer
+          description: Epoch ms
+        author:
+          $ref: "#/components/schemas/WallAuthor"
+    WallPage:
+      type: object
+      required: [posts, nextCursor]
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/WallPost"
+        nextCursor:
+          type: string
+          nullable: true
+          description: 下一頁 cursor；null＝到底了
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+  responses:
+    InvalidParams:
+      description: 入參非法（sort／limit／cursor）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    Internal:
+      description: 服務端錯（DB／RLS 未開會在 server log 留 code 細節）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
