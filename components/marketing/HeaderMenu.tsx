@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { hasUnseenWall, loadWall, loadWallSeenAt } from "@/lib/posts";
 
+import { AuthMenuItem } from "@/components/auth/AuthMenuItem";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -93,6 +94,10 @@ export function HeaderMenu() {
             <ChevronRight size={16} aria-hidden className="ml-auto opacity-60" />
           </DropdownMenuItem>
         ))}
+        {/* UR A.7 登入項：未登入→登入入口，已登入→暱稱＋登出。 */}
+        <AuthMenuItem
+          className={`${styles.menuItem} font-hand min-h-14 cursor-pointer gap-3 rounded-xl px-3 py-2 text-lg font-bold`}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );

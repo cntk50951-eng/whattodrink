@@ -40,6 +40,8 @@
   - `pointerenter`/`pointerleave` listener 加 holderRef closure 快照（避 lint：ref 在 cleanup 時會變）
   - `drink-map.module.css`：手機 max-w 從 `3 × 40px` 改 `2 × 40px`（4 鈕 2×2）；桌面 max-w 從 `6 × 48px` 改 `4 × 48px`（4 鈕 1 列）
   - 152 綠（無新增測試）／tsc 淨／lint 0 error（3 舊 warning）；Playwright 驗 hover 後滾輪 z13→z14、無 hover 滾輪 z14→z14 不變（scroll-trap 保持）
+- **UR A.7 — Google 登入授權（[WIP]，待用戶配 Dashboard＋真點驗）**
+  - `/login`＋Google 一鍵鈕＋`/auth/callback`（code 換 session）＋選單登入／登出項（沿 menuItem 樣式）＋`0006` trigger（Google 名→email 前綴→酒友）＋RLS owner 檔（users 自讀寫／checkins owner 全權）＋`lib/auth` 純函數 4 單測＋auth 三語；§10 Q1 匿名先行作廢；169 綠／tsc 淨／lint 0 error；數據文檔無需更新（零前端數據結構改動）
 - **UR A.6 — 公開牆 API（[WIP]，待用戶 curl 驗）**
   - `GET /api/v1/wall`（hot／latest＋opaque cursor＋limit 1-50，只吐 public 行＋公開列，匿名 likedByMe／me／reported 全 false）＋`0005` 三檔 RLS policy＋`docs/api-openapi.yaml` 首版＋`lib/api/wall.ts` mapper／cursor／參數＋13 單測；165 綠／tsc 淨／lint 0 error；數據文檔無需更新（`photo-mood.md` 牆行未來表映射已對上）
 - **UR 1.1 — 首頁互動式頁面重構（WIP，待用戶側 build＋瀏覽器驗收）**

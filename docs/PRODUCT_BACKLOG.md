@@ -1131,3 +1131,34 @@ UR A.6 公開牆 API（`GET /api/v1/wall`，to-do A.4-2） [WIP]
 *改動記錄*
 - 2026-09-10：開工置 [WIP]（to-do A.4-2；to-do A.2-1 打勾＋A.2-2／A.2-3／A.2-4 註記實際進度）
 - 2026-09-10：契約拍板＋實現完（`0005` 三檔 policy＋`docs/api-openapi.yaml` 首版＋`lib/api/wall.ts` mapper／cursor／參數＋`app/api/v1/wall/route.ts`＋13 單測；165 綠／tsc 淨／lint 0 error；待用戶跑 0005＋curl 驗）
+
+---
+
+UR A.7 Google 登入授權 [WIP]
+
+作為用戶，我要用 Google 一鍵登入（免密碼），登入後才能拍照上傳、發帖，退出後寫操作全部上鎖。
+
+### 背景（定案變更）
+- 推翻架構 §10 Q1「匿名設備號先行」：用户要 Google 登入（Google 帳號＝email，OTP／密碼全不要）；匿名→登入認領合併大坑一步跨過。§10 回寫隨本 UR。
+- 現狀全站匿名裸奔（`users`／`devices` 全空）；本 UR 是第一個 🔒 需求，量級不同。
+
+### 範圍（只做 Google 登入，不多做）
+1. `/login` 頁＋Google 鈕（中文＋品牌風，不做密碼框）＋登出（頂部菜單進出口）
+2. `/auth/callback`（code 換 session，沿 `@supabase/ssr@0.12` PKCE 配方）
+3. `0006`：`handle_new_user()` trigger（`auth.users` 新建→`public.users` 建行，nickname 取 Google 名→email 前綴兜底）＋RLS owner 檔（users 自讀寫；checkins 在 public 讀之外加 owner 全權；likes／reports 讀沿 0005，寫等各端點）
+4. middleware 鏈不斷（intl＋session 刷新沿 A.3 配方）
+5. 不動：Email OTP（砍了）、本地數據合併（不進庫）、刪號（原生階段）、原生 SDK（後續 UR）、公開讀行為（匿名照看）
+
+### AC
+- 點 Google 鈕→同意→跳回站內已登入（暱稱顯示 Google 名）；重開瀏覽器仍在（refresh 輪換）
+- 登出後寫操作上鎖（未登入調寫接口 401，等 A.4-7 驗）
+- `public.users` 有行（trigger 建的，不是手插的）；拿 A 身份讀不到 B 的非公開行（RLS）
+- 無 trenchcoat：service_role 照樣不出前端；OAuth secret 只活在 Supabase Dashboard
+
+### 過堂結論（Phase 1，2026-09-10）
+- UI 面：新增 `/login`（空態頁）＋頂部菜單（`HeaderMenu` 加登入／登出項）＋登入後暱稱顯示位（沿 `MOCK_ME` 位置，換源是後續 UR）；牆／地圖公開面零改
+- 用户側配置是驗收前置（Google Cloud 建 OAuth client＋Supabase 開 provider＋Redirect URLs），實現不依賴其值，可先行編碼
+
+*改動記錄*
+- 2026-09-10：開工置 [WIP]（用户拍板 Google only；§10 Q1 推翻待回寫）
+- 2026-09-10：實現完待驗（配方按裝好的 `@supabase/ssr@0.12` 型別實證；`0006`＋callback＋`/login`＋選單項＋登出＋auth 三語＋§10 回寫；169 綠／tsc 淨／lint 0 error；待用戶：①跑 0006 ②配 Google provider ③真點登入驗）

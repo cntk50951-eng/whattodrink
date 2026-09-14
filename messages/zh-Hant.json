@@ -269,5 +269,13 @@
     "swapBeer": "換酒",
     "deleteEntry": "刪除",
     "confirmDelete": "確認刪除"
+  },
+  "auth": {
+    "title": "登入",
+    "subtitle": "一個 Google 帳號走天下，不用記密碼",
+    "google": "用 Google 繼續",
+    "loggingIn": "跳緊去 Google…",
+    "failed": "登入失敗，再試一次",
+    "logoutName": "登出（{name}）"
   }
 }

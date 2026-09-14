@@ -269,5 +269,13 @@
     "swapBeer": "Swap",
     "deleteEntry": "Delete",
     "confirmDelete": "Confirm delete"
+  },
+  "auth": {
+    "title": "Sign in",
+    "subtitle": "One Google account, no passwords to remember",
+    "google": "Continue with Google",
+    "loggingIn": "Heading to Google…",
+    "failed": "Sign-in failed, try again",
+    "logoutName": "Sign out ({name})"
   }
 }
