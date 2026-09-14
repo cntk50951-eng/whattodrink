@@ -15,6 +15,10 @@
 - 單測 6 個進 `lib/beers.test.ts`（合成 12/8 行 lager 目錄＋靜態池＋afterEach 還原，抄 `beers-api.test.ts` 的 PRISTINE 套路）。
 - 三閘：152 綠／tsc 淨／lint 0 error（3 warning 全在 layout/theme-switcher，pre-existing）。
 
+## 運維教訓（2026-09-10 追記）
+- `/api/v1/beers` 報「Supabase 未配置」但 `.env` 三 key 俱全＋代碼兼容舊制 → 初判本地 dev 舊進程；**用户糾正：打的是遠端服務器** → 真因＝遠端機器上根本沒填這三個 key（本地 `.env` 不會跟著上遠端）。修＝去遠端按下面兩分支補 env＋重啟／重部署，無需改碼。通用規則：凡是改 env（本地 `.env*` 或遠端面板），必重啟／重部署對應進程。
+- `.env` 未被 git 追蹤（ignored），無洩漏；查 key 只報長度不報值。
+
 ## 未決
 - 用户說滑動「最多只有 5 個」：31 池 count 6 應出 6 張，待驗收時順帶確認（數點點數／aria-label `x/6`）。
 - 想喝換酒面板維持舊語義（用户說好的，不動）。
