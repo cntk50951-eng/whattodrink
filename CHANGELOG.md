@@ -45,6 +45,14 @@
   - fix（用戶回報：prod 點登入「失敗、再試一次」無新請求）：`createClient()` 誤用 secret-requiring `requireSupabaseEnv`——`SUPABASE_SERVICE_ROLE_KEY` 沒 `NEXT_PUBLIC_` 前綴、瀏覽器永遠讀不到，production build 拋錯被 `LoginPanel` try/catch 吞掉。新 `requireSupabasePublicEnv` 只看 public 兩條，`client.ts` 改用；`LoginPanel` catch 補 `console.error` 下次不再 silent。173 綠（+4）/tsc 淨/lint 0 error；數據文檔無需更新
 - **UR A.6 — 公開牆 API（[WIP]，待用戶 curl 驗）**
   - `GET /api/v1/wall`（hot／latest＋opaque cursor＋limit 1-50，只吐 public 行＋公開列，匿名 likedByMe／me／reported 全 false）＋`0005` 三檔 RLS policy＋`docs/api-openapi.yaml` 首版＋`lib/api/wall.ts` mapper／cursor／參數＋13 單測；165 綠／tsc 淨／lint 0 error；數據文檔無需更新（`photo-mood.md` 牆行未來表映射已對上）
+- **URC 1.2 — 頂部漢堡改成底部 4 鈕（同啤酒 row，不包 box）（[✓]，merged）**
+  - 新 `components/marketing/BottomNav.tsx`：4 鈕隨機推薦／拍照分享／牆／心情，icon-only 圓鈕（h-11 w-11 rounded-full border-2 bg-card text-primary shadow-[2px_2px_0_var(--border)]），跟 `MapFab` 啤酒同圓鈕家族；牆紅點沿用 UR4.1 v3 配方
+  - `layout.tsx`：拿掉 `<HeaderMenu />`，main 回歸無 `pb`；`components/marketing/HeaderMenu.tsx` 整檔刪除（git 歷史保留）
+  - `DrinkMap`：底部 row 包 `flex items-end gap-2 absolute inset-x-3 bottom-3` 容器，[MapFab, BottomNav] 同一 row；兩者同 hide 條件（sheet／card／指引打開任一即整組讓位）
+  - `MapFab`：從 `absolute left-3` + `.fabDock` 改為純 flex item（`flex items-end gap-2`，無 absolute）；`.fabDock` CSS 規則退役
+  - `drink-map.module.css`：刪 `.fabDock`（無調用點）
+  - v4 細節：4 鈕各自獨立不包 box（早期 v1 用 card 包，v4 用戶改為各自圓鈕）；BottomNav 也只在 home page 顯示（其他頁沒地圖無 nav，用「Back to home」返回）
+  - 152 綠（無新增測試）／tsc 淨／lint 0 error（3 舊 warning）；瀏覽器親眼驗收通過（手機 390×844＋桌面 1280×800）
 - **UR 1.1 — 首頁互動式頁面重構（WIP，待用戶側 build＋瀏覽器驗收）**
   - 新依賴：`leaflet@1.9.4`（真實地理底圖＋免費 CARTO Voyager 瓦片，免 key）、`vitest@^3`（`@types/node@20` 與 vitest 5 互斥，只能用 v3）＋ `npm test` 腳本
   - `components/map/DrinkMap.tsx` — 地圖＋推薦入口同一組件：geolocation 狀態機、拒絕／失敗→全港視圖、塗鴉 pins（自己／MOCK 他人／「想喝」虛線圈）、自訂縮放＋睇全港按鈕、乾杯卡（本地 mock）、`prefers-reduced-motion` 降級

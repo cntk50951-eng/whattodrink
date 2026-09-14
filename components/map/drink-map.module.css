@@ -710,14 +710,8 @@
   }
 }
 
-/* UR1.4 dock: pinned to the bottom-left corner, clearing the iPhone
- * home bar. NOTE — this MUST stay plain CSS: the equivalent Tailwind
- * arbitrary class bottom-[max(0.75rem,env(safe-area-inset-bottom))] is
- * silently dropped by the scanner (verified: absent from dev chunks while
- * its calc()/plain siblings generate). Scanner-invisible = no bottom. */
-.fabDock {
-  bottom: max(0.75rem, env(safe-area-inset-bottom));
-}
+/* UR1.4 dock：URC 1.2 v3 退役，MapFab 改為 inline flex item（由外層
+ * DrinkMap flex 容器定位），不再 own absolute 定位／bottom 值。 */
 
 /* Fan items are absolutely stacked above the beer (see --fan-rise).
  * They MUST NOT stay in flow: invisible-but-in-flow rows still occupy

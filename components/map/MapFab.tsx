@@ -106,7 +106,7 @@ export function MapFab({ hidden, hasWant, onPick }: MapFabProps) {
   if (hidden) return null;
 
   return (
-    <div className={`${styles.above} ${styles.fabDock} absolute left-3`}>
+    <div className={`${styles.above} flex items-end gap-2`}>
       {!quiet && idleLevel >= 2 && (
         <span
           role="status"
@@ -119,7 +119,7 @@ export function MapFab({ hidden, hasWant, onPick }: MapFabProps) {
         type="button"
         onClick={handleTap}
         aria-label={t("pickCta")}
-        className={`relative flex h-16 w-16 items-center justify-center rounded-full border-2 bg-primary text-primary-foreground shadow-[4px_4px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none ${
+        className={`relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 bg-primary text-primary-foreground shadow-[4px_4px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none ${
           !quiet && idleLevel >= 1 ? styles.fabShake : ""
         }`}
       >

@@ -9,7 +9,6 @@ import { getTranslations } from "next-intl/server";
 import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
 import { Footer } from "@/components/marketing/footer";
-import { HeaderMenu } from "@/components/marketing/HeaderMenu";
 import { getUserId } from "@/lib/supabase/server";
 
 /* UR1.5 note: fonts load via <link> in the root layout (see app/layout.tsx).
@@ -85,6 +84,7 @@ export default async function LocaleLayout({
                   whattodrink
                 </Link>
                 <div className="flex items-center gap-2">
+                  {/* URC 1.2：頂部漢堡退役，4 項入口搬到下方 BottomNav（home 頁）。 */}
                   {headerUserId === null && (
                     <Button
                       size="sm"
@@ -94,9 +94,6 @@ export default async function LocaleLayout({
                       {t("signIn")}
                     </Button>
                   )}
-                  {/* UR1.7: retired-Bento entries live here now. Last in the
-                      row = closest to the thumb corner. */}
-                  <HeaderMenu />
                 </div>
               </div>
             </Container>

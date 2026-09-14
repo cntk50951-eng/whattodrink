@@ -20,6 +20,7 @@ import { CityIcon } from "./CityIcon";
 import { MapFab } from "@/components/map/MapFab";
 import { MapToolbar } from "@/components/map/MapToolbar";
 import { MapHotBoard } from "@/components/wall/MapHotBoard";
+import { BottomNav } from "@/components/marketing/BottomNav";
 
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useShake } from "@/hooks/useShake";
@@ -1791,16 +1792,21 @@ export function DrinkMap({
         </p>
       )}
 
-      {/* URC 1.0：MapFab 瘦身為啤酒單鈕——直接開推薦面板，無扇形。
-          地圖操作全部走 MapToolbar（城市卡下同列）。拍照入口走頂部菜單
-          （UR1.7 已存在 photoPick → /?shoot=1）。 */}
-      <MapFab
-        hidden={
-          sheetOpen || card !== null || (geoFailed && !guideDismissed)
-        }
-        hasWant={picked !== null && wantSaved}
-        onPick={openPickSheet}
-      />
+      {/* URC 1.2 v2：啤酒 + 4 鈕 BottomNav 同一 row，都在 map 底部。
+          兩者共享 hide 條件（sheet／card／指引打開任一即整組讓位）。
+          啤酒在左（h-16 w-16 主色），4 鈕在右均分。 */}
+      <div
+        className={`${styles.above} flex items-end gap-2 absolute inset-x-3 bottom-3`}
+      >
+        <MapFab
+          hidden={
+            sheetOpen || card !== null || (geoFailed && !guideDismissed)
+          }
+          hasWant={picked !== null && wantSaved}
+          onPick={openPickSheet}
+        />
+        <BottomNav />
+      </div>
 
 
       {/* UR3.4 足迹模式浮条：标题＋显式返回（toggle 同动作可退）；

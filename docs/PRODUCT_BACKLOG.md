@@ -1020,6 +1020,73 @@ UR3.7 增強我的打卡记录的时候，在彈出的面板中，这个时候�
 - 2026-09-13：raw 入庫（用戶首次提出，待 review），置 []
 - 2026-09-13：用戶 review 後砍掉 B hint 需求，採 A3 條件啟動，置 [WIP] → 落地 → 視覺＋互動驗收通過（無 +/-／hover 啟用滾輪縮放 z13→z14／無 hover 滾輪不動 z14→z14），置 [✓]
 
+**URC 1.2　頂部漢堡改成底部橫排 bar，喝酒 CTA 不變** [✓]
+
+作為用戶，我打開網頁／App，所有功能入口都在底部一排（橫向 bar），一眼看到能幹嘛；
+頂部漢堡收起來、清爽，「今晚喝什麼」的啤酒鈕仍然是頁面最大的那個、按一下就能開。
+
+> 「C」＝Chris（即用戶本人）。URC 系列編號順延承 URC 1.0／URC 1.1，用戶原寫「UC」
+> 統一收回 URC 系列；不改既有 URC 1.0／URC 1.1 編號。
+
+*現況（為什麼要改）*
+- 頂部漢堡（`HeaderMenu`，layout.tsx 右上一顆）→ 展開 4 項下拉（隨機推薦／拍照分享／牆／心情）
+- 漢堡是次優 UI：藏在 icon 裡、用戶得點開才知道有什麼；現代 App 都用底部 tab bar
+- 底部目前只有啤酒鈕（`MapFab`，地圖左下，h-16 w-16 主色＋硬陰影，最顯眼）
+- 用戶原話：「the current one click to explore drinks CTA remain the same position and
+  the icon size is outstanding. Because it the primary function of this app.」
+
+*目標*
+- 4 項入口（隨機／拍照／牆／心情）改成底部橫排 bar，一排 4 鈕
+- 頂部漢堡退役（不另留後門）
+- 啤酒鈕位置不變（左下）、尺寸不縮、視覺仍是頁面最大最顯眼
+- 底部 bar 與啤酒鈕共存：bar 從啤酒右側開始排，手機／桌面一致（如果版型有衝突再議）
+
+*範圍*
+1. **`HeaderMenu` 改成 `BottomNav`**：4 項入口（隨機→`/?pick=1`／拍照→`/?shoot=1`／牆→`/wall`／心情→`/mood`）橫排；位置固定底部
+2. **頂部漢堡退役**：`layout.tsx` 不再渲染 `<HeaderMenu />`；`components/marketing/HeaderMenu.tsx` 可刪（保留 git 歷史）
+3. **`Sign in` 鈕**：保留頂部（不屬於「功能入口」之列）
+4. **Footer**（about／privacy／terms／contact）保留在頁面最底層（合法連結，與功能入口分開）
+5. **隨機推薦項**：仍列在底部 bar（與啤酒鈕指向同目的地）——保留冗餘入口給不熟啤酒鈕的用戶
+6. **底部 bar 與啤酒鈕排版**：待 design 階段拍板（見設計決策）
+
+*邊界情況／失敗處理*
+- `nav` 文案不變（randomPick／photoPick／wallPick／moodPick 三語已有），沿用零新 key
+- 底部 bar 對地圖 sheet 的影響：sheet 半展開／全展開時 bar 仍可見？sheet max-h 50% 在手機沒擋底部——bar 出現在 sheet 下緣以下還是被蓋？需 design 確認
+- 牆紅點：保留（UR4.1 v3 既有行為，搬過來就生效）
+- iPhone home bar：底部 safe-area 預留（沿 `fabDock` 的 `max(env(safe-area-inset-bottom))` 配方）
+- 鍵盤無障礙：4 鈕都是 `<a>`，Tab 順序自然
+- `prefers-reduced-motion`：無新增動效，沿既有降級
+
+*設計決策（待拍板）*
+- A. 底部 bar 與啤酒鈕的版型關係：
+  - A1. 同一 row：bar 4 鈕均分，啤酒疊在 bar 左側佔 2 格寬（iOS tab bar + 中央 FAB 模式）
+  - A2. 分兩 row：bar 在下，啤酒在上、靠左（Spotify 模式）
+  - A3. bar 滿版底部，啤酒浮在 bar 上方（重疊、Z 軸啤酒較高，bar 從啤酒右側起排）
+- B. 桌面端是否也顯示底部 bar：
+  - B1. 桌面也顯示，跨設備一致
+  - B2. 桌面保留頂部漢堡，行動裝置才用底部 bar（分設備策略）
+- C. 牆紅點位置（UR4.1 牆項目的小紅點）：
+  - C1. 沿用 HeaderMenu 既有行為（小紅點在 icon 右上角）
+  - C2. 砍掉紅點（已在 /wall 內滅，不需全局提示）
+
+*驗收標準（Acceptance Criteria）*
+- AC1：頂部漢堡不再出現（layout 不渲染）；4 項入口改在底部一排可見
+- AC2：啤酒鈕位置仍是左下、尺寸仍是頁面最大、視覺一眼分得出是主 CTA
+- AC3：底部 bar 4 鈕皆可達：隨機推薦／拍照分享／牆／心情；點擊正確導航
+- AC4：三語切換 bar 顯示對應文案；鍵盤 Tab 順序合理
+- AC5：sheet 半展開／全展開不擋 bar（任一 design 決策後的最終行為）
+- AC6：tsc 淨／lint 0 error；既有單測不退步；無新增 ESM 依賴
+- AC7：iPhone home bar safe-area 預留不踩邊
+
+*後續（不在本 UR）*
+- 底部 bar 加未讀計數（`/` 以外的路由）→ 另議
+- 啤酒鈕 idle 提示文案（「Tap for tonight's pick!」）跟 bar 隨機鈕 hint 整合 → 另議
+- Footer 與底部 bar 兩層底部共存時的合併 → 視需要另開 UR
+
+*改動記錄*
+- 2026-09-14：raw 入庫（用戶首次提出，待 review），置 []
+- 2026-09-14：用戶拍 A1/B1/C1，落地＋視覺驗收通過（手機 390×844＋桌面 1280×800），置 [✓]；摘要見 CHANGELOG（v4 細節：4 鈕同 row 不包 box、MapFab 改 inline flex item）
+
 EPIC 2 API and Database
 這個是一個新的EPIC，負責實現API和Database的設計
 
