@@ -12,6 +12,12 @@ export type SupabaseEnv = {
   secretKey: string;
 };
 
+/** 瀏覽器端能拿到的：只有 NEXT_PUBLIC_* inline 進 bundle 的兩條。 */
+export type SupabasePublicEnv = {
+  url: string;
+  publicKey: string;
+};
+
 /** 測試傳小對象、正式傳 process.env——兩邊都是 string 字典。 */
 export type EnvSource = Record<string, string | undefined>;
 
@@ -50,6 +56,47 @@ export function requireSupabaseEnv(
   from: EnvSource = process.env,
 ): SupabaseEnv {
   const { env, missing } = resolveSupabaseEnv(from);
+  if (env === null) {
+    throw new Error(
+      `Supabase 未配置：缺少 ${missing.join("、")}（照 .env.example 填進 .env.local，不提交）`,
+    );
+  }
+  return env;
+}
+
+/**
+ * 瀏覽器端 env 解析：只要求 `NEXT_PUBLIC_SUPABASE_URL` + 一個 public key
+ *（publishable 優先，anon 兜底）。**不**要求 secret key——Next.js 不會把
+ * 非 `NEXT_PUBLIC_` 的 env inline 進瀏覽器 bundle，server-only key 永遠讀不到。
+ *
+ * UR A.7 prod bug fix：之前 `createClient()`（瀏覽器）誤用 `requireSupabaseEnv`，
+ * production build 拿不到 secret → throw → LoginPanel try/catch 吞掉 → UI 報
+ * 「登入失敗」但無新請求、無 console 紅字，debug 極難。
+ */
+export function resolveSupabasePublicEnv(
+  from: EnvSource = process.env,
+): { env: SupabasePublicEnv | null; missing: string[] } {
+  const url = nonEmpty(from.NEXT_PUBLIC_SUPABASE_URL);
+  const publicKey =
+    nonEmpty(from.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) ??
+    nonEmpty(from.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  if (url === null || publicKey === null) {
+    const missing: string[] = [];
+    if (url === null) missing.push("NEXT_PUBLIC_SUPABASE_URL");
+    if (publicKey === null)
+      missing.push(
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (或舊制 NEXT_PUBLIC_SUPABASE_ANON_KEY)",
+      );
+    return { env: null, missing };
+  }
+  return { env: { url, publicKey }, missing: [] };
+}
+
+/** 瀏覽器 client 用，缺 key 即拋（fail fast，不靜默跑）。 */
+export function requireSupabasePublicEnv(
+  from: EnvSource = process.env,
+): SupabasePublicEnv {
+  const { env, missing } = resolveSupabasePublicEnv(from);
   if (env === null) {
     throw new Error(
       `Supabase 未配置：缺少 ${missing.join("、")}（照 .env.example 填進 .env.local，不提交）`,

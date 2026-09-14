@@ -8,3 +8,4 @@
 - [UR4.1 拍照分享搬上地圖](2026-09-09-ur41-voice-empty-blob-map-overlay.md) — overlay 配方沿 `?pick=1`，成功留在層內不跳牆
 - [UR A.1 API 架構](2026-09-09-ura1-api-architecture.md) — 設計稿先寫 10 節再開工，三端兼容＋Vercel 部署
 - [UR A.3 Supabase 地基](2026-09-09-ura3-supabase-scaffold.md) — 缺 key 即紅字報錯，proxy 雙中間件＋health 冒煙
+- [UR A.7 prod env bug](2026-09-14-ura7-prod-env-bug.md) — 瀏覽器 client 別 require secret key（Next.js 只 inline `NEXT_PUBLIC_*`），try/catch 不要 silent

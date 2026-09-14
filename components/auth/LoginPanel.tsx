@@ -23,8 +23,13 @@ export function LoginPanel({ failed }: { failed: boolean }) {
           redirectTo: `${window.location.origin}/auth/callback?next=/`,
         },
       });
-      if (error !== null) setError(true);
-    } catch {
+      if (error !== null) {
+        console.error("[auth] signInWithOAuth error:", error);
+        setError(true);
+      }
+    } catch (err) {
+      // silent catch 之前害 debug 兩輪——現在 log 進 console，prod 也看得到
+      console.error("[auth] handleGoogle threw:", err);
       setError(true);
     } finally {
       setBusy(false);
