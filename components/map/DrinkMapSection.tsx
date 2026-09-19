@@ -10,9 +10,12 @@ import { DrinkMap } from "@/components/map/DrinkMap";
  */
 export async function DrinkMapSection({
   pickOpen = false,
+  pickRandom = false,
 }: {
   /** `?pick=1` deep-link: reproduce the fan-pick end state on arrival. */
   pickOpen?: boolean;
+  /** URC 1.2 A3：`?pick=any` → 跳過 L1，直接 L2 全域隨機抽。 */
+  pickRandom?: boolean;
 }): Promise<ReactElement> {
   const t = await getTranslations("map");
 
@@ -21,7 +24,7 @@ export async function DrinkMapSection({
       {/* UR1.3 immersive: no heading block — the title floats on the map
           and every pixel of the first viewport goes to it. */}
       <Container className="pt-3 pb-10 md:pb-16">
-        <DrinkMap initialPickOpen={pickOpen} />
+        <DrinkMap initialPickOpen={pickOpen} initialPickRandom={pickRandom} />
         <p className="text-muted-foreground mt-3 text-xs md:text-sm">
           {t("mockNote")}
         </p>

@@ -65,6 +65,7 @@ import {
   laneCardSize,
   pickNextBatch,
   pickRandomBatch,
+  pickRandomBeer,
   pickSwapBatch,
 } from "@/lib/beers";
 import { BeerIcon } from "./BeerIcon";
@@ -181,9 +182,13 @@ const OTHERS_CLUSTER_PX = 64;
 const INVITE_MOCK_MS = 3000;
 export function DrinkMap({
   initialPickOpen = false,
+  initialPickRandom = false,
 }: {
   /** UR1.7 `?pick=1` deep-link: arrive in the fan-pick end state. */
   initialPickOpen?: boolean;
+  /** URC 1.2 A3：`?pick=any` deep-link: 跳過 L1，直接開 L2 全域隨機抽。
+   * 與 initialPickOpen 互斥，後者優先（保留舊行為）。 */
+  initialPickRandom?: boolean;
 }) {
   const locale = useLocale();
   const t = useTranslations("map");
@@ -933,6 +938,55 @@ export function DrinkMap({
     else map.flyTo(target, z, { duration: 1 });
   }, [initialPickOpen, geoStatus, geoPosition]);
 
+  /* URC 1.2 A3：`?pick=any` → 跳過 L1，直接開 L2 全域隨機抽。
+   * 獨立 ref（不與 initialPickOpen effect 共用，避免互相踩）。 */
+  const pickAnyHomed = useRef(false);
+  const pickAnyOnce = useRef(false);
+  useEffect(() => {
+    if (!initialPickRandom) {
+      pickAnyOnce.current = false;
+      pickAnyHomed.current = false;
+      return;
+    }
+    if (!pickAnyOnce.current) {
+      pickAnyOnce.current = true;
+      // URC 1.2 A3：Tonight's pick 直接開 sheet + L2 batch（跳 L1）。
+      // setState 走 microtask 避 react-hooks/set-state-in-effect（沿 UR1.8 配方）。
+      void Promise.resolve().then(() => {
+        const beer = pickRandomBeer();
+        if (beer === null) return; // 空目錄（理論上不會）
+        const lane = categoryOfBeer(beer);
+        const laneId = lane?.id ?? null;
+        const batch = laneId !== null ? pickRandomBatch(laneId, 6) : [beer];
+        setSheetOpen(true);
+        setPickLanes(false);
+        setPicked(beer);
+        setPickBatch(batch);
+        setBatchIndex(0);
+        setPickLaneId(laneId);
+      });
+    }
+    const map = mapRef.current;
+    if (
+      pickAnyHomed.current ||
+      map === null ||
+      geoStatus !== "success" ||
+      geoPosition === null ||
+      !isWithinHongKong(geoPosition)
+    ) {
+      return;
+    }
+    pickAnyHomed.current = true;
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const z = Math.max(map.getZoom(), 15);
+    const point = map.project([geoPosition.lat, geoPosition.lng], z);
+    const target = map.unproject(point.subtract([0, SHEET_OFFSET_PX]), z);
+    if (reduced) map.setView(target, z);
+    else map.flyTo(target, z, { duration: 1 });
+  }, [initialPickRandom, geoStatus, geoPosition]);
+
   /* ---- UR1.2 live-follow: move the dot, never the camera ---- */
   useEffect(() => {
     const marker = selfMarkerRef.current;
@@ -1009,6 +1063,25 @@ export function DrinkMap({
   function openPickSheet(): void {
     setPickLanes(true);
     setSheetOpen(true);
+  }
+
+  /* URC 1.2 A3 fix：Tonight's pick 直接觸發動作（不依賴 URL 變化）。
+   * 為何不用 Link：原 BottomNav Tonight's pick href `/?pick=any` 在已
+   * 是 `/?pick=any` 時，Next.js Link 視為同 URL no-op、不重 render，導致
+   * pickAnyOnce latch 卡住 → 沒動作。改成 button onClick 直接呼叫，
+   * 同時保留 deep-link 給初次訪問。 */
+  function handleRandomPick(): void {
+    const beer = pickRandomBeer();
+    if (beer === null) return;
+    const lane = categoryOfBeer(beer);
+    const laneId = lane?.id ?? null;
+    const batch = laneId !== null ? pickRandomBatch(laneId, 6) : [beer];
+    setSheetOpen(true);
+    setPickLanes(false);
+    setPicked(beer);
+    setPickBatch(batch);
+    setBatchIndex(0);
+    setPickLaneId(laneId);
   }
 
   /* UR3.8 L2 入口：選定大類 → 該類內隨機抽品牌（映射缺類回退全域，
@@ -1794,7 +1867,11 @@ export function DrinkMap({
 
       {/* URC 1.2 v2：啤酒 + 4 鈕 BottomNav 同一 row，都在 map 底部。
           兩者共享 hide 條件（sheet／card／指引打開任一即整組讓位）。
-          啤酒在左（h-16 w-16 主色），4 鈕在右均分。 */}
+          啤酒在左（h-16 w-16 主色），4 鈕在右均分。
+          URC 1.2 A3 fix：BottomNav onRandomPick 接受 handleRandomPick，
+          Tonight's pick 走 button onClick（不走 URL，避免同 href no-op bug）。
+          URC 1.2 A4：BottomNav 加 hidden prop，sheet 開時整組讓位，
+          避免 sheet 跟按鈕同 y 打架。 */}
       <div
         className={`${styles.above} flex items-end gap-2 absolute inset-x-3 bottom-3`}
       >
@@ -1805,7 +1882,11 @@ export function DrinkMap({
           hasWant={picked !== null && wantSaved}
           onPick={openPickSheet}
         />
-        <BottomNav />
+        {/* URC 1.2 A3：Tonight's pick 直接觸發（不走 URL，避免同 href no-op bug） */}
+        <BottomNav
+          hidden={sheetOpen || card !== null || (geoFailed && !guideDismissed)}
+          onRandomPick={handleRandomPick}
+        />
       </div>
 
 

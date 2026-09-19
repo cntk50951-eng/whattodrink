@@ -52,6 +52,8 @@
   - `MapFab`：從 `absolute left-3` + `.fabDock` 改為純 flex item（`flex items-end gap-2`，無 absolute）；`.fabDock` CSS 規則退役
   - `drink-map.module.css`：刪 `.fabDock`（無調用點）
   - v4 細節：4 鈕各自獨立不包 box（早期 v1 用 card 包，v4 用戶改為各自圓鈕）；BottomNav 也只在 home page 顯示（其他頁沒地圖無 nav，用「Back to home」返回）
+  - **A3 fix（用戶回報：Tonight's pick 重複點擊沒反應）**：`BottomNav` Tonight's pick 改 `<button onClick>`（不走 URL），`DrinkMap` 加 `handleRandomPick()` 同步 `pickRandomBeer` + `pickRandomBatch` + 對應 setStates；deep-link `/?pick=any` 仍保留給初次訪問；教訓見 `.memory/2026-09-17-urc12-a3-link-noop.md`
+  - **A4 fix（用戶回報：sheet 開時 4 鈕還在，沒讓位）**：`BottomNav` 加 `hidden` prop，sheet 開時整組讓位；同樣的 `hidden` 條件傳給 BottomNav 跟 MapFab（sheetOpen || card !== null || (geoFailed && !guideDismissed)）
   - 152 綠（無新增測試）／tsc 淨／lint 0 error（3 舊 warning）；瀏覽器親眼驗收通過（手機 390×844＋桌面 1280×800）
 - **UR 1.1 — 首頁互動式頁面重構（WIP，待用戶側 build＋瀏覽器驗收）**
   - 新依賴：`leaflet@1.9.4`（真實地理底圖＋免費 CARTO Voyager 瓦片，免 key）、`vitest@^3`（`@types/node@20` 與 vitest 5 互斥，只能用 v3）＋ `npm test` 腳本

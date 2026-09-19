@@ -1086,6 +1086,7 @@ UR3.7 增強我的打卡记录的时候，在彈出的面板中，这个时候�
 *改動記錄*
 - 2026-09-14：raw 入庫（用戶首次提出，待 review），置 []
 - 2026-09-14：用戶拍 A1/B1/C1，落地＋視覺驗收通過（手機 390×844＋桌面 1280×800），置 [✓]；摘要見 CHANGELOG（v4 細節：4 鈕同 row 不包 box、MapFab 改 inline flex item）
+- 2026-09-17：A3 fix — Tonight's pick 改 `<button onClick>`（修同 URL Link no-op 重複點擊沒反應 bug）+ A4 — BottomNav 加 hidden prop（sheet 開時整組讓位）；兩個 fix 詳情見 memory `2026-09-17-urc12-a3-link-noop.md`
 
 EPIC 2 API and Database
 這個是一個新的EPIC，負責實現API和Database的設計

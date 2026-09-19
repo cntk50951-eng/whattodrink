@@ -11,6 +11,7 @@ import { DrinkMapSection } from "@/components/map/DrinkMapSection";
  * moved to the header menu. `?pick=1` deep-links the full pick end-state
  * (fly home + fan + sheet), same as tapping the fan entry by hand.
  * UR4.1 v6: `?shoot=1` 把拍照分享蓋成 overlay，地圖常駐底下（沿 pick 配方）。
+ * URC 1.2 A3：`?pick=any` 深鏈 → 跳過 L1，直接 L2 全域隨機抽（Tonight's pick）。
  */
 export default async function MarketingHome({
   searchParams,
@@ -20,7 +21,10 @@ export default async function MarketingHome({
   const { pick, shoot } = await searchParams;
   return (
     <>
-      <DrinkMapSection pickOpen={pick === "1"} />
+      <DrinkMapSection
+        pickOpen={pick === "1"}
+        pickRandom={pick === "any"}
+      />
       {shoot === "1" && <CameraOverlay />}
     </>
   );
