@@ -213,6 +213,32 @@ export function DrinkMap({
   // UR1.2 bottom sheet: closed pill <-> open half-sheet. Auto-closes into
   // a chip when the 想喝 pin drops so the map is never buried on small screens.
   const [sheetOpen, setSheetOpen] = useState(initialPickOpen);
+  // URC 1.3：地圖工具列預設收合；展開由城市卡 chevron icon toggle。
+  const [toolbarExpanded, setToolbarExpanded] = useState(false);
+  // URC 1.3 C3：地圖 click 透過 ref 讀最新 toolbarExpanded（Leaflet
+  // 一次性 init，closure 會卡住舊值）。
+  const toolbarExpandedRef = useRef(toolbarExpanded);
+  useEffect(() => {
+    toolbarExpandedRef.current = toolbarExpanded;
+  });
+  // URC 1.3 B1：idle hint 首次未互動時浮「點 icon 展開」3 秒自動消失。
+  // localStorage 標記用戶已看過就不再顯示（wtd-toolbar-hint 命名空間）。
+  // setState 走 microtask 避 react-hooks/set-state-in-effect（沿 UR1.8 配方）。
+  const [toolbarHint, setToolbarHint] = useState(false);
+  useEffect(() => {
+    let dismissed = false;
+    try {
+      dismissed = window.localStorage.getItem("wtd-toolbar-hint") === "1";
+    } catch {
+      // 隱私模式 — 仍顯示一次。
+    }
+    if (dismissed) return;
+    const id = window.setTimeout(() => {
+      void Promise.resolve().then(() => setToolbarHint(false));
+    }, 3000);
+    void Promise.resolve().then(() => setToolbarHint(true));
+    return () => window.clearTimeout(id);
+  }, []);
   // URC 1.0：扇形退役，fabOpen 不再有 fan 需要管；留 setFabOpen 給舊調用點
   // 不報錯即可（這裡實際無副作用）。
   // UR1.7: App Router reuses the client tree when only searchParams change
@@ -736,6 +762,15 @@ export function DrinkMap({
       // URC 1.0: 扇形退役，不再需要 setFabOpen(false)。
       map.on("dragstart", () => {
         setSelectedId(null);
+      });
+      // URC 1.3 C3：點地圖本身（不含 overlay UI）自動收起工具列。
+      // Leaflet 的 map click 只在點地圖本體觸發，overlay（城市卡、toolbar
+      // 等）有自己的 click 不會冒泡到這裡。透過 ref 讀最新值，避免
+      // closure 卡住初值 false。
+      map.on("click", () => {
+        if (toolbarExpandedRef.current) {
+          void Promise.resolve().then(() => setToolbarExpanded(false));
+        }
       });
       // URC 1.1 A3：桌面 hover 進入地圖才啟用滾輪縮放，沿 UR1.3 scroll-trap
       // 行為給頁面其他部分。pointerleave 立刻 disable，免得拖地圖移出框還在吃滾輪。
@@ -1482,21 +1517,48 @@ export function DrinkMap({
         aria-label={t("mapLabel")}
       />
 
-      {/* URC 1.0：城市卡＋工具列同列堆疊（A1），視覺聚合成「地圖組件」
-          單元。城市資訊是上半，地圖操作收進下半工具列。flex-col 容器兩者
-          同列同邊，gap-2 拉開層次。 */}
+      {/* URC 1.0 + 1.3：城市卡＋工具列同列堆疊，視覺聚合成「地圖組件」
+          單元。城市資訊是上半，地圖操作預設收進城市卡右側 chevron icon，
+          點擊展開下方工具列（URC 1.3 A1）。flex-col 容器兩者同列同邊，
+          gap-2 拉開層次。 */}
       <div
         className={`${styles.above} absolute top-3 left-3 flex flex-col items-start gap-2`}
       >
-        {/* UR3.5 左上城市状态卡（顶双 pill 已删，此处是唯一的顶卡）：
-            城市大字＋登录状态＋上次在线＋条件上次地点，图形 tile 复 tile 行。 */}
+        {/* UR3.5 + URC 1.3 v2：城市卡內 CityIcon 變 clickable（沿用既有
+            圖示，砍掉另加的 chevron）— toggle toolbarExpanded；toolbarHint
+            浮 badge 提示新用戶。idle ping 紅色呼吸環提示這東西可點。 */}
         <div className="flex items-center gap-2.5 rounded-2xl border-2 bg-card/95 py-2 pr-3 pl-2 shadow-[3px_3px_0_var(--border)] backdrop-blur-sm">
-          <span
-            aria-hidden
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 bg-accent text-accent-foreground"
+          <button
+            type="button"
+            onClick={() => {
+              if (toolbarHint) {
+                try {
+                  window.localStorage.setItem("wtd-toolbar-hint", "1");
+                } catch {
+                  // 隱私模式 — 當次關閉即生效
+                }
+                void Promise.resolve().then(() => setToolbarHint(false));
+              }
+              void Promise.resolve().then(() =>
+                setToolbarExpanded((v) => !v),
+              );
+            }}
+            aria-label={
+              toolbarExpanded ? "Hide map tools" : "Show map tools"
+            }
+            aria-expanded={toolbarExpanded}
+            className={`relative flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-xl border-2 bg-accent text-accent-foreground transition-transform active:translate-x-0.5 active:translate-y-0.5 ${toolbarHint ? styles.toolbarHintPing : ""}`}
           >
             <CityIcon code={cityCode} size={54} />
-          </span>
+            {toolbarHint && (
+              <span
+                role="status"
+                className={`${styles.fabBubblePop} font-hand absolute top-[110%] left-1/2 -translate-x-1/2 w-max max-w-44 rounded-2xl border-2 bg-card px-3 py-2 text-sm font-bold whitespace-normal shadow-[3px_3px_0_var(--border)]`}
+              >
+                Tap to open map tools
+              </span>
+            )}
+          </button>
           <span className="min-w-0">
             <span className="font-hand block text-xl leading-none font-bold">
               {t(cityLabelKey)}
@@ -1524,9 +1586,9 @@ export function DrinkMap({
             )}
           </span>
         </div>
-        {/* URC 1.0 地圖工具列：6 個地圖操作收編（縮放＋/-, 回位, 睇全港,
-            搖一搖, 足跡），城市卡下同列堆疊。底卡／sheet／指引打開時整組讓位。 */}
+        {/* URC 1.0 + 1.3 A1：地圖工具列。預設 collapsed；hidden 條件照舊。 */}
         <MapToolbar
+          collapsed={!toolbarExpanded}
           hidden={
             sheetOpen || card !== null || (geoFailed && !guideDismissed)
           }

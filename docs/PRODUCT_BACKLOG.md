@@ -1088,6 +1088,72 @@ UR3.7 增強我的打卡记录的时候，在彈出的面板中，这个时候�
 - 2026-09-14：用戶拍 A1/B1/C1，落地＋視覺驗收通過（手機 390×844＋桌面 1280×800），置 [✓]；摘要見 CHANGELOG（v4 細節：4 鈕同 row 不包 box、MapFab 改 inline flex item）
 - 2026-09-17：A3 fix — Tonight's pick 改 `<button onClick>`（修同 URL Link no-op 重複點擊沒反應 bug）+ A4 — BottomNav 加 hidden prop（sheet 開時整組讓位）；兩個 fix 詳情見 memory `2026-09-17-urc12-a3-link-noop.md`
 
+**URC 1.3　地圖工具列預設收進城市卡，加 icon 展開** [✓]
+
+作為用戶，我打開首頁第一眼看到城市卡就好，地圖相關的 4 個操作（睇全港／回位／足跡／搖一搖）預設收起，需要時點城市卡旁邊的 icon 才展開——這樣首頁的「地圖」更乾淨，操作按需打開。
+
+> 「C」＝Chris（即用戶本人）。URC 系列順延。
+> 注意：搖一搖（Vibrate）衛星鈕保留「地圖操作」範疇（它靠地圖選最近酒友），
+> 雙指縮放（URC 1.1）已是原生手勢不算 CTA。
+
+*現況（為什麼要改）*
+- 地圖工具列 `MapToolbar` 目前固定在城市卡下方，4 鈕永遠可見
+- 用戶原話：「collapse the 4 map related CTAs into the top left 'online' dashboard」
+- 城市卡（左上）已經是「地圖狀態」入口（線上／離線／上次在線／上次地點），工具列同性質
+- 預設收起 → 首頁視覺更乾淨，操作按需展開
+
+*目標*
+- 工具列 4 鈕預設隱藏
+- 城市卡旁加一個 icon（展開觸發器）
+- 點 icon → 展開工具列；再點一次（或其他關閉動作）→ 收起
+
+*範圍*
+1. **MapToolbar 預設隱藏**：取消城市卡下方的固定渲染
+2. **城市卡展開 icon**：在城卡內/旁加一個 chevron-down／grid icon，點擊 toggle 工具列顯示
+3. **展開動效**：accordion 展開／淡入淡出（沿站內風格，transform/opacity only）
+4. **關閉行為**：再次點 icon 收起，或點地圖其他地方收起（見設計決策）
+5. **手機／桌面一致**：跨設備同樣收合行為
+
+*邊界情況／失敗處理*
+- sheet／card／指引打開時，展開狀態的 toolbar 仍要讓位（沿 MapToolbar `hidden` prop 邏輯）
+- 收合狀態下用戶完全看不到工具列——可能不知道有這些功能；見 B 設計決策（要不要 idle hint 提醒）
+- `prefers-reduced-motion`：展開動效降級
+- 鍵盤：icon 為 `<button>`，可 Tab 達到；展開後 Tab 走 4 鈕
+
+*設計決策（待拍板）*
+- A. 展開的呈現方式：
+  - A1. 工具列在城市卡下方原位 inline 展開（accordion 風格，推開城市卡高度）
+  - A2. 浮層 popover，從 icon 浮出 4 鈕卡片（不擠地圖）
+  - A3. 全屏 modal sheet（半透明遮罩＋中央 4 鈕卡片）
+- B. 收合狀態下的可發現性：
+  - B1. 加 idle hint（首次未互動時浮「點 icon 展開地圖工具」3 秒自動消失）
+  - B2. 不加 hint，icon 本身夠明顯（塗鴉風 icon + ink 邊，視覺跳出）
+- C. 關閉行為：
+  - C1. 再點 icon 收起（toggle）
+  - C2. 點地圖其他地方自動收起（click outside）
+  - C3. icon toggle + 點其他地圖也收起（兩者都要）
+- D. icon 位置：
+  - D1. 城市卡內右側（跟 status pill 同行）
+  - D2. 城市卡正下方獨立 icon（單獨一顆圓鈕）
+  - D3. 城市卡正右方（卡外，貼卡右邊）
+
+*驗收標準（Acceptance Criteria）*
+- AC1：首頁剛載入時，城市卡可見，工具列 4 鈕**不可見**
+- AC2：點 icon → 4 鈕展開；再點 icon（或其他約定關閉動作）→ 4 鈕收起
+- AC3：手機／桌面兩端展開位置合理，不互打架
+- AC4：展開狀態下工具列行為不變（睇全港／回位／足跡／搖一搖仍照原邏輯工作）
+- AC5：sheet／card／指引任一打開時工具列自動隱藏
+- AC6：tsc 淨／lint 0 error；既有單測不退步；無新增 ESM 依賴
+
+*後續（不在本 UR）*
+- 城市卡收合狀態下，雙指捏合是否要加 hint → 沿 URC 1.1 已不加，無後續
+- 工具列 idle 提示文案 → 設計拍板後另議
+- 4 鈕各自加 tooltip（hover label）→ 另議
+
+*改動記錄*
+- 2026-09-20：raw 入庫（用戶首次提出，待 review），置 []
+- 2026-09-20：用戶拍 A1/B1/C3/D1 + 改用 v2 — 砍掉 chevron、讓既有 CityIcon 變 clickable，置 [✓]；視覺驗收通過（手機 390×844），詳情見 CHANGELOG
+
 EPIC 2 API and Database
 這個是一個新的EPIC，負責實現API和Database的設計
 

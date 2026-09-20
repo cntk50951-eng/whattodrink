@@ -12,7 +12,10 @@ import {
 import styles from "./drink-map.module.css";
 
 type MapToolbarProps = {
+  /** 舊 prop：sheet／card／指引任一打開時整組讓位。保留語義。 */
   hidden: boolean;
+  /** URC 1.3：預設收合（true = 不渲染）；展開由父層切換 */
+  collapsed: boolean;
   /** UR2.5 摇摇：点击＝程序化摇动（权限申请由调用方包办）。 */
   onShake: () => void;
   /** UR2.9 触发计数（调用方每次触发＋1，含 prime tick）：按钮 key 重挂
@@ -72,6 +75,7 @@ export function markShakeUsed(): void {
  */
 export function MapToolbar({
   hidden,
+  collapsed,
   onShake,
   shakeBurst,
   onRecenter,
@@ -97,6 +101,9 @@ export function MapToolbar({
   }, [shakeQuiet]);
 
   if (hidden) return null;
+  // URC 1.3 A1：預設收合不渲染；展開時走 transform/opacity 進場
+  // （accordion 風格，map-toolbar-accordion keyframes）。
+  if (collapsed) return null;
 
   // URC 1.1：砍 +/- 縮放鈕，4 鈕為睇全港／回位／足跡＋搖一搖衛星。
   // 縮放走雙指捏合／hover 滾輪／鍵盤 +/- 鍵（見頂部 JSDoc）。
@@ -110,6 +117,7 @@ export function MapToolbar({
     <div
       role="toolbar"
       aria-label={t("fabMenu")}
+      // URC 1.3 A1：展開用 transform/opacity accordion 進場。
       // URC 1.1：4 鈕＋搖一搖衛星。手機 flex-wrap（4 鈕＋衛星窄時仍
       // 可換行防熱榜），桌面單行。
       className={`${styles.above} ${styles.mapToolbar} flex flex-wrap items-center justify-center gap-1 md:flex-nowrap md:gap-1.5`}

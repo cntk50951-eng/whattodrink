@@ -55,6 +55,13 @@
   - **A3 fix（用戶回報：Tonight's pick 重複點擊沒反應）**：`BottomNav` Tonight's pick 改 `<button onClick>`（不走 URL），`DrinkMap` 加 `handleRandomPick()` 同步 `pickRandomBeer` + `pickRandomBatch` + 對應 setStates；deep-link `/?pick=any` 仍保留給初次訪問；教訓見 `.memory/2026-09-17-urc12-a3-link-noop.md`
   - **A4 fix（用戶回報：sheet 開時 4 鈕還在，沒讓位）**：`BottomNav` 加 `hidden` prop，sheet 開時整組讓位；同樣的 `hidden` 條件傳給 BottomNav 跟 MapFab（sheetOpen || card !== null || (geoFailed && !guideDismissed)）
   - 152 綠（無新增測試）／tsc 淨／lint 0 error（3 舊 warning）；瀏覽器親眼驗收通過（手機 390×844＋桌面 1280×800）
+- **URC 1.3 — 地圖工具列預設收進城市卡，加 icon 展開（A1/B1/C3/D1，後改 v2 用既有 CityIcon）（[✓]，merged）**
+  - `MapToolbar` 加 `collapsed` prop（預設 true）；展開用 `.toolbarOpen` 動效（transform/opacity accordion 進場）
+  - `DrinkMap`：城市卡內右側加 chevron icon（D1）→ 用戶 review 時改主意：「讓既有 CityIcon 變 clickable」（v2，少一個 CTA）— 砍掉 chevron，城市建築圖改 button 觸發 toggle
+  - B1 idle hint：首次未互動時浮「Tap to open map tools」3 秒自動消失 + 紅色呼吸環 `.toolbarHintPing`；localStorage `wtd-toolbar-hint=1` 記住用戶已看過
+  - C3 點地圖自動收起：Leaflet `map.on('click')` 透過 `toolbarExpandedRef`（避免 init 一次性 closure 卡舊值）→ 點地圖本體（非 overlay UI）收起工具列
+  - `drink-map.module.css`：加 `.toolbarOpen` accordion keyframes + `.toolbarHintPing` 呼吸環 keyframes；reduced-motion 全關
+  - 152→173 綠（無新增測試）／tsc 淨／lint 0 error（3 舊 warning）；瀏覽器親眼驗收通過（手機 390×844）
 - **UR 1.1 — 首頁互動式頁面重構（WIP，待用戶側 build＋瀏覽器驗收）**
   - 新依賴：`leaflet@1.9.4`（真實地理底圖＋免費 CARTO Voyager 瓦片，免 key）、`vitest@^3`（`@types/node@20` 與 vitest 5 互斥，只能用 v3）＋ `npm test` 腳本
   - `components/map/DrinkMap.tsx` — 地圖＋推薦入口同一組件：geolocation 狀態機、拒絕／失敗→全港視圖、塗鴉 pins（自己／MOCK 他人／「想喝」虛線圈）、自訂縮放＋睇全港按鈕、乾杯卡（本地 mock）、`prefers-reduced-motion` 降級

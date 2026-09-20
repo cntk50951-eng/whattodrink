@@ -859,6 +859,49 @@
   background: color-mix(in srgb, var(--card) 100%, transparent);
 }
 
+/* URC 1.3 A1：accordion 進場。transform/opacity only，reduced-motion 全關。 */
+.toolbarOpen {
+  animation: toolbar-accordion 0.22s cubic-bezier(0.34, 1.4, 0.64, 1) 1;
+}
+
+@keyframes toolbar-accordion {
+  from {
+    transform: translateY(-6px) scaleY(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scaleY(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbarOpen {
+    animation: none;
+  }
+}
+
+/* URC 1.3 B1：chevron icon idle ping（紅色呼吸環 1.8s 提醒有東西可點）。 */
+.toolbarHintPing {
+  animation: hint-ping 1.8s ease-out infinite;
+}
+
+@keyframes hint-ping {
+  0%,
+  100% {
+    box-shadow: 2px 2px 0 var(--border);
+  }
+  50% {
+    box-shadow: 2px 2px 0 var(--border), 0 0 0 4px color-mix(in srgb, var(--doodle-red) 35%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbarHintPing {
+    animation: none;
+  }
+}
+
 /* UR2.5 摇一摇声纳：中心一点软闪＋两圈先后扩散就收（JS 定 950ms 卸载）。
  * 三层都只动 transform／opacity；pointer-events 交给调用方关
  * （声纳绝不能挡地图操作）。第二圈 0.28s 出发＋0.9s 走完，
