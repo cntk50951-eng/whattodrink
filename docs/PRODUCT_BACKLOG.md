@@ -1296,3 +1296,31 @@ UR A.7 Google 登入授權 [WIP]
 *改動記錄*
 - 2026-09-10：開工置 [WIP]（用户拍板 Google only；§10 Q1 推翻待回寫）
 - 2026-09-10：實現完待驗（配方按裝好的 `@supabase/ssr@0.12` 型別實證；`0006`＋callback＋`/login`＋選單項＋登出＋auth 三語＋§10 回寫；169 綠／tsc 淨／lint 0 error；待用戶：①跑 0006 ②配 Google provider ③真點登入驗）
+
+---
+
+UR A.8 地图他人 Pin 模糊坐标（公开） [WIP]
+
+作為用戶，我要在地圖上看到他人在可視範圍內的打卡 Pin，但精確位置必須被服務端模糊到街區級，不能暴露他人精確 lat/lng。
+
+### 目標
+- `GET /api/v1/map/pins?bbox` 公開接口（🌐 免登入），只回 `visibility=public` 行的模糊座標＋公開列
+- 服務端 BBOX 過濾＋街區級模糊（非前端藏），替掉 `lib/checkins.ts` MOCK
+
+### 非目標
+- 不做寫入、不做精確座標回傳、不做鑒權（登入後也走同一模糊邏輯）、不做 PostGIS
+
+### 範圍（只做 A.4-3，不多做）
+1. `GET /api/v1/map/pins?bbox=west,south,east,north`（🌐）：BBOX 必填，4 浮點，校驗範圍/順序/面積上限
+2. 僅取 `checkins` 中 `visibility=public` 且 `lat/lng` 非空且落在 BBOX 內的行；按 `created_at DESC` 取前 N（預設 100，上限 200）
+3. 座標模糊：服務端將 lat/lng 截斷至 3 位小數（約 100m 街區），原始值永不外洩
+4. 回傳公開列：`id, lat, lng, area, drinkName, drinkEmoji, nickname, avatarEmoji, gender, cheers, checkedInAt, isOnline`（online 由 `users.last_seen_at` 5min 窗判定）
+5. RLS 復用 `0005` 的 checkins/users/likes 公開讀（不新增 migration），錯誤一律 `{error:{code,message}}` 包絡
+
+### AC（可驗證）
+- 匿名 `GET /api/v1/map/pins?bbox=113.8,22.15,114.44,22.58` 回 200，`pins[].lat/lng` 均為 3 位小數精度，無精確值；private 行不出
+- BBOX 缺參/格式錯/越界/反向 → 400 `invalid_params`；DB 錯 → 500 `internal` + console 診斷行
+- 空 BBOX 或小 BBOX 回 `pins:[]` 不報錯；大於 HK 全圖范围或面積超限 → 400
+
+*改動記錄*
+- 2026-09-15：開工置 [WIP]（to-do A.4-3；公開讀復用 0005 RLS，無新增 migration）

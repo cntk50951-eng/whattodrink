@@ -41,6 +41,35 @@ paths:
           $ref: "#/components/responses/InvalidParams"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/map/pins:
+    get:
+      operationId: getMapPins
+      summary: 地图他人 Pin（免登入，坐标模糊到街区）
+      parameters:
+        - name: bbox
+          in: query
+          required: true
+          description: west,south,east,north 逗号分隔（经度 -180~180，纬度 -90~90，west<east 且 south<north，面积≤2deg²）
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 100
+      responses:
+        "200":
+          description: BBOX 内公开打卡（坐标已截断至 3 位小数约 100m，无精确值；private 行不回）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MapPinsPage"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "500":
+          $ref: "#/components/responses/Internal"
 components:
   schemas:
     WallAuthor:
@@ -100,6 +129,51 @@ components:
           type: string
           nullable: true
           description: 下一頁 cursor；null＝到底了
+    MapPin:
+      type: object
+      required: [id, lat, lng, area, drinkName, drinkEmoji, nickname, avatarUrl, gender, checkedInAt, isOnline]
+      properties:
+        id:
+          type: string
+          format: uuid
+        lat:
+          type: number
+          description: 模糊后纬度（3位小数，约100m街区）
+        lng:
+          type: number
+          description: 模糊后经度（3位小数，约100m街区）
+        area:
+          type: string
+          nullable: true
+        drinkName:
+          type: string
+          nullable: true
+        drinkEmoji:
+          type: string
+          nullable: true
+        nickname:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        gender:
+          type: string
+          nullable: true
+        checkedInAt:
+          type: integer
+          description: Epoch ms
+        isOnline:
+          type: boolean
+          description: users.last_seen_at 5min 窗内算在线
+    MapPinsPage:
+      type: object
+      required: [pins]
+      properties:
+        pins:
+          type: array
+          items:
+            $ref: "#/components/schemas/MapPin"
     ErrorBody:
       type: object
       required: [error]

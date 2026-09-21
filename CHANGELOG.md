@@ -43,6 +43,8 @@
 - **UR A.7 — Google 登入授權（[WIP]，待用戶配 Dashboard＋真點驗）**
   - `/login`＋Google 一鍵鈕＋`/auth/callback`（code 換 session）＋選單登入／登出項（沿 menuItem 樣式）＋`0006` trigger（Google 名→email 前綴→酒友）＋RLS owner 檔（users 自讀寫／checkins owner 全權）＋`lib/auth` 純函數 4 單測＋auth 三語；§10 Q1 匿名先行作廢；169 綠／tsc 淨／lint 0 error；數據文檔無需更新（零前端數據結構改動）
   - fix（用戶回報：prod 點登入「失敗、再試一次」無新請求）：`createClient()` 誤用 secret-requiring `requireSupabaseEnv`——`SUPABASE_SERVICE_ROLE_KEY` 沒 `NEXT_PUBLIC_` 前綴、瀏覽器永遠讀不到，production build 拋錯被 `LoginPanel` try/catch 吞掉。新 `requireSupabasePublicEnv` 只看 public 兩條，`client.ts` 改用；`LoginPanel` catch 補 `console.error` 下次不再 silent。173 綠（+4）/tsc 淨/lint 0 error；數據文檔無需更新
+- **UR A.8 — 地图他人 Pin 模糊坐标（[WIP]，待用戶遠測）**
+  - `GET /api/v1/map/pins?bbox=west,south,east,north&limit` 公開接口（BBOX 過濾＋街区 3 位小数模糊，复用 0005 RLS，无新增 migration）＋`lib/api/pins.ts`（fuzz/parse/toPinJson）＋route＋`docs/api-openapi.yaml` MapPin/MapPinsPage＋11 單測；184 綠／build ✓／lint 0 error（3 舊 warning）；數據文檔無需更新（`photo-mood.md` 已映射 checkins→墙/地图，pins 复用同一表）
 - **UR A.6 — 公開牆 API（[WIP]，待用戶 curl 驗）**
   - `GET /api/v1/wall`（hot／latest＋opaque cursor＋limit 1-50，只吐 public 行＋公開列，匿名 likedByMe／me／reported 全 false）＋`0005` 三檔 RLS policy＋`docs/api-openapi.yaml` 首版＋`lib/api/wall.ts` mapper／cursor／參數＋13 單測；165 綠／tsc 淨／lint 0 error；數據文檔無需更新（`photo-mood.md` 牆行未來表映射已對上）
 - **URC 1.2 — 頂部漢堡改成底部 4 鈕（同啤酒 row，不包 box）（[✓]，merged）**
