@@ -23,6 +23,8 @@ export const USER_CACHE_KEYS = [
   "wtd-cheers-daily",
 ] as const;
 
+export const LOGOUT_CLEAR_EVENT = "wtd:logout" as const;
+
 /** 清除登录用户在本地的私有缓存（登出时调用；SSR 时 no-op）。 */
 export function clearUserLocalCaches(): void {
   if (typeof window === "undefined" || typeof window.localStorage === "undefined") return;
@@ -32,5 +34,10 @@ export function clearUserLocalCaches(): void {
     } catch {
       // storage 不可用不挡登出流程
     }
+  }
+  try {
+    window.dispatchEvent(new CustomEvent(LOGOUT_CLEAR_EVENT));
+  } catch {
+    // jsdom 以外极端环境忽略
   }
 }

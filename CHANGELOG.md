@@ -5,6 +5,12 @@
 ## [Unreleased]
 
 ### Added
+- **UR A.9 登出后私聊残留＋UR A.11 未登录浮层（[WIP]，待用戶瀏覽器驗收，A.10 持久化仍 todo）**
+  - `lib/auth/clear.ts` 新增 `LOGOUT_CLEAR_EVENT = "wtd:logout"`，`clearUserLocalCaches()` 派发事件；`components/auth/HeaderAuth` 登出链已调该函数
+  - `components/wall/WallGrid` 监听事件重读 `loadWall()`（已清 `wtd-wall-*`），私帖 `me:true` 立即消失；`components/map/DrinkMap` 监听清空 `wantHistory/wantRecord/picked/wantSaved/selectedId/swap/confirm/sentIds/cheersFx/loginOverlay`，针/轨迹/额度 UI 同步消失，无需手动刷新
+  - `DrinkMap.dropWant` 未登录守卫：`supabase.auth.getUser()` 判空→弹品牌浮层（doodle 杯＋胶带＋硬阴影，常驻地图 `z-30`，`role=dialog`），文案 `map.loginRequiredTitle/Body`＋`map.cancel`／`map.loginCta` 三语；取消关层不写 `localStorage`，继续走 `signInWithOAuth → /auth/callback?next=/`（沿 A.7 PKCE 配方）
+  - `messages/{zh-Hans,zh-Hant,en}.json` 补四键；`lib/auth/clear.test.ts` 用 `EventTarget` 补事件派发单测（187/187 绿）；`npx tsc --noEmit` 净／`npm run lint` 0 error（3→4 warning 仅旧文件）／`npm run build` 绿（27 页）
+  - `docs/PRODUCT_BACKLOG.md` 拆 3 新 UR：A.9 登出残留 [WIP]→本提交实现、A.10 打卡持久化 `POST /api/v1/checkins`（🔒，to-do A.4-7，仍 []）、A.11 未登录浮层 []→本提交实现置 [WIP]，下一步落地 A.10 DB 链路
 - **UR 4.1 — 拍照分享排行榜（[WIP]，待用戶本地 build＋瀏覽器驗收）**
   - `lib/posts.ts`（`WallPost`＋6 篇 SVG 種子＋`parseWallPost` 校驗＋`toggleLike`／`sortHot`／`sortLatest`／`hasUnseenWall`／`persistPost`＋15 單測，localStorage stub 沿 node 環境缺口）＋`lib/posts.test.ts`；`post_likes`／`post_reports` 記入 future-schema，`photo-mood.md` 加第三節
   - 相機：`?auto=1` 直達（首用說明卡＋`wtd-camera-consent`，回頭客直開鏡頭）＋預覽改全螢幕拍立得＋拍攝／上傳下採樣 ≤1024px（HEIC 退回 object URL，會話可用 reload 丟）＋分享落盤直達詳情；扇形＋選單拍照入口改 `?auto=1`

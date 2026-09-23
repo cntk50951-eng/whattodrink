@@ -37,6 +37,8 @@ import {
   touchVisit,
 } from "@/lib/visit";
 import type { LastVisit } from "@/lib/visit";
+import { LOGOUT_CLEAR_EVENT } from "@/lib/auth/clear";
+import { createClient } from "@/lib/supabase/client";
 import {
   canCheers,
   cheersRemaining,
@@ -192,6 +194,7 @@ export function DrinkMap({
 }) {
   const locale = useLocale();
   const t = useTranslations("map");
+  const ta = useTranslations("auth");
   const heroT = useTranslations("hero");
   const {
     status: geoStatus,
@@ -596,6 +599,9 @@ export function DrinkMap({
    * 由 onScroll 回寫，箭頭按卡寬步進。 */
   const [batchIndex, setBatchIndex] = useState(0);
   const batchStripRef = useRef<HTMLDivElement | null>(null);
+  // UR A.11 未登录打卡唤起登录浮层
+  const [loginOverlayOpen, setLoginOverlayOpen] = useState(false);
+  const [loginBusy, setLoginBusy] = useState(false);
   // UR1.8 frozen drop snapshot (null until the first 想喝, or after reset).
   const [wantRecord, setWantRecord] = useState<WantRecord | null>(null);
   // UR3.7 删除两段确认：只对正在看的 at 武装，换条看自动解除，无需 effect。
@@ -1289,33 +1295,57 @@ export function DrinkMap({
   /**
    * Shared drop core — L1 隱性補全 and UR3.9 批量格 both land here with a
    * concrete brand, so pins / cards / trail never see lane-only check-ins.
+   * UR A.11：未登录不写本地，直接弹登录浮层。
    */
   function dropWant(beer: Beer): void {
-    const map = mapRef.current;
-    // Prefer the real position; otherwise drop the pin at the map centre.
-    const at =
-      geoStatus === "success" &&
-      geoPosition !== null &&
-      isWithinHongKong(geoPosition)
-        ? geoPosition
-        : map !== null
-          ? { lat: map.getCenter().lat, lng: map.getCenter().lng }
-          : DEFAULT_CENTER;
-    setWantSaved(true);
-    // UR1.8: freeze the drop moment — beer, clock, and fix travel together
-    // from here on; the pin and the card only ever read this snapshot.
-    // UR3.4 bug 修：追加进史（旧的不清），上限截尾保最新。
-    // eslint-disable-next-line react-hooks/purity -- dropWant is an event handler (click), not render
-    const record: WantRecord = { beer, at: Date.now(), position: at };
-    // UR3.4 同店顶替：10m 内算同一位置（GPS 漂移），旧条让位，不叠钉。
-    const next = upsertWantHistory(wantHistoryRef.current, record);
-    wantHistoryRef.current = next;
-    setWantHistory(next);
-    saveWantHistory(next);
-    setWantRecord(record);
-    // UR1.2: dropping the pin collapses the sheet into a chip — the map
-    // must never stay buried under the drawer on small screens.
-    setSheetOpen(false);
+    const supabase = createClient();
+    void supabase.auth.getUser().then(({ data }) => {
+      if (data.user === null) {
+        setLoginOverlayOpen(true);
+        return;
+      }
+      const map = mapRef.current;
+      // Prefer the real position; otherwise drop the pin at the map centre.
+      const at =
+        geoStatus === "success" &&
+        geoPosition !== null &&
+        isWithinHongKong(geoPosition)
+          ? geoPosition
+          : map !== null
+            ? { lat: map.getCenter().lat, lng: map.getCenter().lng }
+            : DEFAULT_CENTER;
+      setWantSaved(true);
+      // UR1.8: freeze the drop moment — beer, clock, and fix travel together
+      // from here on; the pin and the card only ever read this snapshot.
+      // UR3.4 bug 修：追加进史（旧的不清），上限截尾保最新。
+      const record: WantRecord = { beer, at: Date.now(), position: at };
+      // UR3.4 同店顶替：10m 内算同一位置（GPS 漂移），旧条让位，不叠钉。
+      const next = upsertWantHistory(wantHistoryRef.current, record);
+      wantHistoryRef.current = next;
+      setWantHistory(next);
+      saveWantHistory(next);
+      setWantRecord(record);
+      // UR1.2: dropping the pin collapses the sheet into a chip — the map
+      // must never stay buried under the drawer on small screens.
+      setSheetOpen(false);
+    });
+  }
+
+  async function handleLoginFromOverlay(): Promise<void> {
+    if (loginBusy) return;
+    setLoginBusy(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/auth/callback?next=/` },
+      });
+      if (error !== null) console.error("[auth] overlay signIn error:", error);
+    } catch (err) {
+      console.error("[auth] overlay handleLogin threw:", err);
+    } finally {
+      setLoginBusy(false);
+    }
   }
 
   /* ---- UR3.7 我的打卡可编辑（UR3.9 v2 改批次自选） ----
@@ -1415,6 +1445,26 @@ export function DrinkMap({
     }, CHEERS_FX_MS);
     return () => window.clearTimeout(timer);
   }, [cheersFx]);
+
+  // UR A.9 登出后想喝钉/cheers 内存态需立即清空（storage 已清，state 仍持旧）
+  useEffect(() => {
+    const handler = () => {
+      wantHistoryRef.current = [];
+      setWantHistory([]);
+      setWantRecord(null);
+      setPicked(null);
+      setWantSaved(false);
+      setSelectedId(null);
+      setSwapOpenFor(null);
+      setConfirmAt(null);
+      sentIdsRef.current = [];
+      setSentIds([]);
+      setCheersFx(null);
+      setLoginOverlayOpen(false);
+    };
+    window.addEventListener(LOGOUT_CLEAR_EVENT, handler);
+    return () => window.removeEventListener(LOGOUT_CLEAR_EVENT, handler);
+  }, []);
 
   // UR3.3 卡内邀约四态（mock）：idle→sent（3s 等对方）→accepted／declined
   //（按该人 declinesInvite 剧本，Mandy 婉拒其余接受）。真后端由对方点按钮，
@@ -2570,6 +2620,74 @@ export function DrinkMap({
                 )}
             </>
           )}
+          </div>
+        </div>
+      )}
+
+      {/* UR A.11 未登录打卡引导浮层（品牌 doodle＋硬阴影，常驻地图之上） */}
+      {loginOverlayOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("loginRequiredTitle")}
+          className="absolute inset-0 z-30 flex items-center justify-center bg-black/55 p-4"
+          onClick={() => setLoginOverlayOpen(false)}
+        >
+          <div
+            role="document"
+            className="relative w-full max-w-sm rounded-2xl border-2 bg-card p-6 pt-7 shadow-[4px_4px_0_var(--border)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              aria-hidden
+              className="absolute -top-3 left-1/2 h-6 w-24 -translate-x-1/2 -rotate-2 bg-(--tape)"
+            />
+            <div className="flex justify-center">
+              <span className="w-20">
+                <BeerMugDoodle cheersLabel="!" />
+              </span>
+            </div>
+            <p className="font-hand mt-3 text-center text-2xl font-bold">
+              {t("loginRequiredTitle")}
+            </p>
+            <p className="text-muted-foreground mt-2 text-center text-sm leading-relaxed">
+              {t("loginRequiredBody")}
+            </p>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setLoginOverlayOpen(false)}
+                className="font-hand flex-1 rounded-full border-2 bg-card px-4 py-2.5 text-base font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+              >
+                {t("cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleLoginFromOverlay()}
+                disabled={loginBusy}
+                className="font-hand inline-flex flex-1 items-center justify-center gap-2 rounded-full border-2 bg-primary px-4 py-2.5 text-base font-bold text-primary-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none disabled:opacity-60"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden>
+                  <path
+                    fill="#4285F4"
+                    d="M23.5 12.3c0-.9-.1-1.5-.3-2.3H12v4.5h6.5c-.1 1.1-.8 2.7-2.4 3.8l-.1.1 3.5 2.7.2.1c2.2-2 3.8-5 3.8-8.9z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 24c3.2 0 6-1.1 7.9-2.9l-3.8-2.9c-1 .7-2.4 1.2-4.1 1.2-3.2 0-5.9-2.1-6.8-5l-.1.1-3.6 2.8v.1C3.5 21.3 7.5 24 12 24z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.2 14.4c-.2-.7-.4-1.5-.4-2.4s.1-1.7.4-2.4l-.1-.1-3.6-2.8-.1.1C.5 8.6 0 10.2 0 12s.5 3.4 1.4 4.9l3.8-2.5z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 4.7c1.8 0 3 .8 3.7 1.4l3.3-3.2C17.9 1.1 15.2 0 12 0 7.5 0 3.5 2.7 1.4 6.9l3.8 2.8c.9-2.9 3.6-5 6.8-5z"
+                  />
+                </svg>
+                {loginBusy ? ta("loggingIn") : t("loginCta")}
+              </button>
+            </div>
           </div>
         </div>
       )}

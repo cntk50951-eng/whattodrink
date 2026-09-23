@@ -268,7 +268,11 @@
     "cityName_sz": "Shenzhen",
     "swapBeer": "Swap",
     "deleteEntry": "Delete",
-    "confirmDelete": "Confirm delete"
+    "confirmDelete": "Confirm delete",
+    "loginRequiredTitle": "Please sign in",
+    "loginRequiredBody": "Check-ins need an account — your pins follow your account across devices",
+    "loginCta": "Sign in",
+    "cancel": "Cancel"
   },
   "auth": {
     "title": "Sign in",

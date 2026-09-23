@@ -268,7 +268,11 @@
     "cityName_sz": "深圳",
     "swapBeer": "换酒",
     "deleteEntry": "删除",
-    "confirmDelete": "确认删除"
+    "confirmDelete": "确认删除",
+    "loginRequiredTitle": "请先登录",
+    "loginRequiredBody": "打卡需要登录，登录后记录会跟随你的账号，换设备也不丢",
+    "loginCta": "去登录",
+    "cancel": "取消"
   },
   "auth": {
     "title": "登录",

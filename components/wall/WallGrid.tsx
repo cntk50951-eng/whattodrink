@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Flame, Mic, Sparkles } from "lucide-react";
 
+import { LOGOUT_CLEAR_EVENT } from "@/lib/auth/clear";
 import {
   loadWall,
   loadWallSeenAt,
@@ -53,6 +54,16 @@ export function WallGrid() {
       setGuideOpen(!loadGuideSeen());
       saveWallSeenAt(Date.now());
     });
+  }, []);
+
+  // UR A.9 登出后私聊帖在内存中需立即消失（storage 已清，state 仍持旧数组）
+  useEffect(() => {
+    const handler = () => {
+      // storage 已被 clearUserLocalCaches 清空，重新读即为不含私帖的墙
+      setPosts(loadWall());
+    };
+    window.addEventListener(LOGOUT_CLEAR_EVENT, handler);
+    return () => window.removeEventListener(LOGOUT_CLEAR_EVENT, handler);
   }, []);
 
   const dismissGuide = () => {

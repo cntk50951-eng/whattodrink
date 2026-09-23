@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-// vitest 跑 node 環境，無 localStorage —— 最小內存 stub
+// vitest 跑 node 環境，無 localStorage —— 最小內存 stub（帶事件分發，供 UR A.9 測試）
 const memStore = new Map<string, string>();
 const ls = {
   getItem: (k: string) => (memStore.has(k) ? (memStore.get(k) as string) : null),
@@ -8,15 +8,21 @@ const ls = {
   removeItem: (k: string) => void memStore.delete(k),
   clear: () => memStore.clear(),
 };
+const winTarget = new EventTarget() as unknown as Window & { localStorage: typeof ls };
+(winTarget as unknown as Record<string, unknown>).localStorage = ls;
 Object.defineProperty(globalThis, "localStorage", { value: ls, configurable: true });
 Object.defineProperty(globalThis, "window", {
-  value: { localStorage: ls } as unknown as Window,
+  value: winTarget,
   configurable: true,
 });
 
 beforeEach(() => memStore.clear());
 
-import { clearUserLocalCaches, USER_CACHE_KEYS } from "./clear";
+import {
+  clearUserLocalCaches,
+  LOGOUT_CLEAR_EVENT,
+  USER_CACHE_KEYS,
+} from "./clear";
 
 describe("clearUserLocalCaches (UR A.7 登出不可见)", () => {
 
@@ -34,6 +40,17 @@ describe("clearUserLocalCaches (UR A.7 登出不可见)", () => {
     }
     // 非用户维度不清除
     expect(window.localStorage.getItem("wtd-camera-consent")).toBe("1");
+  });
+
+  it("登出时派发 wtd:logout 事件，UI 监听后清内存态（UR A.9）", () => {
+    let fired = false;
+    const handler = () => {
+      fired = true;
+    };
+    window.addEventListener(LOGOUT_CLEAR_EVENT, handler);
+    clearUserLocalCaches();
+    window.removeEventListener(LOGOUT_CLEAR_EVENT, handler);
+    expect(fired).toBe(true);
   });
 
   it("SSR 环境 no-op 不抛", () => {

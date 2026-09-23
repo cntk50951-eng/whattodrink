@@ -1379,3 +1379,70 @@ UR A.8 地图他人 Pin 模糊坐标（公开） [✓]（用户回 OK，遠測�
 *改動記錄*
 - 2026-09-15：開工置 [WIP]（to-do A.4-3；公開讀復用 0005 RLS，無新增 migration）
 - 2026-09-15：用户回 OK，置 [✓]
+
+---
+
+UR A.9 登出后私聊打卡残留，UI 未自动刷新 [WIP]
+
+作為用戶，我登出後應該立即看不到自己之前的私密打卡/想喝記錄，下次刷新前也不該殘留。
+
+### 背景
+- 已集成 Google 登录 + DB（`checkins` RLS owner 读写，`public` 读沿 0005），但前端仍有 `wtd-*` 本地持久化（`wtd-wall-my-posts` / `wtd-want-*` / `wtd-cheers`）在 `HeaderAuth` 登出时仅 `signOut + router.refresh()`，`DrinkMap` / `WallGrid` 等 Client state 仍持有旧记录，需等刷新才消失。
+
+### 範圍（只修登出可见性，不多做 DB 合并）
+1. 登出时除 `clearUserLocalCaches()` 清 `localStorage` 外，触发全应用已登录态重置（事件或 reload），`DrinkMap` 想喝钉/轨迹、`WallGrid` 我的帖子等 Client state 立即清空或重读匿名态
+2. 不改 `checkins` 持久化为 DB（那是 A.10），仅保证：登出瞬间 UI 已不可见，刷新后仍不可见（匿名 `GET /api/v1/map/pins` / `wall` 不回 `private` 行）
+3. 不新增表/RLS
+
+### AC
+- 登入 → 打卡（想喝/地图钉）→ 登出：**不刷新页面**，地图上私密钉、想喝卡片、Wall 的 `me:true` 帖子立即消失
+- `F12 Application → Local Storage` 中 `wtd-wall-my-posts` / `wtd-want-record` / `wtd-want-history` / `wtd-wall-overrides` / `wtd-cheers-daily` 已空
+- 刷新后仍不可见；重新登录后可见性由 DB 决定（A.10 完成前仍以本地空为准，不回填）
+
+*改動記錄*
+- 2026-09-15：開工置 [WIP]（用户报 bug #1）
+- 2026-09-15：實現完，待驗（`LOGOUT_CLEAR_EVENT` 事件廣播＋`DrinkMap`/`WallGrid` 監聽清內存態＋`clear.test.ts` 補事件單測；187 綠／tsc 淨／lint 0 error／build 绿）
+
+---
+
+UR A.10 打卡未持久化，二次登录不可见 [ ]（to-do A.4-7）
+
+作為已登录用户，我打卡后下次登录应能看到自己的记录（跨设备/清缓存也不丢）。
+
+### 背景
+- 当前 `wantRecord` / `WallPost` 仍走 `localStorage` POC 水位（`lib/posts.ts` / `lib/wantRecord.ts` 注释均标“后端落地时整块换 Supabase”），未走 DB 寫入；`POST /api/v1/checkins`（A.4-7）尚未實現，`0001` 的 `checkins` 表空
+
+### 範圍（只做持久化链路，不含 UI 浮层）
+1. `POST /api/v1/checkins`（🔒 需登录）：收 `lat/lng/place_name/beer_id/note/visibility`，`user_id = auth.uid()`，DB 插 `checkins`，`visibility` 默认 `private`
+2. 前端 `wantRecord`/`WallPost` 创建改调该 API（失败回退本地，不阻塞分享）
+3. 已登录读：`GET /api/v1/checkins/mine` 或复用 `map/pins` 的 owner 读（`auth.uid()=user_id`），二次登录可回显
+
+### AC
+- 登录态打卡 → `checkins` 表多一行 `user_id=自己`；登出后匿名 `map/pins` 不回该行，登录后 `mine` 可回
+- 未登录调写接口 401
+
+*改動記錄*
+- 2026-09-15：建檔置 [ ]（用户报 bug #2，API 未做）
+
+---
+
+UR A.11 未登录打卡唤起登录浮层 [WIP]（需 UI 设计）
+
+作為未登录用户，我在地图上点“打卡/想喝”时应被引导登录，而不是静默失败或写本地。
+
+### 背景
+- 当前未登录点打卡直接写 `localStorage`（POC），与“已集成登录+DB”预期不符；需要品牌一致的登录引导
+
+### 範圍（只做浮层，不含持久化）
+1. 地图打卡入口（`DrinkMap` 想喝/打卡按钮）未登录点击 → 弹出登录浮层（沿用 `LoginPanel` 的 Google 一键风，品牌 doodle + 硬阴影 + 中文文案，不新增 `type` 枚举外的样式）
+2. 浮层：标题/说明 + `用 Google 继续` + `取消`，`取消` 關閉，`继续` 跳 `/login`（或直接触发 OAuth，不新增 `type`）
+3. 不改 `checkins` 写逻辑
+
+### AC
+- 未登录点击打卡 → 浮层出现，页面不跳，不写 `localStorage`
+- 点 `用 Google 继续` → 走正常 OAuth；点 `取消` → 浮层消失，可继续浏览
+- 已登录点击 → 直接走原打卡流程，不弹层
+
+*改動記錄*
+- 2026-09-15：建檔置 [ ]（用户报 bug #3，需设计 UI）
+- 2026-09-15：實現完，待驗（`DrinkMap` 未登录守卫＋品牌浮层＋三语文案＋`supabase.auth.getUser()` 守衛不寫 `wtd-*`；187 綠／tsc 淨／lint 0 error／build 绿）
