@@ -276,6 +276,7 @@
     "google": "Continue with Google",
     "loggingIn": "Heading to Google…",
     "failed": "Sign-in failed, try again",
-    "logoutName": "Sign out ({name})"
+    "logoutName": "Sign out ({name})",
+    "logout": "Sign out"
   }
 }

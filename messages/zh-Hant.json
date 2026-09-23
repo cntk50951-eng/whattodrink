@@ -276,6 +276,7 @@
     "google": "用 Google 繼續",
     "loggingIn": "跳緊去 Google…",
     "failed": "登入失敗，再試一次",
-    "logoutName": "登出（{name}）"
+    "logoutName": "登出（{name}）",
+    "logout": "登出"
   }
 }

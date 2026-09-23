@@ -7,9 +7,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Container } from "@/components/layout/container";
-import { Button } from "@/components/ui/button";
 import { Footer } from "@/components/marketing/footer";
-import { getUserId } from "@/lib/supabase/server";
+import { HeaderAuth } from "@/components/auth/HeaderAuth";
 
 /* UR1.5 note: fonts load via <link> in the root layout (see app/layout.tsx).
  * next/font/google can't fetch in this sandbox (proxy returns truetype-only
@@ -63,10 +62,6 @@ export default async function LocaleLayout({
   setRequestLocale(locale);
 
   const messages = await getMessages();
-  const t = await getTranslations({ locale, namespace: "nav" });
-  /* UR A.7 header 登入鈕：只在未登入顯示（已登入走漢堡選單登出）；
-   * 舊鏈 `/auth` 是死路由，改指 `/login`。server 讀 session，零閃爍。 */
-  const headerUserId = await getUserId().catch(() => null);
 
   return (
     <div
@@ -84,16 +79,7 @@ export default async function LocaleLayout({
                   whattodrink
                 </Link>
                 <div className="flex items-center gap-2">
-                  {/* URC 1.2：頂部漢堡退役，4 項入口搬到下方 BottomNav（home 頁）。 */}
-                  {headerUserId === null && (
-                    <Button
-                      size="sm"
-                      nativeButton={false}
-                      render={<Link href="/login" />}
-                    >
-                      {t("signIn")}
-                    </Button>
-                  )}
+                  <HeaderAuth />
                 </div>
               </div>
             </Container>
