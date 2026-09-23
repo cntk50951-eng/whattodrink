@@ -1,0 +1,43 @@
+import { beforeEach, describe, expect, it } from "vitest";
+
+// vitest 跑 node 環境，無 localStorage —— 最小內存 stub
+const memStore = new Map<string, string>();
+const ls = {
+  getItem: (k: string) => (memStore.has(k) ? (memStore.get(k) as string) : null),
+  setItem: (k: string, v: string) => void memStore.set(k, v),
+  removeItem: (k: string) => void memStore.delete(k),
+  clear: () => memStore.clear(),
+};
+Object.defineProperty(globalThis, "localStorage", { value: ls, configurable: true });
+Object.defineProperty(globalThis, "window", {
+  value: { localStorage: ls } as unknown as Window,
+  configurable: true,
+});
+
+beforeEach(() => memStore.clear());
+
+import { clearUserLocalCaches, USER_CACHE_KEYS } from "./clear";
+
+describe("clearUserLocalCaches (UR A.7 登出不可见)", () => {
+
+  it("登出后私有墙/想喝/点赞本地缓存被清除", () => {
+    // 先模拟已登录打卡后写入的本地缓存
+    for (const key of USER_CACHE_KEYS) {
+      window.localStorage.setItem(key, JSON.stringify({ fake: 1 }));
+    }
+    window.localStorage.setItem("wtd-camera-consent", "1");
+
+    clearUserLocalCaches();
+
+    for (const key of USER_CACHE_KEYS) {
+      expect(window.localStorage.getItem(key)).toBeNull();
+    }
+    // 非用户维度不清除
+    expect(window.localStorage.getItem("wtd-camera-consent")).toBe("1");
+  });
+
+  it("SSR 环境 no-op 不抛", () => {
+    // vitest jsdom 下 window 存在，此用例仅校验接口不抛
+    expect(() => clearUserLocalCaches()).not.toThrow();
+  });
+});

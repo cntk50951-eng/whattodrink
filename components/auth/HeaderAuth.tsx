@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
+import { clearUserLocalCaches } from "@/lib/auth/clear";
 import { displayName } from "@/lib/auth/profile";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,7 @@ export function HeaderAuth() {
   async function handleLogout(): Promise<void> {
     const supabase = createClient();
     await supabase.auth.signOut();
+    clearUserLocalCaches();
     setName(null);
     setAvatar(null);
     router.refresh();
