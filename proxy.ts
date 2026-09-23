@@ -29,6 +29,6 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Match everything except Next internals, static assets, and the API.
-  matcher: ["/((?!api|_next|.*\\..*).*)"],
+  // Match everything except Next internals, static assets, API, and auth callback.
+  matcher: ["/((?!api|auth|_next|.*\\..*).*)"],
 };
