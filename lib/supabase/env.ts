@@ -94,13 +94,35 @@ export function resolveSupabasePublicEnv(
 
 /** 瀏覽器 client 用，缺 key 即拋（fail fast，不靜默跑）。 */
 export function requireSupabasePublicEnv(
-  from: EnvSource = process.env,
+  from?: EnvSource,
 ): SupabasePublicEnv {
-  const { env, missing } = resolveSupabasePublicEnv(from);
-  if (env === null) {
+  // 測試走 mock 對象（顯式傳 from），正式走直接讀 process.env 字面量
+  // —— Next.js 只會把字面量 `process.env.NEXT_PUBLIC_*` inline 進瀏覽器 bundle，
+  // `from.NEXT_PUBLIC_*` 這種別名寫法不會被替換，導致 production 永遠讀不到
+  // （本地 dev 能跑是因為 Node 的 process.env 在 runtime 還在）。
+  if (from !== undefined) {
+    const { env, missing } = resolveSupabasePublicEnv(from);
+    if (env === null) {
+      throw new Error(
+        `Supabase 未配置：缺少 ${missing.join("、")}（照 .env.example 填進 .env.local，不提交）`,
+      );
+    }
+    return env;
+  }
+  const url = nonEmpty(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const publicKey =
+    nonEmpty(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) ??
+    nonEmpty(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  if (url === null || publicKey === null) {
+    const missing: string[] = [];
+    if (url === null) missing.push("NEXT_PUBLIC_SUPABASE_URL");
+    if (publicKey === null)
+      missing.push(
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (或舊制 NEXT_PUBLIC_SUPABASE_ANON_KEY)",
+      );
     throw new Error(
       `Supabase 未配置：缺少 ${missing.join("、")}（照 .env.example 填進 .env.local，不提交）`,
     );
   }
-  return env;
+  return { url, publicKey };
 }
