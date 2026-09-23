@@ -1,4 +1,4 @@
-import { createClient, getUserId } from "@/lib/supabase/server";
+import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseCreateCheckinBody } from "@/lib/api/checkins";
 
@@ -11,7 +11,7 @@ import { parseCreateCheckinBody } from "@/lib/api/checkins";
 const CHECKIN_SELECT = "id,beer_id,lat,lng,place_name,created_at";
 
 export async function POST(req: Request): Promise<Response> {
-  const userId = await getUserId();
+  const { supabase, userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
   }
@@ -30,7 +30,6 @@ export async function POST(req: Request): Promise<Response> {
   const { beer_id, lat, lng, place_name } = parsed.body;
 
   try {
-    const supabase = await createClient();
 
     // 先校验 beer_id 是否存在（FK 不存在会 500，提前转 400 更友好；并发竞态下仍可能落 FK，故容错两路）
     const { data: beerExists, error: beerErr } = await supabase

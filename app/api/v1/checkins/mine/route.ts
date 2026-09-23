@@ -1,4 +1,4 @@
-import { createClient, getUserId } from "@/lib/supabase/server";
+import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseMineParams, toMineRow } from "@/lib/api/checkins";
 
@@ -11,7 +11,7 @@ import { parseMineParams, toMineRow } from "@/lib/api/checkins";
 const MINE_COLUMNS = "id,beer_id,lat,lng,place_name,created_at,beers(id,name,emoji,category,tagline,icon_url)";
 
 export async function GET(req: Request): Promise<Response> {
-  const userId = await getUserId();
+  const { supabase, userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
   }
@@ -23,7 +23,6 @@ export async function GET(req: Request): Promise<Response> {
   const { limit } = parsed;
 
   try {
-    const supabase = await createClient();
     const { data, error } = await supabase
       .from("checkins")
       .select(MINE_COLUMNS)
