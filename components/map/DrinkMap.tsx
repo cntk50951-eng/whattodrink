@@ -39,6 +39,7 @@ import {
 import type { LastVisit } from "@/lib/visit";
 import { LOGOUT_CLEAR_EVENT } from "@/lib/auth/clear";
 import { createClient } from "@/lib/supabase/client";
+import { mineRowToWantRecord, toMineRow } from "@/lib/api/checkins";
 import {
   canCheers,
   cheersRemaining,
@@ -927,25 +928,95 @@ export function DrinkMap({
   /* ---- UR1.8: resurrect the persisted snapshot after mount ----
    * State starts null on both server and client (no hydration split);
    * the stored record — pin included — returns in one effect pass.
-   * UR3.4 bug 修：单槽改史槽（加推荐酒不再清旧数据， legacy 单键自动迁移）。 */
+   * UR3.4 bug 修：单槽改史槽（加推荐酒不再清旧数据， legacy 单键自动迁移）。
+   * UR A.10 已登录走 DB（mine），匿名走 localStorage；登录态切换时重拉。 */
   const [wantHistory, setWantHistory] = useState<WantRecord[]>([]);
   const wantHistoryRef = useRef<WantRecord[]>([]);
   useEffect(() => {
     wantHistoryRef.current = wantHistory;
   });
   useEffect(() => {
-    // Microtask wrapper: the set-state-in-effect rule only allows setState
-    // in an async continuation (same pattern as useGeolocation mount — see
-    // .memory/2026-09-05-toolchain-pits.md).
-    void Promise.resolve().then(() => {
-      const history = loadWantHistory();
-      if (history.length === 0) return;
-      const latest = history[history.length - 1] as WantRecord;
-      setWantHistory(history);
-      setWantRecord(latest);
-      setPicked(latest.beer);
-      setWantSaved(true);
+    // 初次：已登录拉 mine，否则读本地
+    void createClient()
+      .auth.getUser()
+      .then(async ({ data }) => {
+        if (data.user !== null) {
+          try {
+            const res = await fetch("/api/v1/checkins/mine?limit=30", {
+              cache: "no-store",
+              credentials: "include",
+            });
+            if (!res.ok) throw new Error(`mine ${res.status}`);
+            const json = (await res.json()) as { checkins?: unknown };
+            const rows = Array.isArray(json.checkins) ? json.checkins : [];
+            const parsed: WantRecord[] = [];
+            for (const r of rows) {
+              const row = toMineRow(r);
+              if (row === null) continue;
+              const rec = mineRowToWantRecord(row);
+              if (rec === null) continue;
+              // mineRowToWantRecord 回的是 {at, position, beer, placeName}，补全 WantRecord 形状
+              parsed.push(rec as WantRecord);
+            }
+            // mine 是倒序（新在前），history 要升序（旧在前）
+            parsed.sort((a, b) => a.at - b.at);
+            if (parsed.length === 0) return;
+            const latest = parsed[parsed.length - 1] as WantRecord;
+            setWantHistory(parsed);
+            setWantRecord(latest);
+            setPicked(latest.beer);
+            setWantSaved(true);
+            return;
+          } catch {
+            // 断网/401 回退本地
+          }
+        }
+        // 匿名或 mine 失败：读本地
+        void Promise.resolve().then(() => {
+          const history = loadWantHistory();
+          if (history.length === 0) return;
+          const latest = history[history.length - 1] as WantRecord;
+          setWantHistory(history);
+          setWantRecord(latest);
+          setPicked(latest.beer);
+          setWantSaved(true);
+        });
+      });
+  }, []);
+  // 登录后（SIGNED_IN）即时回显 DB 历史，不等刷新
+  useEffect(() => {
+    const supabase = createClient();
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event !== "SIGNED_IN" || session === null) return;
+      void fetch("/api/v1/checkins/mine?limit=30", {
+        cache: "no-store",
+        credentials: "include",
+      })
+        .then(async (res) => {
+          if (!res.ok) return;
+          const json = (await res.json()) as { checkins?: unknown };
+          const rows = Array.isArray(json.checkins) ? json.checkins : [];
+          const parsed: WantRecord[] = [];
+          for (const r of rows) {
+            const row = toMineRow(r);
+            if (row === null) continue;
+            const rec = mineRowToWantRecord(row);
+            if (rec === null) continue;
+            parsed.push(rec as WantRecord);
+          }
+          parsed.sort((a, b) => a.at - b.at);
+          if (parsed.length === 0) return;
+          const latest = parsed[parsed.length - 1] as WantRecord;
+          // 覆盖本地（登录态以 DB 为准）
+          wantHistoryRef.current = parsed;
+          setWantHistory(parsed);
+          setWantRecord(latest);
+          setPicked(latest.beer);
+          setWantSaved(true);
+        })
+        .catch(() => {});
     });
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   /* ---- UR1.8 fix: resolve the stored position to a place name ----
@@ -967,7 +1038,12 @@ export function DrinkMap({
       );
       wantHistoryRef.current = next;
       setWantHistory(next);
-      saveWantHistory(next);
+      // UR A.10 已登录以 DB 为准，不再回写 wtd-want-history（二次登录靠 mine）
+      void createClient()
+        .auth.getUser()
+        .then(({ data }) => {
+          if (data.user === null) saveWantHistory(next);
+        });
     });
     return () => {
       cancelled = true;
@@ -1299,14 +1375,13 @@ export function DrinkMap({
    */
   function dropWant(beer: Beer): void {
     const supabase = createClient();
-    void supabase.auth.getUser().then(({ data }) => {
+    void supabase.auth.getUser().then(async ({ data }) => {
       if (data.user === null) {
         setLoginOverlayOpen(true);
         return;
       }
       const map = mapRef.current;
-      // Prefer the real position; otherwise drop the pin at the map centre.
-      const at =
+      const position =
         geoStatus === "success" &&
         geoPosition !== null &&
         isWithinHongKong(geoPosition)
@@ -1314,19 +1389,54 @@ export function DrinkMap({
           : map !== null
             ? { lat: map.getCenter().lat, lng: map.getCenter().lng }
             : DEFAULT_CENTER;
+
+      // UR A.10 已登录走 DB 落库，失败回退本地（离线/限流不断体验）
+      try {
+        const res = await fetch("/api/v1/checkins", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            beer_id: beer.id,
+            lat: position.lat,
+            lng: position.lng,
+            place_name: null,
+          }),
+        });
+        if (!res.ok) throw new Error(`checkins ${res.status}`);
+        const json = (await res.json()) as {
+          checkin?: { id: string; beer_id: string; lat: number; lng: number; place_name: string | null; created_at: string };
+        };
+        const row = json.checkin;
+        if (row === undefined || typeof row.created_at !== "string") throw new Error("bad checkin json");
+        const at = Date.parse(row.created_at);
+        if (!Number.isFinite(at)) throw new Error("bad created_at");
+        const record: WantRecord = {
+          beer,
+          at,
+          position,
+          ...(typeof row.place_name === "string" && row.place_name.length > 0 ? { placeName: row.place_name } : {}),
+        };
+        setWantSaved(true);
+        const next = upsertWantHistory(wantHistoryRef.current, record);
+        wantHistoryRef.current = next;
+        setWantHistory(next);
+        // 已登录以 DB 为准，不再写 wtd-want-history（登出会清空本地，二次登录靠 mine 回显）
+        setWantRecord(record);
+        setSheetOpen(false);
+        return;
+      } catch (err) {
+        console.warn("[checkins] POST fallback to local", err);
+      }
+
+      // 回退：匿名旧路径（离线或 POST 挂）
       setWantSaved(true);
-      // UR1.8: freeze the drop moment — beer, clock, and fix travel together
-      // from here on; the pin and the card only ever read this snapshot.
-      // UR3.4 bug 修：追加进史（旧的不清），上限截尾保最新。
-      const record: WantRecord = { beer, at: Date.now(), position: at };
-      // UR3.4 同店顶替：10m 内算同一位置（GPS 漂移），旧条让位，不叠钉。
+      const record: WantRecord = { beer, at: Date.now(), position };
       const next = upsertWantHistory(wantHistoryRef.current, record);
       wantHistoryRef.current = next;
       setWantHistory(next);
       saveWantHistory(next);
       setWantRecord(record);
-      // UR1.2: dropping the pin collapses the sheet into a chip — the map
-      // must never stay buried under the drawer on small screens.
       setSheetOpen(false);
     });
   }

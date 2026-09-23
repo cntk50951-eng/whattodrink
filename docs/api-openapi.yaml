@@ -70,6 +70,78 @@ paths:
           $ref: "#/components/responses/InvalidParams"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/checkins:
+    post:
+      operationId: postCheckin
+      summary: 打卡落库（需登录，type=want visibility=private）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [beer_id, lat, lng]
+              properties:
+                beer_id:
+                  type: string
+                lat:
+                  type: number
+                  minimum: -90
+                  maximum: 90
+                lng:
+                  type: number
+                  minimum: -180
+                  maximum: 180
+                place_name:
+                  type: string
+                  nullable: true
+                  maxLength: 200
+      responses:
+        "201":
+          description: 落库成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [checkin]
+                properties:
+                  checkin:
+                    $ref: "#/components/schemas/Checkin"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/checkins/mine:
+    get:
+      operationId: getMyCheckins
+      summary: 我的打卡历史（需登录，type=want）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 30
+      responses:
+        "200":
+          description: 倒序（新在前）我的打卡，含 beers join
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MinePage"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
 components:
   schemas:
     WallAuthor:
@@ -174,6 +246,72 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MapPin"
+    Checkin:
+      type: object
+      required: [id, beer_id, lat, lng, place_name, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        beer_id:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        place_name:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    MineRow:
+      type: object
+      required: [id, beer_id, lat, lng, place_name, created_at, beers]
+      properties:
+        id:
+          type: string
+          format: uuid
+        beer_id:
+          type: string
+          nullable: true
+        lat:
+          type: number
+          nullable: true
+        lng:
+          type: number
+          nullable: true
+        place_name:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        beers:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            emoji:
+              type: string
+            category:
+              type: string
+            tagline:
+              type: string
+            icon_url:
+              type: string
+              nullable: true
+    MinePage:
+      type: object
+      required: [checkins]
+      properties:
+        checkins:
+          type: array
+          items:
+            $ref: "#/components/schemas/MineRow"
     ErrorBody:
       type: object
       required: [error]
@@ -186,9 +324,20 @@ components:
               type: string
             message:
               type: string
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   responses:
     InvalidParams:
       description: 入參非法（sort／limit／cursor）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    Unauthorized:
+      description: 未登录（缺或坏 JWT）
       content:
         application/json:
           schema:
