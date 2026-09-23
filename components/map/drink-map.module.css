@@ -902,6 +902,53 @@
   }
 }
 
+/* URC 1.4：朋友上線 → 城市卡 CityIcon 搖晃一次（0.6s，rotate + translate）。
+ * 只動 transform，pointer-events 維持（不擋地圖操作）。 */
+.cityShake {
+  animation: city-shake 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1;
+}
+
+@keyframes city-shake {
+  0%,
+  100% {
+    transform: rotate(0deg) translate(0, 0);
+  }
+  15% {
+    transform: rotate(-9deg) translate(-1px, 0);
+  }
+  30% {
+    transform: rotate(8deg) translate(2px, -1px);
+  }
+  45% {
+    transform: rotate(-6deg) translate(-2px, 0);
+  }
+  60% {
+    transform: rotate(5deg) translate(1px, 1px);
+  }
+  75% {
+    transform: rotate(-3deg) translate(0, -1px);
+  }
+  90% {
+    transform: rotate(1deg) translate(0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* URC 1.4 降級：改用 opacity pulse（仍有提示，不擾人）。 */
+  .cityShake {
+    animation: city-pulse 0.6s ease-out 1;
+  }
+  @keyframes city-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+}
+
 /* UR2.5 摇一摇声纳：中心一点软闪＋两圈先后扩散就收（JS 定 950ms 卸载）。
  * 三层都只动 transform／opacity；pointer-events 交给调用方关
  * （声纳绝不能挡地图操作）。第二圈 0.28s 出发＋0.9s 走完，

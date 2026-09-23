@@ -221,6 +221,44 @@ export function DrinkMap({
   useEffect(() => {
     toolbarExpandedRef.current = toolbarExpanded;
   });
+  /* URC 1.4：朋友同城市上線 → CityIcon 搖晃一次。
+   * - cityShakeSeq 是動畫重掛 key（0 不搖，>0 重啟搖晃）
+   * - acknowledgedRef 記錄已注意的朋友 ids（點 CityIcon 展開工具列時重置）
+   * - 每 30s 掃一次 isOnline；新上線的同城市朋友 → 觸發搖晃 + 加入 ack 集
+   * - cityCode 透過 ref 拿（cityCode 在下面才宣告，避 lint: used-before-declaration）*/
+  const [cityShakeSeq, setCityShakeSeq] = useState(0);
+  const acknowledgedRef = useRef<Set<string>>(new Set());
+  const cityCodeRef = useRef<string | null>(null);
+  useEffect(() => {
+    // URC 1.4：debug mode `?shake=1` 用 1000ms 間隔加快驗證；prod 30s。
+    const isDebug = typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("shake") === "1";
+    const intervalMs = isDebug ? 1000 : 30_000;
+    const id = window.setInterval(() => {
+      // URC 1.4：debug mode `?shake=1` 用 'hk' 模擬用戶城市（無定位時
+      // cityCode 為 null，偵測邏輯會跳過；debug mode 跳過該 gate）。
+      const isDebug = intervalMs === 1000;
+      const code = isDebug ? "hk" : cityCodeRef.current;
+      if (code === null) return; // 用戶城市未知，不掃
+      const now = Date.now();
+      const newlyOnline: string[] = [];
+      for (const c of MOCK_CHECKINS) {
+        if (!isOnline(c, now)) continue;
+        // Debug mode 跳過同城市檢查（無碼用戶也能看 shake）
+        if (!isDebug) {
+          const friendCity = resolveCityCode(c.position, c.area);
+          if (friendCity !== code) continue;
+        }
+        if (acknowledgedRef.current.has(c.id)) continue;
+        newlyOnline.push(c.id);
+      }
+      if (newlyOnline.length > 0) {
+        for (const id of newlyOnline) acknowledgedRef.current.add(id);
+        void Promise.resolve().then(() => setCityShakeSeq((n) => n + 1));
+      }
+    }, intervalMs);
+    return () => window.clearInterval(id);
+  }, []);
   // URC 1.3 B1：idle hint 首次未互動時浮「點 icon 展開」3 秒自動消失。
   // localStorage 標記用戶已看過就不再顯示（wtd-toolbar-hint 命名空間）。
   // setState 走 microtask 避 react-hooks/set-state-in-effect（沿 UR1.8 配方）。
@@ -616,6 +654,10 @@ export function DrinkMap({
     geoStatus === "success" && geoPosition !== null ? geoPosition : null;
   // UR3.5+ 城市图形：真 GPS＋真区名才出码，无码回退 Building2（不编造）。
   const cityCode = resolveCityCode(selfFix, currentArea);
+  // URC 1.4：shake 偵測透過 ref 讀最新 cityCode（避 lint refs-in-render）。
+  useEffect(() => {
+    cityCodeRef.current = cityCode;
+  }, [cityCode]);
   const cityLabelKey =
     cityCode === null ? "cityName" : (`cityName_${cityCode}` as const);
 
@@ -1539,6 +1581,8 @@ export function DrinkMap({
                 }
                 void Promise.resolve().then(() => setToolbarHint(false));
               }
+              // URC 1.4 C：點 CityIcon 視為「已注意」，下次新朋友上線再搖。
+              acknowledgedRef.current = new Set();
               void Promise.resolve().then(() =>
                 setToolbarExpanded((v) => !v),
               );
@@ -1547,7 +1591,9 @@ export function DrinkMap({
               toolbarExpanded ? "Hide map tools" : "Show map tools"
             }
             aria-expanded={toolbarExpanded}
-            className={`relative flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-xl border-2 bg-accent text-accent-foreground transition-transform active:translate-x-0.5 active:translate-y-0.5 ${toolbarHint ? styles.toolbarHintPing : ""}`}
+            className={`relative flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-xl border-2 bg-accent text-accent-foreground transition-transform active:translate-x-0.5 active:translate-y-0.5 ${toolbarHint ? styles.toolbarHintPing : ""} ${cityShakeSeq > 0 ? styles.cityShake : ""}`}
+            // URC 1.4：cityShakeSeq 變動重掛 key 重啟搖晃動畫。
+            key={`shake-${cityShakeSeq}`}
           >
             <CityIcon code={cityCode} size={54} />
             {toolbarHint && (

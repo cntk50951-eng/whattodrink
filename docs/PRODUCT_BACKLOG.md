@@ -1088,7 +1088,61 @@ UR3.7 增強我的打卡记录的时候，在彈出的面板中，这个时候�
 - 2026-09-14：用戶拍 A1/B1/C1，落地＋視覺驗收通過（手機 390×844＋桌面 1280×800），置 [✓]；摘要見 CHANGELOG（v4 細節：4 鈕同 row 不包 box、MapFab 改 inline flex item）
 - 2026-09-17：A3 fix — Tonight's pick 改 `<button onClick>`（修同 URL Link no-op 重複點擊沒反應 bug）+ A4 — BottomNav 加 hidden prop（sheet 開時整組讓位）；兩個 fix 詳情見 memory `2026-09-17-urc12-a3-link-noop.md`
 
-**URC 1.3　地圖工具列預設收進城市卡，加 icon 展開** [✓]
+**URC 1.4　朋友上線城市，城市卡 CityIcon 搖晃提示** [✓]
+
+作為用戶，當我有朋友在同一城市上線（5 分鐘內有打卡）時，城市卡的建築
+icon 會搖晃一下，吸引我注意到「有酒友也開了」——既不擾人、又有「有人同在」的
+社交感。
+
+> 「C」＝Chris。URC 系列續編，承 URC 1.3 城市卡 clickable 後的延伸。
+> 注意：搖晃是**一次性觸發**，不是常駐動效——避免持續吸引注意力干擾操作。
+
+*現況（為什麼要加）*
+- 城市卡（UR3.5 / URC 1.3）已是地圖核心資訊中心
+- 朋友上線（UR3.3 isOnline(c, nowMs)）目前只在他人 pin 上加綠點＋頭像綠點
+- 用戶主動想看誰在線（互動榜 / 搖一搖）才會看到；**沒主動**就錯過
+- 城市卡在城市 icon 已有 clickable CTA，順手加社交通知，視覺一體
+
+*目標*
+- 偵測「同城市 + 有任一朋友 isOnline = true」時，CityIcon 搖晃一次
+- 搖晃動畫沿站內風格（transform 旋轉／translate，0.6s 一次）
+- 用戶點 CityIcon 展開工具列即視為「已注意」，不再搖
+- 上線事件過去（isOnline 變 false）即停止搖晃
+- 多位朋友同時上線：仍只搖一次（去重）
+
+*範圍*
+1. **偵測邏輯**：每 30 秒掃一次 `MOCK_CHECKINS`；有任一 `isOnline(c, nowMs)`
+   且同城市 → 觸發搖晃
+2. **同城市判定**：用戶 `cityCode` 跟每位朋友的 `cityCode`（兩者都靠
+   `resolveCityCode(position, area)` 算）
+3. **搖晃動效**：CSS keyframes，shake class 加在 CityIcon button 上
+4. **去重**：本次 session 同一朋友不會重複觸發；新朋友出現 → 重觸發
+5. **點擊視為已注意**：展開工具列時 reset shake flag，下次上線事件再搖
+
+*邊界情況／失敗處理*
+- 城市 code 解析失敗（null）→ 不搖（合理降級）
+- 隱私模式 / `isOnline` 異常 → 走安全降級（不搖）
+- `prefers-reduced-motion`：shake 動效降級為 opacity pulse
+- 搖晃不阻塞地圖操作（pointer-events 維持）
+- sheet／card／指引打開時仍可搖（社交通知不讓位——讓用戶即使在抽獎也能注意到）
+
+*驗收標準（Acceptance Criteria）*
+- AC1：朋友 mock 上線（同城市）→ 城市卡 CityIcon 搖晃一次（約 0.6s）
+- AC2：搖晃結束後 icon 恢復靜止；不會持續抖動
+- AC3：點 CityIcon 展開工具列 → 視為「已注意」，之後同朋友上線仍會再搖
+- AC4：搖晃不擋地圖操作（可同時 zoom or click map）
+- AC5：城市 code 解析失敗時不搖（降級）
+- AC6：tsc 淨／lint 0 error；既有單測不退步；無新增 ESM 依賴
+- AC7：iOS safe-area 內 shake 不踩邊
+
+*後續（不在本 UR）*
+- 朋友上線時額外推播 push notification → 需 PWA / 原生 API，另議
+- 城市卡加 counter badge 顯示「3 人在線」→ 視需求另議
+- shake 動畫細調（時間、幅度）→ 視實際反饋另議
+
+*改動記錄*
+- 2026-09-20：raw 入庫（用戶首次提出，待 review），置 []
+- 2026-09-20：用戶拍 A1/B1/C3/D1 + 改用 v2 — 砍掉 chevron、讓既有 CityIcon 變 clickable，置 [✓]；視覺驗收通過（手機 390×844），詳情見 CHANGELOG
 
 作為用戶，我打開首頁第一眼看到城市卡就好，地圖相關的 4 個操作（睇全港／回位／足跡／搖一搖）預設收起，需要時點城市卡旁邊的 icon 才展開——這樣首頁的「地圖」更乾淨，操作按需打開。
 
@@ -1151,8 +1205,8 @@ UR3.7 增強我的打卡记录的时候，在彈出的面板中，这个时候�
 - 4 鈕各自加 tooltip（hover label）→ 另議
 
 *改動記錄*
-- 2026-09-20：raw 入庫（用戶首次提出，待 review），置 []
-- 2026-09-20：用戶拍 A1/B1/C3/D1 + 改用 v2 — 砍掉 chevron、讓既有 CityIcon 變 clickable，置 [✓]；視覺驗收通過（手機 390×844），詳情見 CHANGELOG
+- 2026-09-22：raw 入庫（用戶首次提出），置 []
+- 2026-09-23：用戶拍 A（30s 掃＋debug 加速）/ B（多位去重搖一次）/ C（點 CityIcon 重置 ack），置 [✓]；視覺驗證通過（`?shake=1` 立即觸發 city-shake 動畫 0.6s）
 
 EPIC 2 API and Database
 這個是一個新的EPIC，負責實現API和Database的設計

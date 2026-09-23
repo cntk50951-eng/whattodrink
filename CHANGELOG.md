@@ -64,6 +64,13 @@
   - C3 點地圖自動收起：Leaflet `map.on('click')` 透過 `toolbarExpandedRef`（避免 init 一次性 closure 卡舊值）→ 點地圖本體（非 overlay UI）收起工具列
   - `drink-map.module.css`：加 `.toolbarOpen` accordion keyframes + `.toolbarHintPing` 呼吸環 keyframes；reduced-motion 全關
   - 152→173 綠（無新增測試）／tsc 淨／lint 0 error（3 舊 warning）；瀏覽器親眼驗收通過（手機 390×844）
+- **URC 1.4 — 朋友同城市上線，城市卡 CityIcon 搖晃提示（[✓]，merged）**
+  - `DrinkMap`：每 30s 掃 `MOCK_CHECKINS` 找同城市且 `isOnline(c, nowMs) === true` 的朋友；新朋友（`acknowledgedRef` 內沒記錄）→ 加入 ack set + `cityShakeSeq++` 觸發搖晃
+  - 城市 code 透過 `cityCodeRef` + 獨立 `useEffect` 同步（避 lint：used-before-declaration）；`shake` 用 `key={shake-${cityShakeSeq}}` 重掛重啟動畫
+  - 點 CityIcon 展開工具列時 `acknowledgedRef = new Set()` 重置 ack，下次新朋友上線再搖
+  - Debug query `?shake=1` 把 interval 縮為 1000ms 並跳過城市 gate（無碼用戶也能驗證）
+  - `drink-map.module.css`：加 `.cityShake` keyframes（rotate ±9° + translate ±2px，0.6s cubic-bezier）；`prefers-reduced-motion` 降級為 opacity pulse
+  - 173 綠（無新增測試）／tsc 淨／lint 0 error（3 舊 warning）；瀏覽器親眼驗證通過（`?shake=1` 立即觸發 city-shake 0.6s）
 - **UR 1.1 — 首頁互動式頁面重構（WIP，待用戶側 build＋瀏覽器驗收）**
   - 新依賴：`leaflet@1.9.4`（真實地理底圖＋免費 CARTO Voyager 瓦片，免 key）、`vitest@^3`（`@types/node@20` 與 vitest 5 互斥，只能用 v3）＋ `npm test` 腳本
   - `components/map/DrinkMap.tsx` — 地圖＋推薦入口同一組件：geolocation 狀態機、拒絕／失敗→全港視圖、塗鴉 pins（自己／MOCK 他人／「想喝」虛線圈）、自訂縮放＋睇全港按鈕、乾杯卡（本地 mock）、`prefers-reduced-motion` 降級
