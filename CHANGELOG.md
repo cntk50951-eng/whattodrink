@@ -5,6 +5,10 @@
 ## [Unreleased]
 
 ### Added
+- **docs(api): 補已上線漏入規的 3 端點（`spec 1.0.0 → 1.1.0`，回顧查漏）**
+  - `docs/api-openapi.yaml` 升 `1.1.0`，補 `GET /api/v1/beers`（`BeersPage`，`Beer` 含 `icon_url`）、`GET /api/v1/health`（`HealthPage`，永遠 200 自檢 `supabase.configured/missing`）、`POST /api/v1/transcribe` 與 `POST /api/transcribe`（`deprecated`，`TranscribeRequest/Response/Error`，粵→普→英擇一，`audioBase64` 6_000_000 上限，訊飛 502 101-110）
+  - 薄代理 `app/api/v1/transcribe/route.ts`（`export {POST} from @/app/api/transcribe/route`，`runtime=node`）使版本化與舊路徑共存半年（`§9`）；`app/api/transcribe/route.ts` 本次入倉（前期漏 `git add`）
+  - 對齊驗證：規格 4 條（wall/pins/checkins×2）已對實現，新增 4 條後共 8 條覆蓋已上線 7 個 `Route`（`/api/v1/*` 6 + 舊 `/api/transcribe` 1），`npm run build` 30 頁（含新 `/api/v1/transcribe`）
 - **UR A.9 登出后私聊残留＋UR A.11 未登录浮层（[WIP]，待用戶瀏覽器驗收，A.10 持久化仍 todo）**
   - `lib/auth/clear.ts` 新增 `LOGOUT_CLEAR_EVENT = "wtd:logout"`，`clearUserLocalCaches()` 派发事件；`components/auth/HeaderAuth` 登出链已调该函数
   - `components/wall/WallGrid` 监听事件重读 `loadWall()`（已清 `wtd-wall-*`），私帖 `me:true` 立即消失；`components/map/DrinkMap` 监听清空 `wantHistory/wantRecord/picked/wantSaved/selectedId/swap/confirm/sentIds/cheersFx/loginOverlay`，针/轨迹/额度 UI 同步消失，无需手动刷新

@@ -1,11 +1,12 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.0.0
+  version: 1.1.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
-    （見 lib/api/envelope.ts）。
+    （見 lib/api/envelope.ts）。`GET /beers/health` 與 `POST /transcribe`
+    為已上線但前期漏入規的端點，本版補齊（§9 演進要求版本化）。
 paths:
   /api/v1/wall:
     get:
@@ -142,6 +143,93 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/beers:
+    get:
+      operationId: getBeers
+      summary: 酒目錄（公開，A.4-1 首條）
+      description: 匿名可調，無參數，RLS `beers public read`，壞行整批 500
+      responses:
+        "200":
+          description: 酒表全量（按 id 排序）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BeersPage"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/health:
+    get:
+      operationId: getHealth
+      summary: 健康探針（永遠 200）
+      description: 不鑑權，僅自檢 `NEXT_PUBLIC_SUPABASE_*` 是否配齊
+      responses:
+        "200":
+          description: ok 與 supabase 配置狀態
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthPage"
+  /api/v1/transcribe:
+    post:
+      operationId: postTranscribeV1
+      summary: 語音轉文字（版本化，A.4 起主路徑）
+      description: 與 `POST /api/transcribe` 同邏輯，僅前綴版本化；舊路徑保留半年
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TranscribeRequest"
+      responses:
+        "200":
+          description: 轉寫結果（粵→普→英擇一，空為 "")
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscribeResponse"
+        "400":
+          description: bad-audio / bad-request（沿用舊信封 `{code,message}`，非 `error` 包絡）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscribeError"
+        "500":
+          description: missing-keys（未配訊飛 key）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscribeError"
+        "502":
+          description: provider-error（訊飛 ASR 101-110）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscribeError"
+  /api/transcribe:
+    post:
+      operationId: postTranscribeLegacy
+      summary: 語音轉文字（舊前綴，deprecated）
+      deprecated: true
+      description: 已上線舊路徑，邏輯同 `POST /api/v1/transcribe`，保留半年後下線
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TranscribeRequest"
+      responses:
+        "200":
+          description: 轉寫結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscribeResponse"
+        "400":
+          $ref: "#/components/responses/TranscribeBadRequest"
+        "500":
+          $ref: "#/components/responses/TranscribeMissingKeys"
+        "502":
+          $ref: "#/components/responses/TranscribeProviderError"
 components:
   schemas:
     WallAuthor:
@@ -312,6 +400,83 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MineRow"
+    Beer:
+      type: object
+      required: [id, emoji, name, category, tagline, icon_url]
+      properties:
+        id:
+          type: string
+        emoji:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        tagline:
+          type: string
+        icon_url:
+          type: string
+          nullable: true
+          description: 自畫圖標公開 URL，NULL 回退 emoji
+    BeersPage:
+      type: object
+      required: [beers]
+      properties:
+        beers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Beer"
+    HealthPage:
+      type: object
+      required: [ok, time, supabase]
+      properties:
+        ok:
+          type: boolean
+          description: 固定 true（health 永遠 200）
+        time:
+          type: string
+          format: date-time
+        supabase:
+          type: object
+          required: [configured]
+          properties:
+            configured:
+              type: boolean
+            url:
+              type: string
+              nullable: true
+            missing:
+              type: array
+              nullable: true
+              items:
+                type: string
+    TranscribeRequest:
+      type: object
+      required: [audioBase64]
+      properties:
+        audioBase64:
+          type: string
+          description: 16k 單聲道 WAV base64（含 44B 頭，服務端自行切 PCM）
+    TranscribeResponse:
+      type: object
+      required: [text, accent]
+      properties:
+        text:
+          type: string
+        accent:
+          type: string
+          nullable: true
+          enum: [cantonese, mandarin, english, null]
+          description: 首個非空結果的語種，皆空為 null
+    TranscribeError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [bad-request, bad-audio, missing-keys, provider-error]
+        message:
+          type: string
     ErrorBody:
       type: object
       required: [error]
@@ -348,3 +513,21 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorBody"
+    TranscribeBadRequest:
+      description: bad-audio / bad-request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TranscribeError"
+    TranscribeMissingKeys:
+      description: missing-keys（未配訊飛 key）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TranscribeError"
+    TranscribeProviderError:
+      description: provider-error（訊飛 ASR 101-110）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TranscribeError"

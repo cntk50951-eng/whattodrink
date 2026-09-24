@@ -68,7 +68,7 @@ export async function getUserId(): Promise<string | null> {
  * 僅 cookie 的 `createClient()` 在 Bearer 場景會因無 session 而 42501。
  */
 export async function getAuthedClient(req?: Request): Promise<{
-  supabase: any;
+  supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string | null;
 }> {
   // 先試 cookie
