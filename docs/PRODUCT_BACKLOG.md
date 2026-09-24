@@ -1447,3 +1447,46 @@ UR A.11 未登录打卡唤起登录浮层 [WIP]（需 UI 设计）
 *改動記錄*
 - 2026-09-15：建檔置 [ ]（用户报 bug #3，需设计 UI）
 - 2026-09-15：實現完，待驗（`DrinkMap` 未登录守卫＋品牌浮层＋三语文案＋`supabase.auth.getUser()` 守衛不寫 `wtd-*`；187 綠／tsc 淨／lint 0 error／build 绿）
+
+---
+
+UR A.12 打卡雙類型（快貼 24h / 帖子永久）[WIP]
+
+作為已登錄用戶，我要把「想喝」落為兩種時效的打卡，以便地圖與牆按規則展示；未登錄點擊應先去登入。
+
+### 背景（承 A.10）
+- `checkins` 已有 `POST /api/v1/checkins`（🔒，`type=want/private`）與 `GET /mine` 回顯，但無時效區分；`wtd-*` 已退場，現需在 DB 層區分快貼與帖子，並為地圖 24h/7d/90d 與三模式可見性打樁。
+
+### 數據（`supabase/migrations/0007_checkins_kind_visibility.sql`）
+- `checkins` 新增 `kind text NOT NULL CHECK (kind IN ('flash','post')) DEFAULT 'flash'`（快貼/帖子）、`expires_at timestamptz`（`flash` 設 `now()+ interval '24 hours'`，`post` 為 `NULL`）
+- `visibility` 擴為 `CHECK (visibility IN ('private','public','friends'))`（`private` 保留舊行，`friends` 供好友模式，`public` 供公開模式；隱身模式不允許寫）
+- `users` 新增 `mode text NOT NULL CHECK (mode IN ('stealth','friends','public')) DEFAULT 'public'`（依本次確認預設公開，`mode_updated_at timestamptz`）
+- `friendships` 新表 `id uuid PK, user_id uuid→users, friend_id uuid→users, status text CHECK ('pending','accepted') , created_at`，惟 A.12 僅建表，不接寫讀（後續 UR 用）
+
+### 請求體（`POST /api/v1/checkins` 擴參，🔒）
+```json
+{
+  "beer_id": "heineken",
+  "lat": 22.28,
+  "lng": 114.15,
+  "place_name": "中環" ,
+  "kind": "flash"   // 'flash' | 'post'，必填；缺省在舊版回兼容為 'flash'
+}
+```
+- 後端由 `users.mode` 派生 `visibility`：`stealth` → 403 `{code:"forbidden"}`；`friends` → `friends`；`public` → `public`（前端不傳 `visibility`，防偽造）
+- `kind=flash` 則 `expires_at = now()+24h`，`kind=post` 則 `NULL`；`type` 仍 `want`，`GET /mine` 回 `kind/expires_at/visibility`
+
+### 範圍（只做打卡落庫與回顯，不含地圖過濾/模式切換牆）
+1. `0007` 建表/擴列與 RLS（`friends` 可見沿 `0006` owner 讀，`stealth` 寫直接 403）
+2. `lib/api/checkins.ts` 擴 `parseCreateCheckinBody` 驗 `kind`、`toMineRow` 回 `kind/expires_at/visibility`、`mineRowToWantRecord` 透傳
+3. `POST /checkins` 支援 `kind`、派生 `visibility/expires_at`、隱身 403；`GET /mine` 回三列
+4. 前端 `DrinkMap`：批量格點酒不再直落釘，改彈「快貼 / 帖子」雙鈕浮層（doodle 卡＋硬陰影，`Clock` 24h / `Pin` 永久，`kind` 具名）；兩鈕皆先 `getUser()` 未登入 → 既有 `wtd:logout` 風格的登入浮層（`A.11` 復用），已登入且 `users.mode=stealth` → 隱身提示浮層（引導切換）；已登入非隱身 → `POST {kind}`
+
+### AC
+- 未登錄點「快貼」或「帖子」→ 登入浮層（`A.11` 同款），不寫庫；登入後點 → 落庫 `checkins` 一行，`kind` 對應，`expires_at` 對應，`visibility` 依 `users.mode`（公開→`public`，好友→`friends`）
+- 隱身模式用戶點任一 → 403 浮層「隱身模式不可打卡，請切換至好友或公開模式」（不寫庫）
+- 已登錄用戶連打兩個 `flash` 與 `post`，`GET /mine` 各回一行，`kind/expires_at` 正確，`flash` 的 `expires_at - created_at ≈ 24h`
+- 匿名調 `POST` 401，缺 `kind` 或非法 `beer_id/lat` 400
+
+*改動記錄*
+- 2026-09-24：建檔置 [WIP]（數據/請求體/AC 定版，預設公開已確認）

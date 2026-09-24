@@ -603,6 +603,9 @@ export function DrinkMap({
   // UR A.11 未登录打卡唤起登录浮层
   const [loginOverlayOpen, setLoginOverlayOpen] = useState(false);
   const [loginBusy, setLoginBusy] = useState(false);
+  // UR A.12 打卡雙類型 chooser + 隱身攔截
+  const [kindChooserBeer, setKindChooserBeer] = useState<Beer | null>(null);
+  const [stealthPromptOpen, setStealthPromptOpen] = useState(false);
   // UR1.8 frozen drop snapshot (null until the first 想喝, or after reset).
   const [wantRecord, setWantRecord] = useState<WantRecord | null>(null);
   // UR3.7 删除两段确认：只对正在看的 at 武装，换条看自动解除，无需 effect。
@@ -1292,11 +1295,16 @@ export function DrinkMap({
     setBatchIndex((prev) => (prev === idx ? prev : idx));
   }
 
-  /* UR3.9 點格即落釘：無需單獨「想喝」按鈕（RAW：不希望用戶手動點想喝）。
-   * 與 L1 隱性補全同走 dropWant，pin／卡／足跡只見真品牌。 */
+  /* UR A.12 點格先選時效：快貼 24h / 帖子永久，登入與隱身皆攔截後才落庫 */
   function handleBatchWant(beer: Beer): void {
     setPicked(beer);
-    dropWant(beer);
+    setKindChooserBeer(beer);
+  }
+  function handleKindChoose(kind: "flash" | "post"): void {
+    const beer = kindChooserBeer;
+    if (beer === null) return;
+    setKindChooserBeer(null);
+    dropWantWithKind(beer, kind);
   }
 
   /**
@@ -1373,7 +1381,7 @@ export function DrinkMap({
    * concrete brand, so pins / cards / trail never see lane-only check-ins.
    * UR A.11：未登录不写本地，直接弹登录浮层。
    */
-  function dropWant(beer: Beer): void {
+  function dropWantWithKind(beer: Beer, kind: "flash" | "post"): void {
     const supabase = createClient();
     void supabase.auth.getUser().then(async ({ data }) => {
       if (data.user === null) {
@@ -1390,7 +1398,7 @@ export function DrinkMap({
             ? { lat: map.getCenter().lat, lng: map.getCenter().lng }
             : DEFAULT_CENTER;
 
-      // UR A.10 已登录走 DB 落库，失败回退本地（离线/限流不断体验）
+      // UR A.12 已登录走 DB 落库（带 kind/visibility），隱身 403 則彈切換提示
       try {
         const res = await fetch("/api/v1/checkins", {
           method: "POST",
@@ -1401,20 +1409,44 @@ export function DrinkMap({
             lat: position.lat,
             lng: position.lng,
             place_name: null,
+            kind,
           }),
         });
-        if (!res.ok) throw new Error(`checkins ${res.status}`);
+        if (!res.ok) {
+          if (res.status === 403) {
+            const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+            console.warn("[checkins] forbidden", body?.error?.message);
+            setStealthPromptOpen(true);
+            return;
+          }
+          throw new Error(`checkins ${res.status}`);
+        }
         const json = (await res.json()) as {
-          checkin?: { id: string; beer_id: string; lat: number; lng: number; place_name: string | null; created_at: string };
+          checkin?: {
+            id: string;
+            beer_id: string;
+            lat: number;
+            lng: number;
+            place_name: string | null;
+            kind: "flash" | "post";
+            visibility: "private" | "public" | "friends";
+            expires_at: string | null;
+            created_at: string;
+          };
         };
         const row = json.checkin;
         if (row === undefined || typeof row.created_at !== "string") throw new Error("bad checkin json");
         const at = Date.parse(row.created_at);
         if (!Number.isFinite(at)) throw new Error("bad created_at");
+        const expiresAt = row.expires_at !== null ? Date.parse(row.expires_at) : null;
         const record: WantRecord = {
           beer,
           at,
           position,
+          kind: row.kind,
+          visibility: row.visibility,
+          expiresAt: expiresAt !== null && Number.isFinite(expiresAt) ? expiresAt : null,
+          id: row.id,
           ...(typeof row.place_name === "string" && row.place_name.length > 0 ? { placeName: row.place_name } : {}),
         };
         setWantSaved(true);
@@ -1429,9 +1461,17 @@ export function DrinkMap({
         console.warn("[checkins] POST fallback to local", err);
       }
 
-      // 回退：匿名旧路径（离线或 POST 挂）
+      // 回退：匿名旧路径（离线或 POST 挂，未登入已在上方攔截，此分支僅離線）
       setWantSaved(true);
-      const record: WantRecord = { beer, at: Date.now(), position };
+      const at = Date.now();
+      const record: WantRecord = {
+        beer,
+        at,
+        position,
+        kind,
+        visibility: "public",
+        expiresAt: kind === "flash" ? at + 24 * 60 * 60 * 1000 : null,
+      };
       const next = upsertWantHistory(wantHistoryRef.current, record);
       wantHistoryRef.current = next;
       setWantHistory(next);
@@ -1439,6 +1479,11 @@ export function DrinkMap({
       setWantRecord(record);
       setSheetOpen(false);
     });
+  }
+  // 兼容舊調用（若有殘留）
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  function dropWant(beer: Beer): void {
+    dropWantWithKind(beer, "flash");
   }
 
   async function handleLoginFromOverlay(): Promise<void> {
@@ -1571,6 +1616,8 @@ export function DrinkMap({
       setSentIds([]);
       setCheersFx(null);
       setLoginOverlayOpen(false);
+      setKindChooserBeer(null);
+      setStealthPromptOpen(false);
     };
     window.addEventListener(LOGOUT_CLEAR_EVENT, handler);
     return () => window.removeEventListener(LOGOUT_CLEAR_EVENT, handler);
@@ -2730,6 +2777,98 @@ export function DrinkMap({
                 )}
             </>
           )}
+          </div>
+        </div>
+      )}
+
+      {/* UR A.12 打卡雙類型 chooser（快貼 24h / 帖子永久） */}
+      {kindChooserBeer !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="選擇打卡類型"
+          className="absolute inset-0 z-30 flex items-end justify-center bg-black/45 p-4 sm:items-center"
+          onClick={() => setKindChooserBeer(null)}
+        >
+          <div
+            role="document"
+            className="relative w-full max-w-sm rounded-2xl border-2 bg-card p-5 pt-6 shadow-[4px_4px_0_var(--border)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div aria-hidden className="absolute -top-3 left-1/2 h-6 w-20 -translate-x-1/2 -rotate-1 bg-(--tape)" />
+            <div className="flex items-center gap-3">
+              <span className="w-12 shrink-0 text-3xl" aria-hidden>
+                {kindChooserBeer.emoji}
+              </span>
+              <div className="min-w-0">
+                <p className="font-hand text-lg font-bold leading-tight">{kindChooserBeer.name}</p>
+                <p className="text-muted-foreground text-xs">{kindChooserBeer.category} · {kindChooserBeer.tagline}</p>
+              </div>
+            </div>
+            <p className="font-hand mt-4 text-center text-base font-bold">發佈為…</p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => handleKindChoose("flash")}
+                className="rounded-2xl border-2 bg-card p-3 text-left shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+              >
+                <span className="inline-flex items-center gap-1.5 font-hand text-base font-bold"><Clock className="h-4 w-4" />快貼 · 24h</span>
+                <span className="text-muted-foreground mt-1 block text-xs leading-relaxed">24 小時後自動從地圖消失，適合即時分享</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleKindChoose("post")}
+                className="rounded-2xl border-2 bg-primary p-3 text-left text-primary-foreground shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+              >
+                <span className="inline-flex items-center gap-1.5 font-hand text-base font-bold"><MapPin className="h-4 w-4" />帖子 · 永久</span>
+                <span className="mt-1 block text-xs leading-relaxed opacity-90">永久保留，直到你刪除，地圖預設顯示 7 天</span>
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setKindChooserBeer(null)}
+              className="font-hand mt-3 w-full rounded-full border-2 bg-card px-4 py-2 text-sm font-bold shadow-[2px_2px_0_var(--border)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+            >
+              {t("cancel")}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* UR A.12 隱身攔截浮層 */}
+      {stealthPromptOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="隱身模式提示"
+          className="absolute inset-0 z-30 flex items-center justify-center bg-black/55 p-4"
+          onClick={() => setStealthPromptOpen(false)}
+        >
+          <div
+            role="document"
+            className="relative w-full max-w-sm rounded-2xl border-2 bg-card p-6 pt-7 shadow-[4px_4px_0_var(--border)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div aria-hidden className="absolute -top-3 left-1/2 h-6 w-24 -translate-x-1/2 -rotate-2 bg-(--tape)" />
+            <p className="font-hand text-center text-xl font-bold">隱身模式不可打卡</p>
+            <p className="text-muted-foreground mt-2 text-center text-sm leading-relaxed">你目前為隱身模式（唯讀），請切換至好友或公開模式後再打卡。地圖綠點在隱身下對任何人不可見。</p>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setStealthPromptOpen(false)}
+                className="font-hand flex-1 rounded-full border-2 bg-card px-4 py-2.5 text-base font-bold shadow-[2px_2px_0_var(--border)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+              >
+                {t("cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStealthPromptOpen(false)}
+                className="font-hand flex-1 rounded-full border-2 bg-primary px-4 py-2.5 text-base font-bold text-primary-foreground shadow-[2px_2px_0_var(--border)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+              >
+                知道了
+              </button>
+            </div>
+            <p className="text-muted-foreground mt-3 text-center text-xs">模式切換與 T&C 將在下一 UR 開放</p>
           </div>
         </div>
       )}

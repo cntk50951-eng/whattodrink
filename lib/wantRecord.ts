@@ -22,6 +22,13 @@ export type WantRecord = {
    * back into storage). Absent offline — the card falls back to coords.
    */
   placeName?: string;
+  /** UR A.12 打卡雙類型：快貼/帖子 */
+  kind?: "flash" | "post";
+  /** DB 回顯用：visibility 與 expires */
+  visibility?: "private" | "public" | "friends";
+  expiresAt?: number | null;
+  /** DB id（mine 回顯時有，本地舊檔無） */
+  id?: string;
 };
 
 export const WANT_STORAGE_KEY = "wtd-want-record";
@@ -78,6 +85,11 @@ export function parseWantRecord(raw: unknown): WantRecord | null {
   if (typeof outer.placeName === "string" && outer.placeName.length > 0) {
     record.placeName = outer.placeName;
   }
+  if (outer.kind === "flash" || outer.kind === "post") record.kind = outer.kind;
+  if (outer.visibility === "private" || outer.visibility === "public" || outer.visibility === "friends") record.visibility = outer.visibility;
+  if (typeof outer.expiresAt === "number" && Number.isFinite(outer.expiresAt)) record.expiresAt = outer.expiresAt;
+  else if (outer.expiresAt === null) record.expiresAt = null;
+  if (typeof outer.id === "string" && outer.id.length > 0) record.id = outer.id;
   return record;
 }
 

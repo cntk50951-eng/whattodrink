@@ -5,6 +5,11 @@
 ## [Unreleased]
 
 ### Added
+- **UR A.12 打卡雙類型（快貼 24h / 帖子永久）[WIP]**
+  - `supabase/migrations/0007_checkins_kind_visibility.sql`：`checkins` 加 `kind flash|post/expires_at`、`visibility` 擴 `friends`、`users` 加 `mode stealth|friends|public` 預設 `public`、`friendships` 樁位；`lib/wantRecord.ts` `WantRecord` 擴 `kind/visibility/expiresAt/id` 並透傳 `parseWantRecord`
+  - `lib/api/checkins.ts` 擴 `parseCreateCheckinBody` 驗 `kind`（缺省閃回 `flash`）、`toMineRow`/`mineRowToWantRecord` 回 `kind/visibility/expires_at`、`lib/api/checkins.test.ts` 14 單測（含 post/缺 kind 回退/exp）；`docs/api-openapi.yaml` `POST /checkins` 加 `kind` 與 `403 steath`、`Checkin/MineRow` 加三列
+  - `app/api/v1/checkins` 雙寫兼容：`POST` 按 `users.mode` 派生 `visibility`（`stealth` 403、`friends`→`friends`、`public`→`public`）、`expires_at`（`flash`+24h）、未遷移 `42703` 回退舊插入；`GET /mine` 回新列並回退舊列補默認，`lib/supabase/server.ts:getAuthedClient` Bearer 雙通道保 RLS
+  - `components/map/DrinkMap` 點格先彈雙鈕浮層（`Clock` 快貼 24h / `MapPin` 帖子永久，doodle 卡+硬陰影，`Beer` emoji 頭），未登入→既有登入浮層，隱身→ 403 浮層「隱身模式不可打卡」，已登入→ `POST {kind}`；`LOGOUT_CLEAR_EVENT` 同清 `kindChooser/stealthPrompt`；201 绿（`checkins` 14/201 總）
 - **docs(api): 補已上線漏入規的 3 端點（`spec 1.0.0 → 1.1.0`，回顧查漏）**
   - `docs/api-openapi.yaml` 升 `1.1.0`，補 `GET /api/v1/beers`（`BeersPage`，`Beer` 含 `icon_url`）、`GET /api/v1/health`（`HealthPage`，永遠 200 自檢 `supabase.configured/missing`）、`POST /api/v1/transcribe` 與 `POST /api/transcribe`（`deprecated`，`TranscribeRequest/Response/Error`，粵→普→英擇一，`audioBase64` 6_000_000 上限，訊飛 502 101-110）
   - 薄代理 `app/api/v1/transcribe/route.ts`（`export {POST} from @/app/api/transcribe/route`，`runtime=node`）使版本化與舊路徑共存半年（`§9`）；`app/api/transcribe/route.ts` 本次入倉（前期漏 `git add`）

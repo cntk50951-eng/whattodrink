@@ -6,6 +6,7 @@
 
 import type { Beer } from "../beers";
 import type { LatLng } from "../geo";
+import type { WantRecord } from "../wantRecord";
 
 export const CHECKINS_MINE_LIMIT = 30;
 export const CHECKINS_MINE_MAX_LIMIT = 50;
@@ -15,6 +16,7 @@ export type CreateCheckinBody = {
   lat: number;
   lng: number;
   place_name?: string | null;
+  kind: "flash" | "post";
 };
 
 export type CreateCheckinJson = {
@@ -24,6 +26,9 @@ export type CreateCheckinJson = {
     lat: number;
     lng: number;
     place_name: string | null;
+    kind: "flash" | "post";
+    visibility: "private" | "public" | "friends";
+    expires_at: string | null; // ISO，flash 有值，post 为 null
     created_at: string; // ISO
   };
 };
@@ -34,6 +39,9 @@ export type MineRowJson = {
   lat: number | null;
   lng: number | null;
   place_name: string | null;
+  kind: "flash" | "post";
+  visibility: "private" | "public" | "friends";
+  expires_at: string | null;
   created_at: string;
   beers: {
     id: string;
@@ -84,12 +92,23 @@ export function parseCreateCheckinBody(
   } else {
     return { error: "place_name 需为字符串或 null" };
   }
+  const kindRaw = r.kind;
+  // 兼容旧客户端缺 kind 时按 flash 回退（A.10 历史包）
+  let kind: "flash" | "post" = "flash";
+  if (kindRaw === undefined || kindRaw === null) {
+    kind = "flash";
+  } else if (kindRaw === "flash" || kindRaw === "post") {
+    kind = kindRaw;
+  } else {
+    return { error: "kind 非法：只要 flash|post" };
+  }
   return {
     body: {
       beer_id: beerId.trim(),
       lat,
       lng,
       ...(placeName === null ? { place_name: null } : { place_name: placeName }),
+      kind,
     },
   };
 }
@@ -120,9 +139,13 @@ export function toMineRow(raw: unknown): MineRowJson | null {
   const lat = typeof raw.lat === "number" && Number.isFinite(raw.lat) ? raw.lat : raw.lat === null ? null : null;
   const lng = typeof raw.lng === "number" && Number.isFinite(raw.lng) ? raw.lng : raw.lng === null ? null : null;
   const placeName = typeof raw.place_name === "string" ? raw.place_name : raw.place_name === null ? null : null;
+  const kind = raw.kind === "flash" || raw.kind === "post" ? raw.kind : raw.kind === null || raw.kind === undefined ? "flash" as const : null;
+  const visibility = raw.visibility === "private" || raw.visibility === "public" || raw.visibility === "friends" ? raw.visibility : null;
+  const expiresAt = typeof raw.expires_at === "string" ? raw.expires_at : raw.expires_at === null ? null : null;
   const createdAt = typeof raw.created_at === "string" ? raw.created_at : null;
   if (id === null || createdAt === null || lat === undefined || lng === undefined || placeName === undefined) return null;
-  if (beerId === undefined) return null;
+  if (beerId === undefined || kind === null || visibility === null || expiresAt === undefined) return null;
+  if (kind !== "flash" && kind !== "post") return null;
   // beers join 可能 null
   let beers: MineRowJson["beers"] = null;
   if (raw.beers !== null && raw.beers !== undefined) {
@@ -138,11 +161,23 @@ export function toMineRow(raw: unknown): MineRowJson | null {
     beers = { id: bid, name, emoji, category, tagline, icon_url: iconUrl };
   }
   if (!Number.isFinite(Date.parse(createdAt))) return null;
-  return { id, beer_id: beerId as string | null, lat: lat as number | null, lng: lng as number | null, place_name: placeName, created_at: createdAt, beers };
+  if (expiresAt !== null && !Number.isFinite(Date.parse(expiresAt))) return null;
+  return {
+    id,
+    beer_id: beerId as string | null,
+    lat: lat as number | null,
+    lng: lng as number | null,
+    place_name: placeName,
+    kind,
+    visibility,
+    expires_at: expiresAt,
+    created_at: createdAt,
+    beers,
+  };
 }
 
-/** DB 行 -> 前端 WantRecord（beer 合成 + placeName 回填 + at/position 冻结）。 */
-export function mineRowToWantRecord(row: MineRowJson): { at: number; position: LatLng; beer: Beer; placeName?: string } | null {
+/** DB 行 -> 前端 WantRecord（beer 合成 + placeName 回填 + at/position 冻结 + kind/visibility）。 */
+export function mineRowToWantRecord(row: MineRowJson): WantRecord | null {
   if (row.lat === null || row.lng === null) return null;
   const at = Date.parse(row.created_at);
   if (!Number.isFinite(at)) return null;
@@ -165,7 +200,16 @@ export function mineRowToWantRecord(row: MineRowJson): { at: number; position: L
     return null;
   }
   const position: LatLng = { lat: row.lat, lng: row.lng };
-  const out: { at: number; position: LatLng; beer: Beer; placeName?: string } = { at, position, beer };
+  const expiresAt = row.expires_at !== null ? Date.parse(row.expires_at) : null;
+  const out: WantRecord = {
+    beer,
+    at,
+    position,
+    kind: row.kind,
+    visibility: row.visibility,
+    expiresAt: expiresAt !== null && Number.isFinite(expiresAt) ? expiresAt : null,
+    id: row.id,
+  };
   if (typeof row.place_name === "string" && row.place_name.length > 0) {
     out.placeName = row.place_name;
   }

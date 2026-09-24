@@ -74,7 +74,7 @@ paths:
   /api/v1/checkins:
     post:
       operationId: postCheckin
-      summary: 打卡落库（需登录，type=want visibility=private）
+      summary: 打卡落库（需登录，A.12 雙類型：flash 24h / post 永久，visibility 由 users.mode 派生）
       security:
         - bearerAuth: []
       requestBody:
@@ -99,6 +99,11 @@ paths:
                   type: string
                   nullable: true
                   maxLength: 200
+                kind:
+                  type: string
+                  enum: [flash, post]
+                  default: flash
+                  description: 快貼 24h / 帖子永久，未傳按 flash 回兼容
       responses:
         "201":
           description: 落库成功
@@ -110,6 +115,12 @@ paths:
                 properties:
                   checkin:
                     $ref: "#/components/schemas/Checkin"
+        "403":
+          description: 隱身模式不可打卡（A.12 模式權限）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "400":
           $ref: "#/components/responses/InvalidParams"
         "401":
@@ -336,7 +347,7 @@ components:
             $ref: "#/components/schemas/MapPin"
     Checkin:
       type: object
-      required: [id, beer_id, lat, lng, place_name, created_at]
+      required: [id, beer_id, lat, lng, place_name, kind, visibility, expires_at, created_at]
       properties:
         id:
           type: string
@@ -350,12 +361,23 @@ components:
         place_name:
           type: string
           nullable: true
+        kind:
+          type: string
+          enum: [flash, post]
+        visibility:
+          type: string
+          enum: [private, public, friends]
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: flash 為 created_at+24h，post 為 null
         created_at:
           type: string
           format: date-time
     MineRow:
       type: object
-      required: [id, beer_id, lat, lng, place_name, created_at, beers]
+      required: [id, beer_id, lat, lng, place_name, kind, visibility, expires_at, created_at, beers]
       properties:
         id:
           type: string
@@ -372,6 +394,17 @@ components:
         place_name:
           type: string
           nullable: true
+        kind:
+          type: string
+          enum: [flash, post]
+        visibility:
+          type: string
+          enum: [private, public, friends]
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: flash 為 created_at+24h，post 為 null
         created_at:
           type: string
           format: date-time
