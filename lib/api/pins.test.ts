@@ -5,6 +5,8 @@ import {
   isBboxOverlapsHK,
   parseBbox,
   parsePinsParams,
+  parseRange,
+  PINS_RANGE_DEFAULT,
   toPinJson,
 } from "./pins";
 
@@ -42,10 +44,28 @@ describe("parseBbox", () => {
   });
 });
 
+describe("parseRange", () => {
+  it("defaults to 7d when missing", () => {
+    expect(parseRange(null)).toEqual({ range: "7d" });
+    expect(parseRange("")).toEqual({ range: "7d" });
+    expect(PINS_RANGE_DEFAULT).toBe("7d");
+  });
+
+  it("parses 7d and 90d", () => {
+    expect(parseRange("7d")).toEqual({ range: "7d" });
+    expect(parseRange("90d")).toEqual({ range: "90d" });
+  });
+
+  it("rejects invalid range", () => {
+    expect(parseRange("bad")).toHaveProperty("error");
+    expect(parseRange("30d")).toHaveProperty("error");
+  });
+});
+
 describe("parsePinsParams", () => {
-  it("defaults limit 100", () => {
+  it("defaults limit 100 and range 7d", () => {
     const r = parsePinsParams(new URLSearchParams("bbox=113.8,22.15,114.44,22.58"));
-    expect(r).toEqual({ bbox: { west: 113.8, south: 22.15, east: 114.44, north: 22.58 }, limit: 100 });
+    expect(r).toEqual({ bbox: { west: 113.8, south: 22.15, east: 114.44, north: 22.58 }, limit: 100, range: "7d" });
   });
 
   it("validates limit 1-200", () => {
@@ -54,6 +74,13 @@ describe("parsePinsParams", () => {
     expect(parsePinsParams(new URLSearchParams("bbox=113,22,114,23&limit=50"))).toEqual(
       expect.objectContaining({ limit: 50 }),
     );
+  });
+
+  it("parses range 90d and rejects bad range", () => {
+    expect(parsePinsParams(new URLSearchParams("bbox=113,22,114,23&range=90d"))).toEqual(
+      expect.objectContaining({ range: "90d" }),
+    );
+    expect(parsePinsParams(new URLSearchParams("bbox=113,22,114,23&range=bad"))).toHaveProperty("error");
   });
 });
 

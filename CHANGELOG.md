@@ -5,6 +5,13 @@
 ## [Unreleased]
 
 ### Added
+- **UR A.13 地圖時間窗口（快貼 24h / 帖子 7d→90d，server side `range`）[WIP]**
+  - `supabase/migrations/0008_pins_range_idx.sql`：為 `GET /map/pins?range` 加速——`checkins_expires_idx` + `checkins_kind_expires_idx` + `checkins_kind_created_idx`（`created_at` 已有索引，補 `expires_at` 以覆蓋 `or` 謂詞；時間判定一律 server `now()`，不信客戶端）
+  - `lib/api/pins.ts`：新增 `PinsRange 7d|90d` + `PINS_RANGE_MS` + `parseRange`（缺省 `7d`）並入 `parsePinsParams`（`range` 默認 `7d`，非法 400），`lib/api/pins.test.ts` +4 單測（預設/7d/90d/非法，總 15 測）
+  - `docs/api-openapi.yaml`：`GET /api/v1/map/pins` 加 `range` query（enum `7d|90d`，default `7d`，description 註 server side `flash 24h` vs `post range`），`MapPinsPage` 不變
+  - `app/api/v1/map/pins/route.ts`：`range`→`cutoffIso = now - rangeMS`→ `orFilter and(kind.eq.flash,expires_at.gt.nowIso),and(kind.eq.post,created_at.gte.cutoffIso)`，`PINS_COLUMNS` 補 `kind,expires_at`，42703 未遷移回退 bbox-only（防 0007 未執行掛圖），`console.error` 沿 beers 梯子
+  - `components/map/DrinkMap.tsx`：地圖右上 pill `查看過去 3 個月 / 只看 7 天內`（`PinsRange` + `localStorage wtd-pins-range` + `fetch /api/v1/map/pins?bbox=HK&range=…`，server side `now`），`apiPins` 真數據優先（非空則替 MOCK，空則回退 MOCK 並顯「暫無數據」），`mapReady` 後自動重渲染簇
+  - `docs/data/home-map.md` 增第 4 節「地圖時間窗口」兩行（`range` + `expires_at` 溯源與索引），後續節順移
 - **UR A.12 打卡雙類型（快貼 24h / 帖子永久）[WIP]**
   - `supabase/migrations/0007_checkins_kind_visibility.sql`：`checkins` 加 `kind flash|post/expires_at`、`visibility` 擴 `friends`、`users` 加 `mode stealth|friends|public` 預設 `public`、`friendships` 樁位；`lib/wantRecord.ts` `WantRecord` 擴 `kind/visibility/expiresAt/id` 並透傳 `parseWantRecord`
   - `lib/api/checkins.ts` 擴 `parseCreateCheckinBody` 驗 `kind`（缺省閃回 `flash`）、`toMineRow`/`mineRowToWantRecord` 回 `kind/visibility/expires_at`、`lib/api/checkins.test.ts` 14 單測（含 post/缺 kind 回退/exp）；`docs/api-openapi.yaml` `POST /checkins` 加 `kind` 與 `403 steath`、`Checkin/MineRow` 加三列

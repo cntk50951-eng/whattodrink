@@ -27,7 +27,14 @@
 | `MOCK_ME.avatarEmoji`（我头像占位） | 回看卡片头圈 | `string`（emoji） | `mock`（`lib/me.ts`，UR2.0） | `users.avatar_url` |
 | `MOCK_ME.gender`（我性别三态） | 回看卡片性别 pill | `Gender`（male／female／secret，`lib/me.ts`） | 同上，默认 `secret` | `users.gender`（enum 同名三值） |
 
-## 四、他人打卡（MOCK，EPIC 3.0 替换）
+## 四、地圖時間窗口（UR A.13，server side）
+
+| 字段 | 页面位置 | 类型 | 当前来源 | 未来表映射 |
+|---|---|---|---|---|
+| `range`（`7d` 預設／`90d` 擴展） | 地圖右上 pill「查看過去 3 個月 / 只看 7 天內」 | `PinsRange`（`lib/api/pins.ts`） | `localStorage wtd-pins-range` + state，`GET /api/v1/map/pins?range=` | 不進庫（查詢參數，server 用 `now()-range` 算 cutoff） |
+| `expires_at`（快貼 24h） | 地圖他人 pin 可見性（server 過濾） | `timestamptz | null` | `checkins.expires_at`（`flash` 設 `now()+24h`，`post` 為 NULL，0007） | `checkins.expires_at`，索引 `checkins_kind_expires_idx`（0008） |
+
+## 五、他人打卡（MOCK→真，UR A.13 接線中）
 
 | 字段 | 页面位置 | 类型 | 当前来源 | 未来表映射 |
 |---|---|---|---|---|
@@ -46,13 +53,13 @@
 | `sentIds`（我已乾杯 id 表，UR3.2 按天） | “已送出”态＋额度 UI | `string[]` | state＋localStorage（`wtd-cheers-daily`＝{day（HK 日期键）, ids}，跨天归零，坏数据归零） | `cheers(from_user_id, to_user_id, checkin_id, created_at)`（UR3.0 加 `to_user_id`，一行双读；UR3.2 加服务端按天 15 次拒绝口径） |
 | `cheersFx`（碰杯特效中，UR3.0） | 特效层显隐＋计数乐观＋1 | `{id,key}｜null` | state，会话 | UI 纯状态，不进库（1.3s 后提交 `sentIds` 即拆） |
 
-## 五、UI 纯状态（不进库，列出防误收）
+## 六、UI 纯状态（不进库，列出防误收）
 
 `selectedId`／`sheetOpen`／`fabOpen`／`guideDismissed`（会话 state）、
 `wtd-fab-tap`（localStorage 静默期戳）、双人同框距离（render 现算）。
 地理常量（`HK_BOUNDS`、zoom、超时）是配置，不是数据。
 
-## 六、搖一搖（UR2.5，会话＋一枚戳，不进库）
+## 七、搖一搖（UR2.5，会话＋一枚戳，不进库）
 
 | 字段 | 页面位置 | 类型 | 当前来源 | 未来表映射 |
 |---|---|---|---|---|
@@ -60,7 +67,7 @@
 | 涟漪坐标＋toast 文案（`ripple`／`shakeToast`） | 地图声纳／顶部提示 | 会话 state（1.25s／3.5s 自散） | render 现算＋定时器 | 不进库（运行时态；UR3.1 涟漪退役，换 `shakeSearch` 晃杯罩，时序不变） |
 | 动作权限态（`permission`） | iOS 首次点摇摇按钮的系统弹窗 | `ShakePermission`（unknown／granted／denied，`hooks/useShake.ts`） | state，会话（拒绝只剩按钮触发） | 不进库（运行时态） |
 
-## 七、我的足迹（UR3.4，MOCK，EPIC 3.0 替换）
+## 八、我的足迹（UR3.4，MOCK，EPIC 3.0 替换）
 
 | 字段 | 页面位置 | 类型 | 当前来源 | 未来表映射 |
 |---|---|---|---|---|

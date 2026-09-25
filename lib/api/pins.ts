@@ -12,6 +12,15 @@ export const PINS_MAX_LIMIT = 200;
 export const PINS_FUZZ_FACTOR = 1000; // 10^3 → 3位小数
 export const PINS_MAX_BBOX_AREA = 2.0; // deg²
 
+// UR A.13 地圖時間窗口：server side 判定，不信客戶端時鐘
+export const PINS_RANGE_DEFAULT = "7d" as const;
+export const PINS_RANGES = ["7d", "90d"] as const;
+export type PinsRange = (typeof PINS_RANGES)[number];
+export const PINS_RANGE_MS: Record<PinsRange, number> = {
+  "7d": 7 * 24 * 60 * 60 * 1000,
+  "90d": 90 * 24 * 60 * 60 * 1000,
+};
+
 export type BBox = {
   west: number;
   south: number;
@@ -66,7 +75,15 @@ export function parseBbox(raw: string | null): { bbox: BBox } | { error: string 
   return { bbox: { west, south, east, north } };
 }
 
-export function parsePinsParams(search: URLSearchParams): { bbox: BBox; limit: number } | { error: string } {
+export function parseRange(raw: string | null): { range: PinsRange } | { error: string } {
+  const v = raw === null || raw.trim() === "" ? PINS_RANGE_DEFAULT : raw.trim();
+  if ((PINS_RANGES as readonly string[]).includes(v)) {
+    return { range: v as PinsRange };
+  }
+  return { error: `range 非法：${raw ?? ""}（只要 7d|90d）` };
+}
+
+export function parsePinsParams(search: URLSearchParams): { bbox: BBox; limit: number; range: PinsRange } | { error: string } {
   const bboxResult = parseBbox(search.get("bbox"));
   if ("error" in bboxResult) return bboxResult;
   const limitRaw = search.get("limit");
@@ -74,7 +91,9 @@ export function parsePinsParams(search: URLSearchParams): { bbox: BBox; limit: n
   if (!Number.isInteger(limit) || limit < 1 || limit > PINS_MAX_LIMIT) {
     return { error: `limit 非法：${limitRaw ?? ""}（要 1-${PINS_MAX_LIMIT} 整数）` };
   }
-  return { bbox: bboxResult.bbox, limit };
+  const rangeResult = parseRange(search.get("range"));
+  if ("error" in rangeResult) return rangeResult;
+  return { bbox: bboxResult.bbox, limit, range: rangeResult.range };
 }
 
 /** 行级校验 + 模糊：DB 行 -> PinJson 或 null（坏行跳过）。 */

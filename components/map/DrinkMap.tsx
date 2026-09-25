@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { PinsRange } from "@/lib/api/pins";
+import type { PinJson } from "@/lib/api/pins";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type * as Leaflet from "leaflet";
 import { useLocale, useTranslations } from "next-intl";
@@ -367,7 +369,27 @@ export function DrinkMap({
     now: number,
   ): void {
     othersLayerRef.current?.remove();
-    const pixels = MOCK_CHECKINS.map((c) => {
+    // UR A.13 真數據優先：apiPins 已加載且非空則用真數據，否則回退 MOCK（開發期空庫不白圖）
+    const useApi = apiPinsLoaded && apiPins.length > 0;
+    const apiAsCheckins: Checkin[] | null = useApi
+      ? apiPins.map((p) => ({
+          id: p.id,
+          nickname: p.nickname ?? "酒友",
+          avatarEmoji: "🍻",
+          gender: ((p.gender as Checkin["gender"]) ?? "secret") as Checkin["gender"],
+          drinkName: p.drinkName ?? "",
+          drinkEmoji: p.drinkEmoji ?? "🍺",
+          area: p.area ?? "",
+          position: { lat: p.lat, lng: p.lng },
+          checkedInAt: p.checkedInAt,
+          onlineAt: p.isOnline ? now : now - 10 * 60_000,
+          cheers: 0,
+          declinesInvite: false,
+          mock: true as const,
+        }))
+      : null;
+    const source: Checkin[] = apiAsCheckins ?? (MOCK_CHECKINS as unknown as Checkin[]);
+    const pixels = source.map((c) => {
       const p = map.latLngToContainerPoint([c.position.lat, c.position.lng]);
       return { x: p.x, y: p.y };
     });
@@ -378,7 +400,7 @@ export function DrinkMap({
     ).entries()) {
       if (cluster.members.length === 1) {
         const idx = cluster.members[0] as number;
-        const c = MOCK_CHECKINS[idx] as Checkin;
+        const c = source[idx] as Checkin;
         // UR A.4-rev2 本地圖退場：mock 酒名對目錄取 icon_url，有圖方形钉，
         // 无图 emoji 圆钉（奇偶错峰倾斜保留）。
         // UR3.3 在线绿点缀右上角（两款钉同挂，簇不挂——簇是多人的）。
@@ -603,9 +625,98 @@ export function DrinkMap({
   // UR A.11 未登录打卡唤起登录浮层
   const [loginOverlayOpen, setLoginOverlayOpen] = useState(false);
   const [loginBusy, setLoginBusy] = useState(false);
-  // UR A.12 打卡雙類型 chooser + 隱身攔截
+  // UR A.13 地圖時間窗口：range 7d/90d server side，不信客戶端時鐘
+  const PINS_RANGE_KEY = "wtd-pins-range";
+  const [pinsRange, setPinsRange] = useState<PinsRange>("7d");
+  const [apiPins, setApiPins] = useState<PinJson[]>([]);
+  const [apiPinsLoaded, setApiPinsLoaded] = useState(false);
+  // UR A.12 打卡雙類型 chooser + 隱身攔截（同步 isAuthed 避免 getUser 懸掛無反應）
   const [kindChooserBeer, setKindChooserBeer] = useState<Beer | null>(null);
   const [stealthPromptOpen, setStealthPromptOpen] = useState(false);
+  const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
+  // 登錄續打卡：未登錄時用戶先選酒/時效，登錄回來後自動續上 POST
+  const PENDING_CHECKIN_KEY = "wtd-pending-checkin";
+  const pendingCheckinRef = useRef<{ beer: Beer; kind: "flash" | "post" } | null>(null);
+  function savePendingCheckin(beer: Beer, kind: "flash" | "post"): void {
+    pendingCheckinRef.current = { beer, kind };
+    try {
+      window.localStorage.setItem(PENDING_CHECKIN_KEY, JSON.stringify({ beer, kind }));
+    } catch {
+      // storage blocked
+    }
+  }
+  function loadPendingCheckin(): { beer: Beer; kind: "flash" | "post" } | null {
+    if (pendingCheckinRef.current !== null) return pendingCheckinRef.current;
+    try {
+      const raw = window.localStorage.getItem(PENDING_CHECKIN_KEY);
+      if (raw === null) return null;
+      const j = JSON.parse(raw) as { beer?: Beer; kind?: string };
+      if (j.beer === undefined || typeof j.beer.id !== "string") return null;
+      if (j.kind !== "flash" && j.kind !== "post") return null;
+      return { beer: j.beer as Beer, kind: j.kind };
+    } catch {
+      return null;
+    }
+  }
+  function clearPendingCheckin(): void {
+    pendingCheckinRef.current = null;
+    try {
+      window.localStorage.removeItem(PENDING_CHECKIN_KEY);
+    } catch {
+      // storage blocked
+    }
+  }
+  function closeLoginOverlay(): void {
+    clearPendingCheckin();
+    setLoginOverlayOpen(false);
+  }
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setIsAuthed(!!data.user)).catch(() => setIsAuthed(false));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setIsAuthed(!!s?.user));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // UR A.13 地圖真數據：按 range 拉取，全港 BBOX，server side 時間
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(PINS_RANGE_KEY) as PinsRange | null;
+      if (saved === "7d" || saved === "90d") {
+        void Promise.resolve().then(() => setPinsRange(saved));
+      }
+    } catch {
+      // privacy mode
+    }
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    const bbox = `${HK_BOUNDS.west},${HK_BOUNDS.south},${HK_BOUNDS.east},${HK_BOUNDS.north}`;
+    const url = `/api/v1/map/pins?bbox=${encodeURIComponent(bbox)}&range=${pinsRange}&limit=100`;
+    void fetch(url, { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(String(res.status));
+        const j = (await res.json()) as { pins?: PinJson[] };
+        if (cancelled) return;
+        setApiPins(Array.isArray(j.pins) ? j.pins : []);
+        setApiPinsLoaded(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setApiPins([]);
+        setApiPinsLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pinsRange]);
+
+  // UR A.13 真數據重渲染：apiPins 就緒後刷新 pin 層（依賴 apiPinsLoaded + apiPins）
+  useEffect(() => {
+    if (!mapReady || mapRef.current === null || leafletRef.current === null) return;
+    if (!apiPinsLoaded) return;
+    renderOthersPins(mapRef.current, leafletRef.current, Date.now());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiPinsLoaded, apiPins, mapReady]);
   // UR1.8 frozen drop snapshot (null until the first 想喝, or after reset).
   const [wantRecord, setWantRecord] = useState<WantRecord | null>(null);
   // UR3.7 删除两段确认：只对正在看的 at 武装，换条看自动解除，无需 effect。
@@ -1295,16 +1406,19 @@ export function DrinkMap({
     setBatchIndex((prev) => (prev === idx ? prev : idx));
   }
 
-  /* UR A.12 點格先選時效：快貼 24h / 帖子永久，登入與隱身皆攔截後才落庫 */
+  /* UR A.12 點格先選時效：快貼 24h / 帖子永久，點格即彈 chooser，第二步再驗登入/隱身 */
   function handleBatchWant(beer: Beer): void {
     setPicked(beer);
-    setKindChooserBeer(beer);
+    // 先收起「今晚飲咩？」bottom sheet，再讓用戶在乾淨地圖上選快貼/帖子
+    setSheetOpen(false);
+    queueMicrotask(() => setKindChooserBeer(beer));
   }
   function handleKindChoose(kind: "flash" | "post"): void {
     const beer = kindChooserBeer;
     if (beer === null) return;
+    // 先关选酒弹窗，下一帧再按需弹登录，避免同帧叠盖导致登录被挡在后面
     setKindChooserBeer(null);
-    dropWantWithKind(beer, kind);
+    queueMicrotask(() => dropWantWithKind(beer, kind));
   }
 
   /**
@@ -1382,9 +1496,15 @@ export function DrinkMap({
    * UR A.11：未登录不写本地，直接弹登录浮层。
    */
   function dropWantWithKind(beer: Beer, kind: "flash" | "post"): void {
+    if (isAuthed === false) {
+      savePendingCheckin(beer, kind);
+      setLoginOverlayOpen(true);
+      return;
+    }
     const supabase = createClient();
     void supabase.auth.getUser().then(async ({ data }) => {
       if (data.user === null) {
+        savePendingCheckin(beer, kind);
         setLoginOverlayOpen(true);
         return;
       }
@@ -1485,6 +1605,18 @@ export function DrinkMap({
   function dropWant(beer: Beer): void {
     dropWantWithKind(beer, "flash");
   }
+  // 登錄成功後自動續上之前選的酒/時效（OAuth 跳轉後靠 localStorage 存活）
+  useEffect(() => {
+    if (isAuthed !== true) return;
+    const pending = loadPendingCheckin();
+    if (pending === null) return;
+    clearPendingCheckin();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 關閉登錄浮層是續打卡的前置同步
+    setLoginOverlayOpen(false);
+    queueMicrotask(() => dropWantWithKind(pending.beer, pending.kind));
+    // dropWantWithKind 在此文件內定義，隨 isAuthed 變化穩定，不需列入 deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthed]);
 
   async function handleLoginFromOverlay(): Promise<void> {
     if (loginBusy) return;
@@ -1853,6 +1985,8 @@ export function DrinkMap({
         />
       </div>
 
+      {/* UR A.13 range pill 已搬到底部 row（與 MapFab/BottomNav 同列，統一樣式）— 見底部容器 */}
+
       {/* Notebook dot-grid over the tiles */}
       <div aria-hidden className={styles.paper} />
 
@@ -2197,6 +2331,29 @@ export function DrinkMap({
           hasWant={picked !== null && wantSaved}
           onPick={openPickSheet}
         />
+        {/* UR A.13 range pill：與 MapFab/BottomNav 同列同高，統一樣式（h-11 rounded-full border-2 shadow 硬陰影），server side 判定 */}
+        {!(
+          sheetOpen ||
+          card !== null ||
+          (geoFailed && !guideDismissed)
+        ) && (
+          <button
+            type="button"
+            onClick={() => {
+              const next: PinsRange = pinsRange === "7d" ? "90d" : "7d";
+              setPinsRange(next);
+              try {
+                window.localStorage.setItem(PINS_RANGE_KEY, next);
+              } catch {
+                // privacy mode
+              }
+            }}
+            aria-label={pinsRange === "7d" ? "查看過去三個月" : "只看最近 7 天"}
+            className="flex h-11 items-center justify-center rounded-full border-2 bg-card px-4 text-xs font-bold text-primary shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+          >
+            {pinsRange === "7d" ? "3 個月" : "7 天"}
+          </button>
+        )}
         {/* URC 1.2 A3：Tonight's pick 直接觸發（不走 URL，避免同 href no-op bug） */}
         <BottomNav
           hidden={sheetOpen || card !== null || (geoFailed && !guideDismissed)}
@@ -2787,7 +2944,7 @@ export function DrinkMap({
           role="dialog"
           aria-modal="true"
           aria-label="選擇打卡類型"
-          className="absolute inset-0 z-30 flex items-end justify-center bg-black/45 p-4 sm:items-center"
+          className="fixed inset-0 z-[998] flex items-end justify-center bg-black/45 p-4 sm:items-center"
           onClick={() => setKindChooserBeer(null)}
         >
           <div
@@ -2841,7 +2998,7 @@ export function DrinkMap({
           role="dialog"
           aria-modal="true"
           aria-label="隱身模式提示"
-          className="absolute inset-0 z-30 flex items-center justify-center bg-black/55 p-4"
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/55 p-4"
           onClick={() => setStealthPromptOpen(false)}
         >
           <div
@@ -2879,8 +3036,8 @@ export function DrinkMap({
           role="dialog"
           aria-modal="true"
           aria-label={t("loginRequiredTitle")}
-          className="absolute inset-0 z-30 flex items-center justify-center bg-black/55 p-4"
-          onClick={() => setLoginOverlayOpen(false)}
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/55 p-4"
+          onClick={() => closeLoginOverlay()}
         >
           <div
             role="document"
@@ -2905,7 +3062,7 @@ export function DrinkMap({
             <div className="mt-5 flex gap-2">
               <button
                 type="button"
-                onClick={() => setLoginOverlayOpen(false)}
+                onClick={() => closeLoginOverlay()}
                 className="font-hand flex-1 rounded-full border-2 bg-card px-4 py-2.5 text-base font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
               >
                 {t("cancel")}

@@ -1490,3 +1490,38 @@ UR A.12 打卡雙類型（快貼 24h / 帖子永久）[WIP]
 
 *改動記錄*
 - 2026-09-24：建檔置 [WIP]（數據/請求體/AC 定版，預設公開已確認）
+
+---
+
+UR A.13 地圖時間窗口（快貼 24h / 帖子 7d→90d）[WIP]
+
+作為用戶，我要在地圖上看到未過期的快貼與帖子；快貼 24h 後自動從地圖消失，帖子預設只顯示 7 天內，切按鈕後可看 90 天內。
+
+### 背景
+- `GET /api/v1/map/pins` 已有 BBOX+模糊（UR A.8），但無時效過濾；`checkins` 已由 0007 新增 `kind flash|post` + `expires_at`（flash +24h，post NULL）
+- 前端 `DrinkMap` 仍走 MOCK，未接真 pins；本次需接真數據並提供 7d/90d 切換
+
+### 數據（`supabase/migrations/0008_pins_range_idx.sql`）
+- 索引：`checkins(kind, expires_at)` 與 `checkins(kind, created_at)`（`created_at` 已有 `checkins_created_idx`，本遷移補 `expires_at` 單列與複合以覆蓋 `or` 謂詞）
+- 時間判定一律 server side（`now()` / `Date.now()`），不信客戶端時鐘
+
+### 契約（`GET /api/v1/map/pins?bbox&limit&range`，🌐）
+- `range` enum `7d|90d`，預設 `7d`（決策：你確認用 `range`，server side 判定）
+- 服務端謂詞：`visibility='public' AND ((kind='flash' AND expires_at > now()) OR (kind='post' AND created_at >= now() - range))` + BBOX + limit + 模糊
+- 空結果 `[]`，壞 `range` 400 `{code:invalid_params}`
+
+### 範圍（只做時間窗口，不含可見性/綠點/好友按鈕/T&C）
+1. `0008` 建索引
+2. `docs/api-openapi.yaml` 為 `/map/pins` 加 `range`
+3. `lib/api/pins.ts` 加 `parseRange` + `parsePinsParams` 整合
+4. `app/api/v1/map/pins/route.ts` 拼時效謂詞（server `now`）
+5. 前端 `DrinkMap` 接真 pins + 底部 7d/90d pill（`wtd-pins-range` localStorage，300ms 防抖）+ 空態文案
+6. 單測 + 三閘
+
+### AC
+- 快貼 24h 前插入 → `range=7d` 與 `90d` 皆不回；`post` 10 天前 → 7d 不回、90d 回；95 天前 `post` → 皆不回
+- 匿名 `curl "…/map/pins?bbox=…&range=7d"` 與 `&range=90d` 90d 條數 ≥ 7d；缺 `range` 預設 7d；非法 `range=bad` 400
+- 地圖 pill 切 7d/90d 立刻重拉，無閃白，BBOX 同步
+
+*改動記錄*
+- 2026-09-24：建檔置 [WIP]（`range` 命名與 server side 判定已確認，細化謂詞與 AC）

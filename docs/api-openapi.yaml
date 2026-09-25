@@ -45,7 +45,7 @@ paths:
   /api/v1/map/pins:
     get:
       operationId: getMapPins
-      summary: 地图他人 Pin（免登入，坐标模糊到街区）
+      summary: 地图他人 Pin（免登入，坐标模糊到街区，UR A.13 时间窗口）
       parameters:
         - name: bbox
           in: query
@@ -60,9 +60,16 @@ paths:
             minimum: 1
             maximum: 200
             default: 100
+        - name: range
+          in: query
+          description: 帖子回溯窗口（server side now 判定）；flash 固定 24h（expires_at>now），post 按 range 过滤（7d 预设→90d 扩展）
+          schema:
+            type: string
+            enum: [7d, 90d]
+            default: 7d
       responses:
         "200":
-          description: BBOX 内公开打卡（坐标已截断至 3 位小数约 100m，无精确值；private 行不回）
+          description: BBOX 内公开打卡（坐标已截断至 3 位小数约 100m，无精确值；private 行不回；flash 已过期不回，post 按 range）
           content:
             application/json:
               schema:
