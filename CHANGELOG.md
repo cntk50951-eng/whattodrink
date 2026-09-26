@@ -16,6 +16,17 @@
   - fix DEF-20260926-001（切換器不可見）：渲染門檻`toolbarExpanded && isAuthed===true`過嚴致無聲消失→只跟展開態＋匿名點走登入浮層（沿打卡口徑）＋`useMyMode(true)`改`/me`直讀；三閘綠，待用戶复驗
   - fix 跟進（用戶糾正：收合不知展開→收合態常駐精簡 pill 露當前模式，一點展開選三檔，不一次全放；三閘綠）
   - fix DEF-20260926-002（引導層被他人卡蓋→守衛先收卡記卡，切換成功恢復原卡續操作；三閘綠，待复驗；組件態流轉無新單測）
+  - **UR A.17 好友模式（關係讀＋friends可見＋綠點＋只看好友鈕）[✓，用户已验收，merged]**
+  - `lib/friends.ts`：`areFriends`（任一方向accepted）＋`friendIdsOf`＋`parseScope all|friends`＋`hideOnlineForViewer`＋`lib/friends.test.ts` 10單測（A.19復用同一函數）
+  - `supabase/migrations/0009_friendships_read_policy.sql`（待用戶Dashboard執行）：friendships自讀＋checkins friends行讀，寫續拒
+  - `GET /api/v1/friends/check?user_id=`（🔒）：`{is_friend}`，匿名401／非法400
+  - `GET /map/pins?scope`＋`GET /wall?scope`：friends需登入（匿名401），回accepted好友的friends＋public行；空好友直接`[]`（不下空集in）；綠點route層post-process（mapper不動，無friends作者零額外查詢）
+  - 前端底部「只看好友」鈕（沿range pill配方，會話態不持久化；匿名點彈登入浮層）；三語`friendsOnly/friendsAll`；`home-map.md`第十節＋`photo-mood.md`牆scope行
+  - 三閘：220→232綠／lint 0 error（3舊warning）／build 32頁（含新`/api/v1/friends/check`）
+  - fix DEF-20260926-004（點pin拉全港→退役遠距雙人同框改只飛對方＋開卡，距離行保留；Snap／Google／Apple同款；搖一搖同函數受益；三閘綠，待复驗）
+  - fix DEF-20260926-005（真pin點不開卡→開卡只認MOCK表，抽apiPinToCheckin共用映射；三閘綠，待复驗）
+  - fix DEF-20260926-006（點真pin卡死→005新card對象致view effect無限循環，改useMemo凍identity；三閘綠，待复驗）
+  - fix DEF-20260926-007（拖圖關卡翻案→刪dragstart關閉，卡只走X／換選／登出；UR2.1已回寫；三閘綠，待复驗）
   - **UR A.19 引導浮層好友感知［文檔化，[] 未實作］**：非好友僅公開鈕／好友雙鈕／未知雙鈕；查法推薦 `GET /friends/check` 最小查詢（A.17 復用）；前置依賴 pins／wall 帶對方 `user_id`；承 A.17 之後
 - **UR A.14 选酒格子啤酒冒泡加载态 [WIP]**
   - `components/map/BeerIcon.tsx`：`icon_url` 三態（`loading`→3 枚上升氣泡 skeleton `bg-[var(--muted)]` `aspect-[3/4]` 固幅/`loaded`→`opacity-100 transition 300ms` 淡入/`broken`→emoji），`beer.icon_url` 變化重置 `loaded/broken`，`prefers-reduced-motion` 靜止；新增 `toBeerIconWrapperClass` 純函數（`w-auto→aspect-[3/4]`/`object-cover` 清理）供多尺寸 `h-20/h-16/h-24/h-full` 適配

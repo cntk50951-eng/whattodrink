@@ -1,5 +1,6 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { friendIdsOf } from "@/lib/friends";
 import {
   WALL_HOT_WINDOW_CAP,
   WALL_HOT_WINDOW_MS,
@@ -30,19 +31,52 @@ export async function GET(req: Request) {
   if ("error" in parsed) {
     return apiError("invalid_params", parsed.error, 400);
   }
-  const { sort, limit, cursor } = parsed.params;
+  const { sort, limit, cursor, scope } = parsed.params;
+
+  // UR A.17 只看好友：需登入，限定 accepted 好友的 friends＋public 行。
+  // 無好友即空牆（不下空集查詢，直接回）。
+  let supabase = await createClient();
+  let visibilities: string[] = ["public"];
+  let authorIds: string[] | null = null;
+  if (scope === "friends") {
+    const authed = await getAuthedClient(req);
+    if (authed.userId === null) {
+      return apiError("unauthorized", "未登录", 401);
+    }
+    const { data: fsRows, error: fsErr } = await authed.supabase
+      .from("friendships")
+      .select("user_id,friend_id,status")
+      .eq("status", "accepted")
+      .or(`user_id.eq.${authed.userId},friend_id.eq.${authed.userId}`);
+    if (fsErr) {
+      console.error(`[api/v1/wall] friendships error: code=${fsErr.code} message=${fsErr.message}`);
+      return apiError("internal", "好友查詢失敗", 500);
+    }
+    const friendIds = friendIdsOf(
+      authed.userId,
+      (fsRows ?? []) as { user_id: unknown; friend_id: unknown; status: unknown }[],
+    );
+    if (friendIds.length === 0) {
+      return apiOk({ posts: [], nextCursor: null });
+    }
+    supabase = authed.supabase;
+    visibilities = ["friends", "public"];
+    authorIds = friendIds;
+  }
 
   try {
-    const supabase = await createClient();
     let rows: unknown[];
     if (sort === "latest") {
       let query = supabase
         .from("checkins")
         .select(WALL_COLUMNS)
-        .eq("visibility", "public")
+        .in("visibility", visibilities)
         .order("created_at", { ascending: false })
         .order("id", { ascending: false })
         .limit(limit + 1);
+      if (authorIds !== null) {
+        query = query.in("user_id", authorIds);
+      }
       if (cursor !== null) {
         query = query.or(
           `created_at.lt.${cursor.ca},and(created_at.eq.${cursor.ca},id.lt.${cursor.id})`,
@@ -58,13 +92,17 @@ export async function GET(req: Request) {
       rows = (data ?? []) as unknown[];
     } else {
       const cutoff = new Date(Date.now() - WALL_HOT_WINDOW_MS).toISOString();
-      const { data, error } = await supabase
+      let query = supabase
         .from("checkins")
         .select(WALL_COLUMNS)
-        .eq("visibility", "public")
+        .in("visibility", visibilities)
         .gte("created_at", cutoff)
         .order("created_at", { ascending: false })
         .limit(WALL_HOT_WINDOW_CAP);
+      if (authorIds !== null) {
+        query = query.in("user_id", authorIds);
+      }
+      const { data, error } = await query;
       if (error) {
         console.error(
           `[api/v1/wall] supabase error: code=${error.code} message=${error.message} details=${error.details ?? ""} hint=${error.hint ?? ""}`,

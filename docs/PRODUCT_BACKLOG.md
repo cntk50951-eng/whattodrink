@@ -232,6 +232,8 @@
 *後續（不在本 UR）*
 - 真實打卡後端、好友 → EPIC 3.0
 - 軌跡記錄／路線回放 → EPIC 3.0
+*改動記錄*
+- 2026-09-26：DEF-20260926-004 fix（遠距雙人同框退役：跨城 `fitBounds` 必拉遠，改一律 `flyTo(對方, max(zoom,14))`＋開卡；Snap／Google／Apple 同款；距離行保留，同框能力日後加卡內鈕；搖一搖聚焦同函數一併受益）
 
 **UR 1.7　首頁地圖獨佔＋頂部菜單** [✓]
 
@@ -359,6 +361,8 @@
 - AC3：三分支内容交互与底部卡时代一致
 *後續（不在本 UR）*
 - 無
+*改動記錄*
+- 2026-09-26：DEF-20260926-007 翻案（拖圖關卡決定推翻：卡只走 X／換選／登出關閉，錨點跟 move 追 pin；AC2 邊界同步作廢，以本條為準）
 
 **UR 2.2　頂部菜單彈出重設計** [✓]
 
@@ -1686,3 +1690,55 @@ UR A.19 引導浮層好友感知（非好友僅公開／好友可公開＋好友
 
 *改動記錄*
 - 2026-09-26：建檔置 []（用戶後續需求文檔化；編號 A.19——A.17 好友模式／A.18 公開＋按鈕＋T&C 已預留不動，新人讓路；只文檔不實作，承 A.17 之後）
+
+---
+
+UR A.17 好友模式（關係讀＋friends可見＋綠點＋只看好友鈕）[✓]
+
+作為好友模式用戶，我打卡只給好友看，我的綠點只給好友見；作為任何用戶，我要一鍵只看好友動態。關係判定與 friends 行讀路徑是 A.19／A.18 的前置，故本 UR 先行。
+
+### 背景（承 A.15 D2＋A.16）
+- 寫路徑已通（`POST /checkins` 按 `users.mode` 派生 friends）；缺讀路徑與關係判定
+- 只看好友鈕原屬 A.18，移入本 UR（否則 scope 無從驗收）；A.18 縮為公開收尾＋T&C（見下）
+
+### 數據（`supabase/migrations/0009_friendships_read_policy.sql`，用戶 Dashboard 執行）
+- friendships RLS 自讀：`user_id=auth.uid() OR friend_id=auth.uid()` 可讀（沿 0006 owner 檔）；寫續拒（加好友／接受流程另議）
+- 驗證行（A.15 D3 模板，用戶填真實 `users.id` 插，至少一對 accepted 互測）
+
+### 契約（實作時一次一個端點走 api-workflow 七步）
+- `GET /api/v1/friends/check?user_id=`（🔒）：回 `{is_friend}`；accepted 任一方向即 true；非法 id 400；匿名 401。`lib` 純函數＋單測，A.19 復用同一函數
+- `GET /api/v1/map/pins?bbox&range&scope`（scope 新增）：`scope=friends` 需登入，回 accepted 好友的 friends＋public 行（時效沿 A.13，模糊沿 A.8）；匿名＋scope→401；scope 非法 400
+- `GET /api/v1/wall?sort&cursor&scope`：同 scope 語義（hot／latest 沿 A.6）
+- 綠點：author.`mode`=friends 且 viewer 非好友→`isOnline=false`；author public→沿舊；stealth 無行（寫路徑已禁，天然）
+
+### 範圍
+1. `lib/friends.ts` 純函數（`areFriends`／check 參數校驗）＋單測
+2. `0009` migration（讀 policy only，不動表結構）
+3. 三端點逐個落地（route＋mapper＋單測＋openapi）
+4. 前端只看好友鈕（地圖下方按鈕列，沿 range pill 配方：開→pins 加 `scope=friends` 重拉，關→回 public；匿名點彈登入浮層；三語）
+5. `docs/data` 同步（home-map 他人行＋photo-mood 牆行補 scope；future-schema friendships 行已轉正不動）
+
+### 非目標
+- cheers／invites 真端點（隨 to-do A.4-11／12，屆時守衛按 A.15 D2；mock 層僅 stealth 守衛不動）
+- 加好友／接受／blocked 流程、好友上限、T&C（A.18）
+
+### AC
+- 好友 A 切 friends 打卡→好友 B `scope=friends` 可見，陌生人 C（public scope）不可見；A 切回公開打卡→人人見
+- 綠點：friends 模式用戶對非好友 `isOnline=false`，好友見在線；公開用戶行為不變
+- 只看好友鈕：開→只剩好友釘；關→恢復；匿名點彈登入浮層
+- 三閘全綠；用戶執行 0009＋插驗證行＋curl 驗三端點（api-workflow 第 7 步）
+
+*改動記錄*
+- 2026-09-26：建檔即開工置 [WIP]（用戶指令開始 A.17；只看好友鈕自 A.18 移入以便驗收，A.18 同步縮範圍）
+- 2026-09-26：實現完待驗（三端點逐個落地＋綠點post-process＋只看好友鈕＋三語；232綠／lint 0 error／build 32頁；待用戶：執行0009＋插驗證行＋curl驗＋瀏覽器驗鈕）
+- 2026-09-26：fix DEF-20260926-004（點pin拉全港→退役遠距同框改只飛對方，UR1.6已回寫；三閘綠，待用户复驗）
+- 2026-09-26：fix DEF-20260926-005（真pin點不開卡→開卡只認MOCK表，抽apiPinToCheckin共用映射＋開卡認apiPins；三閘綠，待复驗）
+- 2026-09-26：fix DEF-20260926-006（點真pin卡死→005修法每render新card對象致view effect無限循環，api卡改useMemo凍identity；三閘綠，待复驗）
+- 2026-09-26：fix DEF-20260926-007（拖圖關卡翻案→刪dragstart關閉，卡只走X／換選／登出；UR2.1已回寫；三閘綠，待复驗）
+- 2026-09-26：用戶驗收通過（scope好友可見＋只看好友鈕＋點pin飛達開卡＋拖圖卡留＋綠點規則（心跳另立項）），置 [✓]；隨本 commit 合 main
+
+---
+
+UR A.18 公開模式收尾＋T&C頁 []
+
+公開模式即現預設行為，本 UR 只做收尾驗收＋T&C 頁（路由＋文案：三模式差異＋各自風險，大綱沿 A.15 D6），承 A.17 之後。牆頁 scope 消費者（篩選 UI）屆時一併定。細化另議。

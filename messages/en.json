@@ -270,6 +270,8 @@
     "deleteEntry": "Delete",
     "confirmDelete": "Confirm delete",
     "loginRequiredTitle": "Please sign in",
+    "friendsOnly": "Friends only",
+    "friendsAll": "Everyone",
     "loginRequiredBody": "Check-ins need an account — your pins follow your account across devices",
     "loginCta": "Sign in",
     "cancel": "Cancel"

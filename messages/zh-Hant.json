@@ -270,6 +270,8 @@
     "deleteEntry": "刪除",
     "confirmDelete": "確認刪除",
     "loginRequiredTitle": "請先登入",
+    "friendsOnly": "淨睇好友",
+    "friendsAll": "全部動態",
     "loginRequiredBody": "打卡需要登入，登入後記錄會跟隨你嘅賬號，換設備都唔會丟",
     "loginCta": "去登入",
     "cancel": "取消"

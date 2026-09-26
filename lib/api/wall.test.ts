@@ -139,13 +139,13 @@ describe("parseWallParams", () => {
 
   it("defaults to latest + 20 + no cursor", () => {
     expect(params("")).toEqual({
-      params: { sort: "latest", limit: 20, cursor: null },
+      params: { sort: "latest", limit: 20, cursor: null, scope: "all" },
     });
   });
 
   it("accepts hot + custom limit", () => {
     const got = params("sort=hot&limit=5");
-    expect(got).toEqual({ params: { sort: "hot", limit: 5, cursor: null } });
+    expect(got).toEqual({ params: { sort: "hot", limit: 5, cursor: null, scope: "all" } });
   });
 
   it("rejects bad sort, out-of-range limit, and cross-sort cursors", () => {
@@ -162,7 +162,14 @@ describe("parseWallParams", () => {
     const cursor = encodeCursor(hotCursorOf(post()));
     const got = params(`sort=hot&cursor=${encodeURIComponent(cursor)}`);
     expect(got).toEqual({
-      params: { sort: "hot", limit: 20, cursor: hotCursorOf(post()) },
+      params: { sort: "hot", limit: 20, cursor: hotCursorOf(post()), scope: "all" },
     });
+  });
+
+  it("parses scope friends and rejects bad scope (UR A.17)", () => {
+    expect(params("scope=friends")).toEqual(
+      expect.objectContaining({ params: expect.objectContaining({ scope: "friends" }) }),
+    );
+    expect(params("scope=everyone")).toHaveProperty("error");
   });
 });

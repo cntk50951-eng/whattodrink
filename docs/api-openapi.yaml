@@ -11,7 +11,7 @@ paths:
   /api/v1/wall:
     get:
       operationId: getWall
-      summary: 公開牆（免登入）
+      summary: 公開牆（免登入；scope=friends 需登入，A.17）
       parameters:
         - name: sort
           in: query
@@ -31,21 +31,55 @@ paths:
           description: 上一頁最后一个帖子的不透明游标（base64url JSON），第一页不传
           schema:
             type: string
+        - name: scope
+          in: query
+          description: all＝公開行（免登入）；friends＝accepted 好友的 friends＋public 行（需登入，匿名＋scope 即 401）
+          schema:
+            type: string
+            enum: [all, friends]
+            default: all
       responses:
         "200":
-          description: 一页公开帖（只含 visibility=public 行＋公开列）
+          description: 一页帖子（all＝visibility=public 行＋公开列；friends＝好友行）
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/WallPage"
         "400":
           $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/friends/check:
+    get:
+      operationId: checkFriend
+      summary: 查與某人是否為好友（需登录，A.17；A.19 引導浮層復用）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 任一方向 accepted 即 true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckResult"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/map/pins:
     get:
       operationId: getMapPins
-      summary: 地图他人 Pin（免登入，坐标模糊到街区，UR A.13 时间窗口）
+      summary: 地图他人 Pin（免登入，坐标模糊到街区，UR A.13 时间窗口；scope=friends 需登入，A.17）
       parameters:
         - name: bbox
           in: query
@@ -67,15 +101,24 @@ paths:
             type: string
             enum: [7d, 90d]
             default: 7d
+        - name: scope
+          in: query
+          description: all＝公開行（免登入）；friends＝accepted 好友的 friends＋public 行（需登入，匿名＋scope 即 401；friends 模式作者對非好友 isOnline=false）
+          schema:
+            type: string
+            enum: [all, friends]
+            default: all
       responses:
         "200":
-          description: BBOX 内公开打卡（坐标已截断至 3 位小数约 100m，无精确值；private 行不回；flash 已过期不回，post 按 range）
+          description: BBOX 内打卡（坐标已截断至 3 位小数约 100m，无精确值；private 行不回；flash 已过期不回，post 按 range；scope=friends 只回好友行）
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/MapPinsPage"
         "400":
           $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/checkins:
@@ -383,6 +426,13 @@ components:
         mode_updated_at:
           type: string
           format: date-time
+    CheckResult:
+      type: object
+      required: [is_friend]
+      description: 是否為好友（任一方向 accepted，A.17）
+      properties:
+        is_friend:
+          type: boolean
     MapPin:
       type: object
       required: [id, lat, lng, area, drinkName, drinkEmoji, nickname, avatarUrl, gender, checkedInAt, isOnline]

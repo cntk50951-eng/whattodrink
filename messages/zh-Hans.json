@@ -270,6 +270,8 @@
     "deleteEntry": "删除",
     "confirmDelete": "确认删除",
     "loginRequiredTitle": "请先登录",
+    "friendsOnly": "只看好友",
+    "friendsAll": "全部动态",
     "loginRequiredBody": "打卡需要登录，登录后记录会跟随你的账号，换设备也不丢",
     "loginCta": "去登录",
     "cancel": "取消"
