@@ -44,6 +44,7 @@ import {
 import type { LastVisit } from "@/lib/visit";
 import { LOGOUT_CLEAR_EVENT } from "@/lib/auth/clear";
 import { useMyMode } from "@/hooks/useMyMode";
+import { useFriendRelation } from "@/hooks/useFriendRelation";
 import { ModePrompt } from "@/components/auth/ModePrompt";
 import type { GuardAction } from "@/components/auth/ModePrompt";
 import type { UserMode } from "@/lib/mode";
@@ -1748,15 +1749,21 @@ export function DrinkMap({
   const [cheersFx, setCheersFx] = useState<{ id: string; key: number } | null>(
     null,
   );
+  // DEF-20260926-009：會話關係緩存＋加好友（hook 共用；陌生卡首次查約 100ms）。
+  const { isFriendCached, addFriendByCheckin } = useFriendRelation();
   function handleCheers(id: string): void {
-    // UR A.16 隱身攔截：唯讀不可乾杯，彈引導浮層（可一鍵切換模式）。
-    // DEF-20260926-002：先收他人卡再彈層（層會被卡蓋住），記卡待切換後恢復。
+    // UR A.16 隱身攔截：唯讀不可乾杯，彈引導浮層（關係由層內自查）。
+    // DEF-20260926-002：先收他人卡再彈層，記卡待切換後恢復。
+    // DEF-009 修正：乾杯除隱身外一律直過（加好友門只攔邀約）。
     if (mode === "stealth") {
       setPendingCardId(id);
       setSelectedId(null);
       setGuardAction("cheers");
       return;
     }
+    proceedCheers(id);
+  }
+  function proceedCheers(id: string): void {
     // MOCK — local state only. EPIC 3 sends a real cheers via Supabase.
     // UR3.2 限额守卫：满 15 即拦（按钮同 disabled，双保险）。
     if (
@@ -1817,16 +1824,48 @@ export function DrinkMap({
   const [invites, setInvites] = useState<Partial<Record<string, InvitePhase>>>(
     {},
   );
+  // DEF-009 修正：公開邀約非好友 → 加完即發邀約（卡不關，原地續操作；
+  // 等接受會死胡同——對方無接受 UI，只能靠互加）。
+  function handleFriendAdded(): void {
+    if (mode === "public" && guardAction === "invite" && pendingCardId !== null) {
+      const pid = pendingCardId;
+      setPendingCardId(null);
+      setGuardAction(null);
+      proceedInvite(pid);
+    }
+  }
   function handleInvite(id: string): void {
-    // UR A.16 隱身攔截：唯讀不可約喝酒，彈引導浮層（可一鍵切換模式）。
+    // UR A.16 隱身攔截：唯讀不可約喝酒，彈引導浮層（關係由層內自查）。
     // DEF-20260926-002：先收他人卡再彈層，記卡待切換後恢復。
+    // DEF-009 修正：邀約須先加好友（乾杯除外）——authed 查關係，好友／未知直過，
+    // 非好友彈加好友層；公開卡不關（加完即發），friends 收卡（切換後恢復）。
     if (mode === "stealth") {
       setPendingCardId(id);
       setSelectedId(null);
       setGuardAction("invite");
       return;
     }
-    const c = MOCK_CHECKINS.find((m) => m.id === id);
+    if (isAuthed === false) {
+      proceedInvite(id);
+      return;
+    }
+    void isFriendCached(id).then((rel) => {
+      if (rel !== false) {
+        proceedInvite(id);
+        return;
+      }
+      setPendingCardId(id);
+      if (mode === "friends") setSelectedId(null);
+      setGuardAction("invite");
+    });
+  }
+  function proceedInvite(id: string): void {
+    let c: Checkin | undefined = MOCK_CHECKINS.find((m) => m.id === id);
+    if (c === undefined) {
+      // DEF-20260926-008 附带：真 pin 也要能約（之前只認 MOCK 表，005 同類漏網）。
+      const hit = apiPins.find((p) => p.id === id);
+      if (hit !== undefined) c = apiPinToCheckin(hit, nowMs);
+    }
     if (
       c === undefined ||
       !isOnline(c, nowMs) ||
@@ -3149,8 +3188,14 @@ export function DrinkMap({
       <ModePrompt
         open={guardAction !== null}
         action={guardAction ?? "checkin"}
+        mode={mode}
         onClose={closeGuard}
         onSwitch={(next) => patchMode(next)}
+        // UR A.19：打卡守衛無對象（null→雙鈕）；乾杯／邀約帶卡 id 查關係。
+        targetCheckinId={guardAction === "checkin" ? null : pendingCardId}
+        // DEF-009：加好友＋公開直執行（卡不關，原地續操作）。
+        onAddFriend={addFriendByCheckin}
+        onFriendAdded={handleFriendAdded}
         onSwitched={() => {
           if (pendingCardId !== null) {
             setSelectedId(pendingCardId);

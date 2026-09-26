@@ -4,7 +4,9 @@ import {
   areFriends,
   friendIdsOf,
   hideOnlineForViewer,
+  parseAddFriendBody,
   parseCheckUserId,
+  parseFriendCheckParams,
   parseScope,
 } from "./friends";
 
@@ -57,6 +59,33 @@ describe("parseCheckUserId / parseScope (UR A.17)", () => {
     expect(parseScope(null)).toEqual({ scope: "all" });
     expect(parseScope("friends")).toEqual({ scope: "friends" });
     expect("error" in parseScope("everyone")).toBe(true);
+  });
+});
+
+describe("parseFriendCheckParams (UR A.19)", () => {
+  const q = (s: string) => parseFriendCheckParams(new URLSearchParams(s));
+  it("user_id 單獨過", () => {
+    expect(q("user_id=abc")).toEqual({ target: { userId: "abc" } });
+  });
+  it("checkin_id 單獨過", () => {
+    expect(q("checkin_id=uuid-1")).toEqual({ target: { checkinId: "uuid-1" } });
+  });
+  it("並存／皆無／超長 → error", () => {
+    expect("error" in q("user_id=a&checkin_id=b")).toBe(true);
+    expect("error" in q("")).toBe(true);
+    expect("error" in q(`checkin_id=${"x".repeat(65)}`)).toBe(true);
+  });
+});
+
+describe("parseAddFriendBody (DEF-20260926-009)", () => {
+  it("friend_id／checkin_id 各自過", () => {
+    expect(parseAddFriendBody({ friend_id: "u1" })).toEqual({ body: { friendId: "u1" } });
+    expect(parseAddFriendBody({ checkin_id: "c1" })).toEqual({ body: { checkinId: "c1" } });
+  });
+  it("並存／皆無／非對象 → error", () => {
+    expect("error" in parseAddFriendBody({ friend_id: "u", checkin_id: "c" })).toBe(true);
+    expect("error" in parseAddFriendBody({})).toBe(true);
+    expect("error" in parseAddFriendBody(null)).toBe(true);
   });
 });
 

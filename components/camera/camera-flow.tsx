@@ -119,6 +119,7 @@ export function CameraFlow({
 }) {
   const t = useTranslations("camera");
   // UR A.16 隱身守衛（發布照片是寫操作，唯讀攔截彈引導）。
+  // DEF-009：ModePrompt 要 mode 決文案；無 target（自己的帖子）故維持雙鈕。
   const [guardAction, setGuardAction] = useState<GuardAction | null>(null);
   const { mode, patchMode } = useMyMode(true);
   const [phase, setPhase] = useState<Phase>(autoStart ? "consent" : "intro");
@@ -445,6 +446,7 @@ export function CameraFlow({
       <ModePrompt
         open={guardAction !== null}
         action={guardAction ?? "photo"}
+        mode={mode}
         onClose={() => setGuardAction(null)}
         onSwitch={(next) => patchMode(next)}
       />

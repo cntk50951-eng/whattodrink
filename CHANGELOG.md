@@ -27,6 +27,14 @@
   - fix DEF-20260926-005（真pin點不開卡→開卡只認MOCK表，抽apiPinToCheckin共用映射；三閘綠，待复驗）
   - fix DEF-20260926-006（點真pin卡死→005新card對象致view effect無限循環，改useMemo凍identity；三閘綠，待复驗）
   - fix DEF-20260926-007（拖圖關卡翻案→刪dragstart關閉，卡只走X／換選／登出；UR2.1已回寫；三閘綠，待复驗）
+  - **UR A.19 引導浮層好友感知 [✓，用户已验收，merged]**
+  - `GET /friends/check` 加 `checkin_id`（server 解作者，行不可見即非好友 fail-closed；`lib` 加 `parseFriendCheckParams`＋3單測）
+  - `ModePrompt` 加 `targetCheckinId`：開層即查，非好友隱藏好友鈕＋註釋行，其餘 fail-open 雙鈕；地圖卡／榜／詳情三處透傳，camera 無 target 不動
+  - 三語`nonFriendNote` 17×3 parity PASS；openapi 補 `checkin_id` 參數
+  - 三閘：232→235綠／lint 0 error（修雙try接縫）／build 32頁；9b：零新增持久化，openapi＋文案已同步
+  - fix DEF-20260926-009（文案模式矩陣＋POST /friends＋0010＋地圖卡關係查＋榜詳情透傳；237綠／build 33頁；待复驗）
+  - fix DEF-009 糾正（乾杯除隱身直過，加好友門只攔邀約；公開邀約加完即發不等接受；刪onProceed死碼＋proceedCta；三閘綠，待复驗）
+  - fix DEF-20260926-008（好友模式非好友直通→關係查＋僅公開鈕＋收卡恢復；守衛層portal＋z1100保頂；附带修真pin邀約；三閘綠，待复驗）
   - **UR A.19 引導浮層好友感知［文檔化，[] 未實作］**：非好友僅公開鈕／好友雙鈕／未知雙鈕；查法推薦 `GET /friends/check` 最小查詢（A.17 復用）；前置依賴 pins／wall 帶對方 `user_id`；承 A.17 之後
 - **UR A.14 选酒格子啤酒冒泡加载态 [WIP]**
   - `components/map/BeerIcon.tsx`：`icon_url` 三態（`loading`→3 枚上升氣泡 skeleton `bg-[var(--muted)]` `aspect-[3/4]` 固幅/`loaded`→`opacity-100 transition 300ms` 淡入/`broken`→emoji），`beer.icon_url` 變化重置 `loaded/broken`，`prefers-reduced-motion` 靜止；新增 `toBeerIconWrapperClass` 純函數（`w-auto→aspect-[3/4]`/`object-cover` 清理）供多尺寸 `h-20/h-16/h-24/h-full` 適配

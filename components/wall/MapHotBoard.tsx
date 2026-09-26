@@ -14,6 +14,7 @@ import {
 import type { WallPost } from "@/lib/posts";
 import { VoicePlayer } from "./PostDetail";
 import { useMyMode } from "@/hooks/useMyMode";
+import { useFriendRelation } from "@/hooks/useFriendRelation";
 import { ModePrompt } from "@/components/auth/ModePrompt";
 import type { GuardAction } from "@/components/auth/ModePrompt";
 import styles from "./wall.module.css";
@@ -42,7 +43,10 @@ export function MapHotBoard({ sheetOpen }: { sheetOpen: boolean }) {
   const [confirm, setConfirm] = useState<"report" | "delete" | null>(null);
   // UR A.16 隱身守衛（讚是寫操作，唯讀攔截彈引導）。
   const [guardAction, setGuardAction] = useState<GuardAction | null>(null);
+  // UR A.19：被讚帖 id 透給引導層查關係（無則雙鈕）。
+  const [guardTarget, setGuardTarget] = useState<string | null>(null);
   const { mode, patchMode } = useMyMode(true);
+  const { addFriendByCheckin } = useFriendRelation();
 
   const refresh = useCallback(() => {
     setPosts(sortHot(loadWall(), Date.now()));
@@ -71,6 +75,7 @@ export function MapHotBoard({ sheetOpen }: { sheetOpen: boolean }) {
   const doLike = (id: string) => {
     // UR A.16 隱身攔截：唯讀不可讚。
     if (mode === "stealth") {
+      setGuardTarget(id);
       setGuardAction("like");
       return;
     }
@@ -108,8 +113,14 @@ export function MapHotBoard({ sheetOpen }: { sheetOpen: boolean }) {
       <ModePrompt
         open={guardAction !== null}
         action={guardAction ?? "like"}
-        onClose={() => setGuardAction(null)}
+        mode={mode}
+        onClose={() => {
+          setGuardAction(null);
+          setGuardTarget(null);
+        }}
         onSwitch={(next) => patchMode(next)}
+        targetCheckinId={guardTarget}
+        onAddFriend={addFriendByCheckin}
       />
       <button
         type="button"

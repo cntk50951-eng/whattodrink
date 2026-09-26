@@ -16,6 +16,7 @@ import {
 } from "@/lib/posts";
 import type { WallPost } from "@/lib/posts";
 import { useMyMode } from "@/hooks/useMyMode";
+import { useFriendRelation } from "@/hooks/useFriendRelation";
 import { ModePrompt } from "@/components/auth/ModePrompt";
 import type { GuardAction } from "@/components/auth/ModePrompt";
 import styles from "./wall.module.css";
@@ -152,6 +153,7 @@ export function PostDetail({ id }: { id: string }) {
   // UR A.16 隱身守衛（讚是寫操作，唯讀攔截彈引導）。
   const [guardAction, setGuardAction] = useState<GuardAction | null>(null);
   const { mode, patchMode } = useMyMode(true);
+  const { addFriendByCheckin } = useFriendRelation();
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -200,8 +202,11 @@ export function PostDetail({ id }: { id: string }) {
       <ModePrompt
         open={guardAction !== null}
         action={guardAction ?? "like"}
+        mode={mode}
         onClose={() => setGuardAction(null)}
         onSwitch={(next) => patchMode(next)}
+        targetCheckinId={id}
+        onAddFriend={addFriendByCheckin}
       />
       <div className="relative rounded-2xl border-2 bg-[#fdfdf8] p-3 pb-4 shadow-[3px_3px_0_var(--border)]">
         <div
