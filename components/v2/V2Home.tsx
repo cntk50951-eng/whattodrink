@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import {
   Camera,
+  ChevronLeft,
   ChevronRight,
   Clock,
   Dices,
@@ -34,7 +35,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMyMode } from "@/hooks/useMyMode";
 import { useFriendRelation } from "@/hooks/useFriendRelation";
@@ -956,9 +957,43 @@ export function V2Home() {
       >
         {/* UR C.3 round-2：portal 掛 body 逃出頁面 .v2scope，Sheet 根自帶 scope
             把淺色現代 token 帶進彈窗子樹（doodle 灌 html 的舊 token 蓋掉） */}
-        <SheetContent side="bottom" className={`${styles.v2scope} max-h-[70svh] gap-4 overflow-y-auto rounded-t-2xl p-4 sm:mx-auto sm:w-full sm:max-w-md`}>
+        <SheetContent side="bottom" showCloseButton={false} className={`${styles.v2scope} max-h-[70svh] gap-4 overflow-y-auto rounded-t-2xl p-4 sm:mx-auto sm:w-full sm:max-w-md`}>
           {/* UR C.3：抓手＋標準頭（Title 必備，無障礙＋去原生 h2） */}
           <div aria-hidden className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
+          {/* UR C.5 導航行：左返回（根段佔位保右 X 永遠右對齊）＋右 in-flow X；
+              默認角落 X 已關（showCloseButton={false}），Esc 照走 */}
+          <div className="flex items-center justify-between">
+            {pickStage === "batch" ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="px-1 text-muted-foreground"
+                onClick={() => setPickStage("cats")}
+              >
+                <ChevronLeft size={16} aria-hidden />
+                {t2("back")}
+              </Button>
+            ) : pickStage === "kinds" || pickStage === "login" ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="px-1 text-muted-foreground"
+                onClick={() => setPickStage(pickStage === "kinds" ? "batch" : "kinds")}
+              >
+                <ChevronLeft size={16} aria-hidden />
+                {t2("back")}
+              </Button>
+            ) : (
+              <span aria-hidden className="w-8" />
+            )}
+            <SheetClose
+              render={
+                <Button variant="ghost" size="icon-sm" aria-label={t("close")}>
+                  <X aria-hidden />
+                </Button>
+              }
+            />
+          </div>
           <SheetHeader className="text-left">
             <SheetTitle>{t("pickTitle")}</SheetTitle>
             <SheetDescription>
@@ -999,14 +1034,6 @@ export function V2Home() {
           )}
           {pickStage === "batch" && (
             <div className="flex flex-col gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="self-start px-1 text-muted-foreground"
-                onClick={() => setPickStage("cats")}
-              >
-                {t2("back")}
-              </Button>
               <div className="grid grid-cols-3 gap-2">
                 {batch.map((b) => (
                   <Card size="sm" key={b.id} className="overflow-hidden p-0">
@@ -1040,14 +1067,6 @@ export function V2Home() {
           )}
           {pickStage === "kinds" && kindBeer !== null && (
             <div className="flex flex-col gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="self-start px-1 text-muted-foreground"
-                onClick={() => setPickStage("batch")}
-              >
-                {t2("back")}
-              </Button>
               <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="outline"
