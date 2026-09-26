@@ -1097,11 +1097,13 @@ export function DrinkMap({
         });
       });
   }, []);
-  // 登录后（SIGNED_IN）即时回显 DB 历史，不等刷新
+  // 登录后即时回显 DB 历史（修复 DEF-20250925-001：登出重登录后不显示）
+  // 覆盖所有已登录事件（SIGNED_IN / INITIAL_SESSION / TOKEN_REFRESHED），并兼容 isAuthed 轮询
   useEffect(() => {
     const supabase = createClient();
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event !== "SIGNED_IN" || session === null) return;
+      if (session === null) return;
+      if (event !== "SIGNED_IN" && event !== "INITIAL_SESSION" && event !== "TOKEN_REFRESHED") return;
       void fetch("/api/v1/checkins/mine?limit=30", {
         cache: "no-store",
         credentials: "include",
@@ -1132,6 +1134,39 @@ export function DrinkMap({
     });
     return () => sub.subscription.unsubscribe();
   }, []);
+  // isAuthed 轮询兜底：SIGNED_IN 漏事件或 INITIAL_SESSION 首次为 null 时，isAuthed true 仍能回显
+  useEffect(() => {
+    if (isAuthed !== true) return;
+    void fetch("/api/v1/checkins/mine?limit=30", {
+      cache: "no-store",
+      credentials: "include",
+    })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const json = (await res.json()) as { checkins?: unknown };
+        const rows = Array.isArray(json.checkins) ? json.checkins : [];
+        const parsed: WantRecord[] = [];
+        for (const r of rows) {
+          const row = toMineRow(r);
+          if (row === null) continue;
+          const rec = mineRowToWantRecord(row);
+          if (rec === null) continue;
+          parsed.push(rec as WantRecord);
+        }
+        parsed.sort((a, b) => a.at - b.at);
+        if (parsed.length === 0) return;
+        const latest = parsed[parsed.length - 1] as WantRecord;
+        // 仅当本地为空或条数不一致时覆盖，避免重复 set 抖动
+        if (parsed.length !== wantHistoryRef.current.length) {
+          wantHistoryRef.current = parsed;
+          setWantHistory(parsed);
+          setWantRecord(latest);
+          setPicked(latest.beer);
+          setWantSaved(true);
+        }
+      })
+      .catch(() => {});
+  }, [isAuthed]);
 
   /* ---- UR1.8 fix: resolve the stored position to a place name ----
    * Stored names win (offline reuse, no network). Otherwise one lookup per

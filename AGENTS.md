@@ -105,3 +105,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - `.harness/` 即規範全文；`CLAUDE.md` 的硬規則（Step 10 確認提交、UI 需用戶親眼確認等）對 Muse 同樣生效。
 - 未經用戶確認不 `commit` / `push`；含 UI 變更先 `open http://localhost:3000/` 等用戶親眼確認。
+- **Defect 统一管理**：用户提出 defect 关键词时，先在 `docs/DEFECTS.md` 落条（`DEF-YYYYMMDD-001`）并按 `Open→Investigating→Fixing→Fixed→Verified→Closed` 流转，Fix 关联 UR 走完整 10 步；详见 `.harness/workflow.md` Step 7b（Muse/Claude 双 harness 同步）。

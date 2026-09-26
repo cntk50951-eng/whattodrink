@@ -21,6 +21,7 @@ export const USER_CACHE_KEYS = [
   WANT_STORAGE_KEY,
   WANT_HISTORY_KEY,
   "wtd-cheers-daily",
+  "wtd-pending-checkin",
 ] as const;
 
 export const LOGOUT_CLEAR_EVENT = "wtd:logout" as const;

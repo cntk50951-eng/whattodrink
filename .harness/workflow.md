@@ -86,6 +86,19 @@
 - 同一個錯修超過 2 次 → 該寫進 `.harness/`（成為規範）
 - 每次修正都是 **memory 候選**（見 step 8）
 
+### Step 7b · Defect 统一管理（用户提出 defect 时必经，Muse / Claude 双 harness 同步）
+
+> 单一真相文档：`docs/DEFECTS.md`。Muse 读取 `.harness/workflow.md`，Claude 读取 `.harness/workflow.md` + `.claude/skills/harness-workflow/SKILL.md`，两者均以此节为准；禁止把 defect 零散记在 memory / commit message / 临时 issue。
+
+- **触发关键词**：用户说「defect/缺陷/有 bug/不工作/出錯/壞了/失效」等，即视为 defect 上报，未在 `docs/DEFECTS.md` 落条不许进修复编码。
+- **落条时机**：收到上报的当轮对话内完成新增（先记录再排查），字段缺省可填 `待确认`，但 ID/标题/状态/日期/复现步骤不可空。
+- **固定字段**（按 `docs/DEFECTS.md` 模板）：
+  `ID`（`DEF-YYYYMMDD-001` 递增）、`标题`、`状态`（`Open → Investigating → Fixing → Fixed → Verified → Closed`）、`严重度`（`P0 阻断 / P1 主要 / P2 次要`）、`发现日期/报告人`、`复现步骤`、`期望 vs 实际`、`初判根因 / 确诊根因`、`关联 UR`、`修复验证`、`回归范围`
+- **流转**：`Open`（落条）→ `Investigating`（定位根因，回写确诊根因）→ `Fixing`（新建 Fix UR 或复用 `DEF-xxx` 作为 UR，走完整 10 步：该 UR 置 `[WIP]`，同样需 build/lint/test、浏览器验证、CHANGELOG、memory）→ `Fixed`（代码已合入 main）→ `Verified`（用户或自动化回归通过）→ `Closed`
+- **关联 UR**：每个 defect 必须关联一个 UR（新建 `fix/defect-xxx` 或复用现有 UR），该 UR 的 `*改動記錄*` 与 `CHANGELOG` 需回链 `DEF-xxx`，`docs/DEFECTS.md` 的 `关联 UR` 回链 UR 编号
+- **禁止**：跳过 `docs/DEFECTS.md` 直接修、把 defect 只记在 memory、私下口头约定“已修”而不在文档置 `Fixed/Verified`
+- **Muse / Claude 一致性**：`AGENTS.md` 的 Muse 映射与 `.claude/skills/harness-workflow/SKILL.md` 均镜像本节；改一处必同步另一处（见 `AGENTS.md` 末节）。
+
 ### 改動回寫 UR（硬性，用戶指令）
 
 用戶每次提出新改動（驗收返工／bug 修／需求追加）並完成後：
@@ -207,6 +220,7 @@ UI 全確定前不建表，但數據文檔（`docs/data/`）必須與前端同�
 □ Step 5 — build / lint / test 全綠（API 任務另檢 `.harness/api-workflow.md` 七步）
 □ Step 6 — UI 功能用瀏覽器實際點過
 □ Step 7 — 看到的錯都修了（root cause 不是 patch）、UR 改動記錄已回寫
+□ Step 7b — 缺陷已在 docs/DEFECTS.md 落条并按 Open→…→Closed 流转，Fix UR 走完整 10 步
 □ Step 8 — memory 有加（如有修正）
 □ Step 9 — CHANGELOG 更新
 □ Step 9b — 數據文檔檢查（有新增／改變數據就同步 `docs/data/`，無則 commit 留痕）

@@ -22,6 +22,7 @@ At the **start of every development task**, follow these steps strictly:
 - **UI changes**: after development, user MUST verify in browser before commit (Step 10a–10b)
 - **New lib / new version**: look up the latest API first via `web_search` + `web_fetch` (Step 3), never rely on training data
 - **Logic errors**: fix immediately, then re-run Step 3→7
+- **Defect 统一管理 (Step 7b)**: 用户提出 defect 关键词时，必须先在 `docs/DEFECTS.md` 按模板落条（ID/标题/状态/严重度/复现/期望-实际/根因/关联 UR）并走 `Open → Investigating → Fixing → Fixed → Verified → Closed` 流转；Fix 必须新建关联 UR 并走完整 10 步（同样需 gates/浏览器/CHANGELOG/memory），禁止跳过文档直接修
 - **UI design changes**: if Step 3.5 conditions hit (new page / redesign / tokens / animation), load the design skill first via `read_skill` (`stitch-design` / `design-taste-frontend` / `taste`) — brand layer (doodle) is locked, see `workflow.md`
 - **Every fix / user correction / toolchain issue**: write a memory entry (Step 8)
 
