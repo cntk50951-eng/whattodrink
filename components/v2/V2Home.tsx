@@ -16,7 +16,9 @@ import {
   LocateFixed,
   Map as MapIcon,
   MapPin,
+  RefreshCw,
   Sparkles,
+  Trash2,
   Users,
   Vibrate,
   X,
@@ -52,6 +54,8 @@ import {
   fetchBeers,
   pickNextBatch,
   pickRandomBatch,
+  pickSwapBatch,
+  resolveFreshBeer,
 } from "@/lib/beers";
 import type { Beer } from "@/lib/beers";
 import {
@@ -65,11 +69,15 @@ import { toMineRow, mineRowToWantRecord } from "@/lib/api/checkins";
 import type { PinJson } from "@/lib/api/pins";
 import {
   loadWantHistory,
+  removeWantAt,
   saveWantHistory,
+  swapWantBeer,
   upsertWantHistory,
+  formatWantCoords,
   formatWantTime,
 } from "@/lib/wantRecord";
 import type { WantRecord } from "@/lib/wantRecord";
+import { MOCK_ME } from "@/lib/me";
 import { trailStops } from "@/lib/trail";
 import { hasUnseenWall, loadWall, loadWallSeenAt } from "@/lib/posts";
 import { buzz, BUZZ_CHEERS, BUZZ_FOUND } from "@/lib/haptics";
@@ -78,7 +86,14 @@ import type { V2MapApi } from "./V2MapView";
 import { apiPinsToMarkers, mockToMarkers } from "./v2Pins";
 import styles from "./v2.module.css";
 
-/** v2 卡片正規形（api／mock／想喝三源歸一，卡片只認此形）。 */
+/** UR2.0 mock 性別標記文案 key（三態，數據源見 lib/me.ts；沿 v1 DrinkMap 同表）。 */
+const GENDER_KEY = {
+  male: "genderMale",
+  female: "genderFemale",
+  secret: "genderSecret",
+} as const;
+
+/** v2 卡片正規形（api／mock 兩源歸一，卡片只認此形）。 */
 type V2Card =
   | {
       kind: "other";
@@ -88,15 +103,6 @@ type V2Card =
       emoji: string;
       drink: string;
       online: boolean;
-      lat: number;
-      lng: number;
-    }
-  | {
-      kind: "want";
-      id: string;
-      title: string;
-      sub: string;
-      emoji: string;
       lat: number;
       lng: number;
     };
@@ -183,6 +189,12 @@ export function V2Home() {
   const [guard, setGuard] = useState<GuardState>(null);
   const [friendState, setFriendState] = useState<FriendState>("unknown");
   const [addState, setAddState] = useState<"idle" | "sent" | "accepted">("idle");
+
+  // UR C.4 自打卡底部 Sheet：按記錄 at 認正在看的條；換酒批／刪除確認隨層開關
+  const [wantSheetAt, setWantSheetAt] = useState<number | null>(null);
+  const [swapOpen, setSwapOpen] = useState(false);
+  const [swapBatch, setSwapBatch] = useState<Beer[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // 輕提示（添加好友佔位／搖一搖空結果），定時自散，卸載清場
   const [note, setNote] = useState<string | null>(null);
@@ -282,12 +294,20 @@ export function V2Home() {
   );
   const wants = useMemo(
     () =>
-      wantHistory.map((w) => ({
-        id: `want-${w.at}`,
-        lat: w.position.lat,
-        lng: w.position.lng,
-        emoji: w.beer.emoji,
-      })),
+      // UR C.4：釘圖與 Sheet 同源（resolveFreshBeer 目錄取新，換酒即換釘圖）
+      wantHistory.map((w) => {
+        const fresh = resolveFreshBeer(w.beer);
+        return {
+          id: `want-${w.at}`,
+          lat: w.position.lat,
+          lng: w.position.lng,
+          emoji: fresh.emoji,
+          iconUrl:
+            fresh.icon_url !== undefined && fresh.icon_url !== null && fresh.icon_url !== ""
+              ? fresh.icon_url
+              : null,
+        };
+      }),
     [wantHistory],
   );
   const trail = useMemo(
@@ -304,7 +324,7 @@ export function V2Home() {
   );
   const wantMarkers = useMemo(
     () =>
-      wants.map((w) => ({ id: w.id, lat: w.lat, lng: w.lng, emoji: w.emoji })),
+      wants.map((w) => ({ id: w.id, lat: w.lat, lng: w.lng, emoji: w.emoji, iconUrl: w.iconUrl })),
     [wants],
   );
   const selfPos: LatLng | null =
@@ -347,20 +367,69 @@ export function V2Home() {
     }
   }
 
+  // UR C.4：自家想喝釘改開底部 Sheet（浮動卡只留他人 kind）。
   function openWant(id: string): void {
     const at = Number(id.replace("want-", ""));
     const rec = wantHistory.find((w) => w.at === at);
     if (rec === undefined) return;
-    setCard({
-      kind: "want",
-      id,
-      title: rec.beer.name,
-      sub: formatWantTime(rec.at, locale),
-      emoji: rec.beer.emoji,
-      lat: rec.position.lat,
-      lng: rec.position.lng,
-    });
+    setSwapOpen(false);
+    setSwapBatch([]);
+    setConfirmDelete(false);
+    setWantSheetAt(at);
     mapApi.current?.flyTo(rec.position);
+  }
+
+  /* ---- UR C.4 自打卡可編輯（沿 v1 UR3.7／UR3.9 配方） ----
+   * 換酒：只換 beer（at／位置／地名不动，pin 不挪位）；候選是同類批次
+   * （`pickSwapBatch`，當前除外），點格即換。持久化：離線記錄（無 DB id）
+   * 寫本地；已登入走 session 即時換（無改酒端點，server 換酒另開 UR）。 */
+  function handleSwapToggle(): void {
+    if (wantSheetAt === null) return;
+    if (swapOpen) {
+      setSwapOpen(false);
+      return;
+    }
+    const rec = wantHistory.find((w) => w.at === wantSheetAt);
+    if (rec === undefined) return;
+    setSwapBatch(pickSwapBatch(resolveFreshBeer(rec.beer), 6));
+    setSwapOpen(true);
+  }
+  function handleSwapRefresh(): void {
+    if (wantSheetAt === null || !swapOpen) return;
+    const rec = wantHistory.find((w) => w.at === wantSheetAt);
+    if (rec === undefined) return;
+    const fresh = resolveFreshBeer(rec.beer);
+    const prevKey = swapBatch.map((b) => b.id).join(",");
+    let next = pickSwapBatch(fresh, 6);
+    for (
+      let i = 0;
+      i < 3 && next.map((b) => b.id).join(",") === prevKey && next.length > 1;
+      i += 1
+    ) {
+      next = pickSwapBatch(fresh, 6);
+    }
+    setSwapBatch(next);
+  }
+  function handleSwapTo(beer: Beer): void {
+    if (wantSheetAt === null) return;
+    const at = wantSheetAt;
+    const next = swapWantBeer(wantHistory, at, beer);
+    setWantHistory(next);
+    const rec = next.find((w) => w.at === at);
+    // 離線記錄才寫本地（沿 A.10：登入以 DB 為準，session 即時換）
+    if (rec !== undefined && rec.id === undefined) saveWantHistory(next);
+    setSwapOpen(false);
+  }
+  function handleDeleteWant(): void {
+    if (wantSheetAt === null) return;
+    const at = wantSheetAt;
+    const doomed = wantHistory.find((w) => w.at === at);
+    const next = removeWantAt(wantHistory, at);
+    setWantHistory(next);
+    if (doomed !== undefined && doomed.id === undefined) saveWantHistory(next);
+    setConfirmDelete(false);
+    setSwapOpen(false);
+    setWantSheetAt(null);
   }
 
   function handleCheers(id: string): void {
@@ -792,9 +861,6 @@ export function V2Home() {
                 </span>
               </>
             )}
-            {card.kind === "want" && (
-              <span className="text-sm text-muted-foreground">{card.sub}</span>
-            )}
           </CardContent>
         </Card>
       )}
@@ -1068,6 +1134,132 @@ export function V2Home() {
                 </div>
               );
             })()}
+        </SheetContent>
+      </Sheet>
+
+      {/* UR C.4 自打卡底部 Sheet（snapshot 式：品牌圖＋用戶資訊＋換酒＋刪除＋圖片佔位槽） */}
+      <Sheet
+        open={wantSheetAt !== null}
+        onOpenChange={(v) => {
+          if (v) return;
+          setWantSheetAt(null);
+          setSwapOpen(false);
+          setConfirmDelete(false);
+        }}
+      >
+        <SheetContent side="bottom" className={`${styles.v2scope} max-h-[85svh] gap-4 overflow-y-auto rounded-t-2xl p-4 sm:mx-auto sm:w-full sm:max-w-md`}>
+          {(() => {
+            const rec =
+              wantSheetAt === null
+                ? undefined
+                : wantHistory.find((w) => w.at === wantSheetAt);
+            if (rec === undefined) return null;
+            // DEF-014：渲染前對活目錄取新（DB 回退行按 beer_id 恢復正名正圖）
+            const fresh = resolveFreshBeer(rec.beer);
+            const dist =
+              selfPos !== null
+                ? formatDistance(haversineMeters(selfPos, rec.position))
+                : null;
+            return (
+              <>
+                <div aria-hidden className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
+                <SheetHeader className="text-left">
+                  <SheetTitle className="flex flex-wrap items-center gap-1.5">
+                    {t("wantTitle")}
+                    <Badge variant="outline">{t(GENDER_KEY[MOCK_ME.gender])}</Badge>
+                    <Badge variant="secondary">{modeLabel}</Badge>
+                  </SheetTitle>
+                  <SheetDescription>{formatWantTime(rec.at, locale)}</SheetDescription>
+                </SheetHeader>
+                <div className="flex items-center gap-3">
+                  <span className="w-24 shrink-0 overflow-hidden rounded-xl border bg-card">
+                    <BeerImg key={fresh.id} beer={fresh} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-bold">{fresh.name}</p>
+                    <p className="flex flex-wrap items-center gap-1.5 pt-1.5 text-sm text-muted-foreground">
+                      <span aria-hidden className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-sm">
+                        {MOCK_ME.avatarEmoji}
+                      </span>
+                      {t("you")}
+                      {rec.kind !== undefined && (
+                        <Badge variant="outline">
+                          {rec.kind === "flash" ? t2("flashTitle") : t2("postTitle")}
+                        </Badge>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5 text-sm">
+                  <span className="flex items-center gap-1.5">
+                    <MapPin size={15} aria-hidden />
+                    {rec.placeName ?? formatWantCoords(rec.position)}
+                  </span>
+                  {dist !== null && (
+                    <span className="flex items-center gap-1.5">
+                      <Footprints size={15} aria-hidden />
+                      {dist}
+                    </span>
+                  )}
+                  <span className="text-xs text-muted-foreground">{t("wantFrozenNote")}</span>
+                </div>
+                {/* 未來快拍入口佔位（純展示，不發請求） */}
+                <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                  <Camera size={16} aria-hidden />
+                  {t2("wantPhotoSoon")}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={handleSwapToggle}>
+                    <Dices size={15} aria-hidden />
+                    {t("swapBeer")}
+                  </Button>
+                  {confirmDelete ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-destructive text-destructive"
+                      onClick={handleDeleteWant}
+                    >
+                      <Trash2 size={15} aria-hidden />
+                      {t("confirmDelete")}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground"
+                      onClick={() => setConfirmDelete(true)}
+                    >
+                      <Trash2 size={15} aria-hidden />
+                      {t("deleteEntry")}
+                    </Button>
+                  )}
+                </div>
+                {swapOpen && (
+                  <div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {swapBatch.map((b) => (
+                        <Card size="sm" key={b.id} className="overflow-hidden p-0">
+                          <Button
+                            variant="ghost"
+                            onClick={() => handleSwapTo(b)}
+                            className="flex h-auto w-full flex-col items-center gap-1 rounded-none p-2"
+                          >
+                            <BeerImg beer={b} />
+                            <span className="w-full truncate text-center text-xs font-medium">{b.name}</span>
+                          </Button>
+                        </Card>
+                      ))}
+                    </div>
+                    <Button variant="outline" size="sm" className="mt-2 w-full" onClick={handleSwapRefresh}>
+                      <RefreshCw size={15} aria-hidden />
+                      {t("pickNextBatch")}
+                    </Button>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </SheetContent>
       </Sheet>
     </div>

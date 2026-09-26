@@ -315,7 +315,8 @@
     "flashDesc": "Disappears after 24 hours",
     "postTitle": "Post · stays",
     "postDesc": "Stays until you delete it",
-    "back": "Back"
+    "back": "Back",
+    "wantPhotoSoon": "Photos coming soon — note this one down in words for now"
   },
   "terms": {
     "title": "Three modes, which one?",

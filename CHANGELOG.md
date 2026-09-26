@@ -39,6 +39,7 @@
   - **UR C.1 v2 首頁（Snap Map 式）[✓，用户已验收，merged]**
   - **UR C.2 v2 模式選擇顯性化 [✓，用户已验收，merged]**：Popover退役，常駐圖標＋文字pill＋inline三檔直切（選後自動收／再點收；匿名走登入）；零新key；三閘241綠／lint 0 error／build 39頁
   - **UR C.3 選酒弹窗 shadcn 化＋去 v1 味 [✓，用户已验收，merged]**：Header／Title／抓手／skeleton淡入／返回鍵／L1列表行文字主導；零原生h2／button（grep驗）；v2.back×3 parity PASS；round-2 配色根因 portal 逃 scope，Sheet 根自帶 v2scope＋sm 居中窄欄＋圓角芯片；三閘241綠／lint 0 error／build 39頁
+  - **UR C.4 v2 自打卡底部 Sheet（換酒＋品牌圖＋用戶資訊）[✓，用户已验收，merged]**：want 釘改開底部 Sheet（浮動卡只留他人；自帶 v2scope＋sm 窄欄）；`lib/beers.ts` 加法 `resolveFreshBeer`（按 id 對活目錄取新，4 單測）＋主角位 BeerImg（DEF-014）；換酒批／點格即換／兩段刪全搬（DEF-013，共用純函數只讀調用；離線寫本地／登入走 session）；用戶行（頭像佔位＋你＋性別＋模式）＋距你 km 前端實算＋圖片虛線佔位槽；round-2 地圖釘圖（有圖白底琥珀環，escAttr＋http(s) 限）；新 key 僅 v2.wantPhotoSoon×3 parity PASS；三閘245綠／lint 0 error／build 39頁
   - fix DEF-20260926-010（render-Link補nativeButton＋v2noscroll hashed；三閘綠，待复驗）
   - fix DEF-20260926-011（v2scope淺色現代覆蓋，globals零動；三閘綠，待复驗）
   - fix DEF-20260926-012 返工（疊加層全z-1000＋根isolate；fixed全屏無footer；Avatar工具鏈裝不上改現成件；三閘綠，待复驗）

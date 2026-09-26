@@ -32,6 +32,8 @@ export type V2WantMarker = {
   lat: number;
   lng: number;
   emoji: string;
+  /** UR C.4：品牌圖 URL（有則釘上顯示品牌圖，無則琥珀底 emoji 回退）。 */
+  iconUrl: string | null;
 };
 
 export type V2TrailMarker = {
@@ -60,6 +62,11 @@ type V2MapViewProps = {
 /** HTML 转义（divIcon  innerHTML 拼昵称首字用，用户内容不可信）。 */
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** 屬性轉義（esc 再加引號；URL 另限 http(s)  scheme，見下）。 */
+function escAttr(s: string): string {
+  return esc(s).replace(/"/g, "&quot;");
 }
 
 /**
@@ -232,12 +239,16 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       badge.addTo(layer);
     }
 
-    // 我的想喝釘（琥珀實心，可點回看）
+    // 我的想喝釘（有品牌圖上圖＋琥珀環保身份，無圖沿舊琥珀實心 emoji）
     for (const w of wants) {
+      const img =
+        w.iconUrl !== null && /^https?:\/\//.test(w.iconUrl)
+          ? `<div class="${styles.v2pinWantImg}"><img src="${escAttr(w.iconUrl)}" alt="" loading="lazy" /></div>`
+          : `<div class="${styles.v2pinWant}">${esc(w.emoji)}</div>`;
       const marker = L.marker([w.lat, w.lng], {
         icon: L.divIcon({
           className: "",
-          html: `<div class="${styles.v2pinWant}">${esc(w.emoji)}</div>`,
+          html: img,
           iconSize: [40, 40],
           iconAnchor: [20, 20],
         }),
