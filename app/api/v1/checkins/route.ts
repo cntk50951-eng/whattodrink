@@ -30,6 +30,27 @@ export async function POST(req: Request): Promise<Response> {
   const { beer_id, lat, lng, place_name, kind } = parsed.body;
 
   try {
+    // 防御：若 public.users 缺行（0006 触发器未执行或旧库），先补行再落库，避免 FK 23503
+    try {
+      const { data: ensured } = await supabase.from("users").select("id").eq("id", userId).maybeSingle();
+      if (ensured === null) {
+        // 尝试从 auth 取昵称/头像，失败则兜底
+        let nickname = "酒友";
+        let avatar: string | null = null;
+        try {
+          const { data: u } = await supabase.auth.getUser();
+          const meta = (u.user?.user_metadata ?? {}) as Record<string, unknown>;
+          const cand =
+            (typeof meta.full_name === "string" && meta.full_name) ||
+            (typeof meta.name === "string" && meta.name) ||
+            (typeof u.user?.email === "string" ? u.user.email.split("@")[0] : null);
+          if (typeof cand === "string" && cand.trim().length > 0) nickname = cand.trim().slice(0, 32);
+          if (typeof meta.avatar_url === "string") avatar = meta.avatar_url;
+          else if (typeof meta.picture === "string") avatar = meta.picture;
+        } catch {}
+        await supabase.from("users").insert({ id: userId, nickname, avatar_url: avatar, gender: "secret" });
+      }
+    } catch {}
     // 取用戶模式派生 visibility；隱身直接 403（A.12 模式權限）。0007 未遷移時 users.mode 缺列，按 public 回退
     let mode: string = "public";
     try {
