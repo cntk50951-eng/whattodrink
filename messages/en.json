@@ -314,7 +314,8 @@
     "flashTitle": "Flash · 24h",
     "flashDesc": "Disappears after 24 hours",
     "postTitle": "Post · stays",
-    "postDesc": "Stays until you delete it"
+    "postDesc": "Stays until you delete it",
+    "back": "Back"
   },
   "terms": {
     "title": "Three modes, which one?",

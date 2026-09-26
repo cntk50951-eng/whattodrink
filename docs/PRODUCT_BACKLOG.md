@@ -1923,6 +1923,33 @@ v1 有常駐模式 pill＋城市卡三檔切換器，v2 只有右上無字圖標
 - 2026-09-26：建檔置 []（用戶指令補 v2 模式選擇；v1 pill 教訓（DEF-001）寫入範圍；待開工指令）
 - 2026-09-26：開工置 [WIP]＋實現完待驗（Popover退役改常駐pill＋inline三檔＋匿名登入；零新key；241綠／lint 0 error／build 39頁；待用戶瀏覽器驗收）
 - 2026-09-26：用戶驗收通過（首屏可見＋切換落庫），置 [✓]；隨本 commit 合 main
+
+---
+
+UR C.3　選酒弹窗 shadcn 化＋去 v1 味（Header／skeleton／返回／列表行）[✓]
+
+選酒 Sheet 的殼是 shadcn `Sheet`，但內容仍是舊版手排：原生 `h2` 標題（Dialog 無障礙缺 Title）、無 drag handle、圖片裸 `<img>`（加載白閃）、kinds 階段無返回鍵。本 UR 把弹窗內裝全換成 shadcn 件，不動選酒邏輯。
+
+### 範圍
+1. `SheetHeader`＋`SheetTitle`＋`SheetDescription`（選酒三段各配標題＋步驟提示；守衛 Sheet 同理；現成件，已在倉）
+2. Drag handle（頂部小抓手，裝飾 div；shadcn Sheet 無內建，不算手搓組件）
+3. 圖片 skeleton：`animate-pulse` 佔位＋`onLoad` 淡入＋壞圖回 emoji（純 Tailwind，不裝 Skeleton——npx 本機不通，另議）
+4. 返回鍵：batch 頭加回退（kinds→batch 亦加；沿用 ghost Button）；空批次不出現（`pickRandomBatch` 永不空，寫死不防禦）
+5. 節奏統一：段間 `gap-4`、內容 `p-4`，與 guard Sheet 對齊
+6. 去 v1 味（用戶返工追加）：L1 改單列列表行（文字主導＋小圖標＋右箭頭，emoji 退居圖標格）；L2 卡統一起幅（正方圖區＋名一行）；copy 不動，只動排版層級
+
+### 非目標
+- 新 shadcn 安裝（ScrollArea／Skeleton 等 npx 通了再議）、選酒邏輯改動（L1／L2／雙鈕／落庫原樣）、v1 任何文件、共用層行為改動
+
+### AC
+- Sheet 內零原生 `h2`／手搓 button（grep 驗）；每段有 Title（無障礙樹可查）
+- 弱網下圖片先 skeleton 後淡入（節流驗）；三段來回導航無死胡同
+- 新 key 僅 `v2.back` 一個（×3 語）；三閘全綠；v1 回歸無變化
+
+*改動記錄*
+- 2026-09-26：建檔置 []（用戶指令選酒弹窗 shadcn 化；npx 不通故 Skeleton／ScrollArea 排除；待開工指令）
+- 2026-09-26：開工置 [WIP]＋用戶追加工去 v1 味；實現完待驗（Header／Title／抓手／skeleton／返回／列表行去emoji主導；241綠／lint 0 error／build 39頁；v2.back×3 parity PASS；待用戶瀏覽器驗收）
+- 2026-09-26 round-2（配色）：根因 portal 逃出 .v2scope 吃 doodle 舊 token；修 Sheet 根自帶 scope＋sm 居中窄欄＋圓角芯片統一；三閘重綠；用戶瀏覽器驗收通過，置 [✓] 合入 main
 - 候選面（暫存）：BottomNav＋卡片試點、地圖原生 skin、列表頁 shadcn 化——正式範圍以用戶指令為準，不預支。
 
 *改動記錄*

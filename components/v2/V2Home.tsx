@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import {
   Camera,
+  ChevronRight,
   Clock,
   Dices,
   Expand,
@@ -31,8 +32,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
-
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMyMode } from "@/hooks/useMyMode";
 import { useFriendRelation } from "@/hooks/useFriendRelation";
@@ -107,6 +107,39 @@ type GuardState = {
 } | null;
 
 type FriendState = "unknown" | "checking" | "friend" | "nonfriend";
+
+/**
+ * UR C.3：品牌圖 skeleton（animate-pulse 佔位＋onLoad 淡入＋壞圖回 emoji）。
+ * 純 Tailwind，無新依賴（Skeleton 裝不上，見 C.3）。模塊級組件，state 獨立。
+ */
+function BeerImg({ beer }: { beer: Beer }) {
+  const [loaded, setLoaded] = useState(false);
+  const [broken, setBroken] = useState(false);
+  const src = beer.icon_url ?? null;
+  if (src === null || src === "" || broken) {
+    return (
+      <span aria-hidden className="flex aspect-square w-full items-center justify-center text-3xl">
+        {beer.emoji}
+      </span>
+    );
+  }
+  return (
+    <span className="relative flex aspect-square w-full items-center justify-center">
+      {!loaded && (
+        <span aria-hidden className="absolute inset-0 animate-pulse rounded-md bg-muted" />
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        onLoad={() => setLoaded(true)}
+        onError={() => setBroken(true)}
+        className={`h-full w-full object-contain transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+      />
+    </span>
+  );
+}
 
 /**
  * UR C.1 v2 首頁（Snap Map 式）：全屏原生地圖＋頂欄＋橫滑 pills＋
@@ -834,29 +867,59 @@ export function V2Home() {
           }
         }}
       >
-        <SheetContent side="bottom" className="max-h-[70svh] overflow-y-auto rounded-t-2xl">
-          <h2 className="text-lg font-bold">{t("pickTitle")}</h2>
+        {/* UR C.3 round-2：portal 掛 body 逃出頁面 .v2scope，Sheet 根自帶 scope
+            把淺色現代 token 帶進彈窗子樹（doodle 灌 html 的舊 token 蓋掉） */}
+        <SheetContent side="bottom" className={`${styles.v2scope} max-h-[70svh] gap-4 overflow-y-auto rounded-t-2xl p-4 sm:mx-auto sm:w-full sm:max-w-md`}>
+          {/* UR C.3：抓手＋標準頭（Title 必備，無障礙＋去原生 h2） */}
+          <div aria-hidden className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
+          <SheetHeader className="text-left">
+            <SheetTitle>{t("pickTitle")}</SheetTitle>
+            <SheetDescription>
+              {pickStage === "cats"
+                ? t("pickCategoriesTitle")
+                : pickStage === "batch"
+                  ? (BEER_CATEGORIES.find((c) => c.id === laneId)?.labelKey !== undefined
+                      ? t(BEER_CATEGORIES.find((c) => c.id === laneId)?.labelKey as string)
+                      : "")
+                  : pickStage === "kinds" && kindBeer !== null
+                    ? kindBeer.name
+                    : ""}
+            </SheetDescription>
+          </SheetHeader>
           {pickStage === "cats" && (
-            <div className="grid grid-cols-2 gap-2 pt-2">
+            <div className="flex flex-col gap-2">
               {BEER_CATEGORIES.map((c) => (
                 <Button
                   key={c.id}
                   variant="outline"
-                  className="h-auto justify-start gap-2 p-3"
+                  className="h-auto justify-between rounded-xl p-3"
                   onClick={() => {
                     setLaneId(c.id);
                     setBatch(pickRandomBatch(c.id, 6));
                     setPickStage("batch");
                   }}
                 >
-                  <span aria-hidden className="text-2xl">{c.emoji}</span>
-                  <span className="text-sm font-bold">{t(c.labelKey)}</span>
+                  <span className="flex items-center gap-3">
+                    <span aria-hidden className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-xl">
+                      {c.emoji}
+                    </span>
+                    <span className="text-sm font-bold">{t(c.labelKey)}</span>
+                  </span>
+                  <ChevronRight size={16} aria-hidden className="text-muted-foreground" />
                 </Button>
               ))}
             </div>
           )}
           {pickStage === "batch" && (
-            <div className="pt-2">
+            <div className="flex flex-col gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="self-start px-1 text-muted-foreground"
+                onClick={() => setPickStage("cats")}
+              >
+                {t2("back")}
+              </Button>
               <div className="grid grid-cols-3 gap-2">
                 {batch.map((b) => (
                   <Card size="sm" key={b.id} className="overflow-hidden p-0">
@@ -868,13 +931,8 @@ export function V2Home() {
                       }}
                       className="flex h-auto w-full flex-col items-center gap-1 rounded-none p-2"
                     >
-                      {b.icon_url !== null && b.icon_url !== undefined && b.icon_url !== "" ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={b.icon_url} alt="" loading="lazy" className="h-12 w-auto object-contain" />
-                      ) : (
-                        <span aria-hidden className="text-3xl">{b.emoji}</span>
-                      )}
-                    <span className="w-full truncate text-center text-xs font-medium">{b.name}</span>
+                      <BeerImg beer={b} />
+                      <span className="w-full truncate text-center text-xs font-medium">{b.name}</span>
                     </Button>
                   </Card>
                 ))}
@@ -894,29 +952,43 @@ export function V2Home() {
             </div>
           )}
           {pickStage === "kinds" && kindBeer !== null && (
-            <div className="grid grid-cols-2 gap-2 pt-2">
+            <div className="flex flex-col gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="self-start px-1 text-muted-foreground"
+                onClick={() => setPickStage("batch")}
+              >
+                {t2("back")}
+              </Button>
+              <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="outline"
-                className="h-auto flex-col items-start gap-1 p-3"
+                className="h-auto flex-col items-start gap-2 rounded-xl p-3"
                 onClick={() => dropWant(kindBeer, "flash")}
               >
-                <span className="flex items-center gap-1 font-bold">
-                  <Clock size={15} aria-hidden />
+                <span className="flex items-center gap-2 font-bold">
+                  <span aria-hidden className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+                    <Clock size={15} />
+                  </span>
                   {t2("flashTitle")}
                 </span>
                 <span className="text-xs font-normal text-muted-foreground">{t2("flashDesc")}</span>
               </Button>
               <Button
                 variant="outline"
-                className="h-auto flex-col items-start gap-1 p-3"
+                className="h-auto flex-col items-start gap-2 rounded-xl p-3"
                 onClick={() => dropWant(kindBeer, "post")}
               >
-                <span className="flex items-center gap-1 font-bold">
-                  <MapPin size={15} aria-hidden />
+                <span className="flex items-center gap-2 font-bold">
+                  <span aria-hidden className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+                    <MapPin size={15} />
+                  </span>
                   {t2("postTitle")}
                 </span>
                 <span className="text-xs font-normal opacity-90">{t2("postDesc")}</span>
               </Button>
+              </div>
             </div>
           )}
           {pickStage === "login" && (
@@ -931,7 +1003,7 @@ export function V2Home() {
       {/* 守衛 Sheet（矩陣：stealth 雙鈕／加鈕；friends 非好友公開＋加鈕；
           公開邀約非好友僅加鈕（加完即發）；乾杯除隱身直過不開層） */}
       <Sheet open={guard !== null} onOpenChange={(v) => !v && setGuard(null)}>
-        <SheetContent side="bottom" className="rounded-t-2xl">
+        <SheetContent side="bottom" className={`${styles.v2scope} rounded-t-2xl sm:mx-auto sm:w-full sm:max-w-md`}>
           {guard !== null &&
             (() => {
               const showPublic = mode === "stealth" || mode === "friends";
@@ -941,14 +1013,17 @@ export function V2Home() {
               const fallback = !showPublic && !showFriends && !showAdd;
               return (
                 <div className="flex flex-col gap-3">
-                  <h2 className="text-lg font-bold">
-                    {mode === "friends" ? tm("guardTitleFriend") : tm("guardTitle")}
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {mode === "friends"
-                      ? tm("guardBodyFriend", { action: tm(guardActKey) })
-                      : tm("guardBody", { action: tm(guardActKey) })}
-                  </p>
+                  <div aria-hidden className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
+                  <SheetHeader className="text-left">
+                    <SheetTitle>
+                      {mode === "friends" ? tm("guardTitleFriend") : tm("guardTitle")}
+                    </SheetTitle>
+                    <SheetDescription>
+                      {mode === "friends"
+                        ? tm("guardBodyFriend", { action: tm(guardActKey) })
+                        : tm("guardBody", { action: tm(guardActKey) })}
+                    </SheetDescription>
+                  </SheetHeader>
                   <div
                     className={`grid gap-2 ${showFriends || fallback ? "grid-cols-2" : "grid-cols-1"}`}
                   >
