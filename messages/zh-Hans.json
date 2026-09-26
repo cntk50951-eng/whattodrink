@@ -314,7 +314,8 @@
     "flashTitle": "快贴 · 24h",
     "flashDesc": "24 小时后自动消失",
     "postTitle": "帖子 · 永久",
-    "postDesc": "永久保留，直到你删除"
+    "postDesc": "永久保留，直到你删除",
+    "back": "返回"
   },
   "terms": {
     "title": "三种模式，怎么选？",
