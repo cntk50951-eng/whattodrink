@@ -1,6 +1,8 @@
 - [URC 1.0 toolbar absolute 跳出 flex 流](2026-09-13-urc1-toolbar-flex.md) — flex 容器的子別用 absolute，會跳脫 gap/堆疊，導致重疊
 - [URC 1.2 A3 Link no-op bug](2026-09-17-urc12-a3-link-noop.md) — 同頁 action 用 `<button onClick>` 而非 `<Link>`，Next.js 同 href no-op + latch 會卡住
+- [pull 後驗內容](2026-09-25-pull-overwrites-siblings.md) — merge 衝突解決時 hunk 可能被 drop，commit graph 在但內容不在
 - [Commit 後不主動起 server](2026-09-13-no-vercel-publish-after-commit.md) — commit+push 後報備就停，等用戶指令才起 server
+- [workflow 預設跳過自動測試](2026-09-26-default-skip-auto-tests.md) — 成本考量：build/lint/test 預設不跑，瀏覽器測試作者手動
 - [UR A.5 換一批 bug 教訓](2026-09-10-ura5-next-batch.md) — 先問清用戶看到的具體名字再定分支，省三輪推理
 - [UR4.0 拆正名](2026-09-09-ur40-split.md) — raw 多輪返工收編為獨立 UR，零代碼改動純文檔正名
 - [UR4.1 互動榜推倒重來](2026-09-09-ur41-board-inmap-crash-icons.md) — 推倒重做的設計要直接砍原段不留合併殘留

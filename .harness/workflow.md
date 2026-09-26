@@ -59,19 +59,25 @@
 - Server Component by default；只在需要 state/effect/event 才 `"use client"`
 - 重要 decision 在程式碼旁寫 comment（為什麼這樣選）
 
-## Step 5 · 編譯驗證 + 單元測試
+## Step 5 · 編譯驗證 + 單元測試（**預設跳過**，省 token）
 
-- `npm run build` — 編譯 + TypeScript 型別檢查
+> 用戶偏好（成本考量）：自動測試**預設不跑**，改由作者手動驗證（Step 10）。
+> 此步驟只在**作者明確要求**或**高風險改動**（型別、API 契約、核心邏輯）時執行。
+
+- `npm run build` — 編譯 + TypeScript 型別檢查（最常用，型別錯誤會在 build 暴露）
 - `npm test` — vitest（如已裝）；純函數 / 邏輯分支必測
 - `npm run lint` — ESLint 無 error
-- **三道 gate 全綠才能進 step 6**
-- API 開發另走 `.harness/api-workflow.md` 七步（一次一個端點，不打包）
+- **三道 gate 全綠才能進 step 6**（如跑）
+- API 開發另走 `.harness/api-workflow.md` 七步（一次一個端點，不打包）；API 路徑**建議**跑 test，因型別契約難靠手動驗
 
-## Step 6 · 瀏覽器測試（具體功能時）
+## Step 6 · 瀏覽器測試（**預設由作者手動**，省 token）
 
-- 涉及**具體 UI 功能**（互動、表單、動畫、狀態變化）時，用 Playwright 或瀏覽器 MCP 開瀏覽器實際點
+> 用戶偏好（成本考量）：瀏覽器測試**預設由作者本人**啟動本地 server 並親眼操作驗證。
+> AI 不主動起 dev server、不主動用 Playwright 截圖「代替」作者看。
+
+- 涉及**具體 UI 功能**（互動、表單、動畫、狀態變化）時，**作者本人**啟動 `npm run dev` 在瀏覽器實際點
 - 純 layout / 靜態頁面可以靠 `npm run build` 通過就算
-- 截圖記錄視覺對不對
+- AI 工具（Playwright MCP）僅在**作者明確要求**「幫我看看」或**debug 特定 bug** 時用
 - 之後做 app（React Native / Flutter）時再想測試方法，目前先 web
 
 ## Step 7 · 發現與修正
@@ -144,7 +150,7 @@ UI 全確定前不建表，但數據文檔（`docs/data/`）必須與前端同�
 
 完工回覆（驗收請求／交付總結）必須逐項報備，報不清＝沒做完：
 
-1. **gate 结果**：build／lint／test 各自全綠或失敗原因（貼數字，不說“通過了”）
+1. **gate 结果**：build／lint／test 各自全綠或失敗原因（**預設跳過**：如未跑，註明「gate 跳過，按用戶偏好由作者手動驗證」；如跑則貼數字，不說“通過了”）
 2. **memory**：新增哪篇（文件名），沒新增就說為什麼沒新增
 3. **CHANGELOG**：寫了哪幾行
 4. **9b**：同步了哪幾個文件／哪幾行，或“零新增、無需更新”
@@ -156,18 +162,13 @@ UI 全確定前不建表，但數據文檔（`docs/data/`）必須與前端同�
 ## Step 10 · 用戶視覺確認 + 提交
 
 > 任何**含 UI 變更**的開發完成後，必須先用本地瀏覽器讓用戶親眼確認，才進 commit 流程。
+> **AI 不主動起 dev server**（除非作者明確要求「幫我跑」），由作者本人 `npm run dev` 啟動驗證。
 
-### 10a. 啟動本地瀏覽器
+### 10a. 作者啟動本地瀏覽器（AI 不做）
 
-- 確保 dev server 跑著（`npm run dev` 在背景）
-- 用 macOS `open` 指令或提供 URL 給用戶開啟
-  ```bash
-  open http://localhost:3000/
-  ```
-- 提供 network URL（同網段手機可測響應式）：
-  ```
-  http://<lan-ip>:3000/
-  ```
+- 作者本人啟動 dev server：`npm run dev`（背景跑）
+- 用 macOS `open` 指令或瀏覽器手動開啟 `http://localhost:3000/`
+- 提供 network URL（同網段手機可測響應式）：`http://<lan-ip>:3000/`
 - **不要**用 vision tool 自動看截圖就當用戶已確認 — vision 看的不等於人眼
 
 ### 10b. 等用戶反饋
@@ -212,27 +213,32 @@ UI 全確定前不建表，但數據文檔（`docs/data/`）必須與前端同�
 
 ## 快速 checklist（每個任務結束前自查）
 
+> **預設**：Step 5 / 6 / 10 的「瀏覽器測試」**跳過 AI 自動執行**（省 token），由作者手動驗證。
+> 下列項目只在**作者明確要求**或**高風險改動**時勾。
+
 ```
 □ Step 1 — 需求有寫下來、AC 列了、UR 狀態 tag 對（無→`[]`，開工→`[WIP]`）、記憶回顧已報備
 □ Step 2 — 疑慮有問完、思考摘要已輸出（≥2 路徑＋取捨＋否決理由）
 □ Step 3 — API 查過最新版本
 □ Step 4 — coding-standards 對齊
-□ Step 5 — build / lint / test 全綠（API 任務另檢 `.harness/api-workflow.md` 七步）
-□ Step 6 — UI 功能用瀏覽器實際點過
+□ Step 5 — build / lint / test 全綠（**預設跳過**，如跑則全綠才能進 step 6；API 任務另檢 `.harness/api-workflow.md` 七步）
+□ Step 6 — UI 功能由作者瀏覽器實際點過（AI 不代做）
 □ Step 7 — 看到的錯都修了（root cause 不是 patch）、UR 改動記錄已回寫
 □ Step 7b — 缺陷已在 docs/DEFECTS.md 落条并按 Open→…→Closed 流转，Fix UR 走完整 10 步
 □ Step 8 — memory 有加（如有修正）
 □ Step 9 — CHANGELOG 更新
 □ Step 9b — 數據文檔檢查（有新增／改變數據就同步 `docs/data/`，無則 commit 留痕）
 □ Step 10 — 等用戶確認 commit；`[✓]` 只在用戶明確驗收該 UR 後打勾
-□ 收尾 — gates＋memory＋CHANGELOG＋9b＋temp 已逐項報備（9c）
+□ 收尾 — memory＋CHANGELOG＋9b＋temp 已逐項報備（9c；gate 預設跳過，跳過要註明）
 ```
 
 ## 例外與降階
 
 | 情境 | 降階方式 |
 |---|---|
+| **預設**（用戶偏好：省 token） | Step 5 build/lint/test 全跳；Step 6 AI 瀏覽器測試跳；Step 10a 由作者本人起 dev server |
+| 高風險改動（型別、API 契約、核心邏輯） | 跑 `npm run build` 抓型別錯誤；可能加跑 `npm test` |
 | 純 scaffold / config-only commit | 可免 step 5 的 test，但 message 註明 `[skip-tests]` |
-| 純文檔修改（`.md` only） | 可免 build，但仍需 lint |
-| lockfile-only 變更 | 可免 test/build，但仍需 lint |
+| 純文檔修改（`.md` only） | 可免 build，但仍需 lint（如跑） |
+| lockfile-only 變更 | 可免 test/build，但仍需 lint（如跑） |
 | 用戶明確指示跳過某 step | 在 commit message 註明 `[skip-<step>]` 原因 |
