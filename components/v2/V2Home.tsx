@@ -31,11 +31,6 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 import { useGeolocation } from "@/hooks/useGeolocation";
@@ -144,6 +139,8 @@ export function V2Home() {
 
   // 選酒 sheet 三段：cats → batch → kinds → login（匿名）
   const [pickOpen, setPickOpen] = useState(false);
+  // UR C.2：模式 pill 展開態（再點／選後自動收）
+  const [modeOpen, setModeOpen] = useState(false);
   const [pickStage, setPickStage] = useState<"cats" | "batch" | "kinds" | "login">("cats");
   const [laneId, setLaneId] = useState<string | null>(null);
   const [batch, setBatch] = useState<Beer[]>([]);
@@ -188,6 +185,7 @@ export function V2Home() {
       setInvites({});
       setGuard(null);
       setPickOpen(false);
+      setModeOpen(false);
     };
     window.addEventListener(LOGOUT_CLEAR_EVENT, handler);
     return () => window.removeEventListener(LOGOUT_CLEAR_EVENT, handler);
@@ -516,6 +514,15 @@ export function V2Home() {
   }
 
   const isNonfriend = friendState === "nonfriend";
+  // UR C.2：常駐 pill 文案（匿名／未知走通用態）
+  const modeLabel =
+    mode === "stealth"
+      ? tm("modeStealth")
+      : mode === "friends"
+        ? tm("modeFriends")
+        : mode === "public"
+          ? tm("modePublic")
+          : tm("switcherLabel");
   const guardActKey =
     guard === null || guard.action === "checkin"
       ? "actCheckin"
@@ -557,35 +564,59 @@ export function V2Home() {
                   : t("meOffline")}
             </p>
           </div>
-        <Popover>
-          <PopoverTrigger
-            aria-label={tm("switcherLabel")}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-card text-primary shadow-md ring-1 ring-foreground/10"
-          >
-            <ModeIcon size={18} aria-hidden />
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-44">
-            {(
-              [
-                { key: "stealth", label: tm("modeStealth"), Icon: EyeOff },
-                { key: "friends", label: tm("modeFriends"), Icon: Users },
-                { key: "public", label: tm("modePublic"), Icon: Globe },
-              ] as const
-            ).map(({ key, label, Icon }) => (
-              <Button
-                key={key}
-                variant="ghost"
-                aria-pressed={mode === key}
-                onClick={() => void patchMode(key)}
-                className="w-full justify-start gap-2 px-2 py-2 font-medium"
-              >
-                <Icon size={15} aria-hidden />
-                {label}
-                {mode === key && <span aria-hidden>✓</span>}
-              </Button>
-            ))}
-          </PopoverContent>
-        </Popover>
+        {/* UR C.2 模式 pill：常駐圖標＋文字；點開 inline 三檔直切
+            （選後自動收／再點收；匿名走登入）。Popover 已退役（入口隱形即死）。 */}
+        <div className="relative flex shrink-0 flex-col items-end">
+          {isAuthed === false ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-11 rounded-full bg-card px-3 font-bold shadow-md ring-1 ring-foreground/10"
+              nativeButton={false}
+              render={<Link href="/login" />}
+            >
+              <Users size={15} aria-hidden />
+              {tm("switcherLabel")}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              aria-expanded={modeOpen}
+              onClick={() => setModeOpen((v) => !v)}
+              className="h-11 rounded-full bg-card px-3 font-bold shadow-md ring-1 ring-foreground/10"
+            >
+              <ModeIcon size={15} aria-hidden />
+              {modeLabel}
+            </Button>
+          )}
+          {modeOpen && isAuthed === true && (
+            <Card size="sm" className="absolute top-full right-0 z-10 mt-1.5 w-44 p-1.5">
+              {(
+                [
+                  { key: "stealth", label: tm("modeStealth"), Icon: EyeOff },
+                  { key: "friends", label: tm("modeFriends"), Icon: Users },
+                  { key: "public", label: tm("modePublic"), Icon: Globe },
+                ] as const
+              ).map(({ key, label, Icon }) => (
+                <Button
+                  key={key}
+                  variant="ghost"
+                  aria-pressed={mode === key}
+                  onClick={() => {
+                    void patchMode(key);
+                    setModeOpen(false);
+                  }}
+                  className="w-full justify-start gap-2 px-2 py-2 font-medium"
+                >
+                  <Icon size={15} aria-hidden />
+                  {label}
+                  {mode === key && <span aria-hidden>✓</span>}
+                </Button>
+              ))}
+            </Card>
+          )}
+        </div>
       </div>
 
       {/* 橫滑 pills（容器內緊貼頂欄行，同一左對齊） */}

@@ -36,7 +36,8 @@
   - fix DEF-009 糾正（乾杯除隱身直過，加好友門只攔邀約；公開邀約加完即發不等接受；刪onProceed死碼＋proceedCta；三閘綠，待复驗）
   - **UR A.18 公開收尾＋T&C頁 [✓，用户确认零逻辑改动直接验收]**：`app/[locale]/terms` 靜態頁（三模式卡＋境外＋成年行，terms三語14鍵parity PASS，Footer鏈生效）；公開三條回歸零代碼；三閘237綠／lint 0 error／build 36頁
   - **EPIC B 好友邀請即時流＋UR B.1／B.2［建檔置[]］**：B.1 friendships補強（updated_at／responded_at／expires_at／source_checkin_id＋0011待寫）；B.2邀請中心＋realtime靜態刷新＋lazy過期；實現待拍板
-  - **UR C.1 v2 首頁（Snap Map 式）[✓，用户已验收，merged]**：全量新文件（`/v2`＋`components/v2`＋v2 css作用域＋v2三語11鍵parity PASS）；OSM免key底圖（CARTO要key不碰）；選酒L1／L2／雙鈕／乾杯邀約守衛／足跡／搖一搖／模式Popover全接共用層；v1零文件（隔離門過）；單測v2Pins 4測；三閘241綠／lint 0 error／build 39頁
+  - **UR C.1 v2 首頁（Snap Map 式）[✓，用户已验收，merged]**
+  - **UR C.2 v2 模式選擇顯性化 [✓，用户已验收，merged]**：Popover退役，常駐圖標＋文字pill＋inline三檔直切（選後自動收／再點收；匿名走登入）；零新key；三閘241綠／lint 0 error／build 39頁：全量新文件（`/v2`＋`components/v2`＋v2 css作用域＋v2三語11鍵parity PASS）；OSM免key底圖（CARTO要key不碰）；選酒L1／L2／雙鈕／乾杯邀約守衛／足跡／搖一搖／模式Popover全接共用層；v1零文件（隔離門過）；單測v2Pins 4測；三閘241綠／lint 0 error／build 39頁
   - fix DEF-20260926-010（render-Link補nativeButton＋v2noscroll hashed；三閘綠，待复驗）
   - fix DEF-20260926-011（v2scope淺色現代覆蓋，globals零動；三閘綠，待复驗）
   - fix DEF-20260926-012 返工（疊加層全z-1000＋根isolate；fixed全屏無footer；Avatar工具鏈裝不上改現成件；三閘綠，待复驗）
