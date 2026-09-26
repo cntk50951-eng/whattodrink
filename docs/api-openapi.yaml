@@ -60,7 +60,12 @@ paths:
       parameters:
         - name: user_id
           in: query
-          required: true
+          description: 對方 user id（與 checkin_id 二選一）
+          schema:
+            type: string
+        - name: checkin_id
+          in: query
+          description: 對方打卡 id（與 user_id 二選一；server 解作者再判，行不可見即非好友。A.19）
           schema:
             type: string
       responses:
@@ -258,7 +263,45 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
-  /api/v1/beers:
+  /api/v1/friends:
+    post:
+      operationId: addFriend
+      summary: 加好友邀請（需登录；雙向 pending 即接受，DEF-009）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: friend_id 與 checkin_id 二選一（後者 server 解作者）
+              properties:
+                friend_id:
+                  type: string
+                checkin_id:
+                  type: string
+      responses:
+        "200":
+          description: 已是好友（accepted）或邀請已在途（pending，冪等）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FriendResult"
+        "201":
+          description: 新邀請已發出（pending）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FriendResult"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/Internal"
     get:
       operationId: getBeers
       summary: 酒目錄（公開，A.4-1 首條）
@@ -433,6 +476,14 @@ components:
       properties:
         is_friend:
           type: boolean
+    FriendResult:
+      type: object
+      required: [status]
+      description: 加好友結果（pending＝邀請在途，accepted＝已是好友，DEF-009）
+      properties:
+        status:
+          type: string
+          enum: [pending, accepted]
     MapPin:
       type: object
       required: [id, lat, lng, area, drinkName, drinkEmoji, nickname, avatarUrl, gender, checkedInAt, isOnline]
@@ -669,6 +720,12 @@ components:
             $ref: "#/components/schemas/ErrorBody"
     Unauthorized:
       description: 未登录（缺或坏 JWT）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    NotFound:
+      description: 對象不存在（不可見行同此回，fail-closed 不辨真假）
       content:
         application/json:
           schema:

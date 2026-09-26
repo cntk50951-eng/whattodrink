@@ -58,6 +58,35 @@ export function parseCheckUserId(
   return { userId: v };
 }
 
+/**
+ * UR A.19 引導浮層好友感知：`user_id` 與 `checkin_id` 二選一互斥
+ * （調用方手裡只有 checkin id 時走後者，server 側解作者，零新增暴露）。
+ */
+export type FriendCheckTarget = { userId: string } | { checkinId: string };
+
+export function parseFriendCheckParams(
+  search: URLSearchParams,
+): { target: FriendCheckTarget } | { error: string } {
+  const userRaw = search.get("user_id");
+  const checkRaw = search.get("checkin_id");
+  const hasUser = userRaw !== null && userRaw.trim() !== "";
+  const hasCheck = checkRaw !== null && checkRaw.trim() !== "";
+  if (hasUser && hasCheck) {
+    return { error: "user_id 與 checkin_id 二選一，不可並存" };
+  }
+  if (hasUser) {
+    const v = (userRaw as string).trim();
+    if (v.length > 64) return { error: "user_id 非法" };
+    return { target: { userId: v } };
+  }
+  if (hasCheck) {
+    const v = (checkRaw as string).trim();
+    if (v.length > 64) return { error: "checkin_id 非法" };
+    return { target: { checkinId: v } };
+  }
+  return { error: "user_id 或 checkin_id 必填其一" };
+}
+
 export const PINS_SCOPES = ["all", "friends"] as const;
 export type PinsScope = (typeof PINS_SCOPES)[number];
 export const PINS_SCOPE_DEFAULT = "all" as const;
@@ -68,6 +97,39 @@ export function parseScope(raw: string | null): { scope: PinsScope } | { error: 
     return { scope: v as PinsScope };
   }
   return { error: `scope 非法：${raw ?? ""}（只要 all|friends）` };
+}
+
+/**
+ * DEF-20260926-009＋UR A.19：加好友請求體（`friend_id` 與 `checkin_id`
+ * 二選一，後者 server 解作者；沿 check 端口徑）。
+ */
+export type AddFriendBody = { friendId: string } | { checkinId: string };
+
+export function parseAddFriendBody(
+  raw: unknown,
+): { body: AddFriendBody } | { error: string } {
+  if (typeof raw !== "object" || raw === null) {
+    return { error: "body 需为对象" };
+  }
+  const r = raw as Record<string, unknown>;
+  const fRaw = r.friend_id;
+  const cRaw = r.checkin_id;
+  const hasF = typeof fRaw === "string" && fRaw.trim() !== "";
+  const hasC = typeof cRaw === "string" && cRaw.trim() !== "";
+  if (hasF && hasC) {
+    return { error: "friend_id 與 checkin_id 二選一，不可並存" };
+  }
+  if (hasF) {
+    const v = (fRaw as string).trim();
+    if (v.length > 64) return { error: "friend_id 非法" };
+    return { body: { friendId: v } };
+  }
+  if (hasC) {
+    const v = (cRaw as string).trim();
+    if (v.length > 64) return { error: "checkin_id 非法" };
+    return { body: { checkinId: v } };
+  }
+  return { error: "friend_id 或 checkin_id 必填其一" };
 }
 
 /**
