@@ -8,19 +8,31 @@ import { BrahmaIcon } from "./brahma";
 import { BudLightIcon } from "./bud-light";
 import { BudweiserIcon } from "./budweiser";
 import { CarlsbergIcon } from "./carlsberg";
+import { ClubColombiaIcon } from "./club-colombia";
 import { CoorsLightIcon } from "./coors-light";
 import { CoronaIcon } from "./corona-extra";
+import { CraftIpaIcon } from "./craft-ipa";
+import { CristalIcon } from "./cristal";
+import { CusquenaIcon } from "./cusquena-dorada";
+import { Dassai45Icon } from "./dassai-45";
 import { DosEquisIcon } from "./dos-equis";
+import { GuinnessDraughtIcon } from "./guinness-draught";
 import { HarbinIcon } from "./harbin";
 import { HeinekenIcon } from "./heineken";
 import { HoegaardenIcon } from "./hoegaarden";
 import { IndioIcon } from "./indio";
+import { ItaipavaIcon } from "./itaipava";
+import { KaiserIcon } from "./kaiser";
 import { KirinIcon } from "./kirin-ichiban";
+import { KakuHighballIcon } from "./kaku-highball";
 import { MillerLiteIcon } from "./miller-lite";
 import { ModeloIcon } from "./modelo-especial";
 import { MoutaiIcon } from "./moutai-flying-fairy";
 import { NegraModeloIcon } from "./negra-modelo";
 import { PacificoIcon } from "./pacifico";
+import { PacenaIcon } from "./pacena";
+import { PilsenCallaoIcon } from "./pilsen-callao";
+import { QuilmesIcon } from "./quilmes";
 import { SapporoIcon } from "./sapporo";
 import { SkolIcon } from "./skol";
 import { SnowIcon } from "./snow";
@@ -29,6 +41,7 @@ import { TecateIcon } from "./tecate";
 import { TsingtaoIcon } from "./tsingtao-classic";
 import { VictoriaIcon } from "./victoria";
 import { YanjingIcon } from "./yanjing";
+import { Yamazaki12YearIcon } from "./yamazaki-12-year";
 import { YebisuIcon } from "./yebisu";
 import { YoungMasterIcon } from "./young-master";
 
@@ -85,6 +98,23 @@ export const BEER_WALL: BeerWallEntry[] = [
   { en: "Indio", cn: "印第欧", pickId: "indio", type: "深色拉格", Icon: IndioIcon },
   { en: "Skol", cn: "斯库尔", pickId: "skol", type: "皮爾森", Icon: SkolIcon },
   { en: "Brahma", cn: "布拉马", pickId: "brahma", type: "皮爾森", Icon: BrahmaIcon },
+  /* Batch3a（靜態缺口第一批：啤酒 lane 收尾＋威士忌＋清酒；IPA／角嗨為演繹版） */
+  { en: "Guinness Draught", cn: "黑罐金豎琴", pickId: "stout", type: "世濤", Icon: GuinnessDraughtIcon },
+  { en: "Craft IPA", cn: "鬱金香杯", pickId: "ipa", type: "印度淡艾", Icon: CraftIpaIcon },
+  { en: "Yamazaki 12 Year", cn: "方瓶", pickId: "yamazaki-12", type: "單一麥芽", Icon: Yamazaki12YearIcon },
+  { en: "Kaku Highball", cn: "角瓶", pickId: "highball", type: "高球", Icon: KakuHighballIcon },
+  { en: "Dassai 45", cn: "白標藍字", pickId: "dasai-45", type: "大吟釀", Icon: Dassai45Icon },
+  /* Batch3（隊列第三批：南美拉格 10；Cristal 指智利啤酒非香檳） */
+  { en: "Antarctica Original", cn: "企鵝黃標", pickId: "antarctica", type: "淡拉格", Icon: AntarcticaIcon },
+  { en: "Itaipava Pilsen", cn: "紅白冠", pickId: "itaipava", type: "淡拉格", Icon: ItaipavaIcon },
+  { en: "Kaiser", cn: "金灰K", pickId: "kaiser", type: "淡拉格", Icon: KaiserIcon },
+  { en: "Cristal", cn: "藍字水晶", pickId: "cristal", type: "淡拉格", Icon: CristalIcon },
+  { en: "Quilmes Clasica", cn: "藍白拖拉機", pickId: "quilmes", type: "淡拉格", Icon: QuilmesIcon },
+  { en: "Andes Origen", cn: "紅字雪山", pickId: "andes", type: "淡拉格", Icon: AndesIcon },
+  { en: "Paceña", cn: "三色徽章", pickId: "pacena", type: "淡拉格", Icon: PacenaIcon },
+  { en: "Cusqueña Dorada", cn: "金日太陽", pickId: "cusquena", type: "淡拉格", Icon: CusquenaIcon },
+  { en: "Pilsen Callao", cn: "綠旗皇冠", pickId: "pilsen-callao", type: "淡拉格", Icon: PilsenCallaoIcon },
+  { en: "Club Colombia Dorada", cn: "紅金花絲", pickId: "club-colombia", type: "淡拉格", Icon: ClubColombiaIcon },
 ];
 
 /** Android-safe asset slug: `Modelo Especial` → `modelo_especial`. */
@@ -146,6 +176,24 @@ const BRAND_ALIASES: BrandAlias[] = [
   { slug: "indio", latin: ["indio"], cjk: ["印第欧", "印第歐"] },
   { slug: "skol", latin: ["skol"], cjk: ["斯库尔", "斯庫爾"] },
   { slug: "brahma", latin: ["brahma"], cjk: ["布拉马", "布拉瑪"] },
+  /* Batch3a：健力士／IPA（泛稱演繹）／山崎／角嗨／獺祭 */
+  { slug: "guinness-draught", latin: ["guinness"], cjk: ["健力士", "吉尼斯"] },
+  { slug: "craft-ipa", latin: ["ipa"], cjk: ["精釀"] },
+  { slug: "yamazaki-12-year", latin: ["yamazaki"], cjk: ["山崎"] },
+  { slug: "kaku-highball", latin: ["highball", "kaku", "kakubin"], cjk: ["角嗨", "角瓶", "嗨棒"] },
+  { slug: "dassai-45", latin: ["dassai", "dasai"], cjk: ["獺祭", "獭祭"] },
+  /* Batch3：南美 10（ñ 走 beerSlug 轉寫：pace-a／cusque-a-dorada；
+   * Cristal 只收啤酒義：latin 不收裸 cristal（香檳同名），cjk 水晶（巴） */
+  { slug: "antarctica-original", latin: ["antarctica"], cjk: ["南极洲", "南極洲"] },
+  { slug: "itaipava-pilsen", latin: ["itaipava"], cjk: ["伊泰帕瓦"] },
+  { slug: "kaiser", latin: ["kaiser"], cjk: ["凱撒", "凯撒"] },
+  { slug: "cristal", latin: ["cerveza cristal", "cristal beer", "cristal pilsen"], cjk: ["水晶"] },
+  { slug: "quilmes-clasica", latin: ["quilmes"], cjk: ["基尔梅斯", "基爾梅斯"] },
+  { slug: "andes-origen", latin: ["andes", "andes origen"], cjk: ["安第斯", "安第斯"] },
+  { slug: "pace-a", latin: ["paceña", "pacena"], cjk: ["帕塞尼亚", "帕塞尼亞"] },
+  { slug: "cusque-a-dorada", latin: ["cusqueña", "cusquena"], cjk: ["库斯科", "庫斯科"] },
+  { slug: "pilsen-callao", latin: ["pilsen callao", "callao"], cjk: ["卡亚俄", "卡亞俄"] },
+  { slug: "club-colombia-dorada", latin: ["club colombia"], cjk: ["哥伦比亚俱乐部", "哥倫比亞俱樂部"] },
 ];
 
 // beerSlug 产下划线（asahi_super_dry），别名表用连字符书写，建表时统一。

@@ -2,11 +2,26 @@ import { describe, expect, it } from "vitest";
 
 // vitest 無 @/ alias（見 memory），測檔一律相對路徑。
 import { BEERS } from "../../../lib/beers";
+import { AndesIcon } from "./andes";
+import { AntarcticaIcon } from "./antarctica-original";
 import { AsahiIcon } from "./asahi-super-dry";
+import { ClubColombiaIcon } from "./club-colombia";
+import { CraftIpaIcon } from "./craft-ipa";
+import { CristalIcon } from "./cristal";
+import { CusquenaIcon } from "./cusquena-dorada";
+import { Dassai45Icon } from "./dassai-45";
+import { GuinnessDraughtIcon } from "./guinness-draught";
 import { HeinekenIcon } from "./heineken";
+import { ItaipavaIcon } from "./itaipava";
+import { KakuHighballIcon } from "./kaku-highball";
+import { KaiserIcon } from "./kaiser";
+import { PacenaIcon } from "./pacena";
+import { PilsenCallaoIcon } from "./pilsen-callao";
+import { QuilmesIcon } from "./quilmes";
 import { ModeloIcon } from "./modelo-especial";
 import { NegraModeloIcon } from "./negra-modelo";
 import { TsingtaoIcon } from "./tsingtao-classic";
+import { Yamazaki12YearIcon } from "./yamazaki-12-year";
 import { BEER_WALL, iconForDrinkName, iconForPickId } from "./wall";
 
 describe("iconForPickId (UR2.6)", () => {
@@ -18,7 +33,7 @@ describe("iconForPickId (UR2.6)", () => {
 
   it("returns null for undrawn brands (caller keeps the emoji)", () => {
     expect(iconForPickId("mojito")).toBeNull();
-    expect(iconForPickId("yamazaki-12")).toBeNull();
+    expect(iconForPickId("malbec-2021")).toBeNull();
     expect(iconForPickId("")).toBeNull();
   });
 
@@ -44,14 +59,59 @@ describe("iconForDrinkName (UR2.7)", () => {
   });
 
   it("returns null when nothing drawn (caller keeps the emoji pin)", () => {
-    expect(iconForDrinkName("角嗨 Highball")).toBeNull();
+    expect(iconForDrinkName("角嗨 Highball")).not.toBeNull();
     expect(iconForDrinkName("Mojito")).toBeNull();
-    expect(iconForDrinkName("本地精釀 IPA")).toBeNull();
+    expect(iconForDrinkName("本地精釀 IPA")).not.toBeNull();
     expect(iconForDrinkName("")).toBeNull();
   });
 
   it("does not match latin aliases inside longer words", () => {
     expect(iconForDrinkName("Absolut Vodka")).toBeNull();
+  });
+});
+
+describe("batch3a 靜態缺口第一批", () => {
+  it("maps the five new pickIds to their components", () => {
+    expect(iconForPickId("stout")).toBe(GuinnessDraughtIcon);
+    expect(iconForPickId("ipa")).toBe(CraftIpaIcon);
+    expect(iconForPickId("yamazaki-12")).toBe(Yamazaki12YearIcon);
+    expect(iconForPickId("highball")).toBe(KakuHighballIcon);
+    expect(iconForPickId("dasai-45")).toBe(Dassai45Icon);
+  });
+
+  it("resolves free-text names via the new aliases", () => {
+    expect(iconForDrinkName("Guinness 健力士")).toBe(GuinnessDraughtIcon);
+    expect(iconForDrinkName("山崎 12 年")).toBe(Yamazaki12YearIcon);
+    expect(iconForDrinkName("獺祭 純米大吟釀 45")).toBe(Dassai45Icon);
+    expect(iconForDrinkName("角瓶 highball")).toBe(KakuHighballIcon);
+  });
+});
+
+describe("batch3 南美拉格十枚", () => {
+  it("maps the ten new pickIds to their components", () => {
+    expect(iconForPickId("antarctica")).toBe(AntarcticaIcon);
+    expect(iconForPickId("itaipava")).toBe(ItaipavaIcon);
+    expect(iconForPickId("kaiser")).toBe(KaiserIcon);
+    expect(iconForPickId("cristal")).toBe(CristalIcon);
+    expect(iconForPickId("quilmes")).toBe(QuilmesIcon);
+    expect(iconForPickId("andes")).toBe(AndesIcon);
+    expect(iconForPickId("pacena")).toBe(PacenaIcon);
+    expect(iconForPickId("cusquena")).toBe(CusquenaIcon);
+    expect(iconForPickId("pilsen-callao")).toBe(PilsenCallaoIcon);
+    expect(iconForPickId("club-colombia")).toBe(ClubColombiaIcon);
+  });
+
+  it("resolves free-text names via the new aliases", () => {
+    expect(iconForDrinkName("Antarctica Original")).toBe(AntarcticaIcon);
+    expect(iconForDrinkName("Quilmes Clásica")).toBe(QuilmesIcon);
+    expect(iconForDrinkName("Cusqueña Dorada")).toBe(CusquenaIcon);
+    expect(iconForDrinkName("Pilsen Callao")).toBe(PilsenCallaoIcon);
+    expect(iconForDrinkName("Club Colombia Dorada")).toBe(ClubColombiaIcon);
+  });
+
+  it("does not steal the champagne namesake (Cristal 誠實回 null)", () => {
+    expect(iconForDrinkName("Louis Roederer Cristal")).toBeNull();
+    expect(iconForDrinkName("水晶啤酒")).toBe(CristalIcon);
   });
 });
 

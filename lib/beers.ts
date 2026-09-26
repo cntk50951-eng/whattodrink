@@ -66,6 +66,18 @@ export const BEERS: Beer[] = [
   { id: "indio", emoji: "🍺", name: "Indio", category: "lager", tagline: "深色拉格印第歐" },
   { id: "skol", emoji: "🍺", name: "Skol", category: "lager", tagline: "巴西派對啤" },
   { id: "brahma", emoji: "🍺", name: "Brahma", category: "lager", tagline: "森巴味拉格" },
+  /* ---- Batch3 隊列第三批收編（南美拉格 10，id／emoji／name／category 沿 seed，
+   * tagline 港味短句；未來 seed 行沿用同 id＋名，API 換源即原地覆蓋） */
+  { id: "antarctica", emoji: "🍺", name: "Antarctica Original", category: "lager", tagline: "企鵝守住的巴西經典" },
+  { id: "itaipava", emoji: "🍺", name: "Itaipava", category: "lager", tagline: "巴西屋企飲乜都係佢" },
+  { id: "kaiser", emoji: "🍺", name: "Kaiser", category: "lager", tagline: "金字K巴國老招牌" },
+  { id: "cristal", emoji: "🍺", name: "Cristal", category: "lager", tagline: "智利國民水晶啤" },
+  { id: "quilmes", emoji: "🍺", name: "Quilmes", category: "lager", tagline: "藍白衫阿根廷味" },
+  { id: "andes", emoji: "🍺", name: "Andes Origen", category: "lager", tagline: "安第斯雪水釀" },
+  { id: "pacena", emoji: "🍺", name: "Paceña", category: "lager", tagline: "玻利維亞之光" },
+  { id: "cusquena", emoji: "🍺", name: "Cusqueña Dorada", category: "lager", tagline: "太陽神的金色" },
+  { id: "pilsen-callao", emoji: "🍺", name: "Pilsen Callao", category: "lager", tagline: "綠瓶老字號1863" },
+  { id: "club-colombia", emoji: "🍺", name: "Club Colombia", category: "lager", tagline: "哥倫比亞Premium" },
 ];
 
 /**

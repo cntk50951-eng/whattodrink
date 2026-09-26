@@ -16,11 +16,18 @@
   Bud Light／Coors Light／Miller Lite／Modelo Especial
 - Batch2（10）：Negra Modelo／Pacifico／Tecate／Dos Equis／Sol／Bohemia／
   Victoria／Indio／Skol／Brahma
+- Batch3a（5，2026-09-26，未验收）：Guinness Draught／Craft IPA／Yamazaki 12／
+  Kaku Highball／Dassai 45 → 靜態目錄 41 枚中 35 有圖，缺口剩 7
+  （Mojito／Gin Tonic／Espresso Martini／梅酒／Malbec／Rosé／Sauvignon Blanc，
+  杯組＋酒杯組兩小批待續）
+- Batch3（10，2026-09-27，未验收）：Antarctica／Itaipava／Kaiser／Cristal／
+  Quilmes／Andes／Paceña／Cusqueña／Pilsen Callao／Club Colombia
+  （＋同步收編，靜態目錄 41→51，45 有圖）
 
 ## 待画
 
-- 本次 100 目标剩余 **80**（队头继续：Antarctica 起）。
-- 全队列剩余 **1099**。
+- 本次 100 目标剩余 **70**（队头继续：Aguila 起）。
+- 全队列剩余 **1089**。
 
 ## 移动端导出（每批顺带跑）
 

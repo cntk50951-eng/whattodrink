@@ -538,5 +538,275 @@
       "android/drawable-xxhdpi/brahma.png",
       "android/drawable-xxxhdpi/brahma.png"
     ]
+  },
+  {
+    "slug": "guinness_draught",
+    "caption": "Guinness Draught（黑罐金豎琴）",
+    "type": "世濤",
+    "svg": "svg/guinness_draught.svg",
+    "ios": [
+      "ios/guinness_draught@1x.png",
+      "ios/guinness_draught@2x.png",
+      "ios/guinness_draught@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/guinness_draught.png",
+      "android/drawable-hdpi/guinness_draught.png",
+      "android/drawable-xhdpi/guinness_draught.png",
+      "android/drawable-xxhdpi/guinness_draught.png",
+      "android/drawable-xxxhdpi/guinness_draught.png"
+    ]
+  },
+  {
+    "slug": "craft_ipa",
+    "caption": "Craft IPA（鬱金香杯）",
+    "type": "印度淡艾",
+    "svg": "svg/craft_ipa.svg",
+    "ios": [
+      "ios/craft_ipa@1x.png",
+      "ios/craft_ipa@2x.png",
+      "ios/craft_ipa@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/craft_ipa.png",
+      "android/drawable-hdpi/craft_ipa.png",
+      "android/drawable-xhdpi/craft_ipa.png",
+      "android/drawable-xxhdpi/craft_ipa.png",
+      "android/drawable-xxxhdpi/craft_ipa.png"
+    ]
+  },
+  {
+    "slug": "yamazaki_12_year",
+    "caption": "Yamazaki 12 Year（方瓶）",
+    "type": "單一麥芽",
+    "svg": "svg/yamazaki_12_year.svg",
+    "ios": [
+      "ios/yamazaki_12_year@1x.png",
+      "ios/yamazaki_12_year@2x.png",
+      "ios/yamazaki_12_year@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/yamazaki_12_year.png",
+      "android/drawable-hdpi/yamazaki_12_year.png",
+      "android/drawable-xhdpi/yamazaki_12_year.png",
+      "android/drawable-xxhdpi/yamazaki_12_year.png",
+      "android/drawable-xxxhdpi/yamazaki_12_year.png"
+    ]
+  },
+  {
+    "slug": "kaku_highball",
+    "caption": "Kaku Highball（角瓶）",
+    "type": "高球",
+    "svg": "svg/kaku_highball.svg",
+    "ios": [
+      "ios/kaku_highball@1x.png",
+      "ios/kaku_highball@2x.png",
+      "ios/kaku_highball@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/kaku_highball.png",
+      "android/drawable-hdpi/kaku_highball.png",
+      "android/drawable-xhdpi/kaku_highball.png",
+      "android/drawable-xxhdpi/kaku_highball.png",
+      "android/drawable-xxxhdpi/kaku_highball.png"
+    ]
+  },
+  {
+    "slug": "dassai_45",
+    "caption": "Dassai 45（白標藍字）",
+    "type": "大吟釀",
+    "svg": "svg/dassai_45.svg",
+    "ios": [
+      "ios/dassai_45@1x.png",
+      "ios/dassai_45@2x.png",
+      "ios/dassai_45@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/dassai_45.png",
+      "android/drawable-hdpi/dassai_45.png",
+      "android/drawable-xhdpi/dassai_45.png",
+      "android/drawable-xxhdpi/dassai_45.png",
+      "android/drawable-xxxhdpi/dassai_45.png"
+    ]
+  },
+  {
+    "slug": "antarctica_original",
+    "caption": "Antarctica Original（企鵝黃標）",
+    "type": "淡拉格",
+    "svg": "svg/antarctica_original.svg",
+    "ios": [
+      "ios/antarctica_original@1x.png",
+      "ios/antarctica_original@2x.png",
+      "ios/antarctica_original@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/antarctica_original.png",
+      "android/drawable-hdpi/antarctica_original.png",
+      "android/drawable-xhdpi/antarctica_original.png",
+      "android/drawable-xxhdpi/antarctica_original.png",
+      "android/drawable-xxxhdpi/antarctica_original.png"
+    ]
+  },
+  {
+    "slug": "itaipava_pilsen",
+    "caption": "Itaipava Pilsen（紅白冠）",
+    "type": "淡拉格",
+    "svg": "svg/itaipava_pilsen.svg",
+    "ios": [
+      "ios/itaipava_pilsen@1x.png",
+      "ios/itaipava_pilsen@2x.png",
+      "ios/itaipava_pilsen@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/itaipava_pilsen.png",
+      "android/drawable-hdpi/itaipava_pilsen.png",
+      "android/drawable-xhdpi/itaipava_pilsen.png",
+      "android/drawable-xxhdpi/itaipava_pilsen.png",
+      "android/drawable-xxxhdpi/itaipava_pilsen.png"
+    ]
+  },
+  {
+    "slug": "kaiser",
+    "caption": "Kaiser（金灰K）",
+    "type": "淡拉格",
+    "svg": "svg/kaiser.svg",
+    "ios": [
+      "ios/kaiser@1x.png",
+      "ios/kaiser@2x.png",
+      "ios/kaiser@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/kaiser.png",
+      "android/drawable-hdpi/kaiser.png",
+      "android/drawable-xhdpi/kaiser.png",
+      "android/drawable-xxhdpi/kaiser.png",
+      "android/drawable-xxxhdpi/kaiser.png"
+    ]
+  },
+  {
+    "slug": "cristal",
+    "caption": "Cristal（藍字水晶）",
+    "type": "淡拉格",
+    "svg": "svg/cristal.svg",
+    "ios": [
+      "ios/cristal@1x.png",
+      "ios/cristal@2x.png",
+      "ios/cristal@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/cristal.png",
+      "android/drawable-hdpi/cristal.png",
+      "android/drawable-xhdpi/cristal.png",
+      "android/drawable-xxhdpi/cristal.png",
+      "android/drawable-xxxhdpi/cristal.png"
+    ]
+  },
+  {
+    "slug": "quilmes_clasica",
+    "caption": "Quilmes Clasica（藍白拖拉機）",
+    "type": "淡拉格",
+    "svg": "svg/quilmes_clasica.svg",
+    "ios": [
+      "ios/quilmes_clasica@1x.png",
+      "ios/quilmes_clasica@2x.png",
+      "ios/quilmes_clasica@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/quilmes_clasica.png",
+      "android/drawable-hdpi/quilmes_clasica.png",
+      "android/drawable-xhdpi/quilmes_clasica.png",
+      "android/drawable-xxhdpi/quilmes_clasica.png",
+      "android/drawable-xxxhdpi/quilmes_clasica.png"
+    ]
+  },
+  {
+    "slug": "andes_origen",
+    "caption": "Andes Origen（紅字雪山）",
+    "type": "淡拉格",
+    "svg": "svg/andes_origen.svg",
+    "ios": [
+      "ios/andes_origen@1x.png",
+      "ios/andes_origen@2x.png",
+      "ios/andes_origen@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/andes_origen.png",
+      "android/drawable-hdpi/andes_origen.png",
+      "android/drawable-xhdpi/andes_origen.png",
+      "android/drawable-xxhdpi/andes_origen.png",
+      "android/drawable-xxxhdpi/andes_origen.png"
+    ]
+  },
+  {
+    "slug": "pace_a",
+    "caption": "Paceña（三色徽章）",
+    "type": "淡拉格",
+    "svg": "svg/pace_a.svg",
+    "ios": [
+      "ios/pace_a@1x.png",
+      "ios/pace_a@2x.png",
+      "ios/pace_a@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/pace_a.png",
+      "android/drawable-hdpi/pace_a.png",
+      "android/drawable-xhdpi/pace_a.png",
+      "android/drawable-xxhdpi/pace_a.png",
+      "android/drawable-xxxhdpi/pace_a.png"
+    ]
+  },
+  {
+    "slug": "cusque_a_dorada",
+    "caption": "Cusqueña Dorada（金日太陽）",
+    "type": "淡拉格",
+    "svg": "svg/cusque_a_dorada.svg",
+    "ios": [
+      "ios/cusque_a_dorada@1x.png",
+      "ios/cusque_a_dorada@2x.png",
+      "ios/cusque_a_dorada@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/cusque_a_dorada.png",
+      "android/drawable-hdpi/cusque_a_dorada.png",
+      "android/drawable-xhdpi/cusque_a_dorada.png",
+      "android/drawable-xxhdpi/cusque_a_dorada.png",
+      "android/drawable-xxxhdpi/cusque_a_dorada.png"
+    ]
+  },
+  {
+    "slug": "pilsen_callao",
+    "caption": "Pilsen Callao（綠旗皇冠）",
+    "type": "淡拉格",
+    "svg": "svg/pilsen_callao.svg",
+    "ios": [
+      "ios/pilsen_callao@1x.png",
+      "ios/pilsen_callao@2x.png",
+      "ios/pilsen_callao@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/pilsen_callao.png",
+      "android/drawable-hdpi/pilsen_callao.png",
+      "android/drawable-xhdpi/pilsen_callao.png",
+      "android/drawable-xxhdpi/pilsen_callao.png",
+      "android/drawable-xxxhdpi/pilsen_callao.png"
+    ]
+  },
+  {
+    "slug": "club_colombia_dorada",
+    "caption": "Club Colombia Dorada（紅金花絲）",
+    "type": "淡拉格",
+    "svg": "svg/club_colombia_dorada.svg",
+    "ios": [
+      "ios/club_colombia_dorada@1x.png",
+      "ios/club_colombia_dorada@2x.png",
+      "ios/club_colombia_dorada@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/club_colombia_dorada.png",
+      "android/drawable-hdpi/club_colombia_dorada.png",
+      "android/drawable-xhdpi/club_colombia_dorada.png",
+      "android/drawable-xxhdpi/club_colombia_dorada.png",
+      "android/drawable-xxxhdpi/club_colombia_dorada.png"
+    ]
   }
 ]
