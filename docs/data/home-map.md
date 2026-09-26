@@ -80,3 +80,11 @@
 |---|---|---|---|---|
 | `mode`（stealth／friends／public） | 城市卡三檔切換器＋乾杯／邀約／讚／拍照守衛 | `UserMode`（`lib/mode.ts`，`hooks/useMyMode.ts`） | state＋`GET /PATCH /api/v1/me`（登入才拉；匿名 null 不攔） | `users.mode`（0007，預設 public） |
 | `guardAction`（守衛浮層動作） | ModePrompt 引導浮層（可一鍵切換） | `"checkin"｜"cheers"｜"invite"｜"like"｜"photo"｜null` | state，會話 | 不進庫（运行时态） |
+
+## 十、好友可見（UR A.17，server side）
+
+| 字段 | 页面位置 | 类型 | 当前来源 | 未来表映射 |
+|---|---|---|---|---|
+| `scope`（`all` 預設／`friends` 只看好友） | 地圖底部「只看好友」鈕＋pins／牆查詢 | `PinsScope`（`lib/friends.ts`） | state，會話（不持久化；`GET /map/pins?scope=`＋`GET /wall?scope=`，friends 需登入） | 不進庫（查詢參數；server 用 friendships accepted 判定） |
+| `friendsOnly`（按鈕開關） | 同上 | `boolean` | state，會話；匿名點彈登入浮層 | 不進庫（运行时态） |
+| 好友關係（accepted 雙向） | scope 查詢＋綠點過濾＋A.19 引導 | `friendships` 行（`lib/friends.ts` 純函數） | `GET /friends/check`＋route 內查（RLS 自讀沿 0009） | `friendships`（0007 建表，0009 開自讀＋friends 行讀） |

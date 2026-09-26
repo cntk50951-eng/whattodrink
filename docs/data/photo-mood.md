@@ -23,6 +23,7 @@
 | `wtd-wall-overrides`（種子讚／檢舉覆寫） | 牆＋詳情 | `{id: {likes, likedByMe, reported}}` | 讚／檢舉時寫 | `post_likes`／`post_reports` |
 | `wtd-wall-seen-at`（已讀水位） | 選單紅點 | epoch ms | 進牆時寫 | 不進庫（端上狀態） |
 | `wtd-wall-guide-seen`（守則看過） | 首訪浮層 | "1" | 關閉時寫 | 不進庫 |
+| `scope`（UR A.17 只看好友，牆 API 已備，前端未接） | `GET /wall?scope=friends` | `PinsScope`（`lib/friends.ts`，沿用 pins 同款） | 查詢參數（friends 需登入，回 accepted 好友的 friends＋public 行） | 不進庫（查詢參數；A.18 牆篩選 UI 屆時消費） |
 | 會話內語音 object URL | 詳情播放器 | `Map<postId, url>`（內存） | 分享時登記 | `checkins.audio_url`（真後端才持久化） |
 
 ## 二、心情推荐（`/mood` stub，无数据）

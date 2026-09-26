@@ -65,7 +65,7 @@ describe("parseRange", () => {
 describe("parsePinsParams", () => {
   it("defaults limit 100 and range 7d", () => {
     const r = parsePinsParams(new URLSearchParams("bbox=113.8,22.15,114.44,22.58"));
-    expect(r).toEqual({ bbox: { west: 113.8, south: 22.15, east: 114.44, north: 22.58 }, limit: 100, range: "7d" });
+    expect(r).toEqual({ bbox: { west: 113.8, south: 22.15, east: 114.44, north: 22.58 }, limit: 100, range: "7d", scope: "all" });
   });
 
   it("validates limit 1-200", () => {
@@ -81,6 +81,13 @@ describe("parsePinsParams", () => {
       expect.objectContaining({ range: "90d" }),
     );
     expect(parsePinsParams(new URLSearchParams("bbox=113,22,114,23&range=bad"))).toHaveProperty("error");
+  });
+
+  it("parses scope friends and rejects bad scope (UR A.17)", () => {
+    expect(parsePinsParams(new URLSearchParams("bbox=113,22,114,23&scope=friends"))).toEqual(
+      expect.objectContaining({ scope: "friends" }),
+    );
+    expect(parsePinsParams(new URLSearchParams("bbox=113,22,114,23&scope=everyone"))).toHaveProperty("error");
   });
 });
 

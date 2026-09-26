@@ -161,17 +161,6 @@ const SHEET_OFFSET_PX = 180;
 /** Down-drag distance on the sheet handle that dismisses the sheet. */
 const SHEET_DISMISS_DY = 72;
 /**
- * UR1.6 two-up frame: the open cheers card eats this much bottom space,
- * so the frame's bottom pad clears it and neither dot hides under the card.
- */
-const FOCUS_CARD_CLEAR_PX = 240;
-/**
- * UR1.6: closer than this, self and the check-in are the same spot for
- * framing purposes — fitBounds would dive to max zoom on a degenerate
- * bound, so fall back to a plain fly-to instead.
- */
-const MIN_FOCUS_SEPARATION_M = 50;
-/**
  * UR3.0 碰杯特效时长（ms）：两杯摆入 0.5s＋碰杯颤动＋星形冲击＋泡沫＋
  * 大字，2.2s 收进“已乾杯”收据态（用户嫌 1.3s 消失太快）。结尾 0.2s 整层
  * 淡出，不硬切。reduced-motion 下直接收据（特效层不渲染）。
@@ -192,6 +181,28 @@ const OTHERS_CLUSTER_PX = 64;
  * 真后端由对方点按钮，无此定时。
  */
 const INVITE_MOCK_MS = 3000;
+/**
+ * DEF-20260926-005：真數據 pin 轉卡片形狀（`renderOthersPins` 的 pin 層
+ * 與開卡 `card` 派生共用同一映射——之前開卡只認 MOCK 表，真 pin 點了無卡）。
+ * `now` 由調用方傳快照（render 內禁 `Date.now()`，沿 UR3.3 配方）。
+ */
+function apiPinToCheckin(p: PinJson, now: number): Checkin {
+  return {
+    id: p.id,
+    nickname: p.nickname ?? "酒友",
+    avatarEmoji: "🍻",
+    gender: ((p.gender as Checkin["gender"]) ?? "secret") as Checkin["gender"],
+    drinkName: p.drinkName ?? "",
+    drinkEmoji: p.drinkEmoji ?? "🍺",
+    area: p.area ?? "",
+    position: { lat: p.lat, lng: p.lng },
+    checkedInAt: p.checkedInAt,
+    onlineAt: p.isOnline ? now : now - 10 * 60_000,
+    cheers: 0,
+    declinesInvite: false,
+    mock: true as const,
+  };
+}
 export function DrinkMap({
   initialPickOpen = false,
   initialPickRandom = false,
@@ -322,13 +333,11 @@ export function DrinkMap({
   const geoRef = useRef({ status: geoStatus, position: geoPosition });
 
   /**
-   * UR1.6 focus-a-drinker: open their card and frame both of us.
+   * UR1.6 focus-a-drinker → DEF-20260926-004：只飛對方＋開卡。
    * Declared BEFORE the init effect (lint: no use-before-define) and reads
    * geo from geoRef (fresh), never from the render closure (stale).
-   * With a fix: fitBounds(self, them) so both dots share the screen.
-   * Without one (Q1 decision): just fly to them; the card shows the
-   * locate hint instead of a distance. Outside-HK fixes still count —
-   * the distance to HK is real even when the dot is parked.
+   * 遠距雙人同框（fitBounds）已退役：跨城必拉遠，Snap／Google／Apple
+   * 三家皆只飛對方；距離資訊由卡片距離行覆蓋（實時），同框需求日後加卡內鈕。
    */
   function handleFocusPerson(c: Checkin): void {
     const map = mapRef.current;
@@ -337,31 +346,9 @@ export function DrinkMap({
     const reduced = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
-    const self =
-      geoRef.current.status === "success" && geoRef.current.position !== null
-        ? geoRef.current.position
-        : null;
-    if (
-      self === null ||
-      haversineMeters(self, c.position) < MIN_FOCUS_SEPARATION_M
-    ) {
-      const z = Math.max(map.getZoom(), 14);
-      if (reduced) map.setView([c.position.lat, c.position.lng], z);
-      else map.flyTo([c.position.lat, c.position.lng], z, { duration: 1 });
-      return;
-    }
-    const frame: [[number, number], [number, number]] = [
-      [self.lat, self.lng],
-      [c.position.lat, c.position.lng],
-    ];
-    if (reduced) {
-      map.fitBounds(frame, { padding: [24, 24], animate: false });
-    } else {
-      map.fitBounds(frame, {
-        paddingTopLeft: [24, 24],
-        paddingBottomRight: [24, FOCUS_CARD_CLEAR_PX],
-      });
-    }
+    const z = Math.max(map.getZoom(), 14);
+    if (reduced) map.setView([c.position.lat, c.position.lng], z);
+    else map.flyTo([c.position.lat, c.position.lng], z, { duration: 1 });
   }
   /**
    * UR2.8 他人 pin 层重建（init＋每次 zoomend 调）：当前 zoom 下投影到
@@ -378,22 +365,9 @@ export function DrinkMap({
     othersLayerRef.current?.remove();
     // UR A.13 真數據優先：apiPins 已加載且非空則用真數據，否則回退 MOCK（開發期空庫不白圖）
     const useApi = apiPinsLoaded && apiPins.length > 0;
+    // DEF-20260926-005：與開卡共用 apiPinToCheckin（同一映射，兩處不分叉）。
     const apiAsCheckins: Checkin[] | null = useApi
-      ? apiPins.map((p) => ({
-          id: p.id,
-          nickname: p.nickname ?? "酒友",
-          avatarEmoji: "🍻",
-          gender: ((p.gender as Checkin["gender"]) ?? "secret") as Checkin["gender"],
-          drinkName: p.drinkName ?? "",
-          drinkEmoji: p.drinkEmoji ?? "🍺",
-          area: p.area ?? "",
-          position: { lat: p.lat, lng: p.lng },
-          checkedInAt: p.checkedInAt,
-          onlineAt: p.isOnline ? now : now - 10 * 60_000,
-          cheers: 0,
-          declinesInvite: false,
-          mock: true as const,
-        }))
+      ? apiPins.map((p) => apiPinToCheckin(p, now))
       : null;
     const source: Checkin[] = apiAsCheckins ?? (MOCK_CHECKINS as unknown as Checkin[]);
     const pixels = source.map((c) => {
@@ -635,6 +609,8 @@ export function DrinkMap({
   // UR A.13 地圖時間窗口：range 7d/90d server side，不信客戶端時鐘
   const PINS_RANGE_KEY = "wtd-pins-range";
   const [pinsRange, setPinsRange] = useState<PinsRange>("7d");
+  // UR A.17 只看好友：scope friends／all server side（會話態，不持久化，預設關）
+  const [friendsOnly, setFriendsOnly] = useState(false);
   const [apiPins, setApiPins] = useState<PinJson[]>([]);
   const [apiPinsLoaded, setApiPinsLoaded] = useState(false);
   // UR A.12 打卡雙類型 chooser + 隱身攔截（同步 isAuthed 避免 getUser 懸掛無反應）
@@ -717,7 +693,8 @@ export function DrinkMap({
   useEffect(() => {
     let cancelled = false;
     const bbox = `${HK_BOUNDS.west},${HK_BOUNDS.south},${HK_BOUNDS.east},${HK_BOUNDS.north}`;
-    const url = `/api/v1/map/pins?bbox=${encodeURIComponent(bbox)}&range=${pinsRange}&limit=100`;
+    // UR A.17 只看好友：scope 由按鈕切（friends 需登入，匿名由按鈕攔，401 兜底清空）
+    const url = `/api/v1/map/pins?bbox=${encodeURIComponent(bbox)}&range=${pinsRange}&limit=100&scope=${friendsOnly ? "friends" : "all"}`;
     void fetch(url, { cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) throw new Error(String(res.status));
@@ -734,7 +711,7 @@ export function DrinkMap({
     return () => {
       cancelled = true;
     };
-  }, [pinsRange]);
+  }, [pinsRange, friendsOnly]);
 
   // UR A.13 真數據重渲染：apiPins 就緒後刷新 pin 層（依賴 apiPinsLoaded + apiPins）
   useEffect(() => {
@@ -764,11 +741,22 @@ export function DrinkMap({
   const isSelf = selectedId === SELF_ID;
   const isWant = selectedId === WANT_ID;
   /** Anchored card content: own marker, the 想喝 snapshot, a mock check-in, or nothing. */
+  const mockCardHit = MOCK_CHECKINS.find((c) => c.id === selectedId);
+  // DEF-20260926-006：api 卡必須 memo——`apiPinToCheckin` 每 render 產新對象，
+  // `card` identity 輪輪換，view snapshot effect（deps 含 card）每輪重跑＋setView，
+  // 即無限循環吃滿主線程（地圖凍死、無報錯、無網絡；MOCK 表是穩定引用故無此問題）。
+  // nowMs 整會話 mount 取一次不漂移（UR3.3），故意不列 deps：卡開期間 onlineAt
+  // 凍結可接受（卡一拖即關）。
+  const apiCard = useMemo(() => {
+    const hit = apiPins.find((p) => p.id === selectedId);
+    return hit === undefined ? null : apiPinToCheckin(hit, nowMs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, apiPins]);
   const card: "self" | "want" | Checkin | null = isSelf
     ? "self"
     : isWant && wantRecord !== null
       ? "want"
-      : (MOCK_CHECKINS.find((c) => c.id === selectedId) ?? null);
+      : (mockCardHit ?? apiCard);
   const geoFailed =
     geoStatus === "denied" ||
     geoStatus === "unavailable" ||
@@ -945,13 +933,8 @@ export function DrinkMap({
         "pan-y pinch-zoom",
         "important",
       );
-      // A map drag means "I'm navigating" — clear selection, no catcher.
-      // UR2.1 (Q1 decision): the anchored card closes too — a navigating
-      // user outruns any pin anyway, and re-tapping is one touch away.
-      // URC 1.0: 扇形退役，不再需要 setFabOpen(false)。
-      map.on("dragstart", () => {
-        setSelectedId(null);
-      });
+      // DEF-20260926-007：拖圖不再關卡（UR2.1 Q1「拖圖關卡」決定推翻）——
+      // 卡只走 X／換選另一 pin／登出關閉；錨點跟 move 快照追 pin，拖圖時卡片跟著走不脫鉤。
       // URC 1.3 C3：點地圖本身（不含 overlay UI）自動收起工具列。
       // Leaflet 的 map click 只在點地圖本體觸發，overlay（城市卡、toolbar
       // 等）有自己的 click 不會冒泡到這裡。透過 ref 讀最新值，避免
@@ -1820,6 +1803,7 @@ export function DrinkMap({
       setKindChooserBeer(null);
       setGuardAction(null);
       setPendingCardId(null);
+      setFriendsOnly(false);
     };
     window.addEventListener(LOGOUT_CLEAR_EVENT, handler);
     return () => window.removeEventListener(LOGOUT_CLEAR_EVENT, handler);
@@ -2493,6 +2477,33 @@ export function DrinkMap({
             className="flex h-11 items-center justify-center rounded-full border-2 bg-card px-4 text-xs font-bold text-primary shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
           >
             {pinsRange === "7d" ? "3 個月" : "7 天"}
+          </button>
+        )}
+        {/* UR A.17 只看好友鈕：與 range pill 同列同高同隱藏條件；匿名點走登入浮層（沿打卡口徑）。 */}
+        {!(
+          sheetOpen ||
+          card !== null ||
+          (geoFailed && !guideDismissed)
+        ) && (
+          <button
+            type="button"
+            onClick={() => {
+              if (isAuthed === false) {
+                setLoginOverlayOpen(true);
+                return;
+              }
+              setFriendsOnly((v) => !v);
+            }}
+            aria-pressed={friendsOnly}
+            aria-label={friendsOnly ? t("friendsAll") : t("friendsOnly")}
+            className={`flex h-11 items-center justify-center gap-1.5 rounded-full border-2 px-4 text-xs font-bold shadow-[2px_2px_0_var(--border)] transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none ${
+              friendsOnly
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-primary"
+            }`}
+          >
+            <Users size={14} aria-hidden strokeWidth={2.5} />
+            {friendsOnly ? t("friendsAll") : t("friendsOnly")}
           </button>
         )}
         {/* URC 1.2 A3：Tonight's pick 直接觸發（不走 URL，避免同 href no-op bug） */}

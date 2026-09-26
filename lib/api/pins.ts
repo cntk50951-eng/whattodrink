@@ -6,6 +6,8 @@
  */
 
 import { HK_BOUNDS } from "../geo";
+import { parseScope } from "../friends";
+import type { PinsScope } from "../friends";
 
 export const PINS_DEFAULT_LIMIT = 100;
 export const PINS_MAX_LIMIT = 200;
@@ -83,7 +85,7 @@ export function parseRange(raw: string | null): { range: PinsRange } | { error: 
   return { error: `range 非法：${raw ?? ""}（只要 7d|90d）` };
 }
 
-export function parsePinsParams(search: URLSearchParams): { bbox: BBox; limit: number; range: PinsRange } | { error: string } {
+export function parsePinsParams(search: URLSearchParams): { bbox: BBox; limit: number; range: PinsRange; scope: PinsScope } | { error: string } {
   const bboxResult = parseBbox(search.get("bbox"));
   if ("error" in bboxResult) return bboxResult;
   const limitRaw = search.get("limit");
@@ -93,7 +95,10 @@ export function parsePinsParams(search: URLSearchParams): { bbox: BBox; limit: n
   }
   const rangeResult = parseRange(search.get("range"));
   if ("error" in rangeResult) return rangeResult;
-  return { bbox: bboxResult.bbox, limit, range: rangeResult.range };
+  // UR A.17 只看好友：scope=friends（匿名＋scope 由 route 擋 401，這裡只做形狀校驗）
+  const scopeResult = parseScope(search.get("scope"));
+  if ("error" in scopeResult) return scopeResult;
+  return { bbox: bboxResult.bbox, limit, range: rangeResult.range, scope: scopeResult.scope };
 }
 
 /** 行级校验 + 模糊：DB 行 -> PinJson 或 null（坏行跳过）。 */

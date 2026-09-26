@@ -7,6 +7,9 @@
  * 與 beers 種子表「壞行整批 500」不同，牆行是用户寫的，見註）。
  */
 
+import { parseScope } from "../friends";
+import type { PinsScope } from "../friends";
+
 export type WallSort = "hot" | "latest";
 
 export const WALL_DEFAULT_LIMIT = 20;
@@ -252,6 +255,8 @@ export type WallParams = {
   sort: WallSort;
   limit: number;
   cursor: WallCursor | null;
+  /** UR A.17 只看好友：friends 需登入（匿名＋scope 由 route 擋 401） */
+  scope: PinsScope;
 };
 
 export function parseWallParams(
@@ -268,10 +273,16 @@ export function parseWallParams(
     return { error: `limit 非法：${limitRaw ?? ""}（要 1-${WALL_MAX_LIMIT} 整數）` };
   }
   const cursorRaw = search.get("cursor");
-  if (cursorRaw === null) return { params: { sort, limit, cursor: null } };
-  const cursor = decodeCursor(cursorRaw);
-  if (cursor === null || cursor.sort !== sort) {
-    return { error: "cursor 非法或與 sort 不配" };
+  if (cursorRaw !== null) {
+    const cursor = decodeCursor(cursorRaw);
+    if (cursor === null || cursor.sort !== sort) {
+      return { error: "cursor 非法或與 sort 不配" };
+    }
+    const scopeResult = parseScope(search.get("scope"));
+    if ("error" in scopeResult) return scopeResult;
+    return { params: { sort, limit, cursor, scope: scopeResult.scope } };
   }
-  return { params: { sort, limit, cursor } };
+  const scopeResult = parseScope(search.get("scope"));
+  if ("error" in scopeResult) return scopeResult;
+  return { params: { sort, limit, cursor: null, scope: scopeResult.scope } };
 }
