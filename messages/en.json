@@ -303,6 +303,35 @@
     "modePublic": "Public",
     "switcherLabel": "Visibility mode"
   },
+  "v2": {
+    "tabMap": "Map",
+    "tabHot": "Hot",
+    "tabShoot": "Snap",
+    "tabMood": "Mood",
+    "tabTrail": "Trail",
+    "addFriendSoon": "Add friend coming soon",
+    "publishAs": "Post as…",
+    "flashTitle": "Flash · 24h",
+    "flashDesc": "Disappears after 24 hours",
+    "postTitle": "Post · stays",
+    "postDesc": "Stays until you delete it"
+  },
+  "terms": {
+    "title": "Three modes, which one?",
+    "lede": "One app, three visibility levels, switchable anytime. Check who can see you before switching.",
+    "publicName": "Public",
+    "publicDesc": "Everyone sees your check-ins and green dot; you can cheers, invite, and like anyone.",
+    "publicRisk": "Risk: block-level location and photos are visible to strangers. Stay safe out there.",
+    "friendsName": "Friends",
+    "friendsDesc": "Only mutual friends see your check-ins and green dot; interactions are friends-only.",
+    "friendsRisk": "Risk: friends can screenshot and forward. Don't add strangers lightly.",
+    "stealthName": "Stealth",
+    "stealthDesc": "You see others' public content, but can't check in, cheers, invite, or like. No heartbeat, no green dot — nobody sees you.",
+    "stealthRisk": "Risk: public content posted before going stealth stays public. Stealth is not deletion.",
+    "crossBorder": "AI analysis runs on overseas cloud services; your photos and text may be transferred abroad for processing.",
+    "ageNote": "Drinking content is for adults aged 18 and above only.",
+    "back": "Back home"
+  },
   "auth": {
     "title": "Sign in",
     "subtitle": "One Google account, no passwords to remember",

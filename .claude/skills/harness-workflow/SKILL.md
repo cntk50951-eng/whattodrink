@@ -12,19 +12,19 @@ At the **start of every development task**, follow these steps strictly:
 1. `.harness/workflow.md` — 10-step development process
 2. `.harness/coding-standards.md` — TypeScript / React / file structure / naming
 3. `.memory/` — read latest 3–5 entries (if new entries exist in last 24h, read ALL of them)
-4.依任務性質再讀 `.harness/` sub-files: `testing.md` / `git.md` / `architecture.md` / `api-workflow.md`（API 任務必讀，七步一次一個端點）
+4.依任務性質再讀 `.harness/` sub-files: `testing.md` / `git.md` / `architecture.md`
 
-(Muse tool note: load another skill's full instructions with the `read_skill` tool using its id or path from the skills catalog — never `read_file` a `bundled://` or `plugin://` path.)
+(Claude Code tool note: project skills here load via the Skill tool when their frontmatter description matches — no extra install needed once the files exist under `.claude/skills/`.)
 
 ## Hard rules
 
 - **Never auto commit / push** without user confirmation (Step 10)
 - **V1/V2 isolation (EPIC C, hard rule, both directions)**: v2 work never modifies v1 files (routes/pages/components/styles/i18n keys); v1 keeps iterating freely; shared-layer (`lib/`/`hooks/`/API) changes must stay backward compatible (additive only) + pass v1/v2 dual regression. See `.harness/workflow.md` Step 4 (V1/V2 isolation) + backlog EPIC C.
 - **UI changes**: after development, user MUST verify in browser before commit (Step 10a–10b)
-- **New lib / new version**: look up the latest API first via `web_search` + `web_fetch` (Step 3), never rely on training data
+- **New lib / new version**: look up the latest API first via the `context7` plugin (Step 3), never rely on training data
 - **Logic errors**: fix immediately, then re-run Step 3→7
 - **Defect 统一管理 (Step 7b)**: 用户提出 defect 关键词时，必须先在 `docs/DEFECTS.md` 按模板落条（ID/标题/状态/严重度/复现/期望-实际/根因/关联 UR）并走 `Open → Investigating → Fixing → Fixed → Verified → Closed` 流转；Fix 必须新建关联 UR 并走完整 10 步（同样需 gates/浏览器/CHANGELOG/memory），禁止跳过文档直接修
-- **UI design changes**: if Step 3.5 conditions hit (new page / redesign / tokens / animation), load the design skill first via `read_skill` (`stitch-design` / `design-taste-frontend` / `taste`) — brand layer (doodle) is locked, see `workflow.md`
+- **UI design changes**: if Step 3.5 conditions hit (new page / redesign / tokens / animation), load the design skill first via the Skill tool (`stitch-design` / `design-taste-frontend` / `taste`) — brand layer (doodle) is locked, see `workflow.md`
 - **Every fix / user correction / toolchain issue**: write a memory entry (Step 8)
 
 ## Environment
@@ -40,7 +40,7 @@ At the **start of every development task**, follow these steps strictly:
 2. Open browser: open http://localhost:3000/ or provide URL
 3. Wait for user to visually verify in browser
 4. Wait for user to say "OK 可以 commit" or give changes
-5. request_user_input for final commit confirmation
+5. AskUserQuestion for final commit confirmation
 6. Only then: git commit + git push
 ```
 

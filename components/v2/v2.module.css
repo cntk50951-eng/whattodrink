@@ -1,0 +1,170 @@
+/**
+ * UR C.1 v2 專用樣式（`[data-ui="v2"]` 作用域概念：本文件所有 class 只用於
+ * v2 組件，禁 v1 引用；禁改 `globals.css` 原塊與一切 v1 module css。
+ * Leaflet divIcon 的 HTML 用字串內插本 module 的 hashed 名（見 V2MapView）。
+ * 動效全走 transform／opacity；`prefers-reduced-motion` 下靜止（skill 硬規則）。
+ */
+
+/**
+ * DEF-20260926-011：v2 淺色現代 token（Snap 參照＋shadcn 語義）。
+ * 背景：doodle 主題運行時灌進 `<html>` 的 token 值會繼承下來，
+ * 此作用域在 v2 根覆蓋——只影響 v2 子樹，v1 一個像素不動。
+ * 主強調琥珀金（brand），字走深 slate 保對比（淺金底白字對比不足，
+ * 故 primary 上用深字，是現代 duotone 常見做法）。
+ */
+.v2scope {
+  --background: oklch(0.98 0.005 250);
+  --foreground: oklch(0.18 0.02 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 260);
+  /* DEF-012 round-4：主強調改 shadcn 官方 Blue 主題（registry themes.ts，
+     Blue light：primary oklch(0.488 0.243 264.376)＋fg 近白偏藍；
+     墨黑／琥珀皆退，用戶拍板要 shadcn 最佳方案。CTA 層級照舊。） */
+  --primary: oklch(0.488 0.243 264.376);
+  --primary-foreground: oklch(0.97 0.014 254.604);
+  --secondary: oklch(0.94 0.01 250);
+  --secondary-foreground: oklch(0.18 0.02 260);
+  --muted: oklch(0.94 0.01 250);
+  --muted-foreground: oklch(0.5 0.02 250);
+  --accent: oklch(0.94 0.01 250);
+  --accent-foreground: oklch(0.18 0.02 260);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.9 0.01 250);
+  --input: oklch(0.9 0.01 250);
+  --ring: oklch(0.65 0.05 250);
+  --radius: 0.75rem;
+  color-scheme: light;
+}
+
+.v2map {
+  position: absolute;
+  inset: 0;
+}
+
+/* Leaflet 容器觸控：豎滑還給頁面，雙指縮放＋橫拖歸地圖（沿 UR1.3 配方）。 */
+.v2map :global(.leaflet-container) {
+  touch-action: pan-y pinch-zoom;
+  font: inherit;
+}
+
+/* 自己：藍點＋呼吸環 */
+.v2self {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #2563eb;
+  border: 3px solid #ffffff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  position: relative;
+}
+
+.v2self::after {
+  content: "";
+  position: absolute;
+  inset: -9px;
+  border-radius: 9999px;
+  border: 2px solid rgb(37 99 235 / 0.55);
+  animation: v2-pulse 2s ease-out infinite;
+}
+
+/* 他人釘：白底首字圓＋品牌環＋右上綠點 */
+.v2pin {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid #0f172a;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  color: #0f172a;
+  position: relative;
+}
+
+.v2pinOnline {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: #16a34a;
+  border: 2px solid #ffffff;
+}
+
+/* 我的想喝釘：琥珀實心 */
+.v2pinWant {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  background: #f59e0b;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+/* 聚合簇：中性圓＋人數 */
+.v2cluster {
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  background: #0f172a;
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* 足跡序號釘 */
+.v2trailNum {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid #dc2626;
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+}
+
+/* 橫滑 pill 列隱藏滾動條（功能保留，可滑） */
+.v2noscroll {
+  scrollbar-width: none;
+}
+
+.v2noscroll::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes v2-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2self::after {
+    animation: none;
+  }
+}

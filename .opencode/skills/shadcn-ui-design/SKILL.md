@@ -63,7 +63,7 @@ npx shadcn@latest add @magicui/shimmer-button # 第三方 registry 用命名空�
 ```
 
 ### 3.2 用色铁律
-1. **一个主强调色**：全站只有一个品牌强调色（默认琥珀金，呼应威士忌/鸡尾酒）。只用在 CTA 按钮、选中态、关键高光。不要一个页面出现三种"强调色"。
+1. **一个主强调色**：token 層用 shadcn 官方 Blue（`primary oklch(0.488 0.243 264.376)`，有據）；但**按鈕面一律中性**（描邊白／淺灰 secondary，用戶拍板去色——CTA 層級靠實心 vs 描邊，不靠填色）。不要一個頁面出現三種"強調色"。
 2. **禁止硬编码**：组件里不准出现 `bg-amber-500`、`text-[#f59e0b]`，一律 token。第三方组件自带硬编码，装完第一件事换成 token。
 3. **文字层级只用三档**：`foreground` → `muted-foreground` → 更弱用透明度。不自创第四档灰。
 4. **对比度**：正文 ≥ 4.5:1，`muted-foreground` 深色底清晰可读（交用户肉眼终验）。

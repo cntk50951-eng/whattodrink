@@ -59,6 +59,13 @@
 - Server Component by default；只在需要 state/effect/event 才 `"use client"`
 - 重要 decision 在程式碼旁寫 comment（為什麼這樣選）
 
+### V1／V2 隔離（EPIC C 硬規則，用戶指令）
+
+- **v2 → v1 零修改**：EPIC C（v2 試驗場）任何改動不得修改 v1 的路由／頁面／組件／樣式／文案 key。修 v1 bug 另開 UR，不搭 v2 車。
+- **v1 → v2 零影響**：v1 照常迭代、不受限；但動共用層（`lib/`／`hooks/`／API）必須向下兼容——新增只做加法（可選參數＋默認走舊行為；禁改既有函數簽名語義、禁改既有文案 key 一字）。
+- **共用層改動雙回歸**：任一方向改了共用層，v1 與 v2 關鍵頁都要回歸（build／lint／test＋雙方目檢），一方紅即回滾。
+- **提交自查**：v2 相關 commit 前 `git status` 確認無 v1 文件（v2 文件住 `app/[locale]/v2/...`＋自帶 module css，鐵律見 backlog EPIC C）。
+
 ## Step 5 · 編譯驗證 + 單元測試（**預設跳過**，省 token）
 
 > 用戶偏好（成本考量）：自動測試**預設不跑**，改由作者手動驗證（Step 10）。
@@ -223,6 +230,7 @@ UI 全確定前不建表，但數據文檔（`docs/data/`）必須與前端同�
 □ Step 2 — 疑慮有問完、思考摘要已輸出（≥2 路徑＋取捨＋否決理由）
 □ Step 3 — API 查過最新版本
 □ Step 4 — coding-standards 對齊
+□ 隔離 — v2 單含 v2 文件（無 v1）；共用層改動向後兼容＋v1／v2 雙回歸
 □ Step 5 — build / lint / test 全綠（**預設跳過**，如跑則全綠才能進 step 6；API 任務另檢 `.harness/api-workflow.md` 七步）
 □ Step 6 — UI 功能由作者瀏覽器實際點過（AI 不代做）
 □ Step 7 — 看到的錯都修了（root cause 不是 patch）、UR 改動記錄已回寫

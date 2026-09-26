@@ -1751,6 +1751,148 @@ UR A.17 好友模式（關係讀＋friends可見＋綠點＋只看好友鈕）[�
 
 ---
 
-UR A.18 公開模式收尾＋T&C頁 []
+UR A.18 公開模式收尾＋T&C頁 [✓]
 
-公開模式即現預設行為，本 UR 只做收尾驗收＋T&C 頁（路由＋文案：三模式差異＋各自風險，大綱沿 A.15 D6），承 A.17 之後。牆頁 scope 消費者（篩選 UI）屆時一併定。細化另議。
+作為用戶，我要点 Footer 的條款看到三種模式的差異與風險（公開會被誰看、好友有何限制、隱身能看不能動），以及年齡與資料處理說明；公開模式本身即預設行為，本 UR 只做收尾回歸不改邏輯。
+
+### 背景
+- Footer `/terms` 現死鏈（404），`/privacy`／`/about` 同病（本 UR 只補 `/terms`，其餘記缺口另議）
+- 文案大綱沿 A.15 D6；版式沿 mood stub（Server Component＋Container／Stack＋塗鴉卡）
+
+### 範圍
+1. `app/[locale]/terms/page.tsx`：三模式卡（差異＋各自風險）＋境外處理行＋成年行＋回首頁鈕；`terms` 三語 14 key；純靜態（reduced-motion 天然合規）
+2. Footer `/terms` 鏈即生效（鏈已在，零改）
+3. 公開收尾回歸（零代碼）：預設 `scope=all`、公開寫入派生、公開綠點人人見——隨三閘＋用戶瀏覽器目檢
+
+### 非目標
+- 牆頁 scope 篩選 UI（另議）、T&C 同意勾選流（註冊同意另議）、`/privacy`／`/about` 頁
+
+### AC
+- `/terms` 三語可開：三模式差異＋風險＋境外＋年齡行齊全；手機／桌面不破版
+- Footer 點條款即達；公開三條回歸用户目檢通過
+- 三閘全綠
+
+*改動記錄*
+- 2026-09-26：佔位展開＋開工置 [WIP]（用戶指令構建 A.18）
+- 2026-09-26：實現完待驗（terms 靜態頁＋三語14鍵＋Footer鏈生效；237綠／lint 0 error／build 36頁；EPIC B／B.1／B.2 同批建檔置[]）
+- 2026-09-26：用戶確認（零邏輯改動，三閘即驗收），置 [✓]
+
+---
+
+EPIC B　好友邀請即時流 []
+
+> 新 EPIC（A 系之外獨立編號：B＝Buddy／邀請社交線）。目標：加好友邀請的發收回免刷新——對方邀請即時現身、我方接受／拒絕即時生效，不靠手動刷新。技術線：Supabase Realtime `postgres_changes`（架構既定，不另加狀態庫／WebSocket 自建）；頻道按 RLS 過濾自相關行，卸載即拆；Publication＋REPLICA IDENTITY 為 Dashboard 動作（agent 只給步驟，用戶執行）。
+
+> 含 UR B.1（表補強）＋B.2（邀請中心＋realtime）。非目標：push 通知（to-do A.4-15，另議）、陌生人私訊（永不）、加好友搜尋（另議）。
+
+UR B.1　friendships 表補強（audit 列）[]
+
+作為開發者，friendships 現只有雙方 id＋狀態，日後無法 audit（何時、因何事認識、在哪），我要補齊時間與來源列再往下做邀請中心。
+
+### 背景（用戶指令：表太簡單，加時間地點信息方便 audit）
+- 現狀（0007 建）：`id／user_id／friend_id／status／created_at`；地點無、更新／回應時間無、來源無
+
+### 範圍（`supabase/migrations/0011_friendships_audit_columns.sql`，用戶執行）
+1. 加列：`updated_at timestamptz NOT NULL DEFAULT now()`（舊行回填 `=created_at`）、`responded_at timestamptz`（接受／拒絕時刻，發起時 NULL）、`expires_at timestamptz`（邀請 24h 有效，server 寫入沿 flash 配方；接受後可 NULL）、`source_checkin_id uuid NULL REFERENCES checkins(id) ON DELETE SET NULL`（因哪張打卡認識的——地點時間由該行 join，表本身不存經緯）
+2. 索引：`expires_at`（過期掃）；RLS 不動（0010 沿用）；`future-schema.md` 同步
+3. `POST /friends` 寫入帶 `expires_at=now()+24h`（＋單測影響面：parse 不變，route 小改）
+
+### 非目標
+- 列表／接受 UI（B.2）、過期 cron（B.2 lazy 先行，掃表另議）、經緯直存（由來源行 join，不冗餘）
+
+### AC
+- migration 可重放；舊行四列回填正確；RLS 行為不變；三閘全綠
+
+UR B.2　邀請中心（列表＋接受／拒絕＋realtime 靜態刷新）[]
+
+作為用戶，我收到好友邀請要即時看到（不刷新頁面），可接受／拒絕；我發出的邀請看得到狀態（待定／已成／過期）。
+
+### 背景（用戶指令：靜態刷新收發回，大新功能，EPIC B 管理）
+- 現狀：單向邀請靜默入庫，對方零感知（A.19 驗收結論）；成好友只靠雙向互加
+
+### 範圍
+1. `GET /friends/invites?box=incoming|outgoing`（🔒）：incoming＝別人加我的 pending（含對方 nickname＋來源打卡摘要），outgoing＝我發的 pending／accepted／expired（lazy：讀時判 `expires_at`，不掃表）
+2. 接受／拒絕 incoming：`PATCH /friends/:id {action: accept|decline}`（🔒；decline＝刪行，需另加 delete policy，另批或同 migration；accept＝accepted＋`responded_at=now()`）
+3. 邀請中心 UI（入口位置待設計決策：城市卡旁／BottomNav 紅點／獨立頁三選一）：列表＋接受／拒絕＋狀態＋空態；三語
+4. Realtime：`friendships` `postgres_changes` 訂閱自相關行（RLS 過濾），到行即刷列表＋紅點，不整頁 reload；斷線重連＋降級（重連失敗回手動刷新，不靜默丟）；卸載拆頻道
+5. 過期：UI 灰掉 expired＋重邀入口；掃表 cron 另議
+
+### 非目標
+- push 通知、搜尋加好友、群組／拉黑（blocked 枚舉保留不用）
+
+### AC
+- 雙號互加：B 號免刷新即見邀請；接受→雙方 accepted＋`responded_at` 落；拒絕→行消失
+- 過期（改系統時間或等 24h 可驗）：灰掉＋不可接受＋可重邀
+- 斷網重連不丟訂閱；三閘全綠；Dashboard Publication 步驟用戶執行
+
+---
+
+EPIC C　UI v2 試驗場（shadcn 現代化，與 v1 並存比效果）
+
+> 用戶指令：試哪個版本更好；v2 用 shadcn 現代風；**現有版本全部保留，路由頁面徹底分開、互不影響**。
+> 編號註記：本 EPIC 下 UR 為 `C.1／C.2…`（**非 URC Chris 系列**，見 URC 1.0 註記；兩者並存，引用時帶全名）。
+> 狀態：EPIC 開立；首個 UR 待用戶發布 v2 細節後建檔。
+
+### 鐵律（v1 凍結，違反即回滾）
+
+1. **現有文件凍結**：v2 不許改 v1 任何路由／頁面／組件／樣式文件。修 v1 bug 另開 UR，不搭 v2 車；每單 v2 commit 前 `git status` 自查無 v1 文件。
+2. **路由頁面全分開**：v2 住 `app/[locale]/v2/...`（`/v2`、`/v2/wall`…），與 v1 同級文件一一對應但**獨立文件**，不複用 v1 頁面組件。
+3. **共用白名單**：僅 `lib/`、`hooks/`、API routes、`messages`（v1 key 只讀；v2 新文案走新增 key，禁改 v1 key 一字）。共用層若需為 v2 加參數，必須向下兼容（可選參數＋默認走 v1 行為）。
+4. **樣式隔離**：禁改 `globals.css` 與一切 v1 `*.module.css`；v2 自帶 module css 或 `[data-ui="v2"]` 作用域；地圖用 Leaflet 原生 skin＋標準 pin（ doodle 濾鏡／紙紋／貼紙釘一律不進 v2）。
+5. **入口**：先直連 URL（v1 零改動）；v1 內加 v2 入口（如橫幅／切換鈕）另開 UR，免污染 v1。
+6. **驗收門**：每單附 v1 回歸（三閘全綠＋v1 關鍵頁目檢無變化）＋v2 獨立驗收；邏輯 bug 修在共用層時，v1／v2 雙回歸。
+
+### 首批候選（等用戶細節逐條建 UR）
+
+- C.1 待定（用戶將發布第一批 v2 改動細節）
+
+---
+
+UR C.1　v2 首頁（Snap Map 式 shadcn 重排）[✓]
+
+參考 Snap Map 首頁截圖（用戶提供 2026-09-26＋行業調研），用 shadcn 把主頁重排成現代地圖 App 樣子：全屏地圖＋頂欄＋橫滑 pills＋右緣工具列＋底部 CTA 列＋五格 tab bar。v1 一個像素不動（EPIC C 鐵律）。
+
+### 截圖元素 → v2 映射（分析結論）
+
+| Snap 元素 | v2 落法 | 複用 |
+|---|---|---|
+| 全屏淺色街道圖 | 全屏 Leaflet，底圖沿 OSM raster（免 key；CARTO 現全面要 key，否則水印，調研確認不碰；OpenFreeMap＋MapLibre 兩新依賴太重，記 C.x 候選） | `lib/geo` 常數 |
+| 頂欄：城市名＋天氣＋雙頭像 | 左頭像（我）＋中城市名＋在線態；**天氣行 omit**（無數據源，另開 UR 前不做）；右頭像暫以模式鈕代（見下） | `resolveCityCode`、`touchVisit`、`MOCK_ME`／`users` |
+| 橫滑 pill 列（回憶／熱門／足跡…） | 橫滑 5 chips：今晚喝什麼／拍照分享／熱門／足跡／搖一搖（白 `rounded-full`，可橫滾） | 各動作既有 handler 邏輯（新文件重接線，不引 v1 組件） |
+| 中央大 marker＋地名卡 | 標準圓釘（首字圓＋品牌環＋在線綠點，零 doodle）；選中彈 shadcn `Card` 底部小浮層（酒／時間／地點／乾杯／邀約沿舊字段） | pins API＋`toPinJson`、守衛（`useMyMode`＋`ModePrompt` 邏輯沿用，皮換新） |
+| 右緣垂直白鈕列 | 睇全港／回位／足跡／搖一搖，白圓鈕垂直列（shadcn `Button size=icon rounded-full`＋`shadow-sm`） | 同左各動作 |
+| 模式入口（Snap 齒輪位） | 右列頂加模式鈕，點開 shadcn `Popover` 三檔（沿用 `PATCH /me`＋守衛，UI 全新） | `useMyMode`、`ModePrompt` |
+| 底部浮動列（搜索＋頭像＋添加好友大 pill） | 主 CTA「今晚飲咩？」（primary 大 pill）＋拍照圓鈕；**添加好友 pill 保留佔位**（用戶拍板：點彈「即將上線」toast，不接假功能，後續完善） | 選酒 L1／L2 邏輯（面板皮換 shadcn `Sheet`？首版可沿底部抽屜結構換膚，細節 C.1 內定） |
+| 底部 TabBar 5 格＋紅點 | 地圖／熱門／拍照（居中顯眼）／心情／**足跡**（用戶拍板，地圖內開關，零新路由）；紅點用 `components/ui/badge`（registry 現成） | 去向見決策 Q1（跨頁暫鏈 v1 頁，C.x 再鏡像） |
+
+### 範圍
+1. 新文件：`app/[locale]/v2/page.tsx`＋`components/v2/*`＋自帶 module css（`[data-ui="v2"]` 作用域，禁碰 `globals.css` 原塊）；文案用新 key（v1 key 只讀）
+2. 只用 `components/ui/` 現成（button／card／badge／popover／dropdown-menu 皆已有，不夠先 `add`，禁手搓 shadcn 風）
+3. 邏輯全複用共用層（pins／mode／cheers 額度／i18n），行為與 v1 一致（乾杯／邀約／守衛／限額一個不少）
+4. 淺色鎖定：C.1 只做淺色 chrome（跟 Snap 參照）；skill 的 dark-first 在此讓路（參考即淺色），`.v2-dark` 留樁位不實現，dark 另開 C.x
+
+### 非目標
+- 天氣、搜索加好友、聊天／故事（無此功能不造假入口）、dark mode、v1 任何文件、共用層行為改動
+
+### AC
+- 首屏元素與映射表一一對應（全屏圖／頂欄／pills 可滾／右列／底部列／tab bar＋紅點＋safe-area），手機 390＋桌面目檢
+- 全部按鈕真工作（選酒／拍照／熱門／足跡／搖一搖／回位／全港／模式切換／乾杯／邀約＋守衛）；三語＋reduced-motion 合規
+- 隔離門：`git status` 無 v1 文件；三閘全綠；v1 關鍵頁回歸無變化
+
+*改動記錄*
+- 2026-09-26：建檔置 []（截圖＋底圖調研＋映射表；tab 第 5 格／添加好友 pill／dark 延後待拍板，不擅自開工）
+- 2026-09-26：用戶拍板（第 5 格＝足跡／添加好友 pill 保留佔位＋即將上線 toast／dark 延後確認）；待開工指令
+- 2026-09-26：開工置 [WIP]＋實現完待驗（v2 首頁全量新文件＋共用層複用＋隔離門過；241綠含v2Pins 4測／lint 0 error／build 39頁含/v2×3；待用戶瀏覽器驗收）
+- 2026-09-26：fix DEF-20260926-010（render-Link補nativeButton×4＋v2noscroll改hashed引用；三閘綠，待复驗）
+- 2026-09-26：fix DEF-20260926-011（doodle運行時token污染→v2scope作用域覆蓋淺色現代；globals零動；三閘綠，待复驗）
+- 2026-09-26：fix DEF-20260926-012 返工（疊加層z-10被panes壓→全z-1000＋根isolate；根改fixed全屏footer不可達；Avatar裝不上改現成primitives＋Separator；三閘綠，待复驗記硬刷新）
+- 2026-09-26：fix DEF-012 round-2（invalidateSize自適應＋選酒Sheet换shadcn件＋頂部單容器左對齊＋ring融合感；附带修空edit吞useEffect；三閘綠）
+- 2026-09-26：fix DEF-012 round-3（弹窗殘留button全换件＋主色去橘改墨黑＋skill同步；漏關Card即修；三閘綠，待复驗）
+- 2026-09-26：fix DEF-012 round-4（黑退位改官方Blue主题＋skill同步；三閘綠，待复驗）
+- 2026-09-26：fix DEF-012 round-5（按鈕面全去色：描邊白／淺灰secondary，primary留備用；skill同步；三閘綠，待复驗）
+- 2026-09-26：fix DEF-012 round-6（pills 首颗漏網去色，v2 零藍驗訖；三閘綠，待复驗）
+- 2026-09-26：用戶驗收通過（版式＋全按鈕＋守衛＋配色），置 [✓]；隨本 commit 合 main
+- 候選面（暫存）：BottomNav＋卡片試點、地圖原生 skin、列表頁 shadcn 化——正式範圍以用戶指令為準，不預支。
+
+*改動記錄*
+- 2026-09-26：建檔置 []（用戶指令 EPIC B 管理＋表補強；realtime 實現待拍板後動工）

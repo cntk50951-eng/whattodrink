@@ -303,6 +303,35 @@
     "modePublic": "公开",
     "switcherLabel": "可见模式"
   },
+  "v2": {
+    "tabMap": "地图",
+    "tabHot": "热门",
+    "tabShoot": "拍照",
+    "tabMood": "心情",
+    "tabTrail": "足迹",
+    "addFriendSoon": "加好友即将上线",
+    "publishAs": "发布为…",
+    "flashTitle": "快贴 · 24h",
+    "flashDesc": "24 小时后自动消失",
+    "postTitle": "帖子 · 永久",
+    "postDesc": "永久保留，直到你删除"
+  },
+  "terms": {
+    "title": "三种模式，怎么选？",
+    "lede": "同一个 App，三种可见度，随时可切换。切换前看清每种模式谁能看到你。",
+    "publicName": "公开",
+    "publicDesc": "所有人看到你的打卡和绿点，你可以和任何人干杯、约喝酒、点赞。",
+    "publicRisk": "风险：街区级位置和照片会被陌生人看到，外出喝酒注意安全。",
+    "friendsName": "好友",
+    "friendsDesc": "只有互加好友的人才能看到你的打卡和绿点，只可与好友互动。",
+    "friendsRisk": "风险：好友截图转发不可控，不熟的人不要乱加。",
+    "stealthName": "隐身",
+    "stealthDesc": "看得到别人的公开内容，但不可打卡、干杯、约喝酒、点赞；无心跳、无绿点，谁都看不到你。",
+    "stealthRisk": "风险：切换隐身前发过的公开内容依然公开；隐身不是删除。",
+    "crossBorder": "AI 分析会使用海外云端处理，你的照片和文字可能会被传输到境外处理。",
+    "ageNote": "饮酒内容仅适合 18 岁或以上人士。",
+    "back": "返回主页"
+  },
   "auth": {
     "title": "登录",
     "subtitle": "一个 Google 账号走天下，不用记密码",
