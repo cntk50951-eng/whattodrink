@@ -1,5 +1,7 @@
 import type { ComponentType } from "react";
 import { AsahiIcon } from "./asahi-super-dry";
+import { AndesIcon } from "./andes";
+import { AntarcticaIcon } from "./antarctica-original";
 import { BlueGirlIcon } from "./blue-girl";
 import { BohemiaIcon } from "./bohemia";
 import { BrahmaIcon } from "./brahma";
@@ -54,35 +56,35 @@ export type BeerWallEntry = {
  */
 export const BEER_WALL: BeerWallEntry[] = [
   { en: "Asahi Super Dry", cn: "銀罐", pickId: "asahi", type: "乾拉格", Icon: AsahiIcon },
-  { en: "Corona Extra", cn: "透明瓶＋青檸", type: "淡拉格", Icon: CoronaIcon },
+  { en: "Corona Extra", cn: "透明瓶＋青檸", pickId: "corona-extra", type: "淡拉格", Icon: CoronaIcon },
   { en: "Tsingtao Classic", cn: "綠瓶", pickId: "tsingtao", type: "淡拉格", Icon: TsingtaoIcon },
-  { en: "Blue Girl", cn: "藍妹", type: "皮爾森", Icon: BlueGirlIcon },
-  { en: "Hoegaarden", cn: "六角杯", type: "小麥白啤", Icon: HoegaardenIcon },
+  { en: "Blue Girl", cn: "藍妹", pickId: "blue-girl", type: "皮爾森", Icon: BlueGirlIcon },
+  { en: "Hoegaarden", cn: "六角杯", pickId: "hoegaarden", type: "小麥白啤", Icon: HoegaardenIcon },
   { en: "Heineken", cn: "綠瓶紅星", pickId: "heineken", type: "淡拉格", Icon: HeinekenIcon },
-  { en: "Kirin Ichiban", cn: "一番搾", type: "淡拉格", Icon: KirinIcon },
-  { en: "Yebisu", cn: "金罐", type: "拉格", Icon: YebisuIcon },
-  { en: "Young Master", cn: "少爺", type: "淡艾", Icon: YoungMasterIcon },
-  { en: "Moutai Flying Fairy", cn: "茅台", type: "醬香白酒", Icon: MoutaiIcon },
-  { en: "Budweiser", cn: "百威", type: "美式拉格", Icon: BudweiserIcon },
-  { en: "Carlsberg", cn: "嘉士伯", type: "皮爾森", Icon: CarlsbergIcon },
-  { en: "Sapporo", cn: "札幌", type: "拉格", Icon: SapporoIcon },
-  { en: "Snow", cn: "雪花", type: "淡拉格", Icon: SnowIcon },
-  { en: "Yanjing", cn: "燕京", type: "淡拉格", Icon: YanjingIcon },
-  { en: "Harbin", cn: "哈尔滨", type: "拉格", Icon: HarbinIcon },
-  { en: "Bud Light", cn: "百威淡啤", type: "淡拉格", Icon: BudLightIcon },
-  { en: "Coors Light", cn: "酷姿淡啤", type: "淡拉格", Icon: CoorsLightIcon },
-  { en: "Miller Lite", cn: "米勒淡啤", type: "淡拉格", Icon: MillerLiteIcon },
-  { en: "Modelo Especial", cn: "莫德罗", type: "淡拉格", Icon: ModeloIcon },
-  { en: "Negra Modelo", cn: "莫德罗黑啤", type: "深色拉格", Icon: NegraModeloIcon },
-  { en: "Pacifico", cn: "太平洋", type: "皮爾森", Icon: PacificoIcon },
-  { en: "Tecate", cn: "特卡特", type: "淡拉格", Icon: TecateIcon },
-  { en: "Dos Equis", cn: "双 X", type: "淡拉格", Icon: DosEquisIcon },
-  { en: "Sol", cn: "太阳", type: "淡拉格", Icon: SolIcon },
-  { en: "Bohemia", cn: "波西米亚", type: "皮爾森", Icon: BohemiaIcon },
-  { en: "Victoria", cn: "维多利亚", type: "維也納拉格", Icon: VictoriaIcon },
-  { en: "Indio", cn: "印第欧", type: "深色拉格", Icon: IndioIcon },
-  { en: "Skol", cn: "斯库尔", type: "皮爾森", Icon: SkolIcon },
-  { en: "Brahma", cn: "布拉马", type: "皮爾森", Icon: BrahmaIcon },
+  { en: "Kirin Ichiban", cn: "一番搾", pickId: "kirin-ichiban", type: "淡拉格", Icon: KirinIcon },
+  { en: "Yebisu", cn: "金罐", pickId: "yebisu", type: "拉格", Icon: YebisuIcon },
+  { en: "Young Master", cn: "少爺", pickId: "young-master", type: "淡艾", Icon: YoungMasterIcon },
+  { en: "Moutai Flying Fairy", cn: "茅台", pickId: "moutai-flying-fairy", type: "醬香白酒", Icon: MoutaiIcon },
+  { en: "Budweiser", cn: "百威", pickId: "budweiser", type: "美式拉格", Icon: BudweiserIcon },
+  { en: "Carlsberg", cn: "嘉士伯", pickId: "carlsberg", type: "皮爾森", Icon: CarlsbergIcon },
+  { en: "Sapporo", cn: "札幌", pickId: "sapporo", type: "拉格", Icon: SapporoIcon },
+  { en: "Snow", cn: "雪花", pickId: "snow", type: "淡拉格", Icon: SnowIcon },
+  { en: "Yanjing", cn: "燕京", pickId: "yanjing", type: "淡拉格", Icon: YanjingIcon },
+  { en: "Harbin", cn: "哈尔滨", pickId: "harbin", type: "拉格", Icon: HarbinIcon },
+  { en: "Bud Light", cn: "百威淡啤", pickId: "bud-light", type: "淡拉格", Icon: BudLightIcon },
+  { en: "Coors Light", cn: "酷姿淡啤", pickId: "coors-light", type: "淡拉格", Icon: CoorsLightIcon },
+  { en: "Miller Lite", cn: "米勒淡啤", pickId: "miller-lite", type: "淡拉格", Icon: MillerLiteIcon },
+  { en: "Modelo Especial", cn: "莫德罗", pickId: "modelo-especial", type: "淡拉格", Icon: ModeloIcon },
+  { en: "Negra Modelo", cn: "莫德罗黑啤", pickId: "negra-modelo", type: "深色拉格", Icon: NegraModeloIcon },
+  { en: "Pacifico", cn: "太平洋", pickId: "pacifico", type: "皮爾森", Icon: PacificoIcon },
+  { en: "Tecate", cn: "特卡特", pickId: "tecate", type: "淡拉格", Icon: TecateIcon },
+  { en: "Dos Equis", cn: "双 X", pickId: "dos-equis", type: "淡拉格", Icon: DosEquisIcon },
+  { en: "Sol", cn: "太阳", pickId: "sol", type: "淡拉格", Icon: SolIcon },
+  { en: "Bohemia", cn: "波西米亚", pickId: "bohemia", type: "皮爾森", Icon: BohemiaIcon },
+  { en: "Victoria", cn: "维多利亚", pickId: "victoria", type: "維也納拉格", Icon: VictoriaIcon },
+  { en: "Indio", cn: "印第欧", pickId: "indio", type: "深色拉格", Icon: IndioIcon },
+  { en: "Skol", cn: "斯库尔", pickId: "skol", type: "皮爾森", Icon: SkolIcon },
+  { en: "Brahma", cn: "布拉马", pickId: "brahma", type: "皮爾森", Icon: BrahmaIcon },
 ];
 
 /** Android-safe asset slug: `Modelo Especial` → `modelo_especial`. */

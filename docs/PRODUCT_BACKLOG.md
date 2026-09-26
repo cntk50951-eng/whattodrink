@@ -445,6 +445,16 @@
 - batch1＋2（30 图）：家族去重 1144－25＝1119（整词＋去括号，獭祭等清酒不误杀），
   台账 `11-icon-progress.md` 批批报剩余；frame 类型 caption＋BEER_WALL 单源＋
   `export:icons` 移动端顺带产出（见 skill `beer-icon` 第 5 节）
+- batch3a（2026-09-26，用户拍板补静态缺口 12 枚之首批 5，未验收不合入）：
+  Guinness Draught（黑罐金竖琴→`stout`，啤酒 lane 收尾之一）／Craft IPA
+  （鬱金香杯琥珀＋酒花，泛稱演繹版→`ipa`，啤酒 lane 收尾之二）／Yamazaki 12
+  （方瓶＋山崎＋金 12→`yamazaki-12`）／Kaku Highball（角瓶＋高球杯→`highball`）／
+  Dassai 45（白标藍字＋紅印→`dasai-45`）。参照：curl 沙盒断网看不到直图，
+  改多源文字 livery 交叉（官网＋包装报道＋搜圖描述，v3 教训允许之“搜圖描述”口径），
+  如实记；IPA／角嗨标演繹版待用户送审定夺。typeLabel：世濤／印度淡艾／單一麥芽／
+  高球／大吟釀（frame＋wall 雙記一致）。別名 5 組（健力士／精釀／山崎／角嗨角瓶／獺祭；
+  精釀泛指回 IPA 通用杯，首個泛稱映射）。wall.test 2 新增＋2 舊斷言翻轉（Highball／IPA
+  由 null 轉命中，yamazaki-12 由 null 轉命中）；預覽頁零改（自動讀牆）。
 - 商标：POC 内部评审用途，上线前需法务过目（记缺口）
 - 旧存档／推荐面板不接新 icon（接线另开 UR）
 *驗收標準（Acceptance Criteria）*
@@ -1776,6 +1786,37 @@ UR A.18 公開模式收尾＋T&C頁 [✓]
 - 2026-09-26：佔位展開＋開工置 [WIP]（用戶指令構建 A.18）
 - 2026-09-26：實現完待驗（terms 靜態頁＋三語14鍵＋Footer鏈生效；237綠／lint 0 error／build 36頁；EPIC B／B.1／B.2 同批建檔置[]）
 - 2026-09-26：用戶確認（零邏輯改動，三閘即驗收），置 [✓]
+
+---
+
+UR A.20　酒圖本地優先（local-first，web／ios／aos 同源）[✓]
+
+動機（用戶指令）：酒圖漸多，API 取圖（本地畫→導出→上傳 bucket→DB→API→客戶端）鏈太長，DB＋storage 雙雙站在渲染關鍵路徑上。源頭本就在本地（`BEER_WALL` 30 手繪 SVG＋exported ios／aos 已落地），web 應同源直讀。
+
+### 範圍
+1. `wall.ts`：27 個無 pickId 條目全補 pickId（目錄 id；Moutai 用 `moutai-flying-fairy`）
+2. `lib/beers.ts`：靜態目錄加 26 行（seed 已有品牌全收；emoji／category 沿 seed，tagline 港味短句；Moutai 行 category `spirits`）＋`BEER_CATEGORIES` 加 `baijiu` lane（match `["spirits"]`，labelKey `catBaijiu`；L1 兩端自動長 lane）
+3. 三語 `map.catBaijiu`（中國白酒／中国白酒／Baijiu）
+4. 渲染 local-first（本地 SVG＞`icon_url`＞emoji）：v1 `BeerIcon`、v2 `BeerImg` 同配方；v2 地圖釘改 createRoot 注入本地組件（無圖回現行 img／emoji）
+5. 單測：`wall.test.ts` 加覆蓋鎖（pickId 唯一＋全靜態 drawn id 可解）；靜態行由既有 orphan 測試覆蓋
+
+### 非目標
+- DB／API 零動（`icon_url` 列保留作 override＋舊客戶端；seed 已有 26 行不動；Moutai 未進 DB，API 換源碰不到它——靜態保底覆蓋）
+- 新 lane 版式設計（L1 自動長格，沿現有列表行／宮格樣式）
+- v1 塗鴉皮／v2 淺色皮改動（只換圖源，不換皮）
+
+### AC
+- 斷網（API 換源失敗）下 30 已畫品牌全出本地圖（預覽牆＋選酒 L2＋自卡＋地圖釘）
+- 無圖品牌（malbec／yamazaki／mojito 等）保持現行 img／emoji 不變
+- 新圖接入＝wall 加一行（pickId），單測鎖死（缺 pickId 即紅）
+- 三閘全綠；v1／v2 雙端用戶目檢（共用層＋v1 渲染皆動，雙回歸）
+
+*改動記錄*
+- 2026-09-26：建檔置 []（用戶拍板 local-first＋React SVG＋全覆蓋；問答定案；編號 A.20 因動 v1＋共用層不進 EPIC C；待開工指令）
+- 2026-09-26：開工置 [WIP]；實現完待驗（靜態＋27 行＋baijiu lane＋catBaijiu×3；wall 全 30 pickId；BeerIcon／BeerImg／地圖釘 local-first；248綠／lint 0 error／build 39頁；待用戶 v1＋v2 雙端瀏覽器驗收）
+- 2026-09-26 round-2（用戶測試返工）：① Sheet 主角圖太小→BeerImg 加 `tall`（本地 3:4 豎幅）＋hero w-28；② DEF-015 unmount 撞渲染期→`unmountRootsAsync` microtask 延後（Fixing）；三閘重綠待複驗
+- 2026-09-26 round-3（選酒格太小）：L2 九宮格＋換酒格全切 `tall`（三列不動格子長高，舊鏈同框跟長；L1 芯片 h-12）；三閘重綠待驗
+- 2026-09-26 round-4（真根因）：agent-browser 量出 svg 被壓 16×16——shadcn Button `[&_svg:not([class*='size-'])]:size-4` reset（v1 手搓 button 無此規故正常）；三處品牌 svg 改 `size-full`（自帶 size- 即豁免）；用戶驗收通過，置 [✓] 合入 main（batch3a 並行未驗收不搭車，見 memory）
 
 ---
 

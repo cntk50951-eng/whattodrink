@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import type { BeerIconComponent } from "./wall";
+
 type BeerIconFrameProps = {
   /** Unique per icon — duplicate filter ids break once 10 SVGs share a page. */
   filterId: string;
@@ -72,4 +74,20 @@ export function BeerIconFrame({
       ) : null}
     </svg>
   );
+}
+
+/**
+ * UR A.20 本地圖靜態殼：把 `BEER_WALL` 查出的動態組件包成靜態 tag。
+ * 背景：`react-hooks/static-components` 在用 hooks 的組件裡禁動態 tag
+ * （`<Local />` 即報，不管引用穩不穩定）；無 hooks 的殼不受檢，
+ * 調用方一律 `<WallIcon Icon={...} />`，不再各寫 eslint-disable。
+ */
+export function WallIcon({
+  Icon,
+  className,
+}: {
+  Icon: BeerIconComponent;
+  className?: string;
+}): ReactNode {
+  return <Icon className={className} />;
 }

@@ -7,6 +7,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { createRoot } from "react-dom/client";
+import type { Root } from "react-dom/client";
 import type * as Leaflet from "leaflet";
 
 import {
@@ -21,6 +23,7 @@ import {
 } from "@/lib/geo";
 import type { LatLng } from "@/lib/geo";
 import { clusterPoints } from "@/lib/clusters";
+import type { BeerIconComponent } from "@/components/marketing/beer-icons/wall";
 import type { V2Marker } from "./v2Pins";
 import styles from "./v2.module.css";
 
@@ -34,6 +37,8 @@ export type V2WantMarker = {
   emoji: string;
   /** UR C.4：品牌圖 URL（有則釘上顯示品牌圖，無則琥珀底 emoji 回退）。 */
   iconUrl: string | null;
+  /** UR A.20：本地 SVG 組件（有則 createRoot 注入優先於 img／emoji）。 */
+  Icon: BeerIconComponent | null;
 };
 
 export type V2TrailMarker = {
@@ -70,6 +75,25 @@ function escAttr(s: string): string {
 }
 
 /**
+ * DEF-20260926-015 確診根因：`root.unmount()` 跑在別樹渲染提交途中，
+ * React 即報 race（同步 unmount 禁在渲染期）。改 microtask 延後一拍，
+ * 圖層 DOM 已同步摘除（`layer.remove()` 照舊），只晚清 React 內部態；
+ * 併發重建導致的重複卸載用 try/catch 吞掉。純函數（數組＋定時，無 JSX）。
+ */
+function unmountRootsAsync(roots: Root[]): void {
+  if (roots.length === 0) return;
+  queueMicrotask(() => {
+    for (const r of roots) {
+      try {
+        r.unmount();
+      } catch {
+        // 已卸載或併發清理過——DOM 早摘，無事可做
+      }
+    }
+  });
+}
+
+/**
  * UR C.1 v2 地圖：Leaflet 原生 skin（零 doodle 濾鏡／紙紋），標準圓釘。
  * 共用層複用（geo 常數＋clusterPoints）；markers 按 props 重建；
  * 操作經 ref 暴露（父層按鈕調）。 reduced-motion 讀掛載時一次。
@@ -83,6 +107,16 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
   const layerRef = useRef<Leaflet.LayerGroup | null>(null);
   const trailRef = useRef<Leaflet.Polyline | null>(null);
+  // UR A.20：divIcon 是 HTML 字串，本地 SVG 組件用 createRoot 注入佔位槽；
+  // 圖層重建／卸載時逐個 unmount（render 內不許寫 ref，只在 effect 內動）。
+  const artRoots = useRef<Root[]>([]);
+  useEffect(() => {
+    return () => {
+      const cur = artRoots.current;
+      artRoots.current = [];
+      unmountRootsAsync(cur);
+    };
+  }, []);
   // 回調 ref 化（marker 點擊閉包讀最新，不重建圖層樹；render 內不許寫 ref）。
   const cbRef = useRef({ onPinClick, onWantClick });
   useEffect(() => {
@@ -198,6 +232,8 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
     if (!mapReady || map === null || L === null) return;
     layerRef.current?.remove();
     trailRef.current?.remove();
+    unmountRootsAsync(artRoots.current);
+    artRoots.current = [];
     const layer = L.layerGroup();
 
     // 他人：像素聚合（沿 UR2.8），單釘原樣、多釘數字簇（點之放大散開）
@@ -239,8 +275,24 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       badge.addTo(layer);
     }
 
-    // 我的想喝釘（有品牌圖上圖＋琥珀環保身份，無圖沿舊琥珀實心 emoji）
+    // 我的想喝釘（UR A.20 本地 SVG 注入優先；無圖沿舊 img／emoji 鏈）
+    const pendingArt: { marker: Leaflet.Marker; Icon: BeerIconComponent }[] = [];
     for (const w of wants) {
+      if (w.Icon !== null) {
+        const Icon = w.Icon;
+        const marker = L.marker([w.lat, w.lng], {
+          icon: L.divIcon({
+            className: "",
+            html: `<div class="${styles.v2pinWantImg}"><span data-art="1"></span></div>`,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20],
+          }),
+        });
+        marker.on("click", () => cbRef.current.onWantClick(w.id));
+        marker.addTo(layer);
+        pendingArt.push({ marker, Icon });
+        continue;
+      }
       const img =
         w.iconUrl !== null && /^https?:\/\//.test(w.iconUrl)
           ? `<div class="${styles.v2pinWantImg}"><img src="${escAttr(w.iconUrl)}" alt="" loading="lazy" /></div>`
@@ -293,6 +345,15 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
 
     layer.addTo(map);
     layerRef.current = layer;
+    // UR A.20：佔位槽已有真 DOM 才可 createRoot（先於 layer 上圖則 getElement 為空）
+    for (const { marker, Icon } of pendingArt) {
+      const slot = marker.getElement()?.querySelector('span[data-art="1"]');
+      if (slot === null || slot === undefined) continue;
+      const root = createRoot(slot);
+      // size-full：與 BeerImg 同理（將來釘若包進 shadcn 件亦不受 svg reset 影響）
+      root.render(<Icon className="size-full" />);
+      artRoots.current.push(root);
+    }
   }, [mapReady, others, wants, trail, self]);
 
   return <div ref={holderRef} className={styles.v2map} />;

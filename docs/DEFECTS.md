@@ -38,6 +38,7 @@
 | DEF-20260926-012 | v2首頁驗收返工（圖層級＋shadcn化＋全屏無footer） | Closed | P0 | 2026-09-26 / @yuki | UR C.1 | round-6止；用戶驗收通過，已合入 main |
 | DEF-20260926-013 | v2自打卡面板無法換酒 | Closed | P1 | 2026-09-26 / @yuki | UR C.4 | v2 want 卡無換酒入口；C.4 沿 v1 全搬進底部 Sheet；用戶驗收通過，已合入 main |
 | DEF-20260926-014 | v2打卡後酒圖標只顯示emoji無品牌圖 | Closed | P1 | 2026-09-26 / @yuki | UR C.4 | v2 want 卡寫死 emoji 圓＋快照直用；C.4 目錄取新＋BeerImg＋地圖釘圖；用戶驗收通過，已合入 main |
+| DEF-20260926-015 | v2地圖釘 createRoot 同步 unmount 撞渲染期報錯 | Closed | P1 | 2026-09-26 / @yuki | UR A.20 | microtask 延後＋try/catch；用戶驗收通過，已合入 main |
 
 ### DEF-20250925-001 登出→重登录后打卡酒类消失
 
@@ -169,6 +170,20 @@
 - **关联 UR**：UR C.4
 - **修复验证**：待（有圖酒顯示品牌圖＋壞圖退 emoji＋DB 回退行按 beer_id 對目錄恢復正名正圖＋三閘綠＋用戶瀏覽器驗收）
 - **回归范围**：選酒 L2 BeerImg（不動）、v1 BeerIcon（不動）
+
+### DEF-20260926-015 v2地圖釘 createRoot 同步 unmount 撞渲染期報錯
+
+- **状态**：Closed（2026-09-26 用户验收通过：重建路徑 Console 乾淨，已合入 main）
+- **严重度**：P1 主要（Console 爆錯；功能面暫無可見損壞）
+- **发现日期 / 报告人**：2026-09-26 / @yuki
+- **复现步骤**：開 `/v2` → 有自家想喝釘時觸發圖層重建（落釘／換酒／開關足跡）：Console 見 `Attempted to synchronously unmount a root while React was already rendering`（`V2MapView.tsx:216`）
+- **期望**：重建只換 DOM，无 Console 報錯
+- **实际**：重建 effect 內 `artRoots.current.forEach((r) => r.unmount())` 同步執行，撞上 React 渲染期即報 race
+- **初判根因**：root 的 unmount 不能跑在別樹渲染提交途中；應延後到 microtask
+- **确诊根因**：同上。修為模塊 `unmountRootsAsync`（microtask 延後＋try/catch 吞併發重卸；圖層 DOM 照舊同步摘），重建入口＋卸載清理雙處調用
+- **关联 UR**：UR A.20
+- **修复验证**：待（同路徑重走＋Console 乾淨＋三閘綠＋用戶複驗）
+- **回归范围**：v2 地圖釘（他人釘／簇／足跡未動）、v1（未動）
 
 ### DEF-20260926-012 v2首頁驗收返工（圖層級＋shadcn化＋全屏無footer）
 

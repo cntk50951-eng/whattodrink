@@ -132,6 +132,13 @@
   display: block;
 }
 
+/* UR A.20 本地 SVG 注入槽（createRoot 掛載點，尺寸給 svg 做 meet 框） */
+.v2pinWantImg span[data-art] {
+  display: block;
+  width: 26px;
+  height: 32px;
+}
+
 /* 聚合簇：中性圓＋人數 */
 .v2cluster {
   width: 44px;

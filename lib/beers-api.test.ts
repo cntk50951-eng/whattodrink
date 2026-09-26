@@ -49,7 +49,7 @@ describe("fetchBeers", () => {
   it("!ok／拋錯／壞行／空表全部回 false 且目錄不動", async () => {
     mockFetchOnce(false, { error: { code: "internal" } });
     await expect(fetchBeers()).resolves.toBe(false);
-    expect(BEERS).toHaveLength(15);
+    expect(BEERS).toHaveLength(PRISTINE.length);
 
     vi.stubGlobal(
       "fetch",
@@ -62,6 +62,6 @@ describe("fetchBeers", () => {
 
     mockFetchOnce(true, { beers: [] });
     await expect(fetchBeers()).resolves.toBe(false);
-    expect(BEERS).toHaveLength(15);
+    expect(BEERS).toHaveLength(PRISTINE.length);
   });
 });
