@@ -162,14 +162,16 @@ UI 全確定前不建表，但數據文檔（`docs/data/`）必須與前端同�
 ## Step 10 · 用戶視覺確認 + 提交
 
 > 任何**含 UI 變更**的開發完成後，必須先用本地瀏覽器讓用戶親眼確認，才進 commit 流程。
-> **AI 不主動起 dev server**（除非作者明確要求「幫我跑」），由作者本人 `npm run dev` 啟動驗證。
+> **AI 主動起 dev server** 給作者手動驗（自動測試預設跳過，瀏覽器手動測是唯一驗證手段；不起 server 等於手動測也沒辦法跑）。
 
-### 10a. 作者啟動本地瀏覽器（AI 不做）
+### 10a. AI 啟動 dev server，作者瀏覽器手動驗
 
-- 作者本人啟動 dev server：`npm run dev`（背景跑）
-- 用 macOS `open` 指令或瀏覽器手動開啟 `http://localhost:3000/`
+- AI 在背景跑 `npm run dev`（背景 process）
+- 提供本機 URL 給作者：`http://localhost:3000/`
 - 提供 network URL（同網段手機可測響應式）：`http://<lan-ip>:3000/`
+- 作者用瀏覽器手動打開、實際操作驗證
 - **不要**用 vision tool 自動看截圖就當用戶已確認 — vision 看的不等於人眼
+- 驗收完成（作者「OK 可以 commit」）後 AI 停止 dev server（背景 task stop）
 
 ### 10b. 等用戶反饋
 
