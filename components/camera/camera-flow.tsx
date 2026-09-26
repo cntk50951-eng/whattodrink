@@ -31,6 +31,9 @@ import {
 } from "@/lib/posts";
 import type { WallPost } from "@/lib/posts";
 import { MOCK_ME } from "@/lib/me";
+import { useMyMode } from "@/hooks/useMyMode";
+import { ModePrompt } from "@/components/auth/ModePrompt";
+import type { GuardAction } from "@/components/auth/ModePrompt";
 import { recordingToWavBase64 } from "@/lib/audio";
 import { VoiceRecorder } from "./voice-recorder";
 
@@ -115,6 +118,9 @@ export function CameraFlow({
   onClose?: () => void;
 }) {
   const t = useTranslations("camera");
+  // UR A.16 隱身守衛（發布照片是寫操作，唯讀攔截彈引導）。
+  const [guardAction, setGuardAction] = useState<GuardAction | null>(null);
+  const { mode, patchMode } = useMyMode(true);
   const [phase, setPhase] = useState<Phase>(autoStart ? "consent" : "intro");
   const [photo, setPhoto] = useState<string | null>(null);
   const [source, setSource] = useState<PhotoSource | null>(null);
@@ -357,6 +363,11 @@ export function CameraFlow({
   // 語音小段（≤400KB）順手存 dataURL，reload 後還能播；存不下只活會話。
   const submit = useCallback(() => {
     if (!photo) return;
+    // UR A.16 隱身攔截：唯讀不可發布（匿名不攔，沿舊行為）。
+    if (mode === "stealth") {
+      setGuardAction("photo");
+      return;
+    }
     const id = newPostId();
     // 空包不算錄過（v5 遺毒：0-byte 也存秒數，牆上播出 416）。
     const clip =
@@ -401,7 +412,7 @@ export function CameraFlow({
       if (onClose) setPhase("received");
       else router.push(`/wall/${id}`);
     })();
-  }, [photo, note, audio, audioBlob, trans, router, onClose]);
+  }, [photo, note, audio, audioBlob, trans, router, onClose, mode]);
 
   const restart = useCallback(() => {
     stopStream(streamRef.current);
@@ -430,6 +441,13 @@ export function CameraFlow({
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
+      {/* UR A.16 隱身守衛浮層（fixed 定位，放樹內任意處皆可）。 */}
+      <ModePrompt
+        open={guardAction !== null}
+        action={guardAction ?? "photo"}
+        onClose={() => setGuardAction(null)}
+        onSwitch={(next) => patchMode(next)}
+      />
       {onClose && phase !== "review" && (
         <div className="flex justify-start">
           <button

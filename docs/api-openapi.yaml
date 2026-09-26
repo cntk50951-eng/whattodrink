@@ -161,6 +161,60 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/me:
+    get:
+      operationId: getMe
+      summary: 我的資料＋可見模式（需登录，A.16）
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 自己 profile（含 users.mode；0007 未遷移時 mode 按 public 回退）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [me]
+                properties:
+                  me:
+                    $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+    patch:
+      operationId: patchMeMode
+      summary: 切換可見模式（需登录，A.16：stealth|friends|public）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode:
+                  type: string
+                  enum: [stealth, friends, public]
+      responses:
+        "200":
+          description: 切換成功，回最新 me
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [me]
+                properties:
+                  me:
+                    $ref: "#/components/schemas/Me"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
   /api/v1/beers:
     get:
       operationId: getBeers
@@ -307,6 +361,28 @@ components:
           type: string
           nullable: true
           description: 下一頁 cursor；null＝到底了
+    Me:
+      type: object
+      required: [id, nickname, avatar_url, gender, mode, mode_updated_at]
+      description: 自己的 profile 公開列＋可見模式（A.16）
+      properties:
+        id:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        gender:
+          type: string
+          enum: [male, female, secret]
+        mode:
+          type: string
+          enum: [stealth, friends, public]
+        mode_updated_at:
+          type: string
+          format: date-time
     MapPin:
       type: object
       required: [id, lat, lng, area, drinkName, drinkEmoji, nickname, avatarUrl, gender, checkedInAt, isOnline]

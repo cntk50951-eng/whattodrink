@@ -73,3 +73,10 @@
 |---|---|---|---|---|
 | 我的足迹站（`trailStops(wantHistory)`，UR3.4 返工后） | 聚光圈＋酒名签＋浮条计数（≥2 站连虚线） | `TrailStop[]`（`lib/trail.ts`，想喝史即足迹，无则空态） | render 现算（无记录不编数据） | `checkins where user_id＝我 order by created_at`（字段直迁，无新表） |
 | `trailMode`（足迹模式开关） | 他人置灰＋浮条＋返回 | `boolean` | state，会话 | 不进库（运行时态） |
+
+## 九、可見模式（UR A.16，隱身先行）
+
+| 字段 | 页面位置 | 类型 | 当前来源 | 未来表映射 |
+|---|---|---|---|---|
+| `mode`（stealth／friends／public） | 城市卡三檔切換器＋乾杯／邀約／讚／拍照守衛 | `UserMode`（`lib/mode.ts`，`hooks/useMyMode.ts`） | state＋`GET /PATCH /api/v1/me`（登入才拉；匿名 null 不攔） | `users.mode`（0007，預設 public） |
+| `guardAction`（守衛浮層動作） | ModePrompt 引導浮層（可一鍵切換） | `"checkin"｜"cheers"｜"invite"｜"like"｜"photo"｜null` | state，會話 | 不進庫（运行时态） |

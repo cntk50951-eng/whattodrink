@@ -11,9 +11,12 @@ import {
   ChevronRight,
   Clock,
   Dices,
+  EyeOff,
+  Globe,
   MapPin,
   RefreshCw,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 import { resolveCityCode } from "@/lib/city";
@@ -40,6 +43,10 @@ import {
 } from "@/lib/visit";
 import type { LastVisit } from "@/lib/visit";
 import { LOGOUT_CLEAR_EVENT } from "@/lib/auth/clear";
+import { useMyMode } from "@/hooks/useMyMode";
+import { ModePrompt } from "@/components/auth/ModePrompt";
+import type { GuardAction } from "@/components/auth/ModePrompt";
+import type { UserMode } from "@/lib/mode";
 import { createClient } from "@/lib/supabase/client";
 import { mineRowToWantRecord, toMineRow } from "@/lib/api/checkins";
 import {
@@ -632,8 +639,27 @@ export function DrinkMap({
   const [apiPinsLoaded, setApiPinsLoaded] = useState(false);
   // UR A.12 打卡雙類型 chooser + 隱身攔截（同步 isAuthed 避免 getUser 懸掛無反應）
   const [kindChooserBeer, setKindChooserBeer] = useState<Beer | null>(null);
-  const [stealthPromptOpen, setStealthPromptOpen] = useState(false);
+  // UR A.16 隱身守衛浮層（取代舊 stealthPrompt：帶一鍵切換鈕；null＝關層）
+  const [guardAction, setGuardAction] = useState<GuardAction | null>(null);
+  // DEF-20260926-002：守衛彈層前先收卡，記住卡 id，切換成功後恢復原卡續操作。
+  const [pendingCardId, setPendingCardId] = useState<string | null>(null);
+  function closeGuard(): void {
+    setGuardAction(null);
+    setPendingCardId(null);
+  }
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
+  // UR A.16 我的可見模式（`GET /me` 直讀，不依賴 isAuthed 快照；
+  // 匿名 401 回 null 不攔，交端點守衛。DEF-20260926-001）
+  const { mode, patchMode } = useMyMode(true);
+  const tm = useTranslations("mode");
+  // DEF-20260926-001：切換器可見只跟展開態；匿名點走登入浮層（沿打卡口徑）。
+  function handleModeSwitch(next: UserMode): void {
+    if (isAuthed === false) {
+      setLoginOverlayOpen(true);
+      return;
+    }
+    void patchMode(next);
+  }
   // 登錄續打卡：未登錄時用戶先選酒/時效，登錄回來後自動續上 POST
   const PENDING_CHECKIN_KEY = "wtd-pending-checkin";
   const pendingCheckinRef = useRef<{ beer: Beer; kind: "flash" | "post" } | null>(null);
@@ -1571,7 +1597,7 @@ export function DrinkMap({
           if (res.status === 403) {
             const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
             console.warn("[checkins] forbidden", body?.error?.message);
-            setStealthPromptOpen(true);
+            setGuardAction("checkin");
             return;
           }
           throw new Error(`checkins ${res.status}`);
@@ -1740,6 +1766,14 @@ export function DrinkMap({
     null,
   );
   function handleCheers(id: string): void {
+    // UR A.16 隱身攔截：唯讀不可乾杯，彈引導浮層（可一鍵切換模式）。
+    // DEF-20260926-002：先收他人卡再彈層（層會被卡蓋住），記卡待切換後恢復。
+    if (mode === "stealth") {
+      setPendingCardId(id);
+      setSelectedId(null);
+      setGuardAction("cheers");
+      return;
+    }
     // MOCK — local state only. EPIC 3 sends a real cheers via Supabase.
     // UR3.2 限额守卫：满 15 即拦（按钮同 disabled，双保险）。
     if (
@@ -1784,7 +1818,8 @@ export function DrinkMap({
       setCheersFx(null);
       setLoginOverlayOpen(false);
       setKindChooserBeer(null);
-      setStealthPromptOpen(false);
+      setGuardAction(null);
+      setPendingCardId(null);
     };
     window.addEventListener(LOGOUT_CLEAR_EVENT, handler);
     return () => window.removeEventListener(LOGOUT_CLEAR_EVENT, handler);
@@ -1799,6 +1834,14 @@ export function DrinkMap({
     {},
   );
   function handleInvite(id: string): void {
+    // UR A.16 隱身攔截：唯讀不可約喝酒，彈引導浮層（可一鍵切換模式）。
+    // DEF-20260926-002：先收他人卡再彈層，記卡待切換後恢復。
+    if (mode === "stealth") {
+      setPendingCardId(id);
+      setSelectedId(null);
+      setGuardAction("invite");
+      return;
+    }
     const c = MOCK_CHECKINS.find((m) => m.id === id);
     if (
       c === undefined ||
@@ -2006,6 +2049,69 @@ export function DrinkMap({
             )}
           </span>
         </div>
+        {/* DEF-20260926-001 跟進：收合態常駐精簡 pill（只露當前模式，一點即展開；
+            全展開才見三檔，不一次全放，沿 URC1.3 收合配方）。 */}
+        {!toolbarExpanded && (
+          <button
+            type="button"
+            onClick={() => setToolbarExpanded(true)}
+            aria-label={tm("switcherLabel")}
+            title={tm("switcherLabel")}
+            className="font-hand flex items-center gap-1.5 rounded-full border-2 bg-card/95 px-3 py-1.5 text-xs font-bold shadow-[2px_2px_0_var(--border)] backdrop-blur-sm transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+          >
+            {mode === "stealth" ? (
+              <>
+                <EyeOff size={13} aria-hidden strokeWidth={2.5} />
+                {tm("modeStealth")}
+              </>
+            ) : mode === "friends" ? (
+              <>
+                <Users size={13} aria-hidden strokeWidth={2.5} />
+                {tm("modeFriends")}
+              </>
+            ) : mode === "public" ? (
+              <>
+                <Globe size={13} aria-hidden strokeWidth={2.5} />
+                {tm("modePublic")}
+              </>
+            ) : (
+              tm("switcherLabel")
+            )}
+          </button>
+        )}
+        {/* UR A.16 城市卡內模式切換（三檔；只跟展開態，匿名點走登入浮層。DEF-20260926-001）。 */}
+        {toolbarExpanded && (
+          <div
+            role="group"
+            aria-label={tm("switcherLabel")}
+            className="flex items-center gap-1 rounded-full border-2 bg-card/95 px-1.5 py-1 shadow-[2px_2px_0_var(--border)] backdrop-blur-sm"
+          >
+            {(
+              [
+                { key: "stealth", label: tm("modeStealth"), Icon: EyeOff },
+                { key: "friends", label: tm("modeFriends"), Icon: Users },
+                { key: "public", label: tm("modePublic"), Icon: Globe },
+              ] as const
+            ).map(({ key, label, Icon }) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={mode === key}
+                aria-label={label}
+                title={label}
+                onClick={() => handleModeSwitch(key)}
+                className={`font-hand flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold transition-transform active:translate-x-0.5 active:translate-y-0.5 ${
+                  mode === key
+                    ? "bg-primary text-primary-foreground shadow-[1px_1px_0_var(--border)]"
+                    : "text-muted-foreground"
+                }`}
+              >
+                <Icon size={13} aria-hidden strokeWidth={2.5} />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         {/* URC 1.0 + 1.3 A1：地圖工具列。預設 collapsed；hidden 條件照舊。 */}
         <MapToolbar
           collapsed={!toolbarExpanded}
@@ -3027,43 +3133,20 @@ export function DrinkMap({
         </div>
       )}
 
-      {/* UR A.12 隱身攔截浮層 */}
-      {stealthPromptOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="隱身模式提示"
-          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/55 p-4"
-          onClick={() => setStealthPromptOpen(false)}
-        >
-          <div
-            role="document"
-            className="relative w-full max-w-sm rounded-2xl border-2 bg-card p-6 pt-7 shadow-[4px_4px_0_var(--border)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div aria-hidden className="absolute -top-3 left-1/2 h-6 w-24 -translate-x-1/2 -rotate-2 bg-(--tape)" />
-            <p className="font-hand text-center text-xl font-bold">隱身模式不可打卡</p>
-            <p className="text-muted-foreground mt-2 text-center text-sm leading-relaxed">你目前為隱身模式（唯讀），請切換至好友或公開模式後再打卡。地圖綠點在隱身下對任何人不可見。</p>
-            <div className="mt-5 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setStealthPromptOpen(false)}
-                className="font-hand flex-1 rounded-full border-2 bg-card px-4 py-2.5 text-base font-bold shadow-[2px_2px_0_var(--border)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-              >
-                {t("cancel")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setStealthPromptOpen(false)}
-                className="font-hand flex-1 rounded-full border-2 bg-primary px-4 py-2.5 text-base font-bold text-primary-foreground shadow-[2px_2px_0_var(--border)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-              >
-                知道了
-              </button>
-            </div>
-            <p className="text-muted-foreground mt-3 text-center text-xs">模式切換與 T&C 將在下一 UR 開放</p>
-          </div>
-        </div>
-      )}
+      {/* UR A.16 隱身守衛浮層（帶一鍵切換；沿舊 stealthPrompt 卡式，內容進 ModePrompt 共用）。
+          DEF-20260926-002：切換成功後恢復被收起的他人卡，續操作。 */}
+      <ModePrompt
+        open={guardAction !== null}
+        action={guardAction ?? "checkin"}
+        onClose={closeGuard}
+        onSwitch={(next) => patchMode(next)}
+        onSwitched={() => {
+          if (pendingCardId !== null) {
+            setSelectedId(pendingCardId);
+            setPendingCardId(null);
+          }
+        }}
+      />
 
       {/* UR A.11 未登录打卡引导浮层（品牌 doodle＋硬阴影，常驻地图之上） */}
       {loginOverlayOpen && (

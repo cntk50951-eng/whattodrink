@@ -274,6 +274,24 @@
     "loginCta": "去登录",
     "cancel": "取消"
   },
+  "mode": {
+    "guardTitle": "隐身模式仅可浏览",
+    "guardBody": "你现在是隐身模式（唯读），不可{action}。切换到好友或公开模式后再试。",
+    "actCheckin": "打卡",
+    "actCheers": "干杯",
+    "actInvite": "约喝酒",
+    "actLike": "点赞",
+    "actPhoto": "发布照片",
+    "switchPublic": "切换为公开",
+    "switchFriends": "切换为好友",
+    "cancel": "取消",
+    "switching": "切换中…",
+    "switchFailed": "切换失败，再试一次",
+    "modeStealth": "隐身",
+    "modeFriends": "好友",
+    "modePublic": "公开",
+    "switcherLabel": "可见模式"
+  },
   "auth": {
     "title": "登录",
     "subtitle": "一个 Google 账号走天下，不用记密码",

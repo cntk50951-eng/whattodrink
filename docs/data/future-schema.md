@@ -25,6 +25,11 @@ UI 全确定后按此开工 EPIC 3.0 真表设计。
   **UR3.3 加 `last_seen_at`**：APP 前台心跳（~30s 写一次），查 5km 内
   `last_seen_at >= now - 5min` 即在线（口径与前端 `isNearbyOnline` 一致，
   mock 用 `Checkin.onlineAt` 相对时间戳占位）；建索引（范围查）
+  **UR A.15 加 `mode`／`mode_updated_at`＋`friendships` 轉正**：`mode` enum
+  （stealth／friends／public，預設 public，0007 已建）；`friendships(id,
+  user_id, friend_id, status, created_at)`（0007 已建，A.15 轉正：好友＝
+  任一方向 `status='accepted'` 即互為好友；`blocked` 保留 V1 不用；
+  RLS 沿 0006 owner 檔 `user_id=uid OR friend_id=uid` 可讀，寫 V1 僅驗證行）
 - `drink_invites(id, from_user_id, to_user_id, checkin_id, status, created_at)` ——
   **UR3.3 新增（EPIC 3.0 实现，UI 先行 mock）**：`status` enum
   （sent／accepted／declined／expired），发出写 sent 行，对方点接受／拒绝
@@ -49,7 +54,7 @@ UI 全确定后按此开工 EPIC 3.0 真表设计。
   mock（`wtd-wall-my-posts`＋`wtd-wall-overrides`）屆時整塊刪
 - `post_reports(post_id, reporter_id, reason, created_at)` —— UR4.1 檢舉
   （V1 口徑：被檢舉即前端隱藏；多檢舉升級走 EPIC 3.0 審核隊列，不在 V1 設計）
-- （暂缓）`bars`、`friendships`、`game_*` —— EPIC 4.0 前不设计
+- （暂缓）`bars`、`game_*` —— EPIC 4.0 前不设计（`friendships` 已由 0007 建表、A.15 轉正，不在此列）
 
 ## 三、MOCK→真替换清单（EPIC 3.0 开工即执行）
 

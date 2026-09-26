@@ -274,6 +274,24 @@
     "loginCta": "去登入",
     "cancel": "取消"
   },
+  "mode": {
+    "guardTitle": "隱身模式僅可瀏覽",
+    "guardBody": "你而家係隱身模式（唯讀），唔可以{action}。轉做好友或者公開模式之後再試。",
+    "actCheckin": "打卡",
+    "actCheers": "乾杯",
+    "actInvite": "約飲酒",
+    "actLike": "讚好",
+    "actPhoto": "發佈相片",
+    "switchPublic": "轉為公開",
+    "switchFriends": "轉為好友",
+    "cancel": "取消",
+    "switching": "切換緊…",
+    "switchFailed": "切換失敗，再試一次",
+    "modeStealth": "隱身",
+    "modeFriends": "好友",
+    "modePublic": "公開",
+    "switcherLabel": "可見模式"
+  },
   "auth": {
     "title": "登入",
     "subtitle": "一個 Google 帳號走天下，不用記密碼",

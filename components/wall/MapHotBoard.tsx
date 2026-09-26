@@ -13,6 +13,9 @@ import {
 } from "@/lib/posts";
 import type { WallPost } from "@/lib/posts";
 import { VoicePlayer } from "./PostDetail";
+import { useMyMode } from "@/hooks/useMyMode";
+import { ModePrompt } from "@/components/auth/ModePrompt";
+import type { GuardAction } from "@/components/auth/ModePrompt";
 import styles from "./wall.module.css";
 
 /**
@@ -37,6 +40,9 @@ export function MapHotBoard({ sheetOpen }: { sheetOpen: boolean }) {
   const [limit, setLimit] = useState(BOARD_INITIAL);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<"report" | "delete" | null>(null);
+  // UR A.16 隱身守衛（讚是寫操作，唯讀攔截彈引導）。
+  const [guardAction, setGuardAction] = useState<GuardAction | null>(null);
+  const { mode, patchMode } = useMyMode(true);
 
   const refresh = useCallback(() => {
     setPosts(sortHot(loadWall(), Date.now()));
@@ -63,6 +69,11 @@ export function MapHotBoard({ sheetOpen }: { sheetOpen: boolean }) {
     detailId === null ? null : (posts.find((p) => p.id === detailId) ?? null);
 
   const doLike = (id: string) => {
+    // UR A.16 隱身攔截：唯讀不可讚。
+    if (mode === "stealth") {
+      setGuardAction("like");
+      return;
+    }
     setPosts((prev) => {
       if (!prev) return prev;
       const next = prev.map((p) => (p.id === id ? toggleLike(p) : p));
@@ -93,6 +104,13 @@ export function MapHotBoard({ sheetOpen }: { sheetOpen: boolean }) {
         detail === null ? "w-44" : "w-72 max-w-[78vw]"
       }`}
     >
+      {/* UR A.16 隱身守衛浮層（fixed 定位，放樹內任意處皆可）。 */}
+      <ModePrompt
+        open={guardAction !== null}
+        action={guardAction ?? "like"}
+        onClose={() => setGuardAction(null)}
+        onSwitch={(next) => patchMode(next)}
+      />
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

@@ -5,6 +5,18 @@
 ## [Unreleased]
 
 ### Added
+- **UR A.16 隱身模式（API＋DB＋UI）[✓，用户已验收，merged]**
+  - `lib/mode.ts`：`USER_MODES`＋`parseMode`＋`parsePatchModeBody`＋`isWriteBlocked(stealth才攔)`＋`toMeJson`（0007未遷移按public回退，沿checkins配方）；`lib/mode.test.ts` 10單測
+  - `app/api/v1/me/route.ts`：`GET /me`（🔒，回profile＋mode，缺行自建沿DEF-20250925-001，42703回退舊列）＋`PATCH /me {mode}`（🔒，白名單三檔，寫`mode＋mode_updated_at`，RLS沿0006自讀寫）；`docs/api-openapi.yaml`加`/me`雙方法＋`Me` schema
+  - `hooks/useMyMode.ts`：登入才拉`GET /me`（匿名null不攔）、`PATCH`樂觀更新失敗回滾、登出事件清null（ref同步走effect，沿UR2.9配方修lint）
+  - `components/auth/ModePrompt.tsx`：共用守衛浮層（沿stealthPrompt卡式＋一鍵切公開／好友直調`PATCH /me`）；舊`stealthPromptOpen`整塊退役，403打卡改彈此層（action=checkin）
+  - 前端五處守衛：乾杯／邀約（DrinkMap）、讚（MapHotBoard＋PostDetail）、拍照發布（camera-flow submit），隱身一律彈層；城市卡內三檔切換器（toolbar展開＋已登入才顯，EyeOff／Users／Globe）
+  - 三語`mode`命名空間16 key×3 parity PASS；`docs/data/home-map.md`加第九節（mode＋guardAction兩行）
+  - 三閘：210→220綠／lint 0 error（3舊warning）／build 31頁（含新`/api/v1/me`）；心跳零代碼（全庫無`last_seen_at`寫入，隱身不上報天然達成）
+  - fix DEF-20260926-001（切換器不可見）：渲染門檻`toolbarExpanded && isAuthed===true`過嚴致無聲消失→只跟展開態＋匿名點走登入浮層（沿打卡口徑）＋`useMyMode(true)`改`/me`直讀；三閘綠，待用戶复驗
+  - fix 跟進（用戶糾正：收合不知展開→收合態常駐精簡 pill 露當前模式，一點展開選三檔，不一次全放；三閘綠）
+  - fix DEF-20260926-002（引導層被他人卡蓋→守衛先收卡記卡，切換成功恢復原卡續操作；三閘綠，待复驗；組件態流轉無新單測）
+  - **UR A.19 引導浮層好友感知［文檔化，[] 未實作］**：非好友僅公開鈕／好友雙鈕／未知雙鈕；查法推薦 `GET /friends/check` 最小查詢（A.17 復用）；前置依賴 pins／wall 帶對方 `user_id`；承 A.17 之後
 - **UR A.14 选酒格子啤酒冒泡加载态 [WIP]**
   - `components/map/BeerIcon.tsx`：`icon_url` 三態（`loading`→3 枚上升氣泡 skeleton `bg-[var(--muted)]` `aspect-[3/4]` 固幅/`loaded`→`opacity-100 transition 300ms` 淡入/`broken`→emoji），`beer.icon_url` 變化重置 `loaded/broken`，`prefers-reduced-motion` 靜止；新增 `toBeerIconWrapperClass` 純函數（`w-auto→aspect-[3/4]`/`object-cover` 清理）供多尺寸 `h-20/h-16/h-24/h-full` 適配
   - `components/map/BeerIcon.test.ts` 5 單測（wrapper 類轉換/缺圖回退），210/210 綠；`npm run build` 30 頁/`lint` 0 errors/`prefers-reduced-motion` 合規，弱網下 6 格齊顯冒泡，就緒後無閃白
