@@ -1952,5 +1952,32 @@ UR C.3　選酒弹窗 shadcn 化＋去 v1 味（Header／skeleton／返回／列
 - 2026-09-26 round-2（配色）：根因 portal 逃出 .v2scope 吃 doodle 舊 token；修 Sheet 根自帶 scope＋sm 居中窄欄＋圓角芯片統一；三閘重綠；用戶瀏覽器驗收通過，置 [✓] 合入 main
 - 候選面（暫存）：BottomNav＋卡片試點、地圖原生 skin、列表頁 shadcn 化——正式範圍以用戶指令為準，不預支。
 
+UR C.4　v2 自打卡底部 Sheet（換酒＋品牌圖＋用戶資訊）[✓]
+
+v2 自家想喝釘的浮動小卡只有 emoji 圓＋酒名＋時間：不能換酒（DEF-013）、只顯 emoji 無品牌圖（DEF-014）。本 UR 把 want 卡升級為底部 Sheet（snapshot 式，未來圖片槽），內容對標 v1 快照卡＋用戶資訊。
+
+### 範圍
+1. want 釘點擊改開底部 Sheet（自帶 `styles.v2scope`，C.3 portal 教訓；浮動卡只留他人 kind）
+2. 圖標修正：按 `beer.id` 對活目錄（`BEERS`，A.4 換源後亦新鮮）取新 beer，`beerByName` 兜底，`BeerImg` 渲染（有圖上圖＋skeleton 淡入，壞圖／無圖退 emoji）；`key={beer.id}` 保證換酒重掛（沿 v1）
+3. 換酒行（沿 v1 UR3.7/3.9）：同類候選批 `pickSwapBatch`（當前除外）＋可刷新（`pickNextBatch` 同配方去重）＋點格即換（`swapWantBeer` 按 at 換 beer，位置時間不動）；離線記錄寫本地（`saveWantHistory`），已登入 session 即時換（無改酒端點，server 換酒另開 UR）
+4. 用戶資訊行：頭像佔位（`MOCK_ME.avatarEmoji`，Avatar 件未到）＋暱稱（`map.you`）＋性別 badge（`MOCK_ME.gender`，沿 v1）＋模式 badge（常駐 mode）
+5. v1 欄位全搬：酒名＋時間（`formatWantTime`）＋地點／坐標＋凍結註記（`wantFrozenNote`）＋kind（flash／post）＋**距你 km**（`haversineMeters`＋`formatDistance` 前端算）
+6. 圖片佔位槽：虛線框＋相機圖標＋`v2.wantPhotoSoon`（未來快拍入口位；本次純佔位）
+7. 刪除：兩段確認（沿 v1；刪的是正在看的 at，刪光關 Sheet）
+
+### 非目標
+- 真頭像／真暱稱數據源（`users` 表接換源 UR 再收，沿 MOCK_ME 口徑）、server 端換酒端點、v1 任何文件、共用層行為改動（純函數只讀調用）
+
+### AC
+- 點自家釘開 Sheet（非浮動卡）；有圖酒顯示品牌圖，壞圖退 emoji；DB 回退行（name＝beer_id）恢復正名正圖
+- 換酒點格即換＋pin 不動＋刷新持久；刪除兩段確認；距離顯示 km；圖片佔位可見
+- 新 key 僅 `v2.wantPhotoSoon` 一個（×3 語）；三閘全綠；v1 回歸無變化
+
+*改動記錄*
+- 2026-09-26：建檔置 []（用戶上報 DEF-013 無換酒＋DEF-014 只顯 emoji；問答定案：Sheet 式＋暱稱性別模式＋越全面越好含距離＋圖片佔位；待開工指令）
+- 2026-09-26：開工置 [WIP]；實現完待驗（want 釘改開底部 Sheet＋resolveWantBeer 目錄取新＋換酒批／兩段刪／距離／圖片佔位；241綠／lint 0 error／build 39頁；wantPhotoSoon×3 parity PASS；待用戶瀏覽器驗收）
+- 2026-09-26 round-2（地圖釘圖）：want 釘 divIcon 有圖上品牌圖（白底＋琥珀環保身份，`V2WantMarker.iconUrl`＋`escAttr`＋http(s) 限）無圖回琥珀實心 emoji；釘圖與 Sheet 同源（換酒即換釘）；三閘重綠待驗
+- 2026-09-26 round-3（合規收尾）：`resolveWantBeer` 下沉共用層 `resolveFreshBeer`（加法，v1 未用）＋4 單測（245 綠）；用戶驗收通過，置 [✓] 合入 main
+
 *改動記錄*
 - 2026-09-26：建檔置 []（用戶指令 EPIC B 管理＋表補強；realtime 實現待拍板後動工）

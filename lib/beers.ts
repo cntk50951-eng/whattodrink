@@ -63,6 +63,20 @@ export function beerByName(name: string): Beer | null {
   return BEERS.find((b) => b.name === name) ?? null;
 }
 
+/**
+ * UR C.4 目錄新鮮解析（共用層加法，舊調用零影響）：快照 beer 可能过期——
+ * DB 回退行 name＝beer_id、emoji＝通用🍺；A.4 換源後目錄 icon_url 也可能
+ * 比快照新。按 `beer.id` 對活目錄取新，`beerByName` 兜底，最後原樣返回。
+ * v2 開卡／釘圖渲染前調用；v1 未用（BeerIcon 另有自解析，不動）。
+ */
+export function resolveFreshBeer(stale: Beer): Beer {
+  return (
+    BEERS.find((b) => b.id === stale.id) ??
+    beerByName(stale.name) ??
+    stale
+  );
+}
+
 export async function fetchBeers(): Promise<boolean> {
   try {
     const res = await fetch("/api/v1/beers", { cache: "no-store" });

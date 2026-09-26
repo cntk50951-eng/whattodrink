@@ -11,6 +11,7 @@ import {
   pickRandomBatch,
   pickRandomBeerIn,
   pickSwapBatch,
+  resolveFreshBeer,
   type Beer,
 } from "./beers";
 
@@ -213,5 +214,32 @@ describe("pickSwapBatch", () => {
     const batch = pickSwapBatch(cur, 6, () => 0.4);
     expect(batch.length).toBeGreaterThan(0);
     expect(batch.map((b) => b.id)).not.toContain(cur.id);
+  });
+});
+
+describe("resolveFreshBeer (UR C.4)", () => {
+  it("按 id 取新：DB 回退行（name＝beer_id、emoji 通用）恢復正名正圖", () => {
+    const stale: Beer = { id: "heineken", name: "heineken", emoji: "🍺", category: "", tagline: "" };
+    const fresh = resolveFreshBeer(stale);
+    expect(fresh.name).toBe("Heineken");
+    expect(fresh.id).toBe("heineken");
+  });
+
+  it("id 對不上時按展示名兜底", () => {
+    const stale: Beer = { id: "nope", name: "Asahi 生啤", emoji: "❓", category: "", tagline: "" };
+    expect(resolveFreshBeer(stale).id).toBe("asahi");
+  });
+
+  it("id 與名都對不上時原樣返回（不拋）", () => {
+    const stale: Beer = { id: "nope", name: "不存在的酒", emoji: "❓", category: "", tagline: "" };
+    expect(resolveFreshBeer(stale)).toBe(stale);
+  });
+
+  it("跟著活目錄走：換源後取新 icon_url", () => {
+    applyBeerCatalog([
+      { id: "heineken", emoji: "🍺", name: "Heineken", category: "lager", tagline: "t", icon_url: "https://x/new.svg" },
+    ]);
+    const stale: Beer = { id: "heineken", emoji: "🍺", name: "Heineken", category: "lager", tagline: "t" };
+    expect(resolveFreshBeer(stale).icon_url).toBe("https://x/new.svg");
   });
 });

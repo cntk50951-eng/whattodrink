@@ -111,6 +111,27 @@
   font-size: 18px;
 }
 
+/* UR C.4 有圖版想喝釘：白底品牌圖＋琥珀環（身份不丟，無圖回上面實心版） */
+.v2pinWantImg {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 3px solid #f59e0b;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.v2pinWantImg img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  display: block;
+}
+
 /* 聚合簇：中性圓＋人數 */
 .v2cluster {
   width: 44px;
