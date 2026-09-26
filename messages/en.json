@@ -274,6 +274,24 @@
     "loginCta": "Sign in",
     "cancel": "Cancel"
   },
+  "mode": {
+    "guardTitle": "Stealth mode is read-only",
+    "guardBody": "You are in stealth mode (read-only) and cannot {action}. Switch to friends or public mode and try again.",
+    "actCheckin": "check in",
+    "actCheers": "cheers",
+    "actInvite": "invite for drinks",
+    "actLike": "like",
+    "actPhoto": "post a photo",
+    "switchPublic": "Switch to public",
+    "switchFriends": "Switch to friends",
+    "cancel": "Cancel",
+    "switching": "Switching…",
+    "switchFailed": "Switch failed, try again",
+    "modeStealth": "Stealth",
+    "modeFriends": "Friends",
+    "modePublic": "Public",
+    "switcherLabel": "Visibility mode"
+  },
   "auth": {
     "title": "Sign in",
     "subtitle": "One Google account, no passwords to remember",

@@ -15,6 +15,9 @@ import {
   toggleLike,
 } from "@/lib/posts";
 import type { WallPost } from "@/lib/posts";
+import { useMyMode } from "@/hooks/useMyMode";
+import { ModePrompt } from "@/components/auth/ModePrompt";
+import type { GuardAction } from "@/components/auth/ModePrompt";
 import styles from "./wall.module.css";
 
 /* 24 根裝飾波形柱（播放進度只走時間，不做真頻譜——mock 誠實口徑）。 */
@@ -146,6 +149,9 @@ export function PostDetail({ id }: { id: string }) {
   const router = useRouter();
   const [post, setPost] = useState<WallPost | null | undefined>(undefined);
   const [confirm, setConfirm] = useState<"report" | "delete" | null>(null);
+  // UR A.16 隱身守衛（讚是寫操作，唯讀攔截彈引導）。
+  const [guardAction, setGuardAction] = useState<GuardAction | null>(null);
+  const { mode, patchMode } = useMyMode(true);
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -169,6 +175,11 @@ export function PostDetail({ id }: { id: string }) {
   }
 
   const doLike = () => {
+    // UR A.16 隱身攔截：唯讀不可讚。
+    if (mode === "stealth") {
+      setGuardAction("like");
+      return;
+    }
     const next = toggleLike(post);
     setPost(next);
     persistPost(next);
@@ -185,6 +196,13 @@ export function PostDetail({ id }: { id: string }) {
 
   return (
     <article>
+      {/* UR A.16 隱身守衛浮層（fixed 定位，放樹內任意處皆可）。 */}
+      <ModePrompt
+        open={guardAction !== null}
+        action={guardAction ?? "like"}
+        onClose={() => setGuardAction(null)}
+        onSwitch={(next) => patchMode(next)}
+      />
       <div className="relative rounded-2xl border-2 bg-[#fdfdf8] p-3 pb-4 shadow-[3px_3px_0_var(--border)]">
         <div
           aria-hidden
