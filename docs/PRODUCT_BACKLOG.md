@@ -1525,3 +1525,29 @@ UR A.13 地圖時間窗口（快貼 24h / 帖子 7d→90d）[WIP]
 
 *改動記錄*
 - 2026-09-24：建檔置 [WIP]（`range` 命名與 server side 判定已確認，細化謂詞與 AC）
+
+---
+
+UR A.14 选酒格子啤酒冒泡加载态 [WIP]
+
+作為用戶，我在選酒 overlay（今晚飲咩？→ 換一批 / 品種格）看到酒格子時，若圖片還在請求/加載中，應看到啤酒冒泡的等待動畫，而不是空白或突兀閃現；圖片就緒後平滑淡入。
+
+### 背景
+- L2 批量 6 格與想喝換酒 3 列均用 `BeerIcon` 渲染 `icon_url`（Supabase Storage svg，`/api/v1/beers` 換源後才有），首屏靜態保底為 emoji，切批後新圖需網絡拉取，`loading="lazy"` 下首繪前為空白，格子高度已固定但內容閃現，缺加載反饋
+- 現有 `BeerIcon` 僅有 `icon_url`→`<img>` / `onError`→emoji 兩態，無 `onLoad` 過渡與 skeleton
+
+### 範圍（只做加載態，不改數據/交互）
+1. `components/map/BeerIcon.tsx` 加三態：`loading`（有 `icon_url` 且未 `onLoad`）→ 冒泡 skeleton；`loaded`→ 淡入 `img`（`opacity-100 transition-opacity 300ms`）；`broken/missing`→ `emoji`（現邏輯保留）
+2. Skeleton：與傳入 `imgClassName` 同高同圓角同邊框（`h-20/h-16/h-24/h-full` 對應 `aspect-[3/4]` 固寬，`bg-[var(--muted)]`+`border-2`），內含 3 枚氣泡 `translateY` 上升 + `opacity` 漸隱（`beer-bubble` 1.2–1.8s 錯峰無限，`prefers-reduced-motion` 靜止），用 `var(--card)` 白泡+`var(--border)` 描邊，沿品牌 doodle 語言
+3. 狀態重置：`beer.icon_url` 變化時重置 `loaded/broken`（`useEffect [icon_url]`），`key={beer.id}` 換酒重掛仍兜底
+4. 多尺寸適配：`h-20`（批量主格）、`h-16`（換酒）、`h-24`（想喝記錄）、`h-full`（他人卡 `h-full`）均通過 `w-auto → aspect-[3/4]` 保持 3:4 畫幅，不撐破 `object-cover`
+5. 單測：`BeerIcon.test.tsx` 覆蓋 `icon_url`→ skeleton→`onLoad`→img、`onError`→emoji、`icon_url` 變化重置
+
+### AC
+- 限流/弱網下打開 L2 批量，6 格在圖片就緒前均見冒泡（3 泡錯峰上升循環），不出現空白；圖片就緒後 300ms 內淡入，無閃白，`prefers-reduced-motion: reduce` 時氣泡靜止僅顯底色
+- 切「換一批」或切品種，新批 6 格重新出現冒泡再淡入；已緩存命中則幾乎無縫（`onLoad` 瞬時，skeleton 僅一幀）
+- 壞圖/`icon_url` 缺省仍回退 emoji，不卡 skeleton
+- `npm run build`/`lint` 0 errors/`npm test` 全綠，`prefers-reduced-motion` 合規
+
+*改動記錄*
+- 2026-09-25：建檔置 [WIP]（選酒 overlay 圖片加載態，冒泡等待，3:4 固幅，300ms 淡入）

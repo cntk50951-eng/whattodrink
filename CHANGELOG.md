@@ -5,6 +5,9 @@
 ## [Unreleased]
 
 ### Added
+- **UR A.14 选酒格子啤酒冒泡加载态 [WIP]**
+  - `components/map/BeerIcon.tsx`：`icon_url` 三態（`loading`→3 枚上升氣泡 skeleton `bg-[var(--muted)]` `aspect-[3/4]` 固幅/`loaded`→`opacity-100 transition 300ms` 淡入/`broken`→emoji），`beer.icon_url` 變化重置 `loaded/broken`，`prefers-reduced-motion` 靜止；新增 `toBeerIconWrapperClass` 純函數（`w-auto→aspect-[3/4]`/`object-cover` 清理）供多尺寸 `h-20/h-16/h-24/h-full` 適配
+  - `components/map/BeerIcon.test.ts` 5 單測（wrapper 類轉換/缺圖回退），210/210 綠；`npm run build` 30 頁/`lint` 0 errors/`prefers-reduced-motion` 合規，弱網下 6 格齊顯冒泡，就緒後無閃白
 - **UR A.13 地圖時間窗口（快貼 24h / 帖子 7d→90d，server side `range`）[WIP]**
   - `supabase/migrations/0008_pins_range_idx.sql`：為 `GET /map/pins?range` 加速——`checkins_expires_idx` + `checkins_kind_expires_idx` + `checkins_kind_created_idx`（`created_at` 已有索引，補 `expires_at` 以覆蓋 `or` 謂詞；時間判定一律 server `now()`，不信客戶端）
   - `lib/api/pins.ts`：新增 `PinsRange 7d|90d` + `PINS_RANGE_MS` + `parseRange`（缺省 `7d`）並入 `parsePinsParams`（`range` 默認 `7d`，非法 400），`lib/api/pins.test.ts` +4 單測（預設/7d/90d/非法，總 15 測）
