@@ -19,6 +19,10 @@ generic and get rejected at review.
   of truth: every new batch appends `{en, cn, Icon}` entries there (plus the
   barrel export). The preview wall and the mobile export both read it — never
   enumerate icons anywhere else. `beerSlug(en)` gives the Android-safe asset name.
+- UR A.20 起 `pickId`（對 `lib/beers.ts` 的目錄 id）**強制**：wall 覆蓋鎖單測
+  （`wall.test.ts`「pickId 全覆蓋鎖」）會紅——缺 pickId／對不上目錄 id 都不許過。
+  web local-first 渲染（`BeerIcon`／`BeerImg`／地圖釘）只認 `pickId`（＋展示名兜底），
+  畫完不加 pickId＝畫了白畫。
 
 ## 1. Reference photos (mandatory)
 

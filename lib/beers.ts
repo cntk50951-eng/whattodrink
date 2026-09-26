@@ -37,6 +37,35 @@ export const BEERS: Beer[] = [
   { id: "stout", emoji: "🍺", name: "Guinness 健力士", category: "stout", tagline: "深夜慢飲的首選" },
   { id: "plum-wine", emoji: "🍶", name: "梅酒 on the rocks", category: "liqueur", tagline: "想念家的味道" },
   { id: "espresso-martini", emoji: "🍸", name: "Espresso Martini", category: "cocktail", tagline: "需要撐到最後一秒" },
+  /* ---- UR A.20 已畫品牌全收編（id／emoji／name／category 沿 seed，tagline 港味短句；
+   * 未來 seed 行沿用同 id＋名，API 換源即原地覆蓋。Moutai 未進 DB，靜態保底覆蓋。） */
+  { id: "corona-extra", emoji: "🍺", name: "Corona Extra", category: "lager", tagline: "加青檸先係靈魂" },
+  { id: "blue-girl", emoji: "🍺", name: "Blue Girl", category: "lager", tagline: "大排檔標配" },
+  { id: "hoegaarden", emoji: "🍺", name: "Hoegaarden", category: "lager", tagline: "六角杯，白啤代表" },
+  { id: "kirin-ichiban", emoji: "🍺", name: "Kirin Ichiban", category: "lager", tagline: "一番搾，飲得出" },
+  { id: "yebisu", emoji: "🍺", name: "Yebisu", category: "lager", tagline: "惠比壽的金罐" },
+  { id: "young-master", emoji: "🍺", name: "Young Master", category: "craft beer", tagline: "少爺，本地薑" },
+  { id: "moutai-flying-fairy", emoji: "🥃", name: "茅台飛天", category: "spirits", tagline: "飛天，敬重要的人" },
+  { id: "budweiser", emoji: "🍺", name: "Budweiser", category: "lager", tagline: "紅白藍的經典" },
+  { id: "carlsberg", emoji: "🍺", name: "Carlsberg", category: "lager", tagline: "綠罐老朋友" },
+  { id: "sapporo", emoji: "🍺", name: "Sapporo", category: "lager", tagline: "星星罐，配拉麵" },
+  { id: "snow", emoji: "🍺", name: "Snow", category: "lager", tagline: "雪花，勇闖天涯" },
+  { id: "yanjing", emoji: "🍺", name: "Yanjing", category: "lager", tagline: "燕京，京味十足" },
+  { id: "harbin", emoji: "🍺", name: "Harbin", category: "lager", tagline: "哈啤，東北味" },
+  { id: "bud-light", emoji: "🍺", name: "Bud Light", category: "lager", tagline: "淡字輩，清爽派" },
+  { id: "coors-light", emoji: "🍺", name: "Coors Light", category: "lager", tagline: "雪山水釀的淡啤" },
+  { id: "miller-lite", emoji: "🍺", name: "Miller Lite", category: "lager", tagline: "米勒，淡啤鼻祖" },
+  { id: "modelo-especial", emoji: "🍺", name: "Modelo Especial", category: "lager", tagline: "墨西哥金罐" },
+  { id: "negra-modelo", emoji: "🍺", name: "Negra Modelo", category: "lager", tagline: "黑啤，濃一點" },
+  { id: "pacifico", emoji: "🍺", name: "Pacifico", category: "lager", tagline: "衝浪後的太平洋" },
+  { id: "tecate", emoji: "🍺", name: "Tecate", category: "lager", tagline: "紅罐，墨西哥日常" },
+  { id: "dos-equis", emoji: "🍺", name: "Dos Equis", category: "lager", tagline: "雙 X 最有趣" },
+  { id: "sol", emoji: "🍺", name: "Sol", category: "lager", tagline: "太陽，曬住飲" },
+  { id: "bohemia", emoji: "🍺", name: "Bohemia", category: "lager", tagline: "波希米亞皮爾森" },
+  { id: "victoria", emoji: "🍺", name: "Victoria", category: "lager", tagline: "維也納拉格麥香" },
+  { id: "indio", emoji: "🍺", name: "Indio", category: "lager", tagline: "深色拉格印第歐" },
+  { id: "skol", emoji: "🍺", name: "Skol", category: "lager", tagline: "巴西派對啤" },
+  { id: "brahma", emoji: "🍺", name: "Brahma", category: "lager", tagline: "森巴味拉格" },
 ];
 
 /**
@@ -49,7 +78,7 @@ export function pickRandomBeer(): Beer {
 }
 
 /* ---- UR A.4 前端接 API ----
- * BEERS 是活目錄：啟動時靜態 15 條保底，`fetchBeers()` 成功即原地換成
+ * BEERS 是活目錄：啟動時靜態保底（15 創始＋A.20 已畫 26），`fetchBeers()` 成功即原地換成
  * API 數據（同 id 全覆蓋，調用方零改——所有 pick 函數讀的都是這個引用）。
  * 換源失敗（斷網／500／空表／壞行）回 false，靜態照走，體感不斷。
  * 測試用 `applyBeerCatalog` 直灌＋還原（vitest 檔級隔離，不污染別檔）。 */
@@ -119,6 +148,8 @@ export const BEER_CATEGORIES: readonly BeerCategory[] = [
   { id: "sake", emoji: "🍶", labelKey: "catSake", match: ["sake"] },
   { id: "cocktail", emoji: "🍸", labelKey: "catCocktail", match: ["cocktail"] },
   { id: "liqueur", emoji: "🍹", labelKey: "catLiqueur", match: ["liqueur"] },
+  /* UR A.20：中國白酒 lane（Moutai；白葡萄酒已佔「白酒」字，lane 名避撞用中國白酒）。 */
+  { id: "baijiu", emoji: "🏺", labelKey: "catBaijiu", match: ["spirits"] },
 ];
 
 /** All beers in a lane. Unknown lane id → [] (caller falls back to global pick). */

@@ -79,6 +79,8 @@ import {
 import type { WantRecord } from "@/lib/wantRecord";
 import { MOCK_ME } from "@/lib/me";
 import { trailStops } from "@/lib/trail";
+import { iconForDrinkName, iconForPickId } from "@/components/marketing/beer-icons/wall";
+import { WallIcon } from "@/components/marketing/beer-icons/doodle";
 import { hasUnseenWall, loadWall, loadWallSeenAt } from "@/lib/posts";
 import { buzz, BUZZ_CHEERS, BUZZ_FOUND } from "@/lib/haptics";
 import { V2MapView } from "./V2MapView";
@@ -117,20 +119,37 @@ type FriendState = "unknown" | "checking" | "friend" | "nonfriend";
 /**
  * UR C.3：品牌圖 skeleton（animate-pulse 佔位＋onLoad 淡入＋壞圖回 emoji）。
  * 純 Tailwind，無新依賴（Skeleton 裝不上，見 C.3）。模塊級組件，state 獨立。
+ * UR A.20 本地優先：已畫品牌走本地 SVG（`iconForPickId` 按 id，
+ * `iconForDrinkName` 按名兜底；瞬時零加載態），無本地圖才走舊鏈。
+ * UR A.20 round-2：`tall` 給主角位（Sheet hero）用——本地 3:4 豎幅圖不再擠進
+ * 正方框（meet 留白致視覺過小），skeleton／img 舊鏈保持正方不動。
+ * UR A.20 round-3：選酒 L2＋換酒格全切 `tall`（三列不動，格子長高吃滿幅；
+ * emoji／img 舊鏈同框跟長，字號同步放大一檔）。
  */
-function BeerImg({ beer }: { beer: Beer }) {
+function BeerImg({ beer, tall = false }: { beer: Beer; tall?: boolean }) {
   const [loaded, setLoaded] = useState(false);
   const [broken, setBroken] = useState(false);
+  const frame = tall ? "aspect-[3/4]" : "aspect-square";
+  const Local = iconForPickId(beer.id) ?? iconForDrinkName(beer.name);
+  if (Local !== null) {
+    // size-full 而非 h-full w-full：shadcn Button 自帶 `[&_svg:not([class*='size-'])]:size-4`
+    // reset（無 size- 類的 svg 一律壓成 16px，專治圖標按鈕）；有 size- 即豁免。
+    return (
+      <span aria-hidden className={`flex w-full items-center justify-center ${frame}`}>
+        <WallIcon Icon={Local} className="size-full" />
+      </span>
+    );
+  }
   const src = beer.icon_url ?? null;
   if (src === null || src === "" || broken) {
     return (
-      <span aria-hidden className="flex aspect-square w-full items-center justify-center text-3xl">
+      <span aria-hidden className={`flex w-full items-center justify-center ${frame} ${tall ? "text-4xl" : "text-3xl"}`}>
         {beer.emoji}
       </span>
     );
   }
   return (
-    <span className="relative flex aspect-square w-full items-center justify-center">
+    <span className={`relative flex w-full items-center justify-center ${frame}`}>
       {!loaded && (
         <span aria-hidden className="absolute inset-0 animate-pulse rounded-md bg-muted" />
       )}
@@ -294,7 +313,8 @@ export function V2Home() {
   );
   const wants = useMemo(
     () =>
-      // UR C.4：釘圖與 Sheet 同源（resolveFreshBeer 目錄取新，換酒即換釘圖）
+      // UR C.4＋A.20：釘圖與 Sheet 同源（resolveFreshBeer 目錄取新，換酒即換釘圖）；
+      // 本地 SVG 組件一併帶下（地圖 createRoot 注入），無圖回 img／emoji 舊鏈
       wantHistory.map((w) => {
         const fresh = resolveFreshBeer(w.beer);
         return {
@@ -306,6 +326,7 @@ export function V2Home() {
             fresh.icon_url !== undefined && fresh.icon_url !== null && fresh.icon_url !== ""
               ? fresh.icon_url
               : null,
+          Icon: iconForPickId(fresh.id) ?? iconForDrinkName(fresh.name),
         };
       }),
     [wantHistory],
@@ -324,7 +345,7 @@ export function V2Home() {
   );
   const wantMarkers = useMemo(
     () =>
-      wants.map((w) => ({ id: w.id, lat: w.lat, lng: w.lng, emoji: w.emoji, iconUrl: w.iconUrl })),
+      wants.map((w) => ({ id: w.id, lat: w.lat, lng: w.lng, emoji: w.emoji, iconUrl: w.iconUrl, Icon: w.Icon })),
     [wants],
   );
   const selfPos: LatLng | null =
@@ -966,7 +987,7 @@ export function V2Home() {
                   }}
                 >
                   <span className="flex items-center gap-3">
-                    <span aria-hidden className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-xl">
+                    <span aria-hidden className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-2xl">
                       {c.emoji}
                     </span>
                     <span className="text-sm font-bold">{t(c.labelKey)}</span>
@@ -997,7 +1018,7 @@ export function V2Home() {
                       }}
                       className="flex h-auto w-full flex-col items-center gap-1 rounded-none p-2"
                     >
-                      <BeerImg beer={b} />
+                      <BeerImg beer={b} tall />
                       <span className="w-full truncate text-center text-xs font-medium">{b.name}</span>
                     </Button>
                   </Card>
@@ -1172,8 +1193,8 @@ export function V2Home() {
                   <SheetDescription>{formatWantTime(rec.at, locale)}</SheetDescription>
                 </SheetHeader>
                 <div className="flex items-center gap-3">
-                  <span className="w-24 shrink-0 overflow-hidden rounded-xl border bg-card">
-                    <BeerImg key={fresh.id} beer={fresh} />
+                  <span className="w-28 shrink-0 overflow-hidden rounded-xl border bg-card p-1">
+                    <BeerImg key={fresh.id} beer={fresh} tall />
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-base font-bold">{fresh.name}</p>
@@ -1245,7 +1266,7 @@ export function V2Home() {
                             onClick={() => handleSwapTo(b)}
                             className="flex h-auto w-full flex-col items-center gap-1 rounded-none p-2"
                           >
-                            <BeerImg beer={b} />
+                            <BeerImg beer={b} tall />
                             <span className="w-full truncate text-center text-xs font-medium">{b.name}</span>
                           </Button>
                         </Card>

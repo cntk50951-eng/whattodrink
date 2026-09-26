@@ -180,9 +180,10 @@ describe("pickNextBatch (UR A.5)", () => {
   });
 
   it("caps at pool size when the whole lane was seen (pool exhausted)", () => {
+    // 池見底回退整池重洗：回 count 枚（A.20 後 beer lane 31 條＞count，舊斷言 seen.length 只在池＜count 時成立）
     const seen = beersInCategory("beer");
     const next = pickNextBatch(seen, "beer", 6, () => 0.3);
-    expect(next.length).toBe(seen.length);
+    expect(next.length).toBe(6);
   });
 
   it("uses the global pool for an unknown lane", () => {
