@@ -41,8 +41,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Claude workspace (project-local)
-.claude/
+# Claude workspace (project-local); skills 例外追蹤（三工具 skill 鏡像同步，見 AGENTS.md）
+.claude/*
+!.claude/skills/
 
 # Staging dir used during scaffold migration
 .staging/
