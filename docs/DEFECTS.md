@@ -33,6 +33,9 @@
 | DEF-20260926-007 | 拖圖自動關卡，用戶要僅X關閉 | Closed | P2 | 2026-09-26 / @yuki | UR A.17 | 刪dragstart關閉；用戶驗收通過，已合入 main |
 | DEF-20260926-008 | 好友模式非好友無攔截＋守衛層級不保頂 | Fixing | P1 | 2026-09-26 / @yuki | UR A.19 | ModePrompt改portal＋z1100保頂；好友模式乾杯邀約加關係查（非好友僅公開鈕＋收卡恢復）；附带修真pin邀約認表；三閘綠待复验 |
 | DEF-20260926-009 | 守衛文案不跟模式＋缺添加好友 | Closed | P1 | 2026-09-26 / @yuki | UR A.19 | 矩陣＋POST /friends＋乾杯豁免修正；用戶驗收通過，已合入 main |
+| DEF-20260926-010 | v2 Button render缺nativeButton報錯 | Closed | P0 | 2026-09-26 / @yuki | UR C.1 | 4處補齊＋零殘留驗訖；用戶驗收通過，已合入 main |
+| DEF-20260926-011 | v2 沿用v1配色未現代化 | Closed | P1 | 2026-09-26 / @yuki | UR C.1 | v2scope覆蓋＋去橘去黑到中性；用戶驗收通過，已合入 main |
+| DEF-20260926-012 | v2首頁驗收返工（圖層級＋shadcn化＋全屏無footer） | Closed | P0 | 2026-09-26 / @yuki | UR C.1 | round-6止；用戶驗收通過，已合入 main |
 
 ### DEF-20250925-001 登出→重登录后打卡酒类消失
 
@@ -135,6 +138,56 @@
 - **关联 UR**：UR A.17
 - **修复验证**：三閘全綠（232／lint 0 error／build 32頁；effect 循環類問題，用戶瀏覽器覆蓋）；待用户复验（點真pin→卡出＋地圖可拖可縮放）
 - **回归范围**：mock／想喝／self 開卡（identity 語義不變）、錨點快照、搖一搖聚焦
+
+### DEF-20260926-012 v2首頁驗收返工（圖層級＋shadcn化＋全屏無footer）
+
+- **状态**：Closed（2026-09-26 用户验收通过：round-6止＋配色中性，已合入 main）
+- **严重度**：P0 阻断（三條並發：不可操作＋不像 shadcn＋版式不符）
+- **发现日期 / 报告人**：2026-09-26 / @yuki
+- **复现步骤**：開 `/v2`（010／011 修後仍須硬刷新）：按鈕點不動；整體仍像 v1；底下有 footer
+- **期望**：按鈕全可點；shadcn 明亮現代；首屏只有地圖 view
+- **实际**：疊加層全被地圖蓋住；組件雖是 shadcn 但味不對；footer 在底
+- **初判根因**：層級＋token＋版式三件事
+- **确诊根因**：
+  1. 層級：疊加層 `z-10`，Leaflet panes 自帶 z 200–700 且直參與全局 stacking——v1 UR1.1 `.above{z-index:1000}` 同一課，本次重蹈。修為全部疊加層 `z-[1000]`＋根 `isolate`（portal sheet z-50 在 body 層照樣在上）。
+  2. shadcn 化：已用 Button／Card／Badge／Popover／Sheet＋Separator（010 追加），`Avatar` 試圖 `shadcn add` 但本機工具鏈調不通 npx（命令被攔截、直調二進制下載超時 240s），改現成 primitives（圓＋ring＋Badge），Avatar 記 C.x 重試。
+  3. 版式：根改 `fixed inset-0` 全屏（header／footer 仍在 DOM 但不可達不擠佔，v1 文件零動）；tab bar 全寬底欄＋CTA 列＋pin 卡照 Snap 位。
+- **关联 UR**：UR C.1（返工直接合入）
+- **修复验证**：三閘全綠（241／lint 0 error／build 39頁）；待用户复验（硬刷新！按鈕可點＋現代感＋無 footer 痕跡）
+- **追補 round-2（同輪驗收四點）**：① 自適應：轉屏／視口變化加 `invalidateSize`（Leaflet 不自跟容器）；② 選酒 Sheet 換 shadcn 件（L1→Button／L2→Card）；③ 頂部重組單容器緊湊左對齊（城市放左，足跡浮條進流排布，永不重疊）；④ 融合感：outline 件全加 ring、tab bar 頂部柔影、pin 卡加 Separator；修完三閘綠，待复驗
+- **追補 round-3**：選酒弹窗殘留三處手搓 button 全換 shadcn（模式行／tab 足跡／批量卡內鈕，grep 驗零殘留）；主色去橘改墨黑（Snap 黑白極簡，CTA 層級靠實心黑 vs 白描邊；skill 示例色让路用戶指令，已同步三 skill）；漏關 `</Card>` 致雙紅即修；三閘綠，待复驗
+- **追補 round-4**：黑退位改 shadcn 官方 Blue（registry themes.ts 有據；Snap 同系藍）；三閘綠
+- **追補 round-5**：按鈕面全去色（主 CTA／相機圓鈕／選中態／kinds／守衛／登入改描邊白淺灰，primary token 留備用；skill 注記同步三文件）；三閘綠，待复驗
+- **追補 round-6**：pills 列首颗今晚喝咩漏網仍藍→outline 去色；grep 驗 v2 零 `bg-primary`／`default` variant（剩 8px 牆 Badge 點未動）；三閘綠，待复驗
+- **回归范围**：v1 首頁（v2 文件＋作用域，理論零影響）
+
+### DEF-20260926-010 v2 Button render缺nativeButton報錯
+
+- **状态**：Closed（2026-09-26 用户验收通过：Console乾淨，已合入 main）
+- **严重度**：P0 阻断（console 爆錯，语义／無障礙受損）
+- **发现日期 / 报告人**：2026-09-26 / @yuki
+- **复现步骤**：開 `/v2` 即 Console 見三條 base-ui nativeButton 報錯（V2Home pills×2、底部拍照）
+- **期望**：零報錯
+- **实际**：`render={<Link>}` 未配 `nativeButton={false}`
+- **初判根因**：v1 mood 頁同配方漏抄
+- **确诊根因**：同上。修為 4 處（含未爆的登入 Link）全補；另修 `v2noscroll` 誤用明串（module hashed 名， along 同單順手）
+- **关联 UR**：UR C.1
+- **修复验证**：三閘全綠（241／lint 0 error／build 39頁）；待用户复验（Console 乾淨）
+- **回归范围**：v1 Button 用法（未動）、登入 Link 層（未開時不渲染）
+
+### DEF-20260926-011 v2 沿用v1配色未現代化
+
+- **状态**：Closed（2026-09-26 用户验收通过：現代感目檢，已合入 main）
+- **严重度**：P1 主要（v2 看起來像 v1，試驗無意義）
+- **发现日期 / 报告人**：2026-09-26 / @yuki
+- **复现步骤**：開 `/v2`，卡片／按鈕呈塗鴉色（米白底＋墨線感）
+- **期望**：淺色現代 shadcn（白卡＋柔邊＋琥珀主色）
+- **实际**：語義 token 被運行時 doodle 主題值污染
+- **初判根因**：token 值問題非組件問題
+- **确诊根因**：doodle theme（`LOCKED_THEME_ID`）運行時把 token 值灌進 `<html>` 繼承鏈，v2 語義類全中招。修為 `v2scope` 作用域覆蓋（淺灰底／白卡／柔邊／琥珀主色＋深 slate 字保對比；`color-scheme: light`），只影響 v2 子樹，`globals.css` 原塊一字未動
+- **关联 UR**：UR C.1
+- **修复验证**：三閘全綠；待用户复验（目檢現代感＋v1 頁回歸無變化）
+- **回归范围**：v1 全站（作用域隔離，理論零影響，用戶回歸目檢確認）
 
 ### DEF-20260926-009 守衛文案不跟模式＋缺添加好友
 

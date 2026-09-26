@@ -19,6 +19,7 @@ At the **start of every development task**, follow these steps strictly:
 ## Hard rules
 
 - **Never auto commit / push** without user confirmation (Step 10)
+- **V1/V2 isolation (EPIC C, hard rule, both directions)**: v2 work never modifies v1 files (routes/pages/components/styles/i18n keys); v1 keeps iterating freely; shared-layer (`lib/`/`hooks/`/API) changes must stay backward compatible (additive only) + pass v1/v2 dual regression. See `.harness/workflow.md` Step 4 (V1/V2 isolation) + backlog EPIC C.
 - **UI changes**: 由用户自行在浏览器验证，OpenCode 不自动执行 agent-browser / playwright 截图（Step 10a–10b 由用户手动完成）
 - **New lib / new version**: look up the latest API first via `mcp__context7__resolve-library-id` + `mcp__context7__query-docs` (Step 3), never rely on training data
 - **Logic errors**: fix immediately, then re-run Step 3→7

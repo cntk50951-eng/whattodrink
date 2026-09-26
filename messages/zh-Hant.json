@@ -303,6 +303,35 @@
     "modePublic": "公開",
     "switcherLabel": "可見模式"
   },
+  "v2": {
+    "tabMap": "地圖",
+    "tabHot": "熱門",
+    "tabShoot": "拍照",
+    "tabMood": "心情",
+    "tabTrail": "足跡",
+    "addFriendSoon": "加好友即將上線",
+    "publishAs": "發佈為…",
+    "flashTitle": "快貼 · 24h",
+    "flashDesc": "24 小時後自動消失",
+    "postTitle": "帖子 · 永久",
+    "postDesc": "永久保留，直到你刪除"
+  },
+  "terms": {
+    "title": "三種模式，點揀？",
+    "lede": "同一個 App，三種可見度，隨時可以轉。轉之前睇清楚每種模式俾邊個睇到你。",
+    "publicName": "公開",
+    "publicDesc": "所有人睇到你嘅打卡同綠點，你可以同任何人乾杯、約飲酒、讚好。",
+    "publicRisk": "風險：街區級位置同相片會被陌生人睇到，出街飲酒注意安全。",
+    "friendsName": "好友",
+    "friendsDesc": "淨係互加咗好友嘅人先睇到你嘅打卡同綠點，只可以同好友互動。",
+    "friendsRisk": "風險：好友截圖轉發控制唔到，唔熟嘅人唔好亂加。",
+    "stealthName": "隱身",
+    "stealthDesc": "睇到人哋嘅公開嘢，但唔可以打卡、乾杯、約飲酒、讚好；無心跳、無綠點，邊個都見你唔到。",
+    "stealthRisk": "風險：轉隱身之前出過嘅公開內容依然係公開；隱身唔係刪除。",
+    "crossBorder": "AI 分析會用海外雲端處理，你嘅相片同文字可能會被傳送到境外處理。",
+    "ageNote": "飲酒內容只適合 18 歲或以上人士。",
+    "back": "返回主頁"
+  },
   "auth": {
     "title": "登入",
     "subtitle": "一個 Google 帳號走天下，不用記密碼",
