@@ -229,9 +229,11 @@ export function V2Home() {
     position: geoStatus === "success" ? geoPos : null,
   });
   const { friends: liveFriends } = useLiveFriends(presence === "online");
-  // UR C.17：只看在線朋友（藏自釘＋打卡＋足跡，朋友層獨顯）＋好友信息卡目標。
-  const [friendsOnly, setFriendsOnly] = useState(false);
+  // UR D.4：好友列表入口（C.17 friendsOnly 地圖獨顯模式退役，見下）。
   const [friendCardId, setFriendCardId] = useState<string | null>(null);
+  function goChatList(): void {
+    router.push(locale === "zh-Hant" ? "/v2/chat" : `/${locale}/v2/chat`);
+  }
   // UR C.18：打卡提交中（冒泡罩開關＋連點守衛；ref 防同 tick 連點，state 驅 UI）。
   const [checkinSubmitting, setCheckinSubmitting] = useState(false);
   const submittingRef = useRef(false);
@@ -450,6 +452,26 @@ export function V2Home() {
     window.history.replaceState(null, "", window.location.pathname);
     resumeTrailRef.current = true;
   }, []);
+  // UR D.4：一鍵定位——mount 讀 ?friend=<id> 記 intent 即清參數（列表定位鈕深鏈）。
+  // 消費等 liveFriends 首批非空（空即無人在線，不消費不打擾；參數已清不重觸）。
+  const locateFriendRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined" || locateFriendRef.current !== null) return;
+    const id = new URLSearchParams(window.location.search).get("friend")?.trim() ?? "";
+    if (id === "") return;
+    window.history.replaceState(null, "", window.location.pathname);
+    locateFriendRef.current = id;
+  }, []);
+  useEffect(() => {
+    const id = locateFriendRef.current;
+    if (id === null || liveFriends.length === 0) return;
+    locateFriendRef.current = null;
+    const f = liveFriends.find((x) => x.user_id === id);
+    // 離線／非好友：靜默消費（人不動，鏡頭不動；列表本就只給在線行定位鍵）。
+    if (f === undefined) return;
+    mapApi.current?.flyTo({ lat: f.lat, lng: f.lng }, 15);
+    setFriendCardId(f.user_id);
+  }, [liveFriends]);
   // 登入態落定＋有 intent→開足跡（fit 跟隨上 effect；microtask 包沿 UR1.8 配方）。
   useEffect(() => {
     if (isAuthed !== true || !resumeTrailRef.current) return;
@@ -820,21 +842,6 @@ export function V2Home() {
     router.push(`${prefix}/v2/chat/room`);
   }
 
-  // UR C.17：在線朋友模式開關（開時飛全員視野——跨區按 bounds 裝下所有人；
-  // 無人在線則 toast 留原地，不進空地圖）。
-  function toggleFriendsOnly(): void {
-    if (friendsOnly) {
-      setFriendsOnly(false);
-      return;
-    }
-    if (liveFriends.length === 0) {
-      flashNote(t2("chatFriendsEmpty"));
-      return;
-    }
-    setFriendsOnly(true);
-    mapApi.current?.fitPoints(liveFriends.map((f) => ({ lat: f.lat, lng: f.lng })));
-  }
-
   const friendMarkers = useMemo(
     () =>
       liveFriends.map((f) => ({
@@ -995,10 +1002,10 @@ export function V2Home() {
     <div data-ui="v2" className={`fixed inset-0 isolate overflow-hidden bg-background ${styles.v2scope}`}>
       <V2MapView
         ref={mapApi}
-        others={friendsOnly ? [] : others}
-        wants={friendsOnly ? [] : wantMarkers}
-        trail={friendsOnly ? null : trail}
-        self={friendsOnly ? null : selfPos}
+        others={others}
+        wants={wantMarkers}
+        trail={trail}
+        self={selfPos}
         onPinClick={openPin}
         onWantClick={openWant}
         onReady={() => setMapReadyTick((n) => n + 1)}
@@ -1161,9 +1168,9 @@ export function V2Home() {
         </Button>
         <Button
           size="sm"
-          variant={friendsOnly ? "secondary" : "outline"}
-          className={`shrink-0 rounded-full shadow-md ring-1 ring-foreground/10 ${friendsOnly ? "" : "bg-card"}`}
-          onClick={toggleFriendsOnly}
+          variant="outline"
+          className="shrink-0 rounded-full bg-card shadow-md ring-1 ring-foreground/10"
+          onClick={goChatList}
         >
           <Users aria-hidden />
           {t2("chatFriendsOnly")}

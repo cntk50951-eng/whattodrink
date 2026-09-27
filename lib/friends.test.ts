@@ -8,6 +8,7 @@ import {
   parseCheckUserId,
   parseFriendCheckParams,
   parseScope,
+  toFriendListItem,
 } from "./friends";
 
 describe("areFriends (UR A.17)", () => {
@@ -98,5 +99,32 @@ describe("hideOnlineForViewer (UR A.17)", () => {
     expect(hideOnlineForViewer("public", "a", "me", [])).toBe(false);
     expect(hideOnlineForViewer(null, "a", "me", [])).toBe(false);
     expect(hideOnlineForViewer("friends", "me", "me", [])).toBe(false);
+  });
+});
+
+describe("toFriendListItem (UR D.4)", () => {
+  const NOW = 1_757_000_000_000;
+  const row = {
+    id: "u1",
+    nickname: "N",
+    avatar_url: null,
+    mode: "public",
+    last_seen_at: new Date(NOW - 60_000).toISOString(),
+  };
+  it("在線映射四列", () => {
+    expect(toFriendListItem(row, NOW)).toEqual({
+      user_id: "u1",
+      nickname: "N",
+      avatar_url: null,
+      online: true,
+    });
+  });
+  it("隱身／超窗／壞行", () => {
+    expect(toFriendListItem({ ...row, mode: "stealth" }, NOW)?.online).toBe(false);
+    expect(
+      toFriendListItem({ ...row, last_seen_at: new Date(NOW - 600_000).toISOString() }, NOW)
+        ?.online,
+    ).toBe(false);
+    expect(toFriendListItem({ id: "u1" }, NOW)).toBeNull();
   });
 });
