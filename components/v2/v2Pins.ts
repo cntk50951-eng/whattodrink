@@ -11,9 +11,12 @@ export type V2Marker = {
   id: string;
   lat: number;
   lng: number;
-  /** 首字（暱稱首字，無則酒字）。 */
+  /** 首字（暱稱首字，無則酒字；有酒圖時退居 fallback）。 */
   label: string;
   online: boolean;
+  /** UR C.6 round-7：釘面改酒圖標——展示名（本地 SVG 解析用）與 emoji（回退）。 */
+  drink: string | null;
+  drinkEmoji: string | null;
 };
 
 export function apiPinsToMarkers(pins: readonly PinJson[]): V2Marker[] {
@@ -23,6 +26,8 @@ export function apiPinsToMarkers(pins: readonly PinJson[]): V2Marker[] {
     lng: p.lng,
     label: (p.nickname ?? p.drinkName ?? "酒").slice(0, 1),
     online: p.isOnline,
+    drink: p.drinkName,
+    drinkEmoji: p.drinkEmoji,
   }));
 }
 
@@ -33,5 +38,7 @@ export function mockToMarkers(checkins: readonly Checkin[] = MOCK_CHECKINS): V2M
     lng: c.position.lng,
     label: (c.nickname ?? c.drinkName ?? "酒").slice(0, 1),
     online: false,
+    drink: c.drinkName,
+    drinkEmoji: c.drinkEmoji,
   }));
 }

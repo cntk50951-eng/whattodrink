@@ -41,6 +41,7 @@
   - **UR C.3 選酒弹窗 shadcn 化＋去 v1 味 [✓，用户已验收，merged]**：Header／Title／抓手／skeleton淡入／返回鍵／L1列表行文字主導；零原生h2／button（grep驗）；v2.back×3 parity PASS；round-2 配色根因 portal 逃 scope，Sheet 根自帶 v2scope＋sm 居中窄欄＋圓角芯片；三閘241綠／lint 0 error／build 39頁
   - **UR A.20 酒圖本地優先（local-first）[✓，用户已验收，merged]**：靜態目錄 15→42（seed 品牌全收＋茅台保底；tagline 港味短句）＋baijiu lane＋catBaijiu×3；wall 全 30 pickId＋覆蓋鎖單測；BeerIcon／BeerImg／地圖釘 local-first（本地SVG＞icon_url＞emoji；shadcn Button svg size-4 reset 改 size-full；地圖釘 createRoot 注入＋microtask 卸載）；resolveFreshBeer 共用加法；fix DEF-20260926-015；DB／API 零動；三閘248綠／lint 0 error／build 39頁
   - **UR C.5 選酒弹窗導航鍵 shadcn 標準化 [✓，用户已验收，merged]**：導航行（左 ghost＋ChevronLeft 返回＋右 in-flow X；默認角落 X 關，Esc 照走）；段內舊返回鍵退役；零新 key；v1 零文件；三閘253綠／lint 0 error／build 39頁
+  - **UR C.6 v2 簇釘散開看每枚 [✓，用户已验收，merged]**：簇徽 fit 最佳視野＋zoomend 跟隨重算（根因修）＋同點散 pin（<40m 擺 ~20m 真 pin）＋釘面酒圖標（本地SVG注入＞酒emoji＞首字，V2Marker 加 drink 兩字段）；蜘蛛／列表中間方案全撤回；零新 key；v1／共用層零動；三閘257綠／lint 0 error／build 39頁
   - **UR C.4 v2 自打卡底部 Sheet（換酒＋品牌圖＋用戶資訊）[✓，用户已验收，merged]**：want 釘改開底部 Sheet（浮動卡只留他人；自帶 v2scope＋sm 窄欄）；`lib/beers.ts` 加法 `resolveFreshBeer`（按 id 對活目錄取新，4 單測）＋主角位 BeerImg（DEF-014）；換酒批／點格即換／兩段刪全搬（DEF-013，共用純函數只讀調用；離線寫本地／登入走 session）；用戶行（頭像佔位＋你＋性別＋模式）＋距你 km 前端實算＋圖片虛線佔位槽；round-2 地圖釘圖（有圖白底琥珀環，escAttr＋http(s) 限）；新 key 僅 v2.wantPhotoSoon×3 parity PASS；三閘245綠／lint 0 error／build 39頁
   - fix DEF-20260926-010（render-Link補nativeButton＋v2noscroll hashed；三閘綠，待复驗）
   - fix DEF-20260926-011（v2scope淺色現代覆蓋，globals零動；三閘綠，待复驗）
