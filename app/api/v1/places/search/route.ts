@@ -56,18 +56,20 @@ export async function GET(req: Request): Promise<Response> {
     }
   }
 
-  // 回退 Nominatim
-  try {
-    const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=8&q=${encodeURIComponent(q)}&countrycodes=hk&addressdetails=1`;
+  // 回退 Nominatim（中文“中环”在 countrycodes=hk 时易空，自动回退无 countrycodes）
+  async function nomSearch(extra: string): Promise<Array<{ place_id: number; display_name: string; lat: string; lon: string; type?: string }>> {
+    const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=8&q=${encodeURIComponent(q)}${extra}&addressdetails=1&accept-language=zh`;
     const res = await fetch(nomUrl, { headers: { Accept: "application/json", "User-Agent": "whattodrink/1.0" }, cache: "no-store" });
-    const json = (await res.json()) as Array<{
-      place_id: number;
-      display_name: string;
-      lat: string;
-      lon: string;
-      type?: string;
-    }>;
-    const places = (Array.isArray(json) ? json : []).map((p) => ({
+    const json = (await res.json()) as Array<{ place_id: number; display_name: string; lat: string; lon: string; type?: string }>;
+    return Array.isArray(json) ? json : [];
+  }
+  try {
+    let raw = await nomSearch("&countrycodes=hk");
+    if (raw.length === 0) raw = await nomSearch("");
+    // 仅保留香港结果（display_name 含 香港/Hong Kong）优先
+    const hkFiltered = raw.filter((p) => /香港|Hong Kong/.test(p.display_name));
+    const use = hkFiltered.length > 0 ? hkFiltered.slice(0, 8) : raw.slice(0, 8);
+    const places = use.map((p) => ({
       place_id: String(p.place_id),
       display_name: p.display_name,
       name: p.display_name.split(",")[0] ?? p.display_name,

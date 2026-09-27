@@ -66,6 +66,7 @@ export function V2GatheringForm() {
   const queryTimer = useRef<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const miniMapRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const miniLeafletRef = useRef<typeof import("leaflet") | null>(null);
   const miniMapInstRef = useRef<import("leaflet").Map | null>(null);
   const miniMarkerRef = useRef<import("leaflet").Marker | null>(null);
@@ -105,23 +106,73 @@ export function V2GatheringForm() {
     };
   }, [query, placeOpen]);
 
-  // 小地图：搜索定位 + 点选定位（Leaflet + 高德/ Nominatim 双源）
+  // 焦点：打开时移至搜索框，避免 trigger 仍聚焦被 aria-hidden/inert 阻断
   useEffect(() => {
-    if (!placeOpen) return;
+    if (placeOpen) {
+      // 下一帧聚焦，避开 inert 时序
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+      // 失焦触发按钮，避免 Blocked aria-hidden
+      (document.activeElement as HTMLElement | null)?.blur();
+    }
+  }, [placeOpen]);
+
+  // 小地图：Uber/高德式 可拖动选点 + 搜索定位 + 点选定位（Leaflet + 高德/ Nominatim 双源）
+  useEffect(() => {
+    if (!placeOpen) {
+      // 关闭时清理，避免二次打开容器失效
+      if (miniMapInstRef.current !== null) {
+        try {
+          miniMapInstRef.current.remove();
+        } catch {}
+        miniMapInstRef.current = null;
+        miniLeafletRef.current = null;
+        miniMarkerRef.current = null;
+        miniMarkersRef.current = [];
+      }
+      return;
+    }
     let cancelled = false;
     (async () => {
       const L = await import("leaflet");
       if (cancelled) return;
       miniLeafletRef.current = L;
-      // 避免重复初始化
-      if (miniMapInstRef.current !== null || miniMapRef.current === null) return;
+      if (miniMapRef.current === null) return;
+      if (miniMapInstRef.current !== null) {
+        setTimeout(() => miniMapInstRef.current?.invalidateSize(), 200);
+        return;
+      }
       const map = L.map(miniMapRef.current, {
         zoomControl: true,
         attributionControl: false,
-      }).setView(place ? [Number(place.lat), Number(place.lon)] : [22.2819, 114.158], 13);
+      }).setView(place ? [Number(place.lat), Number(place.lon)] : [22.2819, 114.158], 14);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
       }).addTo(map);
+      // Uber 式：拖动地图中心选点（moveend 逆地理）
+      let moveTimer: number | null = null;
+      map.on("moveend", () => {
+        if (moveTimer) window.clearTimeout(moveTimer);
+        moveTimer = window.setTimeout(async () => {
+          const c = map.getCenter();
+          try {
+            const res = await fetch(`/api/v1/places/reverse?lat=${c.lat}&lng=${c.lng}`);
+            const json = (await res.json()) as { display_name?: string };
+            const p: Place = {
+              place_id: `rev-${c.lat.toFixed(5)}-${c.lng.toFixed(5)}`,
+              display_name: json.display_name ?? `${c.lat.toFixed(5)},${c.lng.toFixed(5)}`,
+              name: json.display_name?.split(",")[0] ?? `${c.lat.toFixed(5)},${c.lng.toFixed(5)}`,
+              address: json.display_name ?? "",
+              lat: String(c.lat),
+              lon: String(c.lng),
+              category: "map-pick",
+              source: (json as unknown as { source?: string }).source ?? "nominatim",
+            };
+            // 仅当用户拖动时更新，避免与搜索飞点冲突（搜索时会 flyTo，moveend 也会触发，但以搜索结果为准时不覆写）
+            // 这里直接更新，搜索飞点后会再次被选中标记覆盖，体验为“拖动可微调”
+            setPlace(p);
+          } catch {}
+        }, 400);
+      });
       map.on("click", async (e: import("leaflet").LeafletMouseEvent) => {
         const { lat, lng } = e.latlng;
         try {
@@ -420,7 +471,15 @@ export function V2GatheringForm() {
                   <Label>
                     {t("fieldPlace")} <span className="text-destructive">*</span>
                   </Label>
-                  <Button variant="outline" className="w-full justify-between" onClick={() => setPlaceOpen(true)} type="button">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between"
+                    onClick={() => {
+                      (document.activeElement as HTMLElement | null)?.blur();
+                      setPlaceOpen(true);
+                    }}
+                    type="button"
+                  >
                     <span className="flex items-center gap-2 truncate">
                       <MapPin className="size-4 shrink-0" />
                       {place ? place.name : t("pickPlace")}
@@ -582,23 +641,25 @@ export function V2GatheringForm() {
         </div>
       </div>
 
-      {/* Place picker dialog（小地图 + 搜索定位） */}
-      <Dialog open={placeOpen} onOpenChange={setPlaceOpen}>
-        <DialogContent className="max-w-lg">
+      {/* Place picker dialog（Uber/高德式 小地图选点） */}
+      <Dialog open={placeOpen} onOpenChange={(open) => { if (open) (document.activeElement as HTMLElement | null)?.blur(); setPlaceOpen(open); }}>
+        <DialogContent className="max-w-lg max-h-[86vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MapPin className="size-4" /> {t("pickPlace")}
             </DialogTitle>
-            <DialogDescription>{t("pickPlaceHint")} · 高德搜索 + 小地图点选，拒绝手输与私宅</DialogDescription>
+            <DialogDescription>{t("pickPlaceHint")} · 高德搜索 + 拖动地图选点（类 Uber/高德打车），拒绝手输与私宅</DialogDescription>
           </DialogHeader>
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-2 top-2.5 size-4 text-muted-foreground" />
               <Input
+                ref={searchInputRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="搜索中环、尖沙咀、铜锣湾..."
                 className="pl-8"
+                autoFocus
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -611,9 +672,23 @@ export function V2GatheringForm() {
               {searching ? <Loader2 className="size-4 animate-spin" /> : "搜索"}
             </Button>
           </div>
-          {/* 小地图 */}
-          <div ref={miniMapRef} className="h-[220px] w-full overflow-hidden rounded-lg border" />
-          <p className="text-xs text-muted-foreground">在地图上点选亦可定位（点击后自动逆地理至地址），搜索结果会在地图上以标记显示。</p>
+          {/* 小地图 - Uber 式中心 Pin */}
+          <div className="relative h-[280px] w-full shrink-0 overflow-hidden rounded-lg border">
+            <div ref={miniMapRef} className="absolute inset-0" />
+            {/* 中心固定 Pin（不随地图动，拖动即选点） */}
+            <div className="pointer-events-none absolute left-1/2 top-1/2 z-[400] -translate-x-1/2 -translate-y-[18px]">
+              <div className="flex flex-col items-center">
+                <div className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-2 ring-white">
+                  <MapPin className="size-4" />
+                </div>
+                <div className="mt-1 size-2 rounded-full bg-primary/60 blur-[1px]" />
+              </div>
+            </div>
+            <div className="pointer-events-none absolute bottom-2 left-2 rounded bg-card/90 px-2 py-1 text-[11px] text-muted-foreground shadow">
+              拖动地图选择地点 · 点击亦可
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">输入关键词搜索（高德优先）或直接拖动/点击地图，中心点即选中地址。</p>
           <div className="max-h-[28vh] space-y-2 overflow-auto pr-1">
             {searching && <p className="py-6 text-center text-sm text-muted-foreground">搜索中…</p>}
             {!searching &&

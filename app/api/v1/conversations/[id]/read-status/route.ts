@@ -1,4 +1,4 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseConversationId } from "@/lib/api/chat";
 
@@ -21,7 +21,19 @@ export async function GET(
   if ("error" in parsedId) {
     return apiError("invalid_params", parsedId.error, 400);
   }
-  const { data: members } = await supabase
+  // 先 authed 驗我是成員（fail-closed），再 service 讀對方水位行
+  // （RLS 只許讀自己行，authed 拿不到對方，沿列表端點同修）。
+  const { data: mine } = await supabase
+    .from("conversation_members")
+    .select("conversation_id")
+    .eq("conversation_id", parsedId.id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (mine === null) {
+    return apiError("not_found", "找不到该会话", 404);
+  }
+  const svc = await createServiceClient();
+  const { data: members } = await svc
     .from("conversation_members")
     .select("user_id,last_read_at")
     .eq("conversation_id", parsedId.id);
@@ -29,9 +41,6 @@ export async function GET(
     user_id: string;
     last_read_at: string;
   }[];
-  if (!rows.some((m) => m.user_id === userId)) {
-    return apiError("not_found", "找不到该会话", 404);
-  }
   const peer = rows.find((m) => m.user_id !== userId) ?? null;
   const peer_last_read_at =
     peer !== null && Number.isFinite(Date.parse(peer.last_read_at))
