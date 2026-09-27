@@ -2022,6 +2022,30 @@ v2 自家想喝釘的浮動小卡只有 emoji 圓＋酒名＋時間：不能換�
 
 ---
 
+UR C.7　首頁路由切 v2（`/` 按配置落 `/v2`）[✓]
+
+用戶指令：`/`（本地＋遠端）預設進 v2，要一個配置隨時切回。v1 頁原樣保留直連可達。
+
+### 範圍
+1. `proxy.ts`：裸 `/`（無查詢串）且 `HOME_UI=v2` 時 307 到 `/v2`；其餘直通 intl＋session 原鏈
+2. `lib/home.ts`（新，共用加法可單測）：`parseHomeUi`（缺省／非法一律 v2，用戶拍板）＋`resolveHomeTarget`（僅裸 `/`＋v2 檔回 `/v2`；`?pick=1`／`?shoot=1` 深鏈永不劫持）
+3. `.env.example` 加 `HOME_UI` 說明（Vercel 改值需 redeploy，proxy env 編譯期烘焙）
+
+### 非目標
+- v1 任何路由／頁面／組件改動、rewrite 偽裝（用 307 明跳，URL 誠實）、DB／遠端配置中心
+
+### AC
+- `HOME_UI` 未設／v2：`/` 307→`/v2`；`/?pick=1` 200 v1 原頁；`/v2` 200 直達
+- `HOME_UI=v1`：`/` 200 v1 原頁（行為回退）
+- 三閘全綠；用戶本地驗＋遠端目認（遠端零動作即 v2，缺省值帶去）
+
+*改動記錄*
+- 2026-09-26：建檔即開工置 [WIP]（用戶指令首頁切 v2＋可切換配置；EPIC C 鐵律第 5 條預留的入口 UR）
+- 2026-09-26：實現完待驗（proxy 裸 `/`→307 `/v2`＋深鏈放行＋`lib/home.ts` 單測 6；263綠／lint 0 error／build 39頁；本地四路實測／→307、/?pick=1→200、/v2→200、HOME_UI=v1→200；待用戶瀏覽器驗收）
+- 2026-09-26：用戶驗收通過，置 [✓] 合入 main（插畫並行施工，只交 C.7 hunks）
+
+---
+
 UR C.6　v2 簇釘散開看每枚（fit＋散 pin＋酒圖釘面）[✓]
 
 同店扎堆的數字簇（如 9）一點只會 `setView zoom+2`——同坐標放大到頂也分不開，用戶永遠看不到每一枚。五輪收斂終版：fit 最佳視野＋zoom 跟隨重算＋同點散 pin＋釘面酒圖。
@@ -2070,3 +2094,29 @@ UR C.5　選酒弹窗導航鍵 shadcn 標準化（返回＋關閉）[✓]
 
 *改動記錄*
 - 2026-09-26：建檔置 []（用戶指令 EPIC B 管理＋表補強；realtime 實現待拍板後動工）
+
+---
+
+UR C.8　v2 底图试水：OSM↔高德可切换＋自动回退 [WIP]
+
+用戶指令：OSM 在內地訪問差，試水高德瓦片；要靈活、不行隨時換回來。Phase 1 只換瓦片源（Leaflet 照用），v2 先試，v1 不動；轉正（官方 JS API＋Key＋GCJ-02）另開 UR。
+
+### 範圍
+1. 新 `lib/maps/provider.ts`（共用加法）：`parseMapProvider`（`NEXT_PUBLIC_MAP_PROVIDER`，缺省／非法一律 `osm`）＋`tileSpecFor`（osm 走既有 OSM 常數，amap 走 `webrd0{s}.is.autonavi.com…style=8…lang=zh_cn`，attribution 高德）＋`shouldFallbackToOsm`（連續失敗閾值 5）
+2. `V2MapView` 接線：init 走工廠建層；`tileerror` 連錯達閾值自動拆層換 OSM（`tileload` 清零計數）；其餘 pins／聚合／鏡頭邏輯不動
+3. `.env.example` 加 `NEXT_PUBLIC_MAP_PROVIDER` 說明（缺省 osm；Vercel 改值需 redeploy，沿 C.7 口徑）
+
+### 非目標
+- v1 任何文件（`DrinkMap` 不動）、官方 JS API（Phase 2）、GCJ-02 轉換（Phase 2 定 DB 口徑）、Nominatim→regeo（Phase 2）、新 i18n key（attribution 是固定串）
+
+### AC
+- AC1：變量未設／非法→OSM，與之前一字不差
+- AC2：`=amap`→v2 底圖變高德標準圖，pins／聚合／卡片／守衛行為不變
+- AC3：高德連續失敗→自動回 OSM，不白屏
+- AC4：provider 單測；三閘綠；`git status` 無 v1 文件；用戶瀏覽器親驗（含內地視角如可）
+
+### 合規備註
+- 直拼瓦片屬試水（ToS 灰色，短期驗證）；轉正必須官方 JS API。風險已告知用戶，用戶拍板試水。
+
+*改動記錄*
+- 2026-09-27：建檔即開工置 [WIP]（用戶指令試水＋隨時換回；問答定案 env 開關＋自動回退＋只動 v2；編號 C.8 因 C.7 被並行線佔用，新人讓路）

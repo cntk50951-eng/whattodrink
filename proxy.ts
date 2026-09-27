@@ -2,6 +2,7 @@ import createMiddleware from "next-intl/middleware";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { updateSession } from "@/lib/supabase/middleware";
+import { parseHomeUi, resolveHomeTarget } from "@/lib/home";
 import { routing } from "./i18n/routing";
 
 const intlMiddleware = createMiddleware(routing);
@@ -17,6 +18,16 @@ const intlMiddleware = createMiddleware(routing);
  * `/api/v1/health` 看自檢狀態。
  */
 export default async function proxy(request: NextRequest) {
+  // UR C.7：首頁版本開關先行——裸 `/`＋v2 檔明跳 `/v2`；
+  // 其餘（含 v1 深鏈）原樣進 intl＋session 鏈，v1 一個字節不動。
+  const homeTarget = resolveHomeTarget(
+    request.nextUrl.pathname,
+    request.nextUrl.search,
+    parseHomeUi(process.env.HOME_UI),
+  );
+  if (homeTarget !== null) {
+    return NextResponse.redirect(new URL(homeTarget, request.url));
+  }
   const response = intlMiddleware(request) ?? NextResponse.next();
   try {
     return await updateSession(request, response);
