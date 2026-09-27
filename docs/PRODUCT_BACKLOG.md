@@ -2169,3 +2169,27 @@ UR C.10　v2 他人打卡卡升級（與自家 Sheet 同構信息）[✓]
 - 2026-09-27：問答定案（只改 v2＋A 同構 Sheet，容器不動）置 [WIP]；DEF 同步轉 Fixing
 - 2026-09-27：驗收返工（用戶貼自家 Sheet DOM 為準＋X 仍錯位）：「容器不動」決策推翻——他人卡搬進同一 bottom Sheet（同容器同 X，錯位按構造消失；信息行沿上一版）；浮動卡退役刪除
 - 2026-09-27：用戶瀏覽器親驗通過（他人卡進 Sheet，X＋結構與自家一致），置 [✓]
+
+---
+
+UR C.12　v2 捏合縮放歸地圖（禁整頁放大）[WIP]
+
+用戶上報：高德底圖上雙指捏合不縮地圖、反而整頁放大；圖上划動正常、底部區域捏合必炸。根因：viewport 未鎖＋底部 overlay 全 auto＋地圖容器被 C.1 覆寫放行 pinch。
+
+### 範圍
+1. `app/[locale]/v2/layout.tsx`（新，v2 獨立文件）：viewport 鎖 `maximum-scale=1, user-scalable=no`（整頁縮放非法；Snap／Maps 网页版同款；v1 零影響）
+2. 地圖容器 `touch-action` 改回 `none`（Leaflet 全接管；C.1 pan-y 配方在 v2 全屏下退役，v1 原樣）
+3. 底部 overlay（tab bar／CTA 列／pills 列）加 `touch-manipulation`（tap 照用＋去延遲＋禁雙擊縮放＋保滾動）
+
+### 非目標
+- 瓦片層改動（手勢全是 Leaflet 的事，與 provider 正交；C.8 零碰）、v1 任何文件、底部 pinch 轉發（C 方案已否）、桌面端手勢
+
+### AC
+- 真機（iOS Safari＋安卓 Chrome）：圖上／底部任何位置雙指捏合只縮地圖，整頁不動；雙擊不放大；按鈕 tap 照常
+- 三閘全綠；用户真機驗收（headless 無多點觸控，桌面端驗不了捏合）
+
+### 代價備註（用戶已拍板 A）
+- 整頁縮放能力沒了（含無障礙縮放）；切回 v1 首頁（`HOME_UI=v1`）即恢復（v1 未鎖）
+
+*改動記錄*
+- 2026-09-27：建檔即開工置 [WIP]（用戶指令捏合歸地圖；問答定案 A 標準三件套）

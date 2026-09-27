@@ -765,7 +765,7 @@ export function V2Home() {
       </div>
 
       {/* 橫滑 pills（容器內緊貼頂欄行，同一左對齊） */}
-      <div className={`flex gap-2 overflow-x-auto pb-1 ${styles.v2noscroll}`}>
+      <div className={`flex touch-manipulation gap-2 overflow-x-auto pb-1 ${styles.v2noscroll}`}>
         <Button size="sm" variant="outline" className="shrink-0 rounded-full bg-card shadow-md ring-1 ring-foreground/10" onClick={openPick}>
           <Dices aria-hidden />
           {tn("randomPick")}
@@ -859,7 +859,7 @@ export function V2Home() {
 
       {/* 底部 CTA 列 */}
       {card === null && (
-        <div className="absolute inset-x-3 bottom-20 z-[1000] flex items-end gap-2">
+        <div className="absolute inset-x-3 bottom-20 z-[1000] flex touch-manipulation items-end gap-2">
           <Button size="icon-lg" variant="outline" aria-label={tn("photoPick")} className="rounded-full bg-card shadow-md ring-1 ring-foreground/10" nativeButton={false} render={<Link href="/camera" />}>
             <Camera aria-hidden />
           </Button>
@@ -880,7 +880,7 @@ export function V2Home() {
       )}
 
       {/* 底部 TabBar */}
-      <nav aria-label={tn("menu")} className="absolute inset-x-0 bottom-0 z-[1000] border-t bg-card pb-[env(safe-area-inset-bottom)]">
+      <nav aria-label={tn("menu")} className="absolute inset-x-0 bottom-0 z-[1000] touch-manipulation border-t bg-card pb-[env(safe-area-inset-bottom)]">
         <div className="grid grid-cols-5 px-2 pt-1">
           <span className="flex flex-col items-center gap-0.5 py-1.5 text-xs font-bold" aria-current="page">
             <MapIcon size={20} aria-hidden />

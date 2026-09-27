@@ -257,8 +257,9 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       map.on("zoomend", () => {
         setZoomTick((t) => t + 1);
       });
-      // 沉浸高地圖下整屏手勢：豎滑還頁面（沿 UR1.3 scroll-trap 配方）。
-      holder.style.setProperty("touch-action", "pan-y pinch-zoom", "important");
+      // 沉浸高地圖下整屏手勢：UR C.12 改 none（沿 module css 同值，重要性保底；
+      // C.1 pan-y 配方退役理由見 css 註）。
+      holder.style.setProperty("touch-action", "none", "important");
       holder.dataset.ready = "1";
       mapRef.current = map;
       setMapReady(true);
