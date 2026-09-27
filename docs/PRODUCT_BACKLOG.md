@@ -2341,3 +2341,56 @@ UR C.15　v2 好友聊天靜態殼（消息流＋輸入＋已讀三態 mock）[W
 *改動記錄*
 - 2026-09-27：建檔即開工置 [WIP]（用戶指令單獨開線＋裝件＋UI 起步；版本問答只做 v2；分支待定——髒樹是同伴 C.13/C.14，暫不開分支不提交，hunks 分離可辨）
 - 2026-09-27 round-2（用戶拍板：不要 Sheet，要完整聊天頁＋可關＋返回列表 stub）：`ChatThread` 抽線程件（Sheet 殼退役，`V2ChatSheet.tsx` 刪）；新路由 `/v2/chat`（列表 stub：空態＋回地圖，不造假數據）＋`/v2/chat/[friendId]`（完整頁：返回列表＋頭像名＋在線態＋線程全高；未知 id 回退暱稱保直接 URL 永遠可渲染）；pin 點擊改 `router.push`（locale 前綴默繁免寫）；新 key `chatListTitle/chatListEmpty/chatFallbackName`×3；關聯 DEF-20260927-007（pin 點擊無反應，首嫌 friends 空，待用戶回填三問）
+
+---
+
+UR C.16　v2 左上簇升級（精確地名＋真頭像＋登出＋狀態去重）[WIP]
+
+用戶指令三件：①定位精確到國家-城市／城市-區（港澳這類地區）；②登入後無處登出，參 shadcn 正統做登出；③狀態文字重複。
+
+### 現狀（2026-09-27 實證）
+- 地名：`resolveCityCode(selfPos)`（`lib/city.ts`，隊友施工中）只到城市（hk/bj/sh/gz/sz 近中心判定），無區、無澳門（澳門坐標會被判 hk，錯）、海外回 null
+- 頭像：靜態 `Users` 圖標，非本人（`useMyMode` 無 avatar；v1 `HeaderAuth` 有 `user_metadata.avatar_url` 成品可抄）
+- 登出：v2 零入口（`V2Home` 無 signOut／logout 字串）；`lib/auth/clear.ts`（A.7 緩存清＋自動派 `LOGOUT_CLEAR_EVENT`，V2Home 已監聽清足跡／Sheet）＋v1 `handleLogout`（signOut＋清緩存＋`router.refresh()`）可復用
+- 重複：地名下 geo 狀態行（在線/定位中/離線）＋A.21 狀態燈行（● 在線/隱身）＋模式 pill（公開/好友/隱身）——「在線」×2＋模式×2
+
+### 範圍（v2-only：`components/v2/V2Home.tsx`＋`lib/city.ts` 加法＋`messages` 既有命名空間）
+1. 地名：城市（沿 `city.ts`）＋區（C.9 `areaOf` 商圈錨，港境內有效；澳門加 `mo` 碼＋議會前地一錨；海外回城市或國家）；文案 `{區} · {市}`／`{市} · {國}`（待問答定粒度和來源）
+2. 頭像：登入顯示真頭像（`avatar_url`，無則首字），匿名沿舊圖標；點頭像開 shadcn `DropdownMenu`（頭像 trigger 正統），菜單項待定（登出必含）
+3. 登出：`signOut＋clearUserLocalCaches（事件自動清 v2 殘影）＋router.refresh`（沿 v1 配方，v2 補 `isAuthed` 回匿名）
+4. 去重：砍 geo 狀態文字行（定位中／離線改地名旁小點或併入燈行）；狀態只留一處燈＋pill（pill 是切模式入口，保留）
+
+### 非目標
+- 真逆地理 API／外部地名服務（問答選 B 才開）、v1 `HeaderAuth` 改動、共用層破壞性改名、定位權限流程改動
+
+### AC
+- AC1：香港市區顯示到區（如銅鑼灣·香港），澳門不再判香港，海外不顯示錯城
+- AC2：登入見自己頭像，菜單登出可用，登出後足跡／Sheet／想喝殘影全清＋回匿名
+- AC3：左上無重複狀態字；三閘綠；用戶瀏覽器親驗；`git status` 無 v1
+
+*改動記錄*
+- 2026-09-27：建檔置 []（用戶指令三件；待問答定區來源＋菜單範圍後置 [WIP]）
+- 2026-09-27：問答定案（錨近似＋菜單含模式）置 [WIP]；實作完待驗（`geoAreas` 加議會前地一錨＋測試放行澳門、`cityName_mo`＋`logout`×三語、左上改真頭像＋DropdownMenu（模式三檔＋登出）＋C.2 pill 退役、地名 `{區}·{市}`20km 錨門、狀態去重（登入只留燈＋模式字）；tsc 自文件淨／lint 0 error／geo＋spread 15 綠；全樹 build 被隊友未追踪 `V2FriendCard` 三錯擋住（非我方，不碰）；待用戶瀏覽器親驗，未提交）
+- 2026-09-27：DEF-20260927-009（聊天線代修，歸屬記此：點頭像炸 `MenuGroupContext`——`DropdownMenuLabel` 游離 `Group` 外，包一層 `DropdownMenuGroup` 即修，tsc 淨；待用戶硬刷新親驗轉 Fixed）
+
+---
+
+UR C.17　v2 在線朋友模式＋好友信息卡（先看人再聊）[WIP]
+
+用戶指令：①加「在線朋友」鈕，開時藏我光標只顯朋友光標；②多朋友跨區時地圖縮到裝下所有人；③點朋友圈先看信息卡（含最近上線時間，DB 可改），卡內聊天鍵才進完整頁。
+
+### 範圍（v2-only：`components/v2/V2Home.tsx`＋`V2FriendCard.tsx` 新＋`lib/chat.ts` 加法；`components/ui` 零動）
+1. pills 第 6 顆 toggle（Users 圖標，选中 secondary；沿 pills 語言，橫滑收納）：開時 `others/wants/trail/self` 全藏（字面「只顯示在線朋友」）＋`fitPoints` 飛全員 bounds（跨區自動縮放，單點退化由 `fitPoints` 內建守衛；`minZoom:10` 跨洋鉗制是地圖配置，另案）；無人在線 toast 留原地不進空地圖
+2. `V2FriendCard`（bottom Sheet 沿 C.4／C.10 同容器）：頭像＋名＋在線 Badge＋最近上線時間＋「聊天」鍵（進 `/v2/chat/[id]` 後關卡）；對方離線自動收卡 fail-closed
+3. 最近上線時間：`formatSeenAgo`（`Intl.RelativeTimeFormat`，三語零新 key；`updated_at` 端到端現成——**DB 免改動**）；新 key 僅 `chatFriendsOnly/chatFriendsEmpty/chatOpen`×3
+
+### 非目標
+- 真通道（C-chat-2）、列表實現（stub 保留）、v1 任何文件、共用層行為改動（`lib/chat.ts` 純函數加法）
+
+### AC
+- AC1：開模式→自釘打卡足跡全藏＋鏡頭裝下所有在線朋友；再點恢復
+- AC2：點朋友圈→信息卡（誰＋在線＋x 分鐘前）；聊天鍵→完整頁；關卡／離線收卡
+- AC3：無人在線點鈕只 toast 不進空圖；三閘綠；用戶瀏覽器親驗；`git status` 無 v1
+
+*改動記錄*
+- 2026-09-27：建檔即開工置 [WIP]（用户三件＋跨區縮放追加；版本沿 C.15 只做 v2；DB 免改已實證；同伴 C.16 同文件施工中，hunks 逐個驗分離）

@@ -16,6 +16,7 @@ import {
   Footprints,
   Globe,
   LocateFixed,
+  LogOut,
   Map as MapIcon,
   MapPin,
   RefreshCw,
@@ -29,13 +30,25 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMyMode } from "@/hooks/useMyMode";
 import { useFriendRelation } from "@/hooks/useFriendRelation";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useLiveFriends } from "@/hooks/useLiveFriends";
-import { LOGOUT_CLEAR_EVENT } from "@/lib/auth/clear";
+import { V2FriendCard } from "./V2FriendCard";
+import { LOGOUT_CLEAR_EVENT, clearUserLocalCaches } from "@/lib/auth/clear";
+import { displayName } from "@/lib/auth/profile";
 import { createClient } from "@/lib/supabase/client";
 import {
   DEFAULT_CENTER,
@@ -46,6 +59,7 @@ import {
 } from "@/lib/geo";
 import type { LatLng } from "@/lib/geo";
 import { resolveCityCode } from "@/lib/city";
+import { areaOf } from "@/lib/geoAreas";
 import {
   BEER_CATEGORIES,
   beerByName,
@@ -194,6 +208,11 @@ export function V2Home() {
   // UR A.21：watch 常開（心跳要活位置；副作用是自釘跟人走，沿 v1 live-follow 口徑）。
   const { status: geoStatus, position: geoPos } = useGeolocation({ watch: true });
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
+  // UR C.16：頭像資料（auth user_metadata；匿名 null 沿舊圖標）。
+  const [profile, setProfile] = useState<{
+    name: string;
+    avatarUrl: string | null;
+  } | null>(null);
   const { mode, patchMode } = useMyMode(isAuthed === true);
   const { isFriendCached, addFriendByCheckin } = useFriendRelation();
   const mapApi = useRef<V2MapApi | null>(null);
@@ -206,6 +225,9 @@ export function V2Home() {
     position: geoStatus === "success" ? geoPos : null,
   });
   const { friends: liveFriends } = useLiveFriends(presence === "online");
+  // UR C.17：只看在線朋友（藏自釘＋打卡＋足跡，朋友層獨顯）＋好友信息卡目標。
+  const [friendsOnly, setFriendsOnly] = useState(false);
+  const [friendCardId, setFriendCardId] = useState<string | null>(null);
   // 初始中心：首個定位 fix 飛我一次（C.11 fitHk 之後不再搶鏡頭）。
   const centeredRef = useRef(false);
   useEffect(() => {
@@ -231,8 +253,6 @@ export function V2Home() {
 
   // 選酒 sheet 三段：cats → batch → kinds → login（匿名）
   const [pickOpen, setPickOpen] = useState(false);
-  // UR C.2：模式 pill 展開態（再點／選後自動收）
-  const [modeOpen, setModeOpen] = useState(false);
   const [pickStage, setPickStage] = useState<"cats" | "batch" | "kinds" | "login">("cats");
   const [laneId, setLaneId] = useState<string | null>(null);
   const [batch, setBatch] = useState<Beer[]>([]);
@@ -268,10 +288,32 @@ export function V2Home() {
   }
 
   // 登入態＋牆紅點＋酒目錄＋乾杯額度（mount 各一次，沿既有配方）
+  // UR C.16：頭像資料同源 auth（沿 v1 HeaderAuth 口徑：metadata 取名＋圖）。
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => setIsAuthed(!!data.user)).catch(() => setIsAuthed(false));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setIsAuthed(!!s?.user));
+    const syncProfile = (user: {
+      email?: string | null;
+      user_metadata?: unknown;
+    } | null): void => {
+      setIsAuthed(user !== null);
+      if (user === null) {
+        setProfile(null);
+        return;
+      }
+      const md = (user.user_metadata ?? {}) as Record<string, unknown>;
+      const av = md.avatar_url;
+      setProfile({
+        name: displayName(md, user.email ?? null),
+        avatarUrl: typeof av === "string" ? av : null,
+      });
+    };
+    supabase.auth
+      .getUser()
+      .then(({ data }) => syncProfile(data.user))
+      .catch(() => syncProfile(null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) =>
+      syncProfile(s?.user ?? null),
+    );
     void Promise.resolve().then(() => {
       setWallDot(hasUnseenWall(loadWall(), loadWallSeenAt()));
       setSentIds(loadSentToday(new Date()));
@@ -287,7 +329,6 @@ export function V2Home() {
       setInvites({});
       setGuard(null);
       setPickOpen(false);
-      setModeOpen(false);
       // UR C.11：登出關足跡＋登入浮層＋目錄（本地匿名態不留殘影）。
       setTrailOn(false);
       setTrailLoginOpen(false);
@@ -461,6 +502,40 @@ export function V2Home() {
   const cityCode = resolveCityCode(selfPos, null);
   const cityLabelKey =
     cityCode === null ? "cityName" : (`cityName_${cityCode}` as const);
+  // UR C.16：精確地名——20km 內有商圈錨即 `{區} · {市}`（港澳；錨名沿用繁中，
+  // en 暫混排另議）；之外沿舊城市 key，海外無命中回 cityName。
+  const nearbyAnchor =
+    selfPos === null
+      ? null
+      : (() => {
+          const a = areaOf(selfPos.lat, selfPos.lng);
+          if (a === null) return null;
+          if (haversineMeters(selfPos, { lat: a.lat, lng: a.lng }) > 20000)
+            return null;
+          return a;
+        })();
+  const placeTitle =
+    nearbyAnchor === null
+      ? t(cityLabelKey)
+      : `${nearbyAnchor.name} · ${
+          nearbyAnchor.city === "澳門"
+            ? t("cityName_mo")
+            : nearbyAnchor.city === "香港"
+              ? t("cityName_hk")
+              : nearbyAnchor.city
+        }`;
+
+  // UR C.16：登出（沿 v1 HeaderAuth 配方：signOut＋清緩存（事件自動清 v2 殘影）
+  // ＋refresh；isAuthed／profile 由 auth 訂閱自動回匿名）。
+  async function handleLogout(): Promise<void> {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } finally {
+      clearUserLocalCaches();
+      router.refresh();
+    }
+  }
 
   // UR C.11：一鍵足跡——面板與足跡解耦（round-7）：關面板留動畫；
   // 首點開面板（足跡未開順手開＋fit），面板關時再點 tab 才顯式關足跡；
@@ -722,10 +797,29 @@ export function V2Home() {
     });
   }
 
-  // UR C.15：點好友呼吸釘進聊天完整頁（Sheet 已退役；路由直連可分享）。
+  // UR C.17：點好友呼吸釘先看信息卡（聊天鍵在卡內進完整頁；路由直連可分享）。
   function openChat(userId: string): void {
+    if (liveFriends.some((x) => x.user_id === userId)) setFriendCardId(userId);
+  }
+
+  function goChat(userId: string): void {
     const prefix = locale === "zh-Hant" ? "" : `/${locale}`;
     router.push(`${prefix}/v2/chat/${encodeURIComponent(userId)}`);
+  }
+
+  // UR C.17：在線朋友模式開關（開時飛全員視野——跨區按 bounds 裝下所有人；
+  // 無人在線則 toast 留原地，不進空地圖）。
+  function toggleFriendsOnly(): void {
+    if (friendsOnly) {
+      setFriendsOnly(false);
+      return;
+    }
+    if (liveFriends.length === 0) {
+      flashNote(t2("chatFriendsEmpty"));
+      return;
+    }
+    setFriendsOnly(true);
+    mapApi.current?.fitPoints(liveFriends.map((f) => ({ lat: f.lat, lng: f.lng })));
   }
 
   const friendMarkers = useMemo(
@@ -853,18 +947,15 @@ export function V2Home() {
       : guard.action === "cheers"
         ? "actCheers"
         : "actInvite";
-  const modeIcon =
-    mode === "stealth" ? EyeOff : mode === "friends" ? Users : Globe;
-  const ModeIcon = modeIcon;
 
   return (
     <div data-ui="v2" className={`fixed inset-0 isolate overflow-hidden bg-background ${styles.v2scope}`}>
       <V2MapView
         ref={mapApi}
-        others={others}
-        wants={wantMarkers}
-        trail={trail}
-        self={selfPos}
+        others={friendsOnly ? [] : others}
+        wants={friendsOnly ? [] : wantMarkers}
+        trail={friendsOnly ? null : trail}
+        self={friendsOnly ? null : selfPos}
         onPinClick={openPin}
         onWantClick={openWant}
         onReady={() => setMapReadyTick((n) => n + 1)}
@@ -875,91 +966,121 @@ export function V2Home() {
         onStackClick={(ids) => setStackIds(ids)}
       />
 
+      {/* UR C.17 好友信息卡（點釘先看人，卡內聊天鍵進完整頁；對方離線即自動收卡 fail-closed） */}
+      <V2FriendCard
+        friend={liveFriends.find((x) => x.user_id === friendCardId) ?? null}
+        onClose={() => setFriendCardId(null)}
+        onChat={goChat}
+      />
+
       {/* 頂部簇：頭像＋城市＋模式一行，pills 緊貼下方（DEF-012 round-2：
           之前兩段 absolute 留大縫＋不對齊，收進同一容器沿 Snap 緊湊左對齊） */}
       <div className="absolute inset-x-0 top-0 z-[1000] flex flex-col gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card shadow-md ring-1 ring-foreground/10">
-            <Users size={18} aria-hidden className="text-muted-foreground" />
-          </div>
+          {/* UR C.16：真頭像＋shadcn DropdownMenu（Avatar 作 trigger 正統）；
+              模式三檔＋登出收進菜單（C.2 pill 退役）；匿名點頭像去登入。 */}
+          {isAuthed === true ? (
+            <DropdownMenu>
+              {/* Base UI Trigger 原生即 <button>：className／aria 直下，不用 asChild。 */}
+              <DropdownMenuTrigger
+                aria-label={profile?.name ?? t("logout")}
+                className="h-11 w-11 shrink-0 cursor-pointer overflow-hidden rounded-full shadow-md ring-1 ring-foreground/10"
+              >
+                <Avatar className="h-11 w-11">
+                  {profile?.avatarUrl ? (
+                    <AvatarImage
+                      src={profile.avatarUrl}
+                      alt={profile.name}
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : null}
+                  <AvatarFallback className="font-bold">
+                    {profile?.name?.slice(0, 1) ?? (
+                      <Users size={18} aria-hidden className="text-muted-foreground" />
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className={styles.v2scope}>
+                {/* DEF-009：Label 必須在 Group 內（base-ui GroupLabel 硬性要求，游離即炸） */}
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="max-w-48 truncate">
+                    {profile?.name ?? ""}
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  {(
+                    [
+                      { key: "stealth", label: tm("modeStealth"), Icon: EyeOff },
+                      { key: "friends", label: tm("modeFriends"), Icon: Users },
+                      { key: "public", label: tm("modePublic"), Icon: Globe },
+                    ] as const
+                  ).map(({ key, label, Icon }) => (
+                    <DropdownMenuItem
+                      key={key}
+                      onClick={() => {
+                        void patchMode(key);
+                      }}
+                    >
+                      <Icon size={15} aria-hidden />
+                      {label}
+                      {mode === key && <span aria-hidden>✓</span>}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => void handleLogout()}
+                >
+                  <LogOut size={15} aria-hidden />
+                  {t("logout")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link
+              href="/login"
+              aria-label={tm("switcherLabel")}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card shadow-md ring-1 ring-foreground/10"
+            >
+              <Users size={18} aria-hidden className="text-muted-foreground" />
+            </Link>
+          )}
           <div className="min-w-0 flex-1">
             <p className="truncate text-xl leading-tight font-bold tracking-tight">
-              {t(cityLabelKey)}
+              {placeTitle}
             </p>
-            <p className="text-xs font-medium text-muted-foreground">
-              {geoStatus === "success"
-                ? t("meOnline")
-                : geoStatus === "locating"
-                  ? t("meLocating")
-                  : t("meOffline")}
-            </p>
-            {/* UR A.21 左上狀態燈：登入才顯；在線綠／隱身灰（mode 未知 fail-closed 走灰）。 */}
-            {isAuthed === true && (
+            {/* UR C.16 去重：登入只留一處狀態（燈＋模式字）；匿名沿舊 geo 行
+               （無燈無菜單，不重）。未知 mode fail-closed 灰＋通用文案。 */}
+            {isAuthed === true ? (
               <p className="flex items-center gap-1.5 pt-0.5 text-xs font-bold">
                 <span
                   aria-hidden
                   className={`h-2 w-2 rounded-full ${mode === "stealth" ? "bg-muted-foreground" : "bg-green-600"}`}
                 />
                 <span className={mode === "stealth" ? "text-muted-foreground" : "text-green-700 dark:text-green-400"}>
-                  {mode === "stealth" ? tm("modeStealth") : t("onlineNow")}
+                  {mode === "stealth"
+                    ? tm("modeStealth")
+                    : mode === "friends"
+                      ? tm("modeFriends")
+                      : mode === "public"
+                        ? tm("modePublic")
+                        : tm("switcherLabel")}
                 </span>
+              </p>
+            ) : (
+              <p className="text-xs font-medium text-muted-foreground">
+                {geoStatus === "success"
+                  ? t("meOnline")
+                  : geoStatus === "locating"
+                    ? t("meLocating")
+                    : t("meOffline")}
               </p>
             )}
           </div>
-        {/* UR C.2 模式 pill：常駐圖標＋文字；點開 inline 三檔直切
-            （選後自動收／再點收；匿名走登入）。Popover 已退役（入口隱形即死）。 */}
-        <div className="relative flex shrink-0 flex-col items-end">
-          {isAuthed === false ? (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-11 rounded-full bg-card px-3 font-bold shadow-md ring-1 ring-foreground/10"
-              nativeButton={false}
-              render={<Link href="/login" />}
-            >
-              <Users size={15} aria-hidden />
-              {tm("switcherLabel")}
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              aria-expanded={modeOpen}
-              onClick={() => setModeOpen((v) => !v)}
-              className="h-11 rounded-full bg-card px-3 font-bold shadow-md ring-1 ring-foreground/10"
-            >
-              <ModeIcon size={15} aria-hidden />
-              {modeLabel}
-            </Button>
-          )}
-          {modeOpen && isAuthed === true && (
-            <Card size="sm" className="absolute top-full right-0 z-10 mt-1.5 w-44 p-1.5">
-              {(
-                [
-                  { key: "stealth", label: tm("modeStealth"), Icon: EyeOff },
-                  { key: "friends", label: tm("modeFriends"), Icon: Users },
-                  { key: "public", label: tm("modePublic"), Icon: Globe },
-                ] as const
-              ).map(({ key, label, Icon }) => (
-                <Button
-                  key={key}
-                  variant="ghost"
-                  aria-pressed={mode === key}
-                  onClick={() => {
-                    void patchMode(key);
-                    setModeOpen(false);
-                  }}
-                  className="w-full justify-start gap-2 px-2 py-2 font-medium"
-                >
-                  <Icon size={15} aria-hidden />
-                  {label}
-                  {mode === key && <span aria-hidden>✓</span>}
-                </Button>
-              ))}
-            </Card>
-          )}
         </div>
-      </div>
 
       {/* 橫滑 pills（容器內緊貼頂欄行，同一左對齊；UR C.12：橫滑保留，禁雙擊縮放） */}
       <div className={`flex touch-manipulation gap-2 overflow-x-auto pb-1 ${styles.v2noscroll}`}>
@@ -987,6 +1108,15 @@ export function V2Home() {
         <Button size="sm" variant="outline" className="shrink-0 rounded-full bg-card shadow-md ring-1 ring-foreground/10" onClick={doShake}>
           <Vibrate aria-hidden />
           {t("shakeHint")}
+        </Button>
+        <Button
+          size="sm"
+          variant={friendsOnly ? "secondary" : "outline"}
+          className={`shrink-0 rounded-full shadow-md ring-1 ring-foreground/10 ${friendsOnly ? "" : "bg-card"}`}
+          onClick={toggleFriendsOnly}
+        >
+          <Users aria-hidden />
+          {t2("chatFriendsOnly")}
         </Button>
       </div>
       {/* 足跡浮條（頂部容器內流式排布，永不與 pills 重疊） */}

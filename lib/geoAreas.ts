@@ -22,7 +22,7 @@ export type AreaAnchor = {
   country: string;
 };
 
-/** 香港商圈錨（16）：港島 6（含南區）／九龍 5／新界 5，中心取商圈地標概位。 */
+/** 香港商圈錨（16）＋澳門一錨（UR C.16）：港島 6（含南區）／九龍 5／新界 5，中心取商圈地標概位。 */
 export const AREA_ANCHORS: readonly AreaAnchor[] = [
   { id: "central", name: "中環", lat: 22.2819, lng: 114.158, city: "香港", country: "中國" },
   { id: "sheung-wan", name: "上環", lat: 22.287, lng: 114.15, city: "香港", country: "中國" },
@@ -40,6 +40,8 @@ export const AREA_ANCHORS: readonly AreaAnchor[] = [
   { id: "yuen-long", name: "元朗", lat: 22.445, lng: 114.022, city: "香港", country: "中國" },
   { id: "tai-po", name: "大埔", lat: 22.45, lng: 114.164, city: "香港", country: "中國" },
   { id: "tseung-kwan-o", name: "將軍澳", lat: 22.307, lng: 114.268, city: "香港", country: "中國" },
+  // UR C.16：澳門一錨（議會前地；澳門坐標不再誤判香港錨；C.9 最近錨語義不變，澳門打卡自成一組）。
+  { id: "senado", name: "議會前地", lat: 22.1938, lng: 113.5399, city: "澳門", country: "中國" },
 ];
 
 /** z≤此值按錨分組（以上走像素聚類）。全港一屏（z10–11）只剩商圈徽。 */

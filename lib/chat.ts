@@ -43,3 +43,18 @@ export function formatChatTime(atMs: number): string {
   const mm = String(d.getMinutes()).padStart(2, "0");
   return `${hh}:${mm}`;
 }
+
+/**
+ * UR C.17 最近上線時間 → 相對文案（`Intl.RelativeTimeFormat`，三語零新 key）。
+ * 純函數：`locale` 透傳（`zh-Hant／zh-Hans／en`），未來時間鉗零。
+ */
+export function formatSeenAgo(atMs: number, nowMs: number, locale: string): string {
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  const diffSec = Math.max(0, Math.floor((nowMs - atMs) / 1000));
+  if (diffSec < 60) return rtf.format(-diffSec, "second");
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return rtf.format(-diffMin, "minute");
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return rtf.format(-diffHour, "hour");
+  return rtf.format(-Math.floor(diffHour / 24), "day");
+}

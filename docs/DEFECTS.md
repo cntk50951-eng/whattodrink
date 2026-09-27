@@ -49,6 +49,8 @@
 | DEF-20260927-006 | v2 實時位置（自／友呼吸釘）被打卡釘淹沒難辨 | Fixed | P1 | 2026-09-27 / @yuki | UR C.14 | 同層零層級已修（PR#29；親驗待補），见详情 |
 | DEF-20260927-008 | v2 回位按鈕（回到我的位置）點了無反應 | Open | P1 | 2026-09-27 / @yuki | 待查 | 待确认，见详情 |
 | DEF-20260927-007 | v2 點好友圓圈無反應（疑無好友數據可點） | Investigating | P1 | 2026-09-27 / @yuki | UR C.15 | 待确认（首嫌 friends 空：匿名／隱身／對方離線即零圓圈；見詳情） |
+| DEF-20260927-009 | v2 點左上頭像崩潰（MenuGroupContext 缺失） | Open | P0 | 2026-09-27 / @yuki | UR C.16 | `DropdownMenuLabel` 游離 `Group` 外（base-ui 硬性要求）；見詳情 |
+| DEF-20260927-010 | v2 頭像菜單切模式無反應（選好友／隱身仍是公開） | Open | P1 | 2026-09-27 / @yuki | UR C.16 | base-ui `Menu.Item` 無 `onSelect`（Radix 寫法被靜默吞掉）；見詳情 |
 
 ### DEF-20260927-002 locale 根首頁不跳 v2（/zh-Hans 落 v1）
 
@@ -463,6 +465,7 @@
 - **实际**：無反應
 - **初判根因**：待确认 — 可能性：A) `friends` 根本是空（`useLiveFriends(presence === "online")`：匿名／隱身／mode 未載／對方離線／0011 心跳不通即 `[]`，零圓圈可點；用戶點的可能是自釘或啤酒釘）；B) `openChat` 靜默 return（`liveFriends.find` 失配，代碼面 id 同源嫌疑低）；C) 浮層攔截點擊（DEF-012 層級史重演，需瀏覽器實證）
 - **排查进展（2026-09-27）**：靜態舉證走完——`mk.on("click")` 接線在（`V2MapView.tsx:810`）、`handleMapTap` 不清 chat（`V2Home.tsx:487`，只清足跡三態）、`.v2friend` 本體無 `pointer-events:none`（僅 `::after` 有）。故如圓圈真的是好友釘且 `friends` 非空，代碼無辜；轉向要用戶回填：①是否登入＋模式（公開／好友才拉得到人）②對方是否在線（`GET /friends/live` 回什麼）③Console 有無紅錯
+- **行为变更（2026-09-27，UR C.17）**：入口改 pin→信息卡→聊天頁（直接 URL 可獨立複驗：`/v2/chat/<id>`）；根因仍待三問定罪
 - **关联 UR**：UR C.15（入口改路由跳轉後，用戶以直接 URL 複驗；pin 鏈路同步跟進）
 - **修复验证**：待定
 - **回归范围**：好友釘點擊、聊天入口、守衛（隱身仍不可見人）
@@ -480,3 +483,37 @@
 - **关联 UR**：待查（若定罪 C.14 波及則併入，不另開）
 - **修复验证**：待定
 - **回归范围**：回位鈕、鏡頭（recenter／fitHk／fitPoints／flyTo）
+
+### DEF-20260927-010 v2 頭像菜單切模式無反應
+
+- **状态**：Fixing（2026-09-27 當輪落條＋即修，關聯 UR C.16 走 10 步）
+- **严重度**：P1 主要（模式卡公開＝隱身／好友全失效，隱私開關失靈；登出同根同修）
+- **发现日期 / 报告人**：2026-09-27 / @yuki
+- **复现步骤**：
+  1. 開 `/v2`（登入態），點左上頭像開菜單（DEF-009 修後可開）
+  2. 點「好友」或「隱身」（或最下登出）
+  3. 菜單收起，但模式仍是公開（登出無反應，人還在）
+- **期望**：點檔即切（`users.mode` 落庫＋燈跟色）；登出回匿名清殘影
+- **实际**：三個 `onSelect` 全被靜默吞掉，`patchMode`／`handleLogout` 一次都沒跑
+- **初判根因**：同確診（見下）
+- **确诊根因**：base-ui `Menu.Item` 根本沒有 `onSelect`（context7 現查：`MenuItemProps` 只有 `onClick`＋`closeOnClick`＋`disabled`）——C.16 按 Radix 心智寫 `onSelect`，TS 不報錯（`...props` 透傳吞掉未知 prop）＋運行時零反應。修法＝三處 `onSelect` 改 `onClick`（模式檔＋登出；關閉行為沿默認 `closeOnClick`）
+- **关联 UR**：UR C.16（同伴 WIP；代修歸屬記此條，提交時分贓）
+- **修复验证**：tsc 淨＋倉內 `onSelect` 零殘留；待用戶硬刷新親驗（切好友／隱身看燈變色＋登出回匿名）轉 Fixed
+- **回归范围**：頭像菜單三動作、模式守衛（乾杯／邀約／打卡）、登出清理鏈
+
+### DEF-20260927-009 v2 點左上頭像崩潰
+
+- **状态**：Fixing（2026-09-27 當輪落條＋即修，關聯 UR C.16 走 10 步）
+- **严重度**：P0 阻断（頭像菜單是 C.16 模式切換＋登出唯一入口，一點即白屏）
+- **发现日期 / 报告人**：2026-09-27 / @yuki（貼 Turbopack runtime 棧為證）
+- **复现步骤**：
+  1. 開 `/v2`（登入態，左上有真頭像）
+  2. 點頭像開菜單
+  3. 整頁炸：`Base UI: MenuGroupContext is missing. Menu group parts must be used within <Menu.Group> or <Menu.RadioGroup>`（`dropdown-menu.tsx:68`，經 `V2Home.tsx:1005`）
+- **期望**：菜單正常展開（名字＋模式三檔＋登出）
+- **实际**：`DropdownMenuLabel` 游離在任何 `Group` 之外，base-ui runtime 直接拋錯
+- **初判根因**：同確診（見下）
+- **确诊根因**：C.16 頭像菜單把 `DropdownMenuLabel` 放在 `DropdownMenuContent` 直屬子層，而 base-ui 的 `GroupLabel` 必須在 `Menu.Group`（即 `DropdownMenuGroup`）內——shadcn registry 件本身是對的，是調用方拼錯容器（C.10「容器不對即返工」同款）。修法＝Label 外包一層 `DropdownMenuGroup`（已 import，零新依賴；`code-review` skill 第 35 條正是此規範）
+- **关联 UR**：UR C.16（同伴 WIP；崩潰修直接合入，歸屬記此條＋memory，提交時分贓）
+- **修复验证**：tsc 淨；待用戶 `:3000` 硬刷新點頭像親驗轉 Fixed
+- **回归范围**：頭像菜單（Label／三檔／登出）、v1（零碰）、C.2 退役 pill（已刪，不回歸）

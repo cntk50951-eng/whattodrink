@@ -259,6 +259,8 @@
     "stackTitle": "呢度有 {n} 個打卡",
     "stackHint": "點一行開卡，或一鍵喺地圖散開",
     "stackSpread": "喺地圖上散開",
+    "cityName_mo": "澳門",
+    "logout": "登出",
     "cityName": "香港",
     "meOnline": "在線",
     "meLocating": "定位緊…",
@@ -333,7 +335,10 @@
     "chatDelivered": "已送達",
     "chatListTitle": "聊天",
     "chatListEmpty": "好友列表即將上線，先返地圖㩒好友頭像開聊",
-    "chatFallbackName": "酒友"
+    "chatFallbackName": "酒友",
+    "chatFriendsOnly": "在線朋友",
+    "chatFriendsEmpty": "暫時未見在線朋友",
+    "chatOpen": "聊天"
   },
   "terms": {
     "title": "三種模式，點揀？",
