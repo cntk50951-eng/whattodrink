@@ -39,6 +39,7 @@
 | DEF-20260926-013 | v2自打卡面板無法換酒 | Closed | P1 | 2026-09-26 / @yuki | UR C.4 | v2 want 卡無換酒入口；C.4 沿 v1 全搬進底部 Sheet；用戶驗收通過，已合入 main |
 | DEF-20260926-014 | v2打卡後酒圖標只顯示emoji無品牌圖 | Closed | P1 | 2026-09-26 / @yuki | UR C.4 | v2 want 卡寫死 emoji 圓＋快照直用；C.4 目錄取新＋BeerImg＋地圖釘圖；用戶驗收通過，已合入 main |
 | DEF-20260926-015 | v2地圖釘 createRoot 同步 unmount 撞渲染期報錯 | Closed | P1 | 2026-09-26 / @yuki | UR A.20 | microtask 延後＋try/catch；用戶驗收通過，已合入 main |
+| DEF-20260926-016 | Vercel main 部署紅（wall.ts 引缺失模塊） | Closed | P0 | 2026-09-26 / @yuki | 插畫並行線 | 部分推送：wall.ts／index.ts 接線先行，15 枚 .tsx 未進倉；`a8e28c2` 補齊樹後 worktree 驗 tsc 淨＋253 綠 |
 
 ### DEF-20250925-001 登出→重登录后打卡酒类消失
 
@@ -184,6 +185,21 @@
 - **关联 UR**：UR A.20
 - **修复验证**：待（同路徑重走＋Console 乾淨＋三閘綠＋用戶複驗）
 - **回归范围**：v2 地圖釘（他人釘／簇／足跡未動）、v1（未動）
+
+### DEF-20260926-016 Vercel main 部署紅（wall.ts 引缺失模塊）
+
+- **状态**：Closed（遠端 `a8e28c2` 已補齊樹；worktree 隔離驗 tsc 淨＋253 綠，見下）
+- **严重度**：P0 阻断（main 紅，Vercel 無法部署）
+- **发现日期 / 报告人**：2026-09-26 / @yuki（Vercel log 00:29:58，Commit `fd54300`）
+- **复现步骤**：Vercel build `fd54300` 在 `Running TypeScript` 掛：`wall.ts(3,27): error TS2307: Cannot find module './andes'`（及 `antarctica-original` 等）
+- **期望**：main 常綠可部署
+- **实际**：該樹 wall.ts／index.ts 已接 batch3a＋batch3 共 15 組 import／export，但 15 枚 `.tsx` 不在倉內——典型部分推送（只交了 tracked 改動，新文件還躺在 untracked）
+- **确诊根因**：同上。並非 A.20／C.5 hunks 問題（`fd54300` 內我的子集經 contents API 驗過干净；且該 commit 的 wall 內容來自並行線合入）。
+- **解决**：對方 `a8e28c2`（merge：同步遠端 C.5 並合入 icon15 枚）補齊樹；我方以 `git worktree` 隔離驗該 commit（零碰工作區）：`tsc --noEmit` 淨＋vitest 253 綠。Vercel 下一輪 main 部署應綠（dashboard 待用戶目認）。
+- **关联 UR**：插畫並行線（batch3a／batch3；非 A.20／C.5 範圍）
+- **修复验证**：worktree@`a8e28c2`：tsc exit 0＋30 文件 253 測全綠（Turbopack 拒 symlink node_modules，故用 tsc 而非全 build；類型閘即 Vercel 掛點已覆蓋）
+- **回归范围**：插畫管線——新批次接線與 `.tsx` 必須同 commit 進倉（禁 `commit -a` 只交一半）；已寫進本條＋memory
+- **教訓**：`rtk git log` 會吞 HEAD 首行（本輪三次誤讀 graph，改原生 `git rev-parse/show` 才定罪）；Turbopack build 不吃 symlink 的 node_modules（worktree 驗證改走 tsc）
 
 ### DEF-20260926-012 v2首頁驗收返工（圖層級＋shadcn化＋全屏無footer）
 
