@@ -2020,5 +2020,29 @@ v2 自家想喝釘的浮動小卡只有 emoji 圓＋酒名＋時間：不能換�
 - 2026-09-26 round-2（地圖釘圖）：want 釘 divIcon 有圖上品牌圖（白底＋琥珀環保身份，`V2WantMarker.iconUrl`＋`escAttr`＋http(s) 限）無圖回琥珀實心 emoji；釘圖與 Sheet 同源（換酒即換釘）；三閘重綠待驗
 - 2026-09-26 round-3（合規收尾）：`resolveWantBeer` 下沉共用層 `resolveFreshBeer`（加法，v1 未用）＋4 單測（245 綠）；用戶驗收通過，置 [✓] 合入 main
 
+---
+
+UR C.5　選酒弹窗導航鍵 shadcn 標準化（返回＋關閉）[✓]
+
+用戶驗收指出：選酒 overlay 批量段缺顯式 close；通盤返回鍵（純文字無 chevron）與角落 X 觀感不合 shadcn 標準。本 UR 統一三段導航鍵。
+
+### 範圍
+1. 返回鍵標準式：`variant="ghost" size="sm"`＋`ChevronLeft`＋文案（batch／kinds 兩處；沿 shadcn docs back 配方）
+2. 關閉鍵標準式：`showCloseButton={false}` 關默認角落 X，改每段 header 行右側 in-flow `X`（`variant="ghost" size="icon"`，沿 DialogClose 配方；Esc 照走）
+3. L2 加關閉：在 header 行右側 X 關整層（原先只能點角落 X；批量區操作完就地可關）
+4. 對齊：三段 header 行同結構（左返回（根段無）＋右 X），零新 key（沿用 `back`／`close`）
+
+### 非目標
+- 守衛 Sheet（另議）、選酒邏輯、v1 任何文件、共用層改動
+
+### AC
+- 三段皆可：左返上一段、右 X 關整層；Esc 照關；無障礙名齊全（aria-label 沿用）
+- 三閘全綠；用戶瀏覽器驗收（手機＋桌面）
+
+*改動記錄*
+- 2026-09-26：建檔即開工置 [WIP]（用戶指令：批量段缺 close＋通盤按鈕不合 shadcn 觀感；問答定案標準式；v2-only 進 EPIC C）
+- 2026-09-26：實現完待驗（導航行：左 ghost＋ChevronLeft 返回＋右 in-flow X，默認角落 X 關；段內舊返回鍵退役；253綠／lint 0 error／build 39頁；待用戶瀏覽器驗收）
+- 2026-09-26：用戶驗收通過，置 [✓] 合入 main（插畫並行施工中，本次只交 C.5 hunks，見 memory）
+
 *改動記錄*
 - 2026-09-26：建檔置 []（用戶指令 EPIC B 管理＋表補強；realtime 實現待拍板後動工）
