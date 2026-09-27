@@ -2441,3 +2441,163 @@ UR C.19　v2 足跡虛線行軍蟻動效（CSS 描邊偏移，零 rAF）[✓]
 - 2026-09-27：建檔置 []（用戶指令虛線動效；C.13 腳印系另主，本 UR 只做描邊；待問答定方向＋速度後置 [WIP]）
 - 2026-09-27：問答定案（行軍蟻舊→新）置 [WIP]；實作完待驗（path 取節點掛 `v2trailMarch` class＋`stroke-dashoffset 0→-18` 無縫 loop 1.2s、`reduced-motion` 靜止；tsc 淨／lint 0 error／build 綠；待用戶瀏覽器親驗，未提交）
 - 2026-09-27：置 [✓]（用戶指令 mark done；代碼隨隊友聯合提交 PR #34 已合入，在倉實證；瀏覽器親驗用戶未明確回 OK，方向速度如需調另開參數行）
+
+---
+
+EPIC D　好友聊天真通道（1v1＋群預留，先 Realtime 後推播，90 天保留）
+
+> 用戶指令＋問答定案（2026-09-27，見 memory）：首期只做 1v1 好友文字，表 group-ready；推送兩層切（Phase 1 前台 Realtime 本期，Phase 2 推播另開）；保留 90 天自動清。技術路線鎖死：REST＋Supabase Realtime＋Postgres 真源，隊列後置（推播／審核 Phase 2 才談）。
+> 陌生人私訊永不（EPIC B 凍結，本 EPIC 全鏈 fail-closed 只認 accepted 互好友）。
+
+UR D.1　聊天三表＋RLS（migration 0012）[✓]
+
+### 範圍
+1. `supabase/migrations/0012_chat_tables.sql`（可重放）：`message_kind` 枚舉（text／image／audio 一次凍結）＋`conversations`（type＋`direct_key` 1v1 去重＋`expires_at` 90d）＋`conversation_members`（`last_read_at` 水位＋`muted`＋`hidden_at` 只藏自己）＋`messages`（kind／body／attachments jsonb／`client_msg_id` 冪等唯一＋`conv_created` 索引）
+2. RLS（deny-by-default）：會話只讀自己在的／水位只讀寫自己行／消息成員可讀＋本人可發；建會話走 service_role（D.2 route 先驗 accepted）；隱身攔截應用層
+3. `docs/data/future-schema.md` 同步三表＋EPIC 映射行
+
+### 非目標
+- 端點（D.2／D.3）、Realtime Publication（D.3 同開）、推播（D.5b）、附件 bucket（D.6）、v1／UI 任何文件
+
+### AC
+- AC1：SQL 在 Dashboard 一次跑通；重放不炸（IF NOT EXISTS＋DROP IF EXISTS 全套）
+- AC2：陌生人 `select messages` 空（RLS 實證，可截圖）；非成員 insert 拒絕
+- AC3：單測不適用（SQL 無單測口徑，留痕）；tsc／lint 不受影響（零代碼）；用戶執行 migration 回填執行結果
+
+### 改動記錄
+- 2026-09-27：建檔即開工置 [WIP]（用戶指令先建 UR 後 D.1；EPIC D 同立 D.1–D.6）
+
+UR D.2　會話 API＋消息列表 [✓]
+
+作為用戶，我要在 `/v2/chat` 看到真會話列表（對方＋末條＋未讀數），而不是 stub。
+
+### 範圍
+1. `POST /api/v1/conversations`（🔒，find-or-create：`direct_key` 查有回無建；建前驗 accepted 互好友＋雙非隱身，service_role 寫三行一事務）
+2. `GET /api/v1/conversations`（🔒，cursor 分頁；逐會話回對方簡檔＋末條＋未讀數，未讀由 `last_read_at` 現算）
+3. `PATCH /api/v1/conversations/:id/read`（🔒，讀水位）
+4. `DELETE /api/v1/conversations/:id`（🔒，寫 `hidden_at` 只藏自己）
+5. openapi 補四端點＋`lib/api/chat.ts` parse 純函數＋單測；`ChatThread` 所在頁不動（D.3 換源）
+
+### 非目標
+- 發送／Realtime（D.3）、推播（D.5b）、UI 列表實現（列表頁 D.2 後半或 D.4，待定）
+
+### AC
+- 陌生人建會話 403；同兩人重建回同一 id；未讀數＝水位之後對方條數；curl 可驗；三閘綠
+
+*改動記錄*
+- 2026-09-27：建檔置 [WIP]（用戶指令四端點一次全上；service_role 建會話＋N+1 列表 POC 口徑；同伴 D.7 room 重構並行——`[friendId]` 頁被刪改、`goChat` 轉 room，我方零碰，D.3 換源改釘 room 頁；`createServiceClient` 加法；tsc 除同伴刪頁殘留 validator  artifact 外淨／lint 0 error／build 綠（新路由三條在表）／338 綠；待用戶帶 session curl 驗＋合入）
+
+UR D.3　發送＋記錄＋Realtime [✓]
+
+作為用戶，我在聊天房發的字對方即時看到，刷新不丟，斷線恢復對得上。
+
+### 範圍
+1. `POST /api/v1/conversations/:id/messages`（🔒，首期 kind 只收 text；`client_msg_id` 冪等；限流 30/min＋200/day；寫後刷 `expires_at`＝now＋90d）
+2. `GET /api/v1/conversations/:id/messages`（🔒，倒序 keyset 回正序；D.2 漏排，D.3 補，AC 同）
+3. room 頁換真源（`ChatRoomLive` 新：建會話→拉歷史→Realtime 訂閱→樂觀發送；mock 退役；`ChatThread` 加 `external` 受控源，向下兼容；D.7 刪 `[friendId]`，換源改釘 room 頁）
+4. Realtime：`messages` Publication＋REPLICA IDENTITY（Dashboard 動作，用戶執行）＋頁內訂閱本會話（到行即插；去重 id／client echo；卸載拆頻道；未開 Publication 即只有歷史無即時，已註記）
+5. 讀水位順手呼叫（開房＋收對方消息即 PATCH，D.4 的 UI 在後，本呼叫先行鋪路）
+6. openapi＋單測；三閘綠；雙號聯驗（第二設備＋第二賬號，單機驗不了實時）
+
+### 非目標
+- 推播（D.5b）、附件（D.6）、已讀✓✓ UI（D.4）、發送失敗重試鍵（已知缺口，排 D.4 polishing）
+
+### AC
+- A 發 B 收（<2s）；刷新記錄在；斷網重連對賬無重無丟；陌生人發 403；三閘綠
+
+*改動記錄*
+- 2026-09-27：建檔置 [WIP]；實作完待驗（雙端點＋`ChatRoomLive`＋`external` 受控源＋room 換源；send 失敗撤位已知缺口；Publication 待用戶開；tsc 除刪頁 validator artifact 外淨／lint 0 error／build 綠／340 綠；同伴 D.7 文件只做加法改動，hunks 已驗；待雙號聯驗＋合入）
+
+UR D.4　未讀＋已讀✓✓ []
+
+作為用戶，我要列表紅點＋頁內已讀態，知道對方看沒看。
+
+### 範圍
+1. 列表未讀徽（D.2 未讀數接 UI；`Badge` 沿現成件）
+2. 頁內已讀：開頁＋滑到底調 read 水位；對方水位經 Realtime 回傳即翻✓✓（`ChatThread` 接水位 prop）
+3. 三閘綠；雙號聯驗
+
+### 非目標
+- 推播角標（D.5b 跟 App 角標一起）、群已讀（以後）
+
+### AC
+- 發→對方列表＋1；對方看→我方✓✓；三閘綠
+
+UR D.5　推送（a 前台含於 D.3／b 後台推播另期）[]
+
+- D.5a：含於 D.3（前台訂閱＋降級），本條不單獨驗收
+- D.5b（另期）：`devices(platform, push_token)`（A.4-15 未建）＋寫入後 server 扇出（Web Push 先行，APNs／FCM 隨原生；pg_net 或 QStash 削峰重試，量級到了才上）；payload 只帶誰＋哪會話不帶正文（鎖屏隱私＋PDPO）；`muted`／隱身／陌生人三刀
+
+UR D.6　圖片＋語音附件 []
+
+作為用戶，我要發圖＋發語音條，姿勢和牆一致。
+
+### 範圍
+1. `kind` image／audio 開閘（枚舉已有，零遷移）；`attachments` jsonb 落 `{path, mime, bytes, secs?, width?}`
+2. 上傳複用 `POST /uploads/sign`＋**私有 bucket＋播時簽名**（牆公開讀不可混，D.6 建独立 bucket）
+3. 客戶端：`VoiceRecorder`＋`buildRecordingBlob`＋`VoicePlayer small`＋`BeerImg` skeleton 配方照搬；可選轉寫存 `body`
+4. 上限：圖 10MB／語音 2MB・60s（沿架構 §6）；三閘綠
+
+### 非目標
+- 端到端加密（V2 議題，見設計第 7 節取捨③）、閱後即焚（另議）
+
+---
+
+UR D.7　聊天頁殼重做（會話路由＋v2 全屏＋輸入框固定多行）[WIP]
+
+用戶指令四件：① URL 帶對方 user uuid 有風險，換方案；②頁面頂底是 v1 殼，不符合預期；③輸入框固定底部；④輸入框不能換行。
+
+### 現狀（2026-09-27 實證，C.15 隊友代碼）
+- 路由 `app/[locale]/v2/chat/[friendId]` 直掛對方 `users.id`；頁內僅用 live 列表解析（陌生 id 回退渲染，無鑑權攔截）
+- `app/[locale]/layout.tsx` 全局 v1 header（whattodrink＋HeaderAuth）＋Footer 包住所有頁；V2Home 靠 `fixed inset-0` 蓋掉，聊天頁常規流 → v1 上下全露
+- 輸入：shadcn `Input` 單行（天生不能換行）＋form 在 flex 列尾（鍵盤／滾動時不固定）；無 textarea 件（`components/ui` 無此件）
+
+### 範圍（v2-only，不動 locale 佈局／v1）
+1. 路由改會話 id（`[convId]`，D.1 `conversations` 主鍵；server 按 membership 鑑權，非成員／陌生回列表；`friendId` 舊路由 302 轉會話或 404，待問答）
+2. 頁根改 `fixed inset-0` 全屏（沿 V2Home 口徑蓋掉 v1 上下）＋自有 header（沿現有返回＋頭像＋名＋在線態）
+3. 輸入條 `sticky bottom-0`＋安全區＋背景模糊；`Input` 換原生 `textarea` 自動增高（1→5 行）＋Enter 發送／Shift+Enter 換行（桌面；移動端按發送鈕）
+4. 會話來源：D.2 find-or-create 落地後對接（本 UR 假設會話已存在；mock 期沿用本地線程）
+
+### 非目標
+- 真通道（D.3）、會話列表（D.2）、locale 佈局改動、v1 任何文件、附件（D.6）
+
+### AC
+- AC1：URL 無 user uuid；非成員直連回列表；舊 friendId URL 不炸（轉跳或 404 folio）
+- AC2：聊天頁無 v1 header／Footer；輸入條吸底不亂跑；多行輸入＋Enter 發／Shift+Enter 換行
+- AC3：三閘綠；用戶瀏覽器親驗；`git status` 無 v1
+
+*改動記錄*
+- 2026-09-27：建檔置 []（用戶指令四件；C.15 同文件隊友施工中；待問答定路由方案後置 [WIP]）
+- 2026-09-27：問答定案（用戶拍板：URL 零 id）置 [WIP]；實作完待驗（`/v2/chat/room` 無參＋peer 走 sessionStorage（`lib/chatPeer`＋2 單測）＋無 peer 回列表、舊 `[friendId]` 路由刪除、房＋列表改 fixed 全屏蓋 v1 上下、輸入條吸底＋安全區＋毛玻璃、textarea 自動增高＋Enter 發／Shift+Enter 換行＋組字保護；lint 淨／338 綠／build 綠；待用戶瀏覽器親驗，未提交）
+
+---
+
+UR C.20　v2 按鈕清道（頂／右／底去重去廢）[WIP]
+
+用戶指令：頂部、右緣、底部按鈕太多，重複＋不重要的清掉；動手前先確認方案。本 UR 只做刪除＋確認，不加新入口。
+
+### 現狀盤點（2026-09-27 實證 `V2Home`）
+- 頂部：頭像（菜單／登入）＋地名＋狀態單行——C.16 已去重，無按鈕冗餘，不動
+- 橫滑 pills（6）：選酒｜拍照｜酒牆｜足跡｜搖一搖｜只看好友
+- 右緣工具列（4）：回位｜全港｜足跡｜搖一搖
+- 底部 CTA（3，無卡時）：相機｜選酒大鈕｜加好友（toast 佔位，功能未到）
+- 底部 TabBar（5）：地圖｜熱門｜拍照大圓｜足跡｜心情（標準結構，提案不動）
+- 足跡浮條（條件）：標題＋返回（狀態型，非重複，不動）
+- 重複矩陣：選酒×2（pills＝CTA）／拍照×3（pills＝CTA＝TabBar）／足跡×3（pills＝右列＝TabBar）／搖一搖×2（pills＝右列）／酒牆≈熱門（同 `/wall`）／加好友 toast（死鈕，EPIC B 未到）
+
+### 範圍（v2-only：`V2Home.tsx` 刪 JSX＋死 handler＋失用 key；零新入口）
+1. 右列：只留回位＋全港（地圖操作屬性），刪足跡／搖一搖
+2. 底部 CTA：刪相機＋加好友 toast；選酒大鈕去留待問答
+3. pills：刪拍照／足跡／酒牆（TabBar 全有），留選酒／搖一搖／只看好友（待問答）
+4. 失用 i18n key 清理（三語同刪，parity 不破）
+
+### 非目標
+- TabBar 改動、新入口、v1 任何文件、handler 邏輯改動（只刪調用，不動函數體；真死碼另計）
+
+### AC
+- AC1：三區無功能重複入口；死 toast 鈕消失（或問答留）
+- AC2：刪後無失用 import／key（lint 淨）；三閘綠；用戶瀏覽器親驗；`git status` 無 v1
+
+*改動記錄*
+- 2026-09-27：建檔置 []（用戶指令清理＋動手前確認；待問答定刪留清單後置 [WIP]）
+- 2026-09-27：問答定案（右列刪足跡搖一搖／CTA留選酒大鈕刪相機和toast／pills刪三留三）置 [WIP]；實作完待驗（`V2Home` 刪 7 枚重複鈕：右列足跡搖一搖、CTA相機和加好友toast、pills拍照足跡酒牆；失用 key 保留（nav 共用＋E線 reuse）；build 綠／lint 淨／340 綠；待用戶瀏覽器親驗，未提交）

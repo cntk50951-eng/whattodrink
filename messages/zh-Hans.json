@@ -339,6 +339,7 @@
     "chatFriendsOnly": "在线朋友",
     "chatFriendsEmpty": "暂时未见在线朋友",
     "chatOpen": "聊天",
+    "chatRoomFailed": "会话打不开，稍后再试",
     "checkinSubmitting": "发布中…"
   },
   "terms": {

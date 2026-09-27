@@ -339,6 +339,7 @@
     "chatFriendsOnly": "Online friends",
     "chatFriendsEmpty": "No friends online right now",
     "chatOpen": "Chat",
+    "chatRoomFailed": "Could not open this chat, try again later",
     "checkinSubmitting": "Posting…"
   },
   "terms": {

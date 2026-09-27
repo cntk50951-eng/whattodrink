@@ -17,7 +17,7 @@ export default function V2ChatListPage() {
   const homeHref = locale === "zh-Hant" ? "/v2" : `/${locale}/v2`;
 
   return (
-    <div className={`${styles.v2scope} flex h-dvh flex-col bg-background p-4`}>
+    <div className={`${styles.v2scope} fixed inset-0 isolate z-[1000] flex h-dvh flex-col overflow-hidden bg-background p-4`}>
       <header className="flex shrink-0 items-center gap-2">
         <Button variant="ghost" size="icon" aria-label={t("back")} render={<Link href={homeHref} />} nativeButton={false}>
           <ChevronLeft size={18} aria-hidden className="size-[18px]" />

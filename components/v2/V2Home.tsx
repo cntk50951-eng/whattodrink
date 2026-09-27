@@ -50,6 +50,7 @@ import { useLiveFriends } from "@/hooks/useLiveFriends";
 import { V2FriendCard } from "./V2FriendCard";
 import { LOGOUT_CLEAR_EVENT, clearUserLocalCaches } from "@/lib/auth/clear";
 import { displayName } from "@/lib/auth/profile";
+import { setActivePeer } from "@/lib/chatPeer";
 import { createClient } from "@/lib/supabase/client";
 import {
   DEFAULT_CENTER,
@@ -801,14 +802,17 @@ export function V2Home() {
     });
   }
 
-  // UR C.17：點好友呼吸釘先看信息卡（聊天鍵在卡內進完整頁；路由直連可分享）。
+  // UR C.17：點好友呼吸釘先看信息卡（聊天鍵在卡內進完整頁）。
+  // UR D.7：進房改零 id（peer 寫 session，路由固定 `/v2/chat/room`）。
   function openChat(userId: string): void {
     if (liveFriends.some((x) => x.user_id === userId)) setFriendCardId(userId);
   }
 
+  // UR D.7：零 id 路由——peer 寫 session，URL 永遠是乾淨的 `/v2/chat/room`。
   function goChat(userId: string): void {
     const prefix = locale === "zh-Hant" ? "" : `/${locale}`;
-    router.push(`${prefix}/v2/chat/${encodeURIComponent(userId)}`);
+    setActivePeer(userId);
+    router.push(`${prefix}/v2/chat/room`);
   }
 
   // UR C.17：在線朋友模式開關（開時飛全員視野——跨區按 bounds 裝下所有人；
@@ -1131,23 +1135,6 @@ export function V2Home() {
           <Dices aria-hidden />
           {tn("randomPick")}
         </Button>
-        <Button size="sm" variant="outline" className="shrink-0 rounded-full bg-card shadow-md ring-1 ring-foreground/10" nativeButton={false} render={<Link href="/camera" />}>
-          <Camera aria-hidden />
-          {tn("photoPick")}
-        </Button>
-        <Button size="sm" variant="outline" className="shrink-0 rounded-full bg-card shadow-md ring-1 ring-foreground/10" nativeButton={false} render={<Link href="/wall" />}>
-          <Flame aria-hidden />
-          {tn("wallPick")}
-        </Button>
-        <Button
-          size="sm"
-          variant={trailOn ? "secondary" : "outline"}
-          className={`shrink-0 rounded-full shadow-md ring-1 ring-foreground/10 ${trailOn ? "" : "bg-card"}`}
-          onClick={handleTrailTab}
-        >
-          <Footprints aria-hidden />
-          {t("footprints")}
-        </Button>
         <Button size="sm" variant="outline" className="shrink-0 rounded-full bg-card shadow-md ring-1 ring-foreground/10" onClick={doShake}>
           <Vibrate aria-hidden />
           {t("shakeHint")}
@@ -1200,25 +1187,6 @@ export function V2Home() {
         >
           <Expand aria-hidden />
         </Button>
-        <Button
-          size="icon"
-          variant={trailOn ? "secondary" : "outline"}
-          aria-label={t("footprints")}
-          aria-pressed={trailOn}
-          className={`rounded-full shadow-md ${trailOn ? "" : "bg-card"}`}
-          onClick={handleTrailTab}
-        >
-          <Footprints aria-hidden />
-        </Button>
-        <Button
-          size="icon"
-          variant="outline"
-          aria-label={t("shakeHint")}
-          className="rounded-full bg-card shadow-md ring-1 ring-foreground/10"
-          onClick={doShake}
-        >
-          <Vibrate aria-hidden />
-        </Button>
       </div>
 
       {/* UR C.11：匿名點足跡先登入（浮層；登入後 ?trail=1 續跑不斷） */}
@@ -1244,24 +1212,13 @@ export function V2Home() {
         </p>
       )}
 
-      {/* 底部 CTA 列 */}
+      {/* 底部 CTA 列（UR C.20：只留選酒大鈕——主要賣點；相機走 TabBar 大圓，
+          加好友 toast（死鈕）退役，EPIC B/E 線再上） */}
       {card === null && (
         <div className="absolute inset-x-3 bottom-20 z-[1000] flex touch-manipulation items-end gap-2">
-          <Button size="icon-lg" variant="outline" aria-label={tn("photoPick")} className="rounded-full bg-card shadow-md ring-1 ring-foreground/10" nativeButton={false} render={<Link href="/camera" />}>
-            <Camera aria-hidden />
-          </Button>
           <Button variant="outline" className="h-12 flex-1 rounded-full bg-card text-base font-bold shadow-md ring-1 ring-foreground/10" onClick={openPick}>
             <Dices aria-hidden />
             {t("pickTitle")}
-          </Button>
-          <Button
-            variant="outline"
-            aria-label={t2("addFriendSoon")}
-            className="h-12 shrink-0 rounded-full bg-card px-4 font-bold shadow-md"
-            onClick={() => flashNote(t2("addFriendSoon"))}
-          >
-            <Users aria-hidden />
-            {t2("addFriendSoon")}
           </Button>
         </div>
       )}

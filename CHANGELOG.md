@@ -5,6 +5,15 @@
 ## [Unreleased]
 
 ### Added
+- **EPIC D 好友聊天真通道＋UR D.1 三表 [WIP]**
+  - UR D.1 mark done（用戶 Dashboard 執行 0012 回填 green）
+- **UR D.2 會話 API 四端點 [WIP]**（待真數據聯驗，D.3 聯驗時一併驗）
+- **UR D.3 發送＋記錄＋Realtime [WIP]**
+  - `POST+GET /:id/messages`（text 首期＋冪等＋雙檔限流＋隱身雙驗＋90d 刷新；keyset 回正序）；`ChatRoomLive` 新（建會話→歷史→訂閱→樂觀發送；讀水位順手呼叫）；`ChatThread` 加 `external` 受控源（向下兼容）；room 頁換源（mock 退役）；openapi 補 2 端點＋MessagePage；`chatRoomFailed`×3；三閘：build 綠／lint 0 error／340 綠
+  - 已知缺口：發送失敗撤位無重試鍵（排 D.4）；Publication 待用戶 Dashboard 開（無則只有歷史無即時）；同伴 D.7 文件只做加法，hunks 已驗
+  - 單測：`parseCreateMessageBody`＋4 測（chat.test 14 綠）；待雙號聯驗＋合入
+  - `lib/api/chat.ts` 新（`directKey`／parse／cursor／mapper）＋12 單測；`createServiceClient` 加法；`POST+GET /conversations`、`PATCH /:id/read`、`DELETE /:id`（RLS＋陌生人 fail-closed＋冪等＋水位）；openapi 補 4 端點＋6 schemas；三閘：build 綠／lint 0 error／338 綠；待用戶帶 session curl 驗
+  - 並行註記：同伴 D.7 room 重構刪改 `[friendId]` 頁（我方零碰零恢復）；`server.ts` edit 切斷註釋即修（教訓：oldString 含註釋頭即整段吞，錨點只取標題行）；`Error`→`ErrorBody` 誤引即修；build 撞同伴進行中 build 等 90s 重跑
 - **UR C.15 v2 好友聊天靜態殼 [WIP]**
   - `components/ui` 補裝 `avatar`＋`scroll-area`＋`input`（registry-first，base-ui 後端；CLI 誤裝 `cn` 包＋`from "cn"` 已修正回 `@/lib/utils`，死依賴卸載）
   - `lib/chat.ts` 新（`mockThread`／`appendLocalEcho`／`formatChatTime` 純函數）＋`lib/chat.test.ts` 4 單測
