@@ -5,6 +5,18 @@
 ## [Unreleased]
 
 ### Added
+- **UR C.15 v2 好友聊天靜態殼 [WIP]**
+  - `components/ui` 補裝 `avatar`＋`scroll-area`＋`input`（registry-first，base-ui 後端；CLI 誤裝 `cn` 包＋`from "cn"` 已修正回 `@/lib/utils`，死依賴卸載）
+  - `lib/chat.ts` 新（`mockThread`／`appendLocalEcho`／`formatChatTime` 純函數）＋`lib/chat.test.ts` 4 單測
+  - `V2ChatSheet` 由佔位殼升級消息流（Avatar＋左右氣泡＋今日分隔＋已讀✓✓三態 mock；發送／say-hi 本地樂觀追加，語音仍 toast；零寫庫）
+  - `v2.chatSoon/chatToday/chatRead/chatDelivered`×3（`chatSoon` 屬 A.21 缺 key 修漏）；數據文檔無需更新（零新增持久化，會話態 mock）
+  - EPIC B 確認：B 是邀請即時流非聊天線，聊天通道即本 UR（A.21 遺留另開）
+  - round-2（用戶拍板完整頁代 Sheet）：`ChatThread` 新＋`/v2/chat` 列表 stub＋`/v2/chat/[friendId]` 完整頁（未知 id 回退保直接 URL 可渲染）；pin 改路由跳轉；`V2ChatSheet.tsx` 刪；`chatListTitle/chatListEmpty/chatFallbackName`×3；關聯 DEF-20260927-007
+- **UR C.14 v2實時位置視覺層級 round-2（重疊自動散開＋+N堆疊列表）[WIP，未驗收未提交]**
+  - `lib/mapSpread.ts`（新，純函數）：`planSpread`（像素碰撞即 Vogel 螺旋自動散開，組內 id 序確定性，超 cap 收堆疊）＋`avoidLive`（live 像素徑向避讓，活人永不動）＋`lib/mapSpread.test.ts` 9 單測＋1 快照
+  - `V2MapView`：z>11 小組自動散開（免徽→fit→散三段舞）＋超 cap 組 +N 徽（`v2stack` 白底琥珀環）＋自/友/想喝/序號釘 live 避讓＋`onStackClick`＋`spreadStack`（復用 C.6 地理圓周散 pin）；刪退役 `clusterPoints`／`V2_CLUSTER_PX` 接線
+  - `V2Home`：+N 堆疊列表 Sheet（行點開卡＋一鍵散開）＋`stackTitle/stackHint/stackSpread`×三語；關聯 DEF-20260927-006（Fixing）
+  - 三閘317綠／lint 0 error／build 41頁；待用戶雙號瀏覽器親驗
 - **UR C.12 v2 捏合縮放歸地圖 [✓，用户真機验收，merged]**：v2 獨立 layout 鎖 viewport＋容器 touch none＋底部 touch-manipulation；v1／瓦片零文件；三閘285綠／lint 0 error／build 39頁
 - **UR C.10 v2他人打卡卡升級（與自家Sheet同構信息）[WIP]**
   - `lib/me.ts`加法`parseGender`（自由串轉三態，非法回secret）＋`lib/me.test.ts` 3單測

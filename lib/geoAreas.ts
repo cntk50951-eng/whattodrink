@@ -72,6 +72,16 @@ export type AreaGroup = {
   members: number[];
 };
 
+export type CityGroup = {
+  city: string;
+  members: number[];
+};
+
+export type CountryGroup = {
+  country: string;
+  members: number[];
+};
+
 /**
  * 按錨分組：空錨成員（理論無，防禦）按輸入順序併入首組，不丟 pin。
  * 空輸入回空數組。
@@ -92,6 +102,88 @@ export function groupByAnchor(
     if (g === undefined) {
       g = { anchor, members: [] };
       byId.set(anchor.id, g);
+      order.push(g);
+    }
+    g.members.push(index);
+  });
+  return order;
+}
+
+/**
+ * 按城市分組（UR C.13 三级：国家>城市>区）。
+ * cityOfCoords 判最近城市，null 归为 "other"。
+ */
+export function groupByCity(
+  points: readonly { lat: number; lng: number }[],
+): CityGroup[] {
+  const byCity = new Map<string, CityGroup>();
+  const order: CityGroup[] = [];
+  // 动态导入避免循环，轻量实现：直接用中心距离近似
+  const CITY_CENTERS: Record<string, { lat: number; lng: number }> = {
+    hk: { lat: 22.28, lng: 114.15 },
+    sz: { lat: 22.543, lng: 114.057 },
+    gz: { lat: 23.129, lng: 113.264 },
+    sh: { lat: 31.23, lng: 121.47 },
+    bj: { lat: 39.9, lng: 116.4 },
+  };
+  function cityOf(lat: number, lng: number): string {
+    let best: string | null = null;
+    let bestD = Infinity;
+    for (const [code, c] of Object.entries(CITY_CENTERS)) {
+      const dLat = lat - c.lat;
+      const dLng = (lng - c.lng) * Math.cos((lat * Math.PI) / 180);
+      const d = dLat * dLat + dLng * dLng;
+      if (d < bestD) {
+        bestD = d;
+        best = code;
+      }
+    }
+    if (bestD > 9) return "other";
+    return best ?? "other";
+  }
+  points.forEach((p, index) => {
+    const city = cityOf(p.lat, p.lng);
+    let g = byCity.get(city);
+    if (g === undefined) {
+      g = { city, members: [] };
+      byCity.set(city, g);
+      order.push(g);
+    }
+    g.members.push(index);
+  });
+  return order;
+}
+
+/**
+ * 按国家分組（粗分：中国 vs other，基于是否在任一中国城市 5 度内）。
+ */
+export function groupByCountry(
+  points: readonly { lat: number; lng: number }[],
+): CountryGroup[] {
+  const byCountry = new Map<string, CountryGroup>();
+  const order: CountryGroup[] = [];
+  const CITY_CENTERS: Record<string, { lat: number; lng: number }> = {
+    hk: { lat: 22.28, lng: 114.15 },
+    sz: { lat: 22.543, lng: 114.057 },
+    gz: { lat: 23.129, lng: 113.264 },
+    sh: { lat: 31.23, lng: 121.47 },
+    bj: { lat: 39.9, lng: 116.4 },
+  };
+  function countryOf(lat: number, lng: number): string {
+    for (const c of Object.values(CITY_CENTERS)) {
+      const dLat = lat - c.lat;
+      const dLng = (lng - c.lng) * Math.cos((lat * Math.PI) / 180);
+      const d = dLat * dLat + dLng * dLng;
+      if (d <= 25) return "中国";
+    }
+    return "other";
+  }
+  points.forEach((p, index) => {
+    const country = countryOf(p.lat, p.lng);
+    let g = byCountry.get(country);
+    if (g === undefined) {
+      g = { country, members: [] };
+      byCountry.set(country, g);
       order.push(g);
     }
     g.members.push(index);

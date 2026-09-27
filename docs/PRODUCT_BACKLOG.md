@@ -2259,3 +2259,84 @@ UR C.11　一鍵我的足跡（登入續跑＋飛全軌跡＋tab 換位＋目錄
 - 2026-09-27：驗收返工 round-11（靜態腳印＋reduced-motion 嫌疑）：用戶見靜態殘留——reduced-motion 開啟時靜止腳印只是噪聲（序號釘已承載信息），改 display:none；待用戶確認系統動效開關，決策記此
 - 2026-09-27：驗收返工 round-12（斷腿自擺烏龍）：交替跨區數據下 50km 斷腿吃掉全部腿致零腳印（DEF-002 確診；該規則是 round-6 我發明的，用戶從未要求隱藏跨洋）——刪斷腿，跨洋點線即旅程；決策記此
 - 2026-09-27：用戶指令 round-13（動畫取消）：目錄保留，腳印動畫取消另立需求——渲染调用全撤（序號釘＋錨徽保留）；`interpolateFootprints`＋`at`＋CSS 休眠留用（Stadia 先例）；DEF-002 隨之關閉；決策記此
+UR C.13　區域足跡腳印動畫（區域內時序循環）[WIP]
+
+用戶指令：足跡中點擊足跡要看到動態循環的真實腳印軌跡（不是虛線），按打卡記錄的區域為單位，區域內按最新打卡時間由舊到新依次出現。現狀：點足跡先彈｢我的足跡｣Sheet，動畫被遮住，關 Sheet 後動畫消失始終無法顯示。預期：關 Sheet 後動畫仍在，僅點地圖空白／其他按鈕（或二次點足跡）才消失。本 UR 基於最新代碼從零重起（round-13 休眠作廢，`interpolateFootprints`+`v2step` 解休眠）。
+
+### 背景（為何重起）
+- round-4 虛線→round-6 熱暈→腳印流→斷腿/抖動/`minZoom`鉗制等十餘輪收斂，最終 round-13 按｢動畫取消另立｣全撤調用（僅序號釘+錨徽保留），根因是舊腳印為全局時序腿（跨區拉線需 50km 斷腿兜底）與｢區域單位｣語義正交，且 `watch` 抖動致圖層重掛｢只播一次｣— 均已在主幹修復（`stableSelf 10m`/`writeTrailFlag`/`trailRef` 清理/`reduced-motion display:none`），具備重起條件
+- 現缺口：`V2MapView` 無 `interpolateFootprints` 調用、無 `v2step` 節點，`trailOn` 與 `stopsOpen` 雖已解耦（關 Sheet 留動畫）但無動畫可留
+
+### 範圍（v2-only，EPIC C 鐵律：只動 `app/[locale]/v2/*`/`components/v2/*`/`v2.module.css` 作用域，共用層只做加法）
+1. **數據**：`lib/trail.ts` 新增 `footprintsByArea(stops: TrailStop[], perLeg=4, cap=48): FootStep[]`（純函數可單測）— `hk = filter(isWithinHongKong)` → `groupByAnchor(hk)` 分組 → 每組內按 `at` 升序（舊→新）→ `interpolateFootprints(ms, per, perCap)` 組內插值累進（全局 `step` 連號供錯峰），`far` 單點無腿不插；總量 `cap` 按組內腿數均分（沿舊 `per = min(perLeg, floor(cap/totalLegs))`），`angle` 沿用 `atan2`，空/單點回空
+2. **渲染**：`components/v2/V2MapView.tsx` 新增常駐腳印層（`footLayerRef`+`footMarksRef`，`mount` 建/`unmount` 清，仿 `friendLayer` 常駐複用+`setLatLng`，主層 `others/wants/trailNum/area` 重建不碰它）— `useEffect([trail])` 專管對帳：`trail===null` 即清；否則 `steps = footprintsByArea(trail)` → `L.divIcon(html='<div class=v2step style="transform:rotate(angle) translateX(leftRight)">🦶</div>')`，`leftRight` 由 `step%2` 交替，`animationDelay = (step%8)*150ms` 錯峰循環；`far` 不畫
+3. **動效**：解休眠 `components/v2/v2.module.css` 的 `v2step`/`v2stepfade`（`2.4s ease-in-out infinite`，`will-change: opacity, transform`），`prefers-reduced-motion` 保持 `display:none`（序號釘已承載信息，不做噪聲）
+4. **生命週期**：`V2Home.tsx` 狀態機不推翻（首點 `trailOn+stopsOpen`→關 Sheet 留 `trailOn`→二次 Tab/地圖空白/登出清）；補 `stopsOpen onOpenChange(false)` 僅清目錄不碰 `trailOn` 已是現狀，腳印層不依賴 `stopsOpen`，關 Sheet 後原地重見；`handleMapTap`（地圖空白點擊，`closest(.leaflet-marker-icon)` 守衛）清 `trailOn/stopsOpen/trailLoginOpen` 符合｢點地圖其他地方才消失｣，其他 pills/工具列操作默認不清（待本 UR 問答拍板是否擴到任意非足跡操作則首行加清）
+5. **隔離**：零碰 `app/globals.css` 原塊與一切 v1 `*.module.css`/`messages` 舊 key；`footprintsByArea` 加法不改 `interpolateFootprints` 簽名；`git status` 無 v1 文件
+
+### 非目標
+- v1 任何文件/樣式/文案、境外 `far` 連腿（單點不連，境外多點再補分組）、虛線/熱暈/蜘蛛圓等已退役形態、後端 `checkins` 新欄位（`TrailStop` 字段已夠）、dark 模式（C.1 淺色鎖定讓路）
+
+### AC
+- AC1：已登入且有 ≥2 點同區時，點足跡 Tab→目錄 Sheet 彈起同時地圖見區域內舊→新循環腳印（🦶 按 `angle` 朝向、左右交替、錯峰淡入 `2.4s infinite`，`reduced-motion` 下腳印 `display:none` 僅序號釘）
+- AC2：關目錄 Sheet（X/下滑/二次 Tab 第一段）後腳印仍在地圖原位循環；點地圖空白（非 pin）或二次 Tab 第二段（`trailOn` 清）後腳印消失
+- AC3：跨區不連腿（銅鑼灣與旺角各 2 點則各區內 4 枚腳印，區間無腳印，總量 ≤48）
+- AC4：單點/空足跡無腳印不炸版；HK 境外單點恒獨立序號釘無腳印
+- AC5：三語/無障礙沿舊 key；`npm run build`+`lint`+`test` 全綠；`git status` 無 v1；用戶瀏覽器親驗（關 Sheet 後循環、地圖點清）
+
+*改動記錄*
+- 2026-09-27：建檔置 []（用戶指令新 UR 管理區域腳印重起；基於最新代碼從零設計，`stopsOpen` 與 `trailOn` 解耦已具備；待問答定案 `far` 與清除時機後置 [WIP]）
+
+---
+
+UR C.14　v2 實時位置視覺層級（自／友 live 釘壓過打卡釘）[WIP]
+
+Fix UR（DEF-20260927-006）：API 側已證正常（雙號聯測 `/friends/live` 回坐標），純 UI 層級問題。自釘 18px 與啤酒釘 40–44px 同層零 `zIndexOffset` 被物理蓋住；友釘雖獨立層但同尺寸、堆疊看運氣；三枚呼吸環共用同一動畫無區分。
+
+### 範圍（v2-only：`components/v2/V2MapView.tsx`＋`v2.module.css`，零碰 v1／共用層）
+1. live 釘層級：自／友加 `zIndexOffset`（自最高），尺寸拉開差距（自 18→24 起跳，待定案）
+2. 呼吸環區分：自／友不同節奏或顏色語義（沿 A.21 綠＝在線／灰＝隱身），打卡釘無呼吸環不搶戲
+3. 同坐標打卡釘降調：live 存在時同點啤酒釘縮小或半透明（待定案，不動點擊行為）
+
+### 非目標
+- 輪詢節拍改動（30s 不動，架構已凍結）、後端／RLS 改動、v1 任何文件、C.6／C.9 聚類邏輯改動
+
+### AC
+- AC1：雙號同屏時自釘／友釘一眼可辨，不被打卡釘蓋住
+- AC2：打卡釘點擊行為不變；`prefers-reduced-motion` 下呼吸環靜止
+- AC3：三閘綠；用戶瀏覽器親驗（雙號同屏）
+
+*改動記錄*
+- 2026-09-27：建檔置 []（DEF-20260927-006 Investigating 確診即建；待問答定案視覺方案後置 [WIP]）
+- 2026-09-27：問答定案（用戶授權選最優：A 層級法＋三態分形＋live 放大）置 [WIP]；實作完待驗（自釘 18→28px 雙環快脈衝＋z1000、友釘 3px 環 2.8s 慢脈衝＋z600、打卡釘零動、`reduced-motion` 補 `::before`；build 41 頁綠；待用戶雙號瀏覽器親驗）
+- 2026-09-27 round-2：用戶判層級法效果仍不明顯，改散開＋堆疊（問答拍板全套：Vogel 自動散開＋live 避讓＋超 cap 收 +N 列表；shadcn AvatarGroup +N／popover＋C.4/C.10 Sheet 語言）；實作完待驗（`lib/mapSpread`＋9 單測＋1 快照、簇徽退役改自動散、+N 徽＋列表 Sheet＋一鍵散開復用 C.6、`stack*`×三語；317綠／lint 0 error／build 41頁；待用戶雙號瀏覽器親驗）
+
+---
+
+UR C.15　v2 好友聊天靜態殼（消息流＋輸入＋已讀三態 mock）[WIP]
+
+用戶指令：聊天單獨開線，先裝 shadcn 件，從 UI 開始構建。A 路線（Sheet 原地長大）已拍板；只做 v2（版本門禁問答定案）。
+
+### 背景
+- EPIC B 是邀請即時流（B.1 表補強＋B.2 邀請中心＋realtime），**不是聊天線**；聊天通道是 A.21 遺留「通道另開 UR」，即本 UR。
+- 現狀 `V2ChatSheet.tsx` 是 A.21 佔位殼（三鈕全 toast，零寫入）；`v2.chatSoon` key 缺失（V2Home 已調用，點語音即炸樹——本 UR 順手補齊）。
+- 件：`avatar`＋`scroll-area`＋`input` 經 `shadcn add` 補裝（base-ui 後端；CLI 誤裝 `cn` 包＋`from "cn"` 已修正回 `@/lib/utils`，死依賴卸載）。
+
+### 範圍（v2-only：`components/v2/V2ChatSheet.tsx`＋`lib/chat.ts`＋`v2.chat*` 新 key；`components/ui/*` 只增不改）
+1. Sheet 殼沿 C.4 snapshot 口徑（容器不動）：Header 換 Avatar 件（有圖上圖＋Fallback 首字＋AvatarBadge 綠點）＋暱稱＋在線 Badge
+2. 消息流：`ScrollArea` 內 mock 三段（對方招呼→我回→對方已讀），左右氣泡（我方右／對方左＋頭像），日期分隔「今日」，我方末條已讀✓✓（已讀／已送達三態 mock）
+3. 輸入條：`Input` 圓角＋Send／Mic 圓鈕；發送本地樂觀追加（會話態，不持久化不寫庫）；say-hi 本地追加 👋；語音仍 toast（通道未建，沿 addFriendSoon 口徑）
+4. 新 key 僅 `chatSoon/chatToday/chatRead/chatDelivered`×3（`chatSoon` 屬缺 key 修漏，其餘沿用既有 `chat*`）
+
+### 非目標
+- 真通道／Realtime／持久化（C-chat-2）、語音消息（C-chat-3）、v1 任何文件、共用層行為改動（`lib/chat.ts` 純函數加法）
+
+### AC
+- AC1：點好友釘開 Sheet 即見消息流（左右＋時間＋已讀態），空好友不炸版
+- AC2：輸入發送即本地上屏＋自動滾到底；say-hi 追加 👋；語音 toast 不變
+- AC3：`reduced-motion` 下無自動滾動畫（直接跳底）；三語 parity PASS
+- AC4：三閘綠；用戶瀏覽器親驗（手機＋桌面）；`git status` 無 v1 文件
+
+*改動記錄*
+- 2026-09-27：建檔即開工置 [WIP]（用戶指令單獨開線＋裝件＋UI 起步；版本問答只做 v2；分支待定——髒樹是同伴 C.13/C.14，暫不開分支不提交，hunks 分離可辨）
+- 2026-09-27 round-2（用戶拍板：不要 Sheet，要完整聊天頁＋可關＋返回列表 stub）：`ChatThread` 抽線程件（Sheet 殼退役，`V2ChatSheet.tsx` 刪）；新路由 `/v2/chat`（列表 stub：空態＋回地圖，不造假數據）＋`/v2/chat/[friendId]`（完整頁：返回列表＋頭像名＋在線態＋線程全高；未知 id 回退暱稱保直接 URL 永遠可渲染）；pin 點擊改 `router.push`（locale 前綴默繁免寫）；新 key `chatListTitle/chatListEmpty/chatFallbackName`×3；關聯 DEF-20260927-007（pin 點擊無反應，首嫌 friends 空，待用戶回填三問）

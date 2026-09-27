@@ -256,6 +256,9 @@
     "trailTitle": "My trail · {n} stops",
     "trailBack": "Back",
     "trailEmpty": "No stops yet. Go log one!",
+    "stackTitle": "{n} check-ins here",
+    "stackHint": "Tap a row to open, or spread them on the map",
+    "stackSpread": "Spread on map",
     "cityName": "Hong Kong",
     "meOnline": "Online",
     "meLocating": "Locating…",
@@ -323,7 +326,14 @@
     "chatHi": "👋 Say Hi",
     "chatPlaceholder": "Type a message…",
     "chatSend": "Send",
-    "chatVoice": "Voice"
+    "chatVoice": "Voice",
+    "chatSoon": "Chat is coming soon — stay tuned",
+    "chatToday": "Today",
+    "chatRead": "Read",
+    "chatDelivered": "Delivered",
+    "chatListTitle": "Chats",
+    "chatListEmpty": "Friend list coming soon — tap a friend pin on the map to start",
+    "chatFallbackName": "Buddy"
   },
   "terms": {
     "title": "Three modes, which one?",
