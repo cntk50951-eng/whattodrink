@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { appendLocalEcho, formatChatTime, formatSeenAgo, mockThread } from "./chat";
+import { appendLocalEcho, formatChatTime, formatListTime, formatSeenAgo, mergeFriendList, mockThread } from "./chat";
 
 const NOW = 1_757_000_000_000;
 
@@ -49,5 +49,33 @@ describe("formatSeenAgo", () => {
 
   it("未來時間鉗零不炸", () => {
     expect(formatSeenAgo(NOW + 60_000, NOW, "en")).toBe("now");
+  });
+});
+
+describe("formatListTime", () => {
+  it("同天 HH:mm，跨天 M/d", () => {
+    const noon = new Date(NOW);
+    noon.setHours(12, 34, 0, 0);
+    const morning = new Date(NOW);
+    morning.setHours(9, 5, 0, 0);
+    expect(formatListTime(morning.getTime(), noon.getTime())).toBe("09:05");
+    const yesterday = new Date(noon.getTime() - 24 * 3600_000);
+    const t = formatListTime(yesterday.getTime(), noon.getTime());
+    expect(t).toBe(`${yesterday.getMonth() + 1}/${yesterday.getDate()}`);
+  });
+});
+
+describe("mergeFriendList", () => {
+  const f = (id: string, online: boolean) => ({ user_id: id, nickname: id, avatar_url: null, online });
+  it("在線置頂＋組內末信倒序＋無記錄沉底", () => {
+    const rows = mergeFriendList(
+      [f("off-new", false), f("on-old", true), f("off-none", false), f("on-new", true)],
+      new Map([
+        ["off-new", 300],
+        ["on-old", 100],
+        ["on-new", 200],
+      ]),
+    );
+    expect(rows.map((r) => r.user_id)).toEqual(["on-new", "on-old", "off-new", "off-none"]);
   });
 });

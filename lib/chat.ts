@@ -15,6 +15,8 @@ export type ChatMessage = {
   at: number;
   /** 只有我方消息有意義：對方是否已讀（mock 定死） */
   read: boolean;
+  /** UR D.4：發送失敗位（留行＋重試鍵；成功／重發即清） */
+  failed?: boolean;
 };
 
 const MINUTE_MS = 60_000;
@@ -57,4 +59,51 @@ export function formatSeenAgo(atMs: number, nowMs: number, locale: string): stri
   const diffHour = Math.floor(diffMin / 60);
   if (diffHour < 24) return rtf.format(-diffHour, "hour");
   return rtf.format(-Math.floor(diffHour / 24), "day");
+}
+
+/**
+ * UR D.4 列表時間：同天 `HH:mm`，否則 `M/d`（locale 只定分隔語義，
+ * 用 `Intl`  parts 取月日數字，不拼寫月份名，三語零新 key）。
+ */
+export function formatListTime(atMs: number, nowMs: number): string {
+  const a = new Date(atMs);
+  const n = new Date(nowMs);
+  if (
+    a.getFullYear() === n.getFullYear() &&
+    a.getMonth() === n.getMonth() &&
+    a.getDate() === n.getDate()
+  ) {
+    return formatChatTime(atMs);
+  }
+  return `${a.getMonth() + 1}/${a.getDate()}`;
+}
+
+/**
+ * UR D.4 列表合併排序（純函數）：好友全量＋會話末動 map →
+ * 在線組置頂＋離線在後，組內按末信倒序，無記錄沉底（按暱稱穩序）。
+ */
+export type FriendListEntry = {
+  user_id: string;
+  nickname: string;
+  avatar_url: string | null;
+  online: boolean;
+  updated_at: number | null;
+};
+
+export function mergeFriendList(
+  friends: { user_id: string; nickname: string; avatar_url: string | null; online: boolean }[],
+  updatedByPeer: Map<string, number>,
+): FriendListEntry[] {
+  const rows: FriendListEntry[] = friends.map((f) => ({
+    ...f,
+    updated_at: updatedByPeer.get(f.user_id) ?? null,
+  }));
+  rows.sort((a, b) => {
+    if (a.online !== b.online) return a.online ? -1 : 1;
+    const at = a.updated_at ?? Number.NEGATIVE_INFINITY;
+    const bt = b.updated_at ?? Number.NEGATIVE_INFINITY;
+    if (at !== bt) return bt - at;
+    return a.nickname < b.nickname ? -1 : 1;
+  });
+  return rows;
 }

@@ -1,6 +1,6 @@
 import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { areFriends, parseAddFriendBody } from "@/lib/friends";
+import { areFriends, friendIdsOf, parseAddFriendBody, toFriendListItem } from "@/lib/friends";
 
 /**
  * DEF-20260926-009＋UR A.19：最小好友邀請（🔒，V1 無接受 UI）。
@@ -145,4 +145,45 @@ export async function POST(req: Request): Promise<Response> {
   } catch (err) {
     return apiError("internal", err instanceof Error ? err.message : "unknown", 500);
   }
+}
+
+/**
+ * UR D.4 好友列表（🔒）。
+ * `GET /api/v1/friends` —— accepted 互好友全量（在線＋離線都要，排序由客戶端按末信排；
+ * 只吐四列：精確坐標永不進列表，一鍵定位走地圖深鏈用 live 數據，隱私分離）。
+ */
+export async function GET(req: Request): Promise<Response> {
+  const { supabase, userId } = await getAuthedClient(req);
+  if (userId === null) {
+    return apiError("unauthorized", "未登录", 401);
+  }
+  const { data: fsRows } = await supabase
+    .from("friendships")
+    .select("user_id,friend_id,status")
+    .eq("status", "accepted")
+    .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+  const ids = friendIdsOf(
+    userId,
+    ((fsRows ?? []) as unknown[]) as {
+      user_id: unknown;
+      friend_id: unknown;
+      status: unknown;
+    }[],
+  );
+  if (ids.length === 0) return apiOk({ friends: [] });
+  const { data: users, error: uErr } = await supabase
+    .from("users")
+    .select("id,nickname,avatar_url,mode,last_seen_at")
+    .in("id", ids);
+  if (uErr !== null) {
+    console.error(`[api/v1/friends] list error: code=${uErr.code} message=${uErr.message}`);
+    return apiError("internal", "读取好友失败", 500);
+  }
+  const nowMs = Date.now();
+  const friends = [];
+  for (const row of (users ?? []) as unknown[]) {
+    const f = toFriendListItem(row, nowMs);
+    if (f !== null) friends.push(f);
+  }
+  return apiOk({ friends });
 }

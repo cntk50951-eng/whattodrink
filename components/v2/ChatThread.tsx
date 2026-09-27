@@ -22,6 +22,10 @@ export type ChatPeer = {
 export type ChatExternalSource = {
   messages: ChatMessage[];
   onSend: (text: string) => void;
+  /** UR D.4：失敗重試（同 client_msg_id 重發，冪等不 double；不傳即無重試鍵）。 */
+  onRetry?: (id: string) => void;
+  /** UR D.4：對方讀水位 ms（我方行 at<=水位即✓✓；null 即沿舊 mock read 旗）。 */
+  readAt?: number | null;
 };
 
 /**
@@ -96,6 +100,10 @@ export function ChatThread({
   }
 
   const lastMeId = [...shown].reverse().find((m) => m.role === "me")?.id ?? null;
+  const readAt = external?.readAt ?? null;
+  // UR D.4：水位在即按水位判已讀，否則沿舊 read 旗（mock／離線態）。
+  const isRead = (m: ChatMessage): boolean =>
+    readAt !== null ? m.at <= readAt : m.read;
 
   return (
     <>
@@ -114,12 +122,21 @@ export function ChatThread({
                 </div>
                 <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                   {formatChatTime(m.at)}
-                  {m.read ? (
+                  {isRead(m) ? (
                     <CheckCheck size={12} aria-hidden className="size-3" />
                   ) : (
                     <Check size={12} aria-hidden className="size-3" />
                   )}
-                  {m.id === lastMeId && (m.read ? t2("chatRead") : t2("chatDelivered"))}
+                  {m.id === lastMeId && (isRead(m) ? t2("chatRead") : t2("chatDelivered"))}
+                  {m.failed === true && external?.onRetry !== undefined && (
+                    <button
+                      type="button"
+                      onClick={() => external.onRetry?.(m.id)}
+                      className="font-bold text-destructive underline underline-offset-2"
+                    >
+                      {t2("chatRetry")}
+                    </button>
+                  )}
                 </span>
               </div>
             ) : (
