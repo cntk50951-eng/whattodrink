@@ -171,6 +171,13 @@
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
 }
 
+/* UR C.6 round-7 他人釘本地圖槽（createRoot 掛載點；尺寸沿想喝釘同規） */
+.v2pin span[data-art] {
+  display: block;
+  width: 26px;
+  height: 32px;
+}
+
 /* 橫滑 pill 列隱藏滾動條（功能保留，可滑） */
 .v2noscroll {
   scrollbar-width: none;
