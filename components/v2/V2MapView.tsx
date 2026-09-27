@@ -14,14 +14,16 @@ import type * as Leaflet from "leaflet";
 import {
   DEFAULT_CENTER,
   HK_BOUNDS,
-  OSM_ATTRIBUTION,
-  OSM_MAX_NATIVE_ZOOM,
-  OSM_URL,
   ZOOM_DEFAULT,
   ZOOM_MAX,
   ZOOM_MIN,
   haversineMeters,
 } from "@/lib/geo";
+import {
+  parseMapProvider,
+  shouldFallbackToOsm,
+  tileSpecFor,
+} from "@/lib/maps/provider";
 import type { LatLng } from "@/lib/geo";
 import { clusterPoints } from "@/lib/clusters";
 import type { BeerIconComponent } from "@/components/marketing/beer-icons/wall";
@@ -208,7 +210,8 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       const reduced = window.matchMedia(
         "(prefers-reduced-motion: reduce)",
       ).matches;
-      map = L.map(holderRef.current, {
+      // created  freeze 非空实例（闭包内直接用；map 留给清理函数置空）。
+      const created = L.map(holderRef.current, {
         zoomControl: false,
         scrollWheelZoom: false,
         minZoom: ZOOM_MIN,
@@ -216,11 +219,39 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
         zoomAnimation: !reduced,
         fadeAnimation: !reduced,
       });
-      L.tileLayer(OSM_URL, {
-        attribution: OSM_ATTRIBUTION,
+      map = created;
+      // UR C.8 试水：底图经 env 开关（缺省 OSM，与之前一致）；
+      // 高德瓦片连续失败达阈值自动拆层换 OSM（tileload 成功清零计数）。
+      const spec = tileSpecFor(
+        parseMapProvider(process.env.NEXT_PUBLIC_MAP_PROVIDER),
+      );
+      const baseLayer = L.tileLayer(spec.url, {
+        attribution: spec.attribution,
         maxZoom: ZOOM_MAX,
-        maxNativeZoom: OSM_MAX_NATIVE_ZOOM,
-      }).addTo(map);
+        maxNativeZoom: spec.maxNativeZoom,
+        ...(spec.subdomains !== undefined
+          ? { subdomains: spec.subdomains }
+          : {}),
+      });
+      let consecutiveErrors = 0;
+      let fellBack = false;
+      baseLayer.on("tileload", () => {
+        consecutiveErrors = 0;
+      });
+      baseLayer.on("tileerror", () => {
+        if (fellBack) return;
+        consecutiveErrors += 1;
+        if (!shouldFallbackToOsm(consecutiveErrors)) return;
+        fellBack = true;
+        created.removeLayer(baseLayer);
+        const osm = tileSpecFor("osm");
+        L.tileLayer(osm.url, {
+          attribution: osm.attribution,
+          maxZoom: ZOOM_MAX,
+          maxNativeZoom: osm.maxNativeZoom,
+        }).addTo(created);
+      });
+      baseLayer.addTo(map);
       map.setView([DEFAULT_CENTER.lat, DEFAULT_CENTER.lng], ZOOM_DEFAULT);
       // UR C.6 round-6：縮放結束觸發重建（見 zoomTick）。
       map.on("zoomend", () => {
