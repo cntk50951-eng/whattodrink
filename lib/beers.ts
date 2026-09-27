@@ -78,6 +78,18 @@ export const BEERS: Beer[] = [
   { id: "cusquena", emoji: "🍺", name: "Cusqueña Dorada", category: "lager", tagline: "太陽神的金色" },
   { id: "pilsen-callao", emoji: "🍺", name: "Pilsen Callao", category: "lager", tagline: "綠瓶老字號1863" },
   { id: "club-colombia", emoji: "🍺", name: "Club Colombia", category: "lager", tagline: "哥倫比亞Premium" },
+  /* ---- Batch4 隊列第四批收編（中美加勒比 10；Toña／Gallo 等 ñ 名保留原文，
+   * id 取 ASCII 轉寫；API 換源同 id 即覆蓋） */
+  { id: "aguila", emoji: "🍺", name: "Aguila Original", category: "lager", tagline: "哥倫比亞國民鷹" },
+  { id: "poker", emoji: "🍺", name: "Poker", category: "lager", tagline: "開枱啦啤" },
+  { id: "polar", emoji: "🍺", name: "Cerveza Polar", category: "lager", tagline: "白熊委內瑞拉" },
+  { id: "regional", emoji: "🍺", name: "Regional Pilsen", category: "lager", tagline: "馬拉開波5度" },
+  { id: "balboa", emoji: "🍺", name: "Balboa", category: "lager", tagline: "巴拿馬1910" },
+  { id: "imperial", emoji: "🍺", name: "Imperial", category: "lager", tagline: "小鷹哥斯達" },
+  { id: "tona", emoji: "🍺", name: "Toña", category: "lager", tagline: "火山尼加拉瓜" },
+  { id: "gallo", emoji: "🍺", name: "Gallo", category: "lager", tagline: "危地馬拉金雞" },
+  { id: "carib", emoji: "🍺", name: "Carib Lager", category: "lager", tagline: "加勒比海之藍" },
+  { id: "red-stripe", emoji: "🍺", name: "Red Stripe", category: "lager", tagline: "牙買加斜紅" },
 ];
 
 /**

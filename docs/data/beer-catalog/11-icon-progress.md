@@ -23,11 +23,14 @@
 - Batch3（10，2026-09-27，未验收）：Antarctica／Itaipava／Kaiser／Cristal／
   Quilmes／Andes／Paceña／Cusqueña／Pilsen Callao／Club Colombia
   （＋同步收編，靜態目錄 41→51，45 有圖）
+- Batch4（10，2026-09-27，未验收）：Aguila／Poker／Polar／Regional／Balboa／
+  Imperial／Toña／Gallo／Carib／Red Stripe
+  （＋同步收編，靜態目錄 51→61，55 有圖）
 
 ## 待画
 
-- 本次 100 目标剩余 **70**（队头继续：Aguila 起）。
-- 全队列剩余 **1089**。
+- 本次 100 目标剩余 **60**（队头继续：Presidente 起）。
+- 全队列剩余 **1079**。
 
 ## 移动端导出（每批顺带跑）
 

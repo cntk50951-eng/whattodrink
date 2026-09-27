@@ -21,6 +21,7 @@
 - 落 DEF-20260926-016（Closed）＋本篇；BACKLOG 不另開 UR（並行線範圍）。
 - 新一輪並行 batch（aguila／balboa 等，wall.ts／index.ts 已髒、`.tsx` 在倉）目測同配方，告警已在下文回覆裡給用戶，未動手。
 
-## 關聯
+## 追補（遠端仍 v1 排查，2026-09-27）
 
-- 缺陷：DEF-20260926-016（Closed）；遠端 main `a8e28c2` 待 Vercel 下一輪部署轉綠（dashboard 用戶目認）
+- 遠端 main 已走到 `9504922`（對方空合併同步＋C.8 等）；C.7 跳轉碼在倉（proxy＋`lib/home.ts` 俱在）。
+- worktree 鎖 tip 驗：`tsc` 淨＋vitest 32 文件 271→268 綠（數隨對方測試增減，當輪 268），源樹健康——問題不在代碼，轉 Vercel 側（部署狀態／env／域名／緩存四查，用戶 dashboard 動作）。

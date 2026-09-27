@@ -32,6 +32,10 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTi
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMyMode } from "@/hooks/useMyMode";
 import { useFriendRelation } from "@/hooks/useFriendRelation";
+import { useHeartbeat } from "@/hooks/useHeartbeat";
+import { useLiveFriends } from "@/hooks/useLiveFriends";
+import { V2ChatSheet } from "./V2ChatSheet";
+import type { ChatFriend } from "./V2ChatSheet";
 import { LOGOUT_CLEAR_EVENT } from "@/lib/auth/clear";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -74,7 +78,7 @@ import {
 import type { WantRecord } from "@/lib/wantRecord";
 import { MOCK_ME, parseGender } from "@/lib/me";
 import type { Gender } from "@/lib/me";
-import { trailStops } from "@/lib/trail";
+import { trailStops, parseTrailResume, readTrailFlag, writeTrailFlag, TRAIL_ON_KEY, STOPS_OPEN_KEY } from "@/lib/trail";
 import { iconForDrinkName, iconForPickId } from "@/components/marketing/beer-icons/wall";
 import { WallIcon } from "@/components/marketing/beer-icons/doodle";
 import { hasUnseenWall, loadWall, loadWallSeenAt } from "@/lib/posts";
@@ -90,6 +94,9 @@ const GENDER_KEY = {
   female: "genderFemale",
   secret: "genderSecret",
 } as const;
+
+/** GPS 抖動凍結門檻（米）：小於此的 watch 更新不進 state，圖層不重建。 */
+const SELF_UPDATE_MIN_M = 10;
 
 /** v2 卡片正規形（api／mock 兩源歸一，卡片只認此形）。 */
 type V2Card =
@@ -183,11 +190,29 @@ export function V2Home() {
   const t2 = useTranslations("v2");
   const locale = useLocale();
 
-  const { status: geoStatus, position: geoPos } = useGeolocation();
+  // UR A.21：watch 常開（心跳要活位置；副作用是自釘跟人走，沿 v1 live-follow 口徑）。
+  const { status: geoStatus, position: geoPos } = useGeolocation({ watch: true });
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
   const { mode, patchMode } = useMyMode(isAuthed === true);
   const { isFriendCached, addFriendByCheckin } = useFriendRelation();
   const mapApi = useRef<V2MapApi | null>(null);
+
+  // UR A.21 呈現態：匿名沿舊／未知 fail-closed 走隱身（心跳＋好友全停，先保隱私再談閃爍）。
+  const presence: "online" | "stealth" | "anon" =
+    isAuthed !== true ? "anon" : mode === "public" || mode === "friends" ? "online" : "stealth";
+  useHeartbeat({
+    enabled: presence === "online",
+    position: geoStatus === "success" ? geoPos : null,
+  });
+  const { friends: liveFriends } = useLiveFriends(presence === "online");
+  const [chatFriend, setChatFriend] = useState<ChatFriend | null>(null);
+  // 初始中心：首個定位 fix 飛我一次（C.11 fitHk 之後不再搶鏡頭）。
+  const centeredRef = useRef(false);
+  useEffect(() => {
+    if (centeredRef.current || geoStatus !== "success" || geoPos === null) return;
+    centeredRef.current = true;
+    mapApi.current?.flyTo(geoPos);
+  }, [geoStatus, geoPos]);
 
   const [apiPins, setApiPins] = useState<PinJson[]>([]);
   const [apiPinsLoaded, setApiPinsLoaded] = useState(false);
@@ -197,6 +222,11 @@ export function V2Home() {
   const [invites, setInvites] = useState<Partial<Record<string, "sent" | "accepted">>>({});
   const [card, setCard] = useState<V2Card | null>(null);
   const [trailOn, setTrailOn] = useState(false);
+  // UR C.11：一鍵足跡——登入浮層開關／地圖 ready tick／?trail=1 續跑 intent／目錄 Sheet。
+  const [trailLoginOpen, setTrailLoginOpen] = useState(false);
+  const [stopsOpen, setStopsOpen] = useState(false);
+  const [mapReadyTick, setMapReadyTick] = useState(0);
+  const resumeTrailRef = useRef(false);
   const [wallDot, setWallDot] = useState(false);
 
   // 選酒 sheet 三段：cats → batch → kinds → login（匿名）
@@ -215,6 +245,8 @@ export function V2Home() {
 
   // UR C.4 自打卡底部 Sheet：按記錄 at 認正在看的條；換酒批／刪除確認隨層開關
   const [wantSheetAt, setWantSheetAt] = useState<number | null>(null);
+  // UR C.11 round-3：詳情返回目錄（目錄來才記 "stops"；地圖釘直開為 null 不帶返回鈕）。
+  const [wantReturnTo, setWantReturnTo] = useState<"stops" | null>(null);
   const [swapOpen, setSwapOpen] = useState(false);
   const [swapBatch, setSwapBatch] = useState<Beer[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -254,6 +286,11 @@ export function V2Home() {
       setGuard(null);
       setPickOpen(false);
       setModeOpen(false);
+      // UR C.11：登出關足跡＋登入浮層＋目錄（本地匿名態不留殘影）。
+      setTrailOn(false);
+      setTrailLoginOpen(false);
+      setStopsOpen(false);
+      setWantReturnTo(null);
     };
     window.addEventListener(LOGOUT_CLEAR_EVENT, handler);
     return () => window.removeEventListener(LOGOUT_CLEAR_EVENT, handler);
@@ -343,20 +380,141 @@ export function V2Home() {
             lat: s.position.lat,
             lng: s.position.lng,
             n: i + 1,
+            at: s.at,
           }))
         : null,
     [trailOn, wantHistory],
   );
+  // UR C.11：一鍵足跡——開足跡即飛全軌跡（沿 v1 fitBounds 口徑；等 onReady tick）。
+  useEffect(() => {
+    if (!trailOn || trail === null || trail.length === 0) return;
+    mapApi.current?.fitPoints(trail.map((s) => ({ lat: s.lat, lng: s.lng })));
+  }, [trailOn, trail, mapReadyTick]);
+  // UR C.11：登入續跑——mount 讀 ?trail=1 記 intent 即清參數（防重觸）。
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!parseTrailResume(window.location.search)) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    resumeTrailRef.current = true;
+  }, []);
+  // 登入態落定＋有 intent→開足跡（fit 跟隨上 effect；microtask 包沿 UR1.8 配方）。
+  useEffect(() => {
+    if (isAuthed !== true || !resumeTrailRef.current) return;
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      resumeTrailRef.current = false;
+      setTrailLoginOpen(false);
+      setTrailOn(true);
+      setStopsOpen(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthed]);
+  // UR C.11 round-8：開關會話持久化——mount 讀（microtask 包沿 UR1.8 配方），
+  // 變更寫透（只寫存儲不寫 state，lint 安全）；HMR／手動重載不斷流。
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      if (readTrailFlag(TRAIL_ON_KEY)) setTrailOn(true);
+      if (readTrailFlag(STOPS_OPEN_KEY)) setStopsOpen(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(() => {
+    writeTrailFlag(TRAIL_ON_KEY, trailOn);
+    writeTrailFlag(STOPS_OPEN_KEY, stopsOpen);
+  }, [trailOn, stopsOpen]);
   const wantMarkers = useMemo(
     () =>
       wants.map((w) => ({ id: w.id, lat: w.lat, lng: w.lng, emoji: w.emoji, iconUrl: w.iconUrl, Icon: w.Icon })),
     [wants],
   );
-  const selfPos: LatLng | null =
-    geoStatus === "success" && geoPos !== null ? geoPos : null;
+  // UR C.11 round-9（DEF-002）：self 防抖——watch 每回調都換對象，
+  // 不攔會致 markers effect 反覆重掛、CSS 動畫永遠重播（「只播一次」觀感）。
+  // 10m 內抖動凍結末點（沿 UR1.2 凍結末點口徑）；真走動照跟。v2-only，hook 不動。
+  const [stableSelf, setStableSelf] = useState<LatLng | null>(null);
+  useEffect(() => {
+    if (geoStatus !== "success" || geoPos === null) return;
+    // 同步寫包 microtask（set-state-in-effect 規則，沿 UR1.8 配方）。
+    const pos = geoPos;
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      setStableSelf((prev) => {
+        if (prev === null || haversineMeters(prev, pos) > SELF_UPDATE_MIN_M)
+          return pos;
+        return prev;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [geoStatus, geoPos]);
+  const selfPos: LatLng | null = stableSelf;
   const cityCode = resolveCityCode(selfPos, null);
   const cityLabelKey =
     cityCode === null ? "cityName" : (`cityName_${cityCode}` as const);
+
+  // UR C.11：一鍵足跡——面板與足跡解耦（round-7）：關面板留動畫；
+  // 首點開面板（足跡未開順手開＋fit），面板關時再點 tab 才顯式關足跡；
+  // 清足跡只走地圖本體點／tab 二次關／登出。匿名先登入浮層，fit 跟隨 effect。
+  function handleTrailTab(): void {
+    if (stopsOpen) {
+      setStopsOpen(false);
+      return;
+    }
+    if (trailOn) {
+      setTrailOn(false);
+      return;
+    }
+    if (isAuthed !== true) {
+      setTrailLoginOpen(true);
+      return;
+    }
+    setTrailOn(true);
+    setStopsOpen(true);
+  }
+
+  // UR C.11 round-7：點地圖本體清足跡＋面板＋登入浮層（pin 上點不進此分支）。
+  function handleMapTap(): void {
+    if (!trailOn && !stopsOpen && !trailLoginOpen) return;
+    setTrailOn(false);
+    setStopsOpen(false);
+    setTrailLoginOpen(false);
+  }
+
+  // UR C.11：Google 一鍵登入（沿 LoginPanel OAuth 配方；next 帶 ?trail=1 續跑）。
+  async function handleTrailLogin(): Promise<void> {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=/v2?trail=1`,
+        },
+      });
+      if (error !== null)
+        console.error("[trail] signInWithOAuth error:", error);
+    } catch (err) {
+      console.error("[trail] handleTrailLogin threw:", err);
+    }
+  }
+
+  // UR C.11 返工 R-A：行點即飛＋開 want Sheet（詳情管理一步到位）。
+  function openStopRecord(at: number): void {
+    const rec = wantHistory.find((w) => w.at === at);
+    if (rec === undefined) return;
+    setStopsOpen(false);
+    mapApi.current?.flyTo(rec.position);
+    openWant(`want-${at}`);
+    // openWant 默認清返回（直開口徑）；目錄來才記，關詳情／點返回即回目錄。
+    setWantReturnTo("stops");
+  }
 
   function openPin(id: string): void {
     // 他人卡進 Sheet：關自家 Sheet（互斥， latest tap 贏）。
@@ -415,6 +573,8 @@ export function V2Home() {
     if (rec === undefined) return;
     // 自家 Sheet 開時關他人卡（互斥）。
     setCard(null);
+    // 地圖釘直開不帶返回（目錄來由 openStopRecord 事後記）。
+    setWantReturnTo(null);
     setSwapOpen(false);
     setSwapBatch([]);
     setConfirmDelete(false);
@@ -560,6 +720,24 @@ export function V2Home() {
     });
   }
 
+  // UR A.21：點好友呼吸釘開打招呼 Sheet（通道未建，寫入零行；見 V2ChatSheet）。
+  function openChat(userId: string): void {
+    const f = liveFriends.find((x) => x.user_id === userId);
+    if (f === undefined) return;
+    setChatFriend({ user_id: f.user_id, nickname: f.nickname, avatarUrl: f.avatar_url });
+  }
+
+  const friendMarkers = useMemo(
+    () =>
+      liveFriends.map((f) => ({
+        id: f.user_id,
+        lat: f.lat,
+        lng: f.lng,
+        label: f.nickname.slice(0, 1),
+      })),
+    [liveFriends],
+  );
+
   function openPick(): void {
     setPickStage("cats");
     setLaneId(null);
@@ -688,6 +866,11 @@ export function V2Home() {
         self={selfPos}
         onPinClick={openPin}
         onWantClick={openWant}
+        onReady={() => setMapReadyTick((n) => n + 1)}
+        onMapTap={handleMapTap}
+        presence={presence}
+        friends={friendMarkers}
+        onFriendClick={openChat}
       />
 
       {/* 頂部簇：頭像＋城市＋模式一行，pills 緊貼下方（DEF-012 round-2：
@@ -708,6 +891,18 @@ export function V2Home() {
                   ? t("meLocating")
                   : t("meOffline")}
             </p>
+            {/* UR A.21 左上狀態燈：登入才顯；在線綠／隱身灰（mode 未知 fail-closed 走灰）。 */}
+            {isAuthed === true && (
+              <p className="flex items-center gap-1.5 pt-0.5 text-xs font-bold">
+                <span
+                  aria-hidden
+                  className={`h-2 w-2 rounded-full ${mode === "stealth" ? "bg-muted-foreground" : "bg-green-600"}`}
+                />
+                <span className={mode === "stealth" ? "text-muted-foreground" : "text-green-700 dark:text-green-400"}>
+                  {mode === "stealth" ? tm("modeStealth") : t("onlineNow")}
+                </span>
+              </p>
+            )}
           </div>
         {/* UR C.2 模式 pill：常駐圖標＋文字；點開 inline 三檔直切
             （選後自動收／再點收；匿名走登入）。Popover 已退役（入口隱形即死）。 */}
@@ -764,7 +959,7 @@ export function V2Home() {
         </div>
       </div>
 
-      {/* 橫滑 pills（容器內緊貼頂欄行，同一左對齊） */}
+      {/* 橫滑 pills（容器內緊貼頂欄行，同一左對齊；UR C.12：橫滑保留，禁雙擊縮放） */}
       <div className={`flex touch-manipulation gap-2 overflow-x-auto pb-1 ${styles.v2noscroll}`}>
         <Button size="sm" variant="outline" className="shrink-0 rounded-full bg-card shadow-md ring-1 ring-foreground/10" onClick={openPick}>
           <Dices aria-hidden />
@@ -782,7 +977,7 @@ export function V2Home() {
           size="sm"
           variant={trailOn ? "secondary" : "outline"}
           className={`shrink-0 rounded-full shadow-md ring-1 ring-foreground/10 ${trailOn ? "" : "bg-card"}`}
-          onClick={() => setTrailOn((v) => !v)}
+          onClick={handleTrailTab}
         >
           <Footprints aria-hidden />
           {t("footprints")}
@@ -800,7 +995,7 @@ export function V2Home() {
               ? t("trailTitle", { n: trail.length })
               : t("trailEmpty")}
           </p>
-          <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setTrailOn(false)}>
+          <Button size="sm" variant="ghost" className="rounded-full" onClick={() => { setTrailOn(false); setStopsOpen(false); }}>
             {t("trailBack")}
           </Button>
         </div>
@@ -815,7 +1010,8 @@ export function V2Home() {
           aria-label={t("recenter")}
           className="rounded-full bg-card shadow-md ring-1 ring-foreground/10"
           onClick={() => {
-            if (selfPos !== null) mapApi.current?.recenter();
+            // DEF-005：無定位也調（`recenter` 內部 null 即飛香港中心；守衛攔掉等於殺逃生口）。
+            mapApi.current?.recenter();
           }}
         >
           <LocateFixed aria-hidden />
@@ -835,7 +1031,7 @@ export function V2Home() {
           aria-label={t("footprints")}
           aria-pressed={trailOn}
           className={`rounded-full shadow-md ${trailOn ? "" : "bg-card"}`}
-          onClick={() => setTrailOn((v) => !v)}
+          onClick={handleTrailTab}
         >
           <Footprints aria-hidden />
         </Button>
@@ -849,6 +1045,22 @@ export function V2Home() {
           <Vibrate aria-hidden />
         </Button>
       </div>
+
+      {/* UR C.11：匿名點足跡先登入（浮層；登入後 ?trail=1 續跑不斷） */}
+      {trailLoginOpen && (
+        <div className="absolute inset-x-3 bottom-24 z-[1000] rounded-2xl border bg-card p-4 shadow-lg">
+          <p className="text-base font-bold">{t("loginRequiredTitle")}</p>
+          <p className="pt-1 text-sm text-muted-foreground">{t("loginRequiredBody")}</p>
+          <div className="flex gap-2 pt-3">
+            <Button size="sm" onClick={() => void handleTrailLogin()}>
+              {t("loginCta")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setTrailLoginOpen(false)}>
+              {t("cancel")}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* 輕提示 */}
       {note !== null && (
@@ -896,19 +1108,20 @@ export function V2Home() {
               <Camera size={22} aria-hidden />
             </span>
           </Link>
-          <Link href="/mood" className="flex flex-col items-center gap-0.5 py-1.5 text-xs font-medium text-muted-foreground">
-            <Sparkles size={20} aria-hidden />
-            {t2("tabMood")}
-          </Link>
+          {/* UR C.11：足跡與心情換位（地圖／熱門／拍照／足跡／心情） */}
           <Button
             variant="ghost"
             aria-pressed={trailOn}
-            onClick={() => setTrailOn((v) => !v)}
+            onClick={handleTrailTab}
             className={`flex h-auto flex-col items-center gap-0.5 rounded-none py-1.5 text-xs font-medium ${trailOn ? "font-bold" : "text-muted-foreground"}`}
           >
             <Footprints size={20} aria-hidden />
             {t2("tabTrail")}
           </Button>
+          <Link href="/mood" className="flex flex-col items-center gap-0.5 py-1.5 text-xs font-medium text-muted-foreground">
+            <Sparkles size={20} aria-hidden />
+            {t2("tabMood")}
+          </Link>
         </div>
       </nav>
 
@@ -1156,6 +1369,11 @@ export function V2Home() {
           setCard(null);
           setSwapOpen(false);
           setConfirmDelete(false);
+          // UR C.11 round-3：關詳情自動回目錄（直開時 returnTo 為 null，不回）。
+          if (wantReturnTo === "stops") {
+            setWantReturnTo(null);
+            setStopsOpen(true);
+          }
         }}
       >
         <SheetContent side="bottom" className={`${styles.v2scope} max-h-[85svh] gap-4 overflow-y-auto rounded-t-2xl p-4 sm:mx-auto sm:w-full sm:max-w-md`}>
@@ -1278,6 +1496,25 @@ export function V2Home() {
             return (
               <>
                 <div aria-hidden className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
+                {/* UR C.11 round-3：目錄來才有返回（沿 C.5 返回鍵口徑，文案复用 trailBack） */}
+                {wantReturnTo === "stops" && (
+                  <div className="flex items-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="px-1 text-muted-foreground"
+                      onClick={() => {
+                        setWantSheetAt(null);
+                        setSwapOpen(false);
+                        setConfirmDelete(false);
+                        setStopsOpen(true);
+                      }}
+                    >
+                      <ChevronLeft size={16} aria-hidden />
+                      {t("trailBack")}
+                    </Button>
+                  </div>
+                )}
                 <SheetHeader className="text-left">
                   <SheetTitle className="flex flex-wrap items-center gap-1.5">
                     {t("wantTitle")}
@@ -1377,6 +1614,82 @@ export function V2Home() {
           })()}
         </SheetContent>
       </Sheet>
+
+      {/* UR C.11 返工 R-A：記錄目錄 Sheet（目錄；行點即飛＋開 want Sheet 詳情管理） */}
+      <Sheet
+        open={stopsOpen}
+        onOpenChange={(v) => {
+          if (!v) setStopsOpen(false);
+        }}
+      >
+        <SheetContent side="bottom" className={`${styles.v2scope} max-h-[70svh] gap-4 overflow-y-auto rounded-t-2xl p-4 sm:mx-auto sm:w-full sm:max-w-md`}>
+          <div aria-hidden className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
+          {(() => {
+            const rows = [...wantHistory].sort((a, b) => b.at - a.at);
+            if (rows.length === 0) {
+              return (
+                <>
+                  <SheetHeader className="text-left">
+                    <SheetTitle>{t("trailTitle", { n: 0 })}</SheetTitle>
+                  </SheetHeader>
+                  <p className="text-sm text-muted-foreground">{t("trailEmpty")}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setStopsOpen(false);
+                      openPick();
+                    }}
+                  >
+                    <Dices size={15} aria-hidden />
+                    {t("pickTitle")}
+                  </Button>
+                </>
+              );
+            }
+            const newest = rows[0] as WantRecord;
+            return (
+              <>
+                <SheetHeader className="text-left">
+                  <SheetTitle>{t("trailTitle", { n: rows.length })}</SheetTitle>
+                  <SheetDescription>
+                    {formatWantTime(newest.at, locale)}
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="flex flex-col gap-2">
+                  {rows.map((r) => (
+                    <Button
+                      key={r.at}
+                      variant="outline"
+                      onClick={() => openStopRecord(r.at)}
+                      className="h-auto w-full justify-start gap-3 p-2"
+                    >
+                      <span className="w-14 shrink-0 overflow-hidden rounded-lg border bg-card p-0.5">
+                        <BeerImg beer={r.beer} />
+                      </span>
+                      <span className="min-w-0 flex-1 text-left">
+                        <span className="block truncate text-sm font-bold">{r.beer.name}</span>
+                        <span className="block truncate pt-0.5 text-xs font-normal text-muted-foreground">
+                          {formatWantTime(r.at, locale)} ·{" "}
+                          {r.placeName ?? formatWantCoords(r.position)}
+                        </span>
+                      </span>
+                      <ChevronRight size={16} aria-hidden className="shrink-0 text-muted-foreground" />
+                    </Button>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
+        </SheetContent>
+      </Sheet>
+
+      {/* UR A.21 打招呼 Sheet（點好友呼吸釘開；通道未建，見組件註）。 */}
+      <V2ChatSheet
+        friend={chatFriend}
+        onClose={() => setChatFriend(null)}
+        onSoon={() => flashNote(t2("chatSoon"))}
+      />
     </div>
   );
 }

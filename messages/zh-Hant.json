@@ -317,7 +317,13 @@
     "postTitle": "帖子 · 永久",
     "postDesc": "永久保留，直到你刪除",
     "back": "返回",
-    "wantPhotoSoon": "照片即將上線，先用文字記下這一杯"
+    "wantPhotoSoon": "照片即將上線，先用文字記下這一杯",
+    "chatOnline": "在線上",
+    "chatEmpty": "打個招呼開始吧",
+    "chatHi": "👋 Say Hi",
+    "chatPlaceholder": "輸入訊息…",
+    "chatSend": "發送",
+    "chatVoice": "語音"
   },
   "terms": {
     "title": "三種模式，點揀？",

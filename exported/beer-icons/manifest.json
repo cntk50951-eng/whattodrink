@@ -808,5 +808,185 @@
       "android/drawable-xxhdpi/club_colombia_dorada.png",
       "android/drawable-xxxhdpi/club_colombia_dorada.png"
     ]
+  },
+  {
+    "slug": "aguila_original",
+    "caption": "Aguila Original（黃鷹飛）",
+    "type": "淡拉格",
+    "svg": "svg/aguila_original.svg",
+    "ios": [
+      "ios/aguila_original@1x.png",
+      "ios/aguila_original@2x.png",
+      "ios/aguila_original@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/aguila_original.png",
+      "android/drawable-hdpi/aguila_original.png",
+      "android/drawable-xhdpi/aguila_original.png",
+      "android/drawable-xxhdpi/aguila_original.png",
+      "android/drawable-xxxhdpi/aguila_original.png"
+    ]
+  },
+  {
+    "slug": "poker",
+    "caption": "Poker（綠牌同花）",
+    "type": "淡拉格",
+    "svg": "svg/poker.svg",
+    "ios": [
+      "ios/poker@1x.png",
+      "ios/poker@2x.png",
+      "ios/poker@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/poker.png",
+      "android/drawable-hdpi/poker.png",
+      "android/drawable-xhdpi/poker.png",
+      "android/drawable-xxhdpi/poker.png",
+      "android/drawable-xxxhdpi/poker.png"
+    ]
+  },
+  {
+    "slug": "cerveza_polar",
+    "caption": "Cerveza Polar（白熊藍標）",
+    "type": "淡拉格",
+    "svg": "svg/cerveza_polar.svg",
+    "ios": [
+      "ios/cerveza_polar@1x.png",
+      "ios/cerveza_polar@2x.png",
+      "ios/cerveza_polar@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/cerveza_polar.png",
+      "android/drawable-hdpi/cerveza_polar.png",
+      "android/drawable-xhdpi/cerveza_polar.png",
+      "android/drawable-xxhdpi/cerveza_polar.png",
+      "android/drawable-xxxhdpi/cerveza_polar.png"
+    ]
+  },
+  {
+    "slug": "regional_pilsen",
+    "caption": "Regional Pilsen（紅白5度）",
+    "type": "淡拉格",
+    "svg": "svg/regional_pilsen.svg",
+    "ios": [
+      "ios/regional_pilsen@1x.png",
+      "ios/regional_pilsen@2x.png",
+      "ios/regional_pilsen@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/regional_pilsen.png",
+      "android/drawable-hdpi/regional_pilsen.png",
+      "android/drawable-xhdpi/regional_pilsen.png",
+      "android/drawable-xxhdpi/regional_pilsen.png",
+      "android/drawable-xxxhdpi/regional_pilsen.png"
+    ]
+  },
+  {
+    "slug": "balboa",
+    "caption": "Balboa（紅衣探險家）",
+    "type": "淡拉格",
+    "svg": "svg/balboa.svg",
+    "ios": [
+      "ios/balboa@1x.png",
+      "ios/balboa@2x.png",
+      "ios/balboa@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/balboa.png",
+      "android/drawable-hdpi/balboa.png",
+      "android/drawable-xhdpi/balboa.png",
+      "android/drawable-xxhdpi/balboa.png",
+      "android/drawable-xxxhdpi/balboa.png"
+    ]
+  },
+  {
+    "slug": "imperial",
+    "caption": "Imperial（黃黑鷹）",
+    "type": "淡拉格",
+    "svg": "svg/imperial.svg",
+    "ios": [
+      "ios/imperial@1x.png",
+      "ios/imperial@2x.png",
+      "ios/imperial@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/imperial.png",
+      "android/drawable-hdpi/imperial.png",
+      "android/drawable-xhdpi/imperial.png",
+      "android/drawable-xxhdpi/imperial.png",
+      "android/drawable-xxxhdpi/imperial.png"
+    ]
+  },
+  {
+    "slug": "to_a",
+    "caption": "Toña（紅字火山）",
+    "type": "淡拉格",
+    "svg": "svg/to_a.svg",
+    "ios": [
+      "ios/to_a@1x.png",
+      "ios/to_a@2x.png",
+      "ios/to_a@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/to_a.png",
+      "android/drawable-hdpi/to_a.png",
+      "android/drawable-xhdpi/to_a.png",
+      "android/drawable-xxhdpi/to_a.png",
+      "android/drawable-xxxhdpi/to_a.png"
+    ]
+  },
+  {
+    "slug": "gallo",
+    "caption": "Gallo（黑金雞頭）",
+    "type": "淡拉格",
+    "svg": "svg/gallo.svg",
+    "ios": [
+      "ios/gallo@1x.png",
+      "ios/gallo@2x.png",
+      "ios/gallo@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/gallo.png",
+      "android/drawable-hdpi/gallo.png",
+      "android/drawable-xhdpi/gallo.png",
+      "android/drawable-xxhdpi/gallo.png",
+      "android/drawable-xxxhdpi/gallo.png"
+    ]
+  },
+  {
+    "slug": "carib_lager",
+    "caption": "Carib Lager（藍海金浪）",
+    "type": "淡拉格",
+    "svg": "svg/carib_lager.svg",
+    "ios": [
+      "ios/carib_lager@1x.png",
+      "ios/carib_lager@2x.png",
+      "ios/carib_lager@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/carib_lager.png",
+      "android/drawable-hdpi/carib_lager.png",
+      "android/drawable-xhdpi/carib_lager.png",
+      "android/drawable-xxhdpi/carib_lager.png",
+      "android/drawable-xxxhdpi/carib_lager.png"
+    ]
+  },
+  {
+    "slug": "red_stripe",
+    "caption": "Red Stripe（斜紅帶）",
+    "type": "淡拉格",
+    "svg": "svg/red_stripe.svg",
+    "ios": [
+      "ios/red_stripe@1x.png",
+      "ios/red_stripe@2x.png",
+      "ios/red_stripe@3x.png"
+    ],
+    "android": [
+      "android/drawable-mdpi/red_stripe.png",
+      "android/drawable-hdpi/red_stripe.png",
+      "android/drawable-xhdpi/red_stripe.png",
+      "android/drawable-xxhdpi/red_stripe.png",
+      "android/drawable-xxxhdpi/red_stripe.png"
+    ]
   }
 ]

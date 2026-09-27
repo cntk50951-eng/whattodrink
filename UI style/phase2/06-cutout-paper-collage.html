@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>今晚喝咩？— Whattodrink (Cutout Paper Collage v2)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,800;0,900&family=Caveat:wght@400;500;600;700&family=DM+Mono:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    /* ============================================================
+       CUTOUT PAPER COLLAGE v2 — Hand-cut paper craft aesthetic
+       Stitch DS: assets/18076919508181630993
+       Reference: Stitch screen 50e80cc65d6e45f3b1853d507b0e893e
+       "Layered torn paper shapes overlapping each other with
+       visible drop shadows. Each element is a distinct paper layer
+       with slightly rough, hand-cut edges. Mixed paper textures."
+       Enhanced: 2026-09-03
+       Key principles:
+       - Paper grain texture on every shape
+       - Drop shadows on every layer (1-3px y offset)
+       - Slightly irregular hand-cut edges
+       - Warm earthy palette (kraft, mustard, terracotta, sage, burgundy)
+       - 8-12px radius (not sharp, not pill)
+       - No gradients (flat color blocks)
+       ============================================================ */
+
+    :root {
+      --color-paper: #f0e4c8;
+      --color-paper-2: #e8d8b0;
+      --color-paper-3: #d8c890;
+      --color-kraft: #8a6a3a;
+      --color-kraft-dark: #5a4a28;
+      --color-mustard: #c89030;
+      --color-mustard-light: #d8a838;
+      --color-terracotta: #b85a3a;
+      --color-terracotta-dark: #8a3a1c;
+      --color-sage: #8a9a6a;
+      --color-sage-dark: #5a6a3a;
+      --color-burgundy: #7a2a1c;
+      --color-burgundy-dark: #4a1a10;
+      --color-cream: #f5ecd5;
+      --color-ink: #2a1a08;
+      --color-ink-soft: #5a4a30;
+
+      --r-sm: 4px;
+      --r: 8px;
+      --r-md: 12px;
+      --r-lg: 16px;
+      --r-xl: 24px;
+      --r-pill: 9999px;
+
+      --shadow-1: 2px 2px 0 0 rgba(42, 26, 8, 0.3);
+      --shadow-2: 4px 4px 0 0 rgba(42, 26, 8, 0.3);
+      --shadow-3: 6px 6px 0 0 rgba(42, 26, 8, 0.3);
+      --shadow-4: 8px 8px 0 0 rgba(42, 26, 8, 0.3);
+
+      --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px;
+      --s-6: 24px; --s-7: 32px; --s-8: 40px; --s-9: 48px; --s-10: 64px;
+      --s-11: 80px; --s-12: 96px;
+      --container-margin: 32px;
+      --container-max: 1280px;
+
+      --font-display: "Playfair Display", "Noto Sans TC", Georgia, serif;
+      --font-sans: "Inter", "Noto Sans TC", sans-serif;
+      --font-hand: "Caveat", cursive;
+      --font-mono: "DM Mono", ui-monospace, monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      font-size: 16px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+    /* Heavy paper grain */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.12;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      mix-blend-mode: multiply;
+    }
+    /* Subtle fiber pattern */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.04;
+      background-image: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 40px,
+        rgba(122, 86, 30, 0.1) 40px,
+        rgba(122, 86, 30, 0.1) 41px
+      );
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+    img, svg { display: block; max-width: 100%; }
+
+    /* Typography */
+    .display {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-style: italic;
+      letter-spacing: -0.03em;
+      line-height: 0.95;
+      font-size: clamp(48px, 8vw, 80px);
+      color: var(--color-ink);
+    }
+    .h1 {
+      font-family: var(--font-display);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+      font-size: clamp(32px, 5vw, 44px);
+    }
+    .h2 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      font-size: clamp(24px, 3.5vw, 32px);
+    }
+    .h3 { font-weight: 700; line-height: 1.3; font-size: 18px; }
+    .body { font-weight: 400; font-size: 15px; line-height: 1.65; }
+    .body-lg { font-weight: 400; font-size: 17px; line-height: 1.6; }
+    .label {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 11px;
+    }
+    .label-sm {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 10px;
+    }
+    .muted { color: var(--color-ink-soft); }
+
+    .container {
+      max-width: var(--container-max);
+      margin: 0 auto;
+      padding: 0 var(--container-margin);
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ============================================================
+       TOP NAV — kraft paper bar
+       ============================================================ */
+    .topbar {
+      background: var(--color-kraft);
+      color: var(--color-cream);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow-2);
+    }
+    .topbar__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s-6);
+      padding: var(--s-4) 0;
+    }
+    .wordmark {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-style: italic;
+      font-size: 20px;
+      letter-spacing: -0.02em;
+      color: var(--color-cream);
+    }
+    .wordmark__dot {
+      display: inline-block;
+      width: 0.4em;
+      height: 0.4em;
+      background: var(--color-burgundy);
+      margin: 0 0.08em;
+      transform: translateY(-0.05em);
+      transform: rotate(45deg);
+    }
+    .nav { display: none; gap: var(--s-7); }
+    .nav__item {
+      position: relative;
+      padding: var(--s-2) 0;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--color-cream);
+      opacity: 0.7;
+    }
+    .nav__item:hover { opacity: 1; }
+    .nav__item--active { opacity: 1; }
+    .nav__item--active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 3px;
+      background: var(--color-burgundy);
+    }
+    @media (min-width: 768px) { .nav { display: flex; } }
+    .lang-switch {
+      display: flex;
+      background: var(--color-paper);
+      border: 1.5px solid var(--color-ink);
+      border-radius: var(--r-pill);
+      padding: 2px;
+    }
+    .lang-switch__btn {
+      padding: 5px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--color-ink);
+      border-radius: var(--r-pill);
+    }
+    .lang-switch__btn--active { background: var(--color-burgundy); color: var(--color-cream); }
+
+    /* ============================================================
+       HERO
+       ============================================================ */
+    .hero { padding: var(--s-10) 0; }
+    .hero__grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-9);
+      align-items: center;
+    }
+    @media (min-width: 960px) {
+      .hero__grid { grid-template-columns: 1.1fr 1fr; }
+    }
+    .hero__stamp {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: var(--color-burgundy);
+      color: var(--color-cream);
+      margin-bottom: var(--s-6);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      box-shadow: var(--shadow-2);
+    }
+    .hero__stamp-tape {
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      transform: translateX(-50%) rotate(-2deg);
+      width: 60px;
+      height: 16px;
+      background: rgba(232, 168, 48, 0.7);
+    }
+    .hero__stamp-wrap {
+      position: relative;
+      display: inline-block;
+    }
+    .hero__sub {
+      margin-top: var(--s-5);
+      max-width: 38ch;
+      color: var(--color-ink-soft);
+    }
+    .hero__cta-row {
+      margin-top: var(--s-7);
+      display: flex;
+      gap: var(--s-4);
+      flex-wrap: wrap;
+    }
+
+    /* Buttons — paper craft style */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s-2);
+      padding: 14px 24px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      border: 1.5px solid var(--color-ink);
+      transition: all 0.15s ease;
+      cursor: pointer;
+      position: relative;
+    }
+    .btn:hover { transform: translate(-2px, -2px); }
+    .btn--burgundy { background: var(--color-burgundy); color: var(--color-cream); box-shadow: var(--shadow-2); }
+    .btn--burgundy:hover { box-shadow: var(--shadow-3); }
+    .btn--mustard { background: var(--color-mustard); color: var(--color-ink); box-shadow: var(--shadow-2); }
+    .btn--mustard:hover { box-shadow: var(--shadow-3); }
+    .btn--sage { background: var(--color-sage); color: var(--color-cream); box-shadow: var(--shadow-2); }
+    .btn--terracotta { background: var(--color-terracotta); color: var(--color-cream); box-shadow: var(--shadow-2); }
+    .btn--paper { background: var(--color-paper); color: var(--color-ink); box-shadow: var(--shadow-2); }
+    .btn--sm { padding: 8px 14px; font-size: 10px; }
+
+    /* ============================================================
+       HERO ART — paper layered illustration with depth
+       ============================================================ */
+    .hero__art {
+      position: relative;
+      aspect-ratio: 1 / 1;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    .hero__art-svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    /* ============================================================
+       SECTIONS
+       ============================================================ */
+    .section {
+      padding: var(--s-10) 0;
+      position: relative;
+    }
+    .section--kraft { background: var(--color-kraft); color: var(--color-cream); }
+    .section--terracotta { background: var(--color-terracotta); color: var(--color-cream); }
+    .section--sage { background: var(--color-sage); color: var(--color-cream); }
+    .section__head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: var(--s-6);
+      margin-bottom: var(--s-8);
+      padding-bottom: var(--s-4);
+      border-bottom: 2px dashed currentColor;
+    }
+    .section__head-text { max-width: 60ch; }
+    .section__rule-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      color: var(--color-burgundy);
+      text-transform: uppercase;
+    }
+    .section--kraft .section__rule-num { color: var(--color-mustard); }
+    .section--terracotta .section__rule-num { color: var(--color-cream); }
+    .section--sage .section__rule-num { color: var(--color-cream); }
+
+    /* ============================================================
+       BENTO GRID — paper cards with drop shadows
+       ============================================================ */
+    .bento {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-auto-rows: minmax(220px, auto);
+      gap: var(--s-5);
+    }
+    @media (min-width: 768px) {
+      .bento { grid-template-columns: 2fr 1fr; grid-auto-rows: minmax(280px, auto); }
+    }
+    .bento__card {
+      position: relative;
+      background: var(--color-paper);
+      color: var(--color-ink);
+      border: 1.5px solid var(--color-ink);
+      border-radius: var(--r-md);
+      padding: var(--s-5);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-3);
+      box-shadow: var(--shadow-3);
+      transition: all 0.2s ease;
+    }
+    .bento__card:hover { transform: translate(-3px, -3px) rotate(-0.5deg); box-shadow: var(--shadow-4); }
+    .bento__card--kraft { background: var(--color-kraft); color: var(--color-cream); }
+    .bento__card--terracotta { background: var(--color-terracotta); color: var(--color-cream); }
+    .bento__card--sage { background: var(--color-sage); color: var(--color-cream); }
+    .bento__stamp {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 4px 10px;
+      background: var(--color-ink);
+      color: var(--color-paper);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+    }
+    .bento__card-body {
+      padding: var(--s-3) 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-3);
+      flex: 1;
+    }
+    .bento__card-art {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 110px;
+    }
+    .bento__card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: var(--s-3);
+      border-top: 1.5px dashed currentColor;
+    }
+    .bento__num {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-style: italic;
+      font-size: 48px;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      color: var(--color-burgundy);
+    }
+    .bento__card--kraft .bento__num { color: var(--color-mustard); }
+    .bento__card--terracotta .bento__num { color: var(--color-mustard); }
+    .bento__card--sage .bento__num { color: var(--color-cream); }
+
+    .how {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-4);
+    }
+    @media (min-width: 768px) {
+      .how { grid-template-columns: 1fr auto 1fr auto 1fr; align-items: stretch; }
+    }
+    .how__step {
+      background: var(--color-paper);
+      border: 1.5px solid var(--color-ink);
+      border-radius: var(--r-md);
+      padding: var(--s-5);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-2);
+      box-shadow: var(--shadow-2);
+    }
+    .how__num {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-style: italic;
+      font-size: 36px;
+      color: var(--color-burgundy);
+      line-height: 1;
+    }
+    .how__arrow {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-ink);
+    }
+    @media (min-width: 768px) { .how__arrow { display: flex; } }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    .footer {
+      background: var(--color-ink);
+      color: var(--color-cream);
+      padding: var(--s-9) 0 var(--s-8);
+    }
+    .footer__inner {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-6);
+      align-items: flex-start;
+    }
+    @media (min-width: 768px) {
+      .footer__inner { flex-direction: row; justify-content: space-between; align-items: center; }
+    }
+    .footer__brand {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-2);
+    }
+    .socials { display: flex; gap: var(--s-3); }
+    .socials__btn {
+      width: 40px;
+      height: 40px;
+      border: 1.5px solid var(--color-cream);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-cream);
+      transition: all 0.15s ease;
+    }
+    .socials__btn:hover {
+      background: var(--color-mustard);
+      color: var(--color-ink);
+      border-color: var(--color-mustard);
+      transform: translate(-2px, -2px);
+    }
+
+    /* Accessibility */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar" role="banner">
+    <div class="container topbar__inner">
+      <a href="#" class="wordmark" aria-label="Whattodrink home">
+        WHATTO<span class="wordmark__dot" aria-hidden="true"></span>DRINK
+      </a>
+      <nav class="nav" aria-label="主導航">
+        <a href="#" class="nav__item nav__item--active">今晚喝咩</a>
+        <a href="#" class="nav__item">拍照選酒</a>
+        <a href="#" class="nav__item">心情推薦</a>
+      </nav>
+      <div class="lang-switch" role="group" aria-label="語言切換">
+        <button class="lang-switch__btn lang-switch__btn--active" type="button" aria-pressed="true">繁</button>
+        <button class="lang-switch__btn" type="button" aria-pressed="false">简</button>
+        <button class="lang-switch__btn" type="button" aria-pressed="false">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <div class="hero__grid">
+        <div>
+          <div class="hero__stamp-wrap">
+            <div class="hero__stamp-tape" aria-hidden="true"></div>
+            <div class="hero__stamp">CUTOUT EDITION · NO. 06</div>
+          </div>
+          <h1 class="display">今晚<br />喝咩？</h1>
+          <p class="body-lg hero__sub">
+            一層層剪紙疊出嘅溫暖——讓命運幫你揀返杯啱你嘅酒。獨酌定聚會，都唔使再揀到頭都大。
+          </p>
+          <div class="hero__cta-row">
+            <a href="#" class="btn btn--burgundy">隨機抽一杯</a>
+            <a href="#" class="btn btn--mustard">睇下點用</a>
+          </div>
+        </div>
+
+        <div class="hero__art" aria-hidden="true">
+          <svg class="hero__art-svg" viewBox="0 0 480 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cutout paper collage beer illustration">
+            <defs>
+              <filter id="paperTexture">
+                <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>
+                <feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.12 0"/>
+                <feComposite operator="in" in2="SourceGraphic"/>
+              </filter>
+              <filter id="paperDrop">
+                <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+                <feOffset dx="3" dy="4" result="offset"/>
+                <feFlood flood-color="#2a1a08" flood-opacity="0.25"/>
+                <feComposite in2="offset" operator="in"/>
+                <feComposite in="SourceGraphic"/>
+              </filter>
+            </defs>
+
+            <!-- Background kraft paper table -->
+            <rect x="0" y="0" width="480" height="480" fill="#d8c890" filter="url(#paperTexture)"/>
+
+            <!-- Layer 1: Mustard paper backdrop (large, slightly rotated) -->
+            <g filter="url(#paperDrop)">
+              <path d="M 30 50 L 460 35 L 470 380 L 25 395 Z" fill="#c89030" filter="url(#paperTexture)"/>
+            </g>
+
+            <!-- Layer 2: Sage paper shape (left) -->
+            <g filter="url(#paperDrop)">
+              <path d="M 40 200 L 35 230 L 60 240 L 75 235 L 90 245 L 110 235 L 120 220 L 110 200 L 95 190 L 75 195 Z" fill="#8a9a6a" filter="url(#paperTexture)"/>
+            </g>
+            <line x1="50" y1="220" x2="105" y2="215" stroke="#5a6a3a" stroke-width="1" opacity="0.4"/>
+            <line x1="55" y1="230" x2="100" y2="228" stroke="#5a6a3a" stroke-width="0.5" opacity="0.3"/>
+
+            <!-- Layer 3: Terracotta lemon slice (right) -->
+            <g filter="url(#paperDrop)">
+              <ellipse cx="380" cy="320" rx="70" ry="22" fill="#b85a3a" filter="url(#paperTexture)" transform="rotate(8 380 320)"/>
+              <ellipse cx="380" cy="320" rx="58" ry="16" fill="#f0d4a8" transform="rotate(8 380 320)"/>
+              <line x1="335" y1="320" x2="425" y2="320" stroke="#8a3a1c" stroke-width="1" transform="rotate(8 380 320)"/>
+            </g>
+
+            <!-- Layer 4: Bottle (kraft paper with terracotta label) -->
+            <g filter="url(#paperDrop)">
+              <path d="M 175 130 L 175 170 L 165 180 L 165 400 L 240 400 L 240 180 L 230 170 L 230 130 Z" fill="#8a6a3a" filter="url(#paperTexture)"/>
+              <rect x="170" y="240" width="65" height="55" fill="#b85a3a" filter="url(#paperTexture)"/>
+              <rect x="180" y="260" width="45" height="6" fill="#f0d4a8"/>
+              <rect x="180" y="270" width="45" height="3" fill="#f0d4a8"/>
+              <rect x="180" y="277" width="35" height="3" fill="#f0d4a8"/>
+            </g>
+
+            <!-- Layer 5: Beer mug (cream with golden liquid) -->
+            <g filter="url(#paperDrop)">
+              <path d="M 280 200 L 275 380 Q 275 405 300 405 L 400 405 Q 425 405 425 380 L 420 200 Z" fill="#f0e4c8" filter="url(#paperTexture)"/>
+              <path d="M 280 250 L 275 378 Q 275 400 300 400 L 400 400 Q 425 400 425 378 L 420 250 Z" fill="#c89030" filter="url(#paperTexture)"/>
+              <path d="M 270 200 Q 265 175 290 168 Q 305 152 325 165 Q 345 152 365 165 Q 385 152 405 168 Q 425 175 420 200 Z" fill="#f0d4a8" filter="url(#paperTexture)"/>
+              <path d="M 425 250 Q 470 250 470 300 Q 470 350 425 350" fill="none" stroke="#8a6a3a" stroke-width="14" stroke-linecap="round"/>
+              <path d="M 425 250 Q 470 250 470 300 Q 470 350 425 350" fill="none" stroke="#f0e4c8" stroke-width="6" stroke-linecap="round" filter="url(#paperTexture)"/>
+              <circle cx="345" cy="320" r="14" fill="#d8a838" filter="url(#paperTexture)"/>
+              <text x="345" y="324" text-anchor="middle" fill="#2a1a08" font-family="Caveat, cursive" font-weight="700" font-size="14">W·D</text>
+            </g>
+
+            <!-- Layer 6: Burgundy tape strips (decorative) -->
+            <g filter="url(#paperDrop)">
+              <rect x="50" y="40" width="80" height="14" fill="#7a2a1c" filter="url(#paperTexture)" transform="rotate(-8 50 40)"/>
+              <rect x="320" y="50" width="70" height="12" fill="#7a2a1c" filter="url(#paperTexture)" transform="rotate(5 320 50)"/>
+            </g>
+
+            <!-- Layer 7: Sage plant decoration (right) -->
+            <g filter="url(#paperDrop)">
+              <ellipse cx="440" cy="270" rx="40" ry="50" fill="#8a9a6a" filter="url(#paperTexture)" transform="rotate(15 440 270)"/>
+              <line x1="440" y1="220" x2="440" y2="320" stroke="#5a6a3a" stroke-width="2"/>
+            </g>
+
+            <!-- Bottom mustard strip -->
+            <rect x="0" y="430" width="480" height="50" fill="#c89030" filter="url(#paperTexture)"/>
+            <text x="32" y="465" fill="#2a1a08" font-family="Playfair Display, serif" font-weight="900" font-style="italic" font-size="22">Whattodrink</text>
+            <text x="32" y="478" fill="#7a2a1c" font-family="Caveat, cursive" font-size="14">— a paper craft pour —</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--mustard" style="background: var(--color-mustard)">
+    <div class="container">
+      <div class="section__head">
+        <div>
+          <div class="section__rule-num">UR 1.1 · 3 PATHS</div>
+          <h2 class="h1" style="margin-top: 8px">三個方法，揀返你今晚嗰杯</h2>
+        </div>
+      </div>
+      <div class="bento">
+        <article class="bento__card bento__card--kraft">
+          <div class="bento__stamp">UR 1.1 / 01</div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 200 140" width="80%">
+                <rect x="60" y="60" width="50" height="60" fill="#c89030"/>
+                <rect x="65" y="80" width="40" height="35" fill="#b85a3a"/>
+                <path d="M 120 50 L 120 130 L 150 130 L 150 50 Z" fill="#f0e4c8"/>
+                <path d="M 122 70 L 119 100 L 148 100 L 145 70 Z" fill="#c89030"/>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div>
+                <div class="label-sm">隨機 · 0 sec</div>
+                <div class="h3">由命運揀返杯</div>
+              </div>
+              <a href="#" class="btn btn--burgundy btn--sm">立即試</a>
+            </div>
+          </div>
+        </article>
+        <article class="bento__card bento__card--sage">
+          <div class="bento__stamp">UR 1.1 / 02</div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 100 100" width="60%">
+                <rect x="25" y="10" width="50" height="80" rx="6" fill="#7a2a1c"/>
+                <rect x="28" y="15" width="44" height="60" fill="#8a9a6a"/>
+                <circle cx="50" cy="50" r="10" fill="#c89030"/>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div>
+                <div class="label-sm">影相 · 5 sec</div>
+                <div class="h3">影張相即刻知</div>
+              </div>
+              <a href="#" class="btn btn--paper btn--sm">試下</a>
+            </div>
+          </div>
+        </article>
+        <article class="bento__card bento__card--terracotta">
+          <div class="bento__stamp">UR 1.1 / 03</div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 100 100" width="60%">
+                <path d="M 20 50 Q 20 20 50 20 Q 80 20 80 50 Q 80 80 50 80 L 35 80 L 25 90 L 30 80 Q 20 80 20 50 Z" fill="#f0e4c8"/>
+                <rect x="38" y="45" width="24" height="22" fill="#c89030"/>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div>
+                <div class="label-sm">心情 · 1 min</div>
+                <div class="h3">講你而家點</div>
+              </div>
+              <a href="#" class="btn btn--mustard btn--sm">揀返杯</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--kraft">
+    <div class="container">
+      <div class="section__head">
+        <div>
+          <div class="section__rule-num">UR 1.1 · 3 STEPS</div>
+          <h2 class="h1" style="margin-top: 8px">點樣運作</h2>
+        </div>
+      </div>
+      <div class="how">
+        <article class="how__step">
+          <div class="how__num">01</div>
+          <div class="h3">揀方法</div>
+          <p class="body">隨機抽、影相、講心情——揀你而家想點。</p>
+        </article>
+        <div class="how__arrow">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M 6 16 L 26 16 M 18 8 L 26 16 L 18 24"/>
+          </svg>
+        </div>
+        <article class="how__step">
+          <div class="how__num">02</div>
+          <div class="h3">收結果</div>
+          <p class="body">用 token 即時換返杯啱你場合嘅酒款。</p>
+        </article>
+        <div class="how__arrow">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M 6 16 L 26 16 M 18 8 L 26 16 L 18 24"/>
+          </svg>
+        </div>
+        <article class="how__step">
+          <div class="how__num">03</div>
+          <div class="h3">記低</div>
+          <p class="body">記低你嘅心情，之後可以翻睇飲過咩。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer" role="contentinfo">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <a href="#" class="wordmark" aria-label="Whattodrink">
+          WHATTO<span class="wordmark__dot" aria-hidden="true"></span>DRINK
+        </a>
+        <div class="label">© 2026 · HK · Cutout Edition</div>
+      </div>
+      <div class="socials">
+        <a href="#" class="socials__btn" aria-label="Instagram">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="14" height="14"/>
+            <circle cx="10" cy="10" r="3.5"/>
+            <circle cx="14.5" cy="5.5" r="0.5" fill="currentColor"/>
+          </svg>
+        </a>
+        <a href="#" class="socials__btn" aria-label="Threads">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M 5 8 Q 10 4 14 7 Q 17 10 14 13 Q 10 16 6 13"/>
+          </svg>
+        </a>
+        <a href="#" class="socials__btn" aria-label="小紅書">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <text x="10" y="14" text-anchor="middle" font-family="Inter" font-weight="800" font-size="9" fill="currentColor" stroke="none">紅</text>
+            <rect x="3" y="3" width="14" height="14"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

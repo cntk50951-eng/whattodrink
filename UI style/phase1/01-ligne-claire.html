@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Whattodrink — Ligne Claire</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Caveat:wght@500;700&family=Work+Sans:wght@400;700&family=Noto+Serif+TC:wght@700;900&family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=ZCOOL+XiaoWei&family=Special+Elite&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --bg-deep:        #1F3A3A;
+  --bg-wall:        #2A4A4A;
+  --bg-wood:        #C4A878;
+  --wood-grain:     #8B6F4A;
+  --beer-light:     #FFD27A;
+  --beer-mid:       #E89B2C;
+  --beer-dark:      #8B5A1A;
+  --bottle-brown:   #8B3A1A;
+  --bottle-highlight:#D4801F;
+  --bottle-spot:    #2A1008;
+  --cap-teal:       #3A6B6B;
+  --label-bg:       #5A8A8A;
+  --label-dark:     #3A5A5A;
+  --label-text:     #F5E8D0;
+  --foam:           #FFF8E7;
+  --foam-shadow:    #E8DCC0;
+  --text-primary:   #F5E8D0;
+  --text-secondary: #C9B896;
+  --accent-amber:   #E89B2C;
+  --ink:            #2A1810;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Work Sans", sans-serif;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  min-height: 100vh;
+  /* paper grain overlay */
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.95 0 0 0 0 0.88 0 0 0 0 0.78 0 0 0 0.18 0'/></filter><rect width='220' height='220' filter='url(%23n)' opacity='0.5'/></svg>");
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 40px;
+  border-bottom: 3px solid var(--ink);
+  position: relative;
+}
+header::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -6px;
+  height: 3px;
+  background: var(--accent-amber);
+}
+.brand {
+  font-family: "Alfa Slab One", serif;
+  font-size: 28px;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  text-transform: uppercase;
+}
+.brand .ampersand { color: var(--accent-amber); }
+.nav-links {
+  display: flex;
+  gap: 32px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 13px;
+}
+.nav-links a { color: var(--text-secondary); }
+.nav-links a:hover { color: var(--text-primary); }
+.style-badge {
+  font-family: "Caveat", cursive;
+  font-size: 22px;
+  color: var(--accent-amber);
+  padding: 4px 16px;
+  border: 2px solid var(--accent-amber);
+  border-radius: 999px;
+  transform: rotate(-2deg);
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 32px;
+  align-items: end;
+  padding: 40px 64px 0;
+  max-width: 1280px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.hero-text { position: relative; z-index: 2; padding-bottom: 80px; }
+.eyebrow {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 13px;
+  color: var(--accent-amber);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.eyebrow::before { content: "✦"; font-size: 16px; }
+.hero-title {
+  font-family: "Noto Serif TC", "ZCOOL XiaoWei", "Source Han Serif TC", serif;
+  font-weight: 900;
+  font-size: clamp(56px, 8vw, 112px);
+  line-height: 0.95;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+  margin: 20px 0 24px;
+  text-shadow: 4px 4px 0 var(--ink);
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+.hero-title .highlight {
+  color: var(--accent-amber);
+  display: inline-block;
+  transform: rotate(-3deg);
+  text-shadow: 4px 4px 0 var(--ink);
+}
+.hero-sub {
+  font-family: "Caveat", cursive;
+  font-size: 28px;
+  color: var(--text-secondary);
+  margin-bottom: 36px;
+  max-width: 540px;
+  line-height: 1.2;
+}
+.cta-row { display: flex; gap: 16px; align-items: center; }
+.btn-primary {
+  background: var(--accent-amber);
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 4px;
+  padding: 16px 28px;
+  font-family: "Alfa Slab One", "Noto Serif TC", serif;
+  font-size: 18px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 0 var(--ink);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.btn-primary:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 0 var(--ink); }
+.btn-primary:active { transform: translate(2px, 2px); box-shadow: 0 0 0 0 var(--ink); }
+.btn-secondary {
+  background: transparent;
+  color: var(--text-primary);
+  border: 2px solid var(--text-primary);
+  border-radius: 4px;
+  padding: 14px 24px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.illustration {
+  position: relative;
+  z-index: 1;
+}
+.illustration svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(8px 8px 0 rgba(0,0,0,0.3));
+}
+
+/* wood counter at bottom */
+.wood-counter {
+  background: var(--bg-wood);
+  height: 140px;
+  position: relative;
+  border-top: 4px solid var(--ink);
+  overflow: hidden;
+}
+.wood-counter::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    /* wavy grain: multiple horizontal bands of varying thickness */
+    radial-gradient(ellipse 200% 8px at 50% 18px, var(--wood-grain) 0%, transparent 60%),
+    radial-gradient(ellipse 180% 6px at 50% 42px, rgba(0,0,0,0.18) 0%, transparent 50%),
+    radial-gradient(ellipse 220% 10px at 50% 70px, var(--wood-grain) 0%, transparent 55%),
+    radial-gradient(ellipse 160% 5px at 50% 92px, rgba(0,0,0,0.15) 0%, transparent 50%),
+    radial-gradient(ellipse 200% 7px at 50% 115px, var(--wood-grain) 0%, transparent 60%);
+  background-repeat: no-repeat;
+  opacity: 0.85;
+}
+.wood-counter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='160'><filter id='w'><feTurbulence baseFrequency='0.012 0.4' numOctaves='2'/><feDisplacementMap in='SourceGraphic' scale='8'/></filter><g filter='url(%23w)'><path d='M 0 30 Q 200 25 400 32 T 800 28' stroke='%238B6F4A' stroke-width='2' fill='none' opacity='0.6'/><path d='M 0 60 Q 250 55 500 62 T 800 58' stroke='%238B6F4A' stroke-width='2.5' fill='none' opacity='0.5'/><path d='M 0 100 Q 200 95 400 102 T 800 98' stroke='%238B6F4A' stroke-width='2' fill='none' opacity='0.5'/><path d='M 0 130 Q 250 125 500 132 T 800 128' stroke='%238B6F4A' stroke-width='1.5' fill='none' opacity='0.6'/></g></svg>");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  opacity: 0.7;
+}
+
+.features {
+  background: var(--bg-deep);
+  padding: 80px 64px 40px;
+  max-width: 1280px;
+  margin: 0 auto;
+  border-top: 3px solid var(--ink);
+  position: relative;
+}
+.features::before {
+  content: "✦  ✦  ✦";
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--accent-amber);
+  font-size: 14px;
+  letter-spacing: 1em;
+}
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  margin-top: 48px;
+}
+.feature-card {
+  background: var(--bg-deep);
+  border: 3px solid var(--ink);
+  border-radius: 6px;
+  padding: 28px;
+  text-align: center;
+  box-shadow: 6px 6px 0 0 var(--accent-amber);
+  transform: rotate(var(--rot, 0deg));
+  transition: transform 0.15s;
+}
+.feature-card:hover { transform: rotate(0deg) scale(1.02); }
+.feature-card .num {
+  font-family: "Alfa Slab One", serif;
+  font-size: 56px;
+  color: var(--accent-amber);
+  line-height: 1;
+}
+.feature-card h3 {
+  font-family: "Alfa Slab One", serif;
+  font-size: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 12px 0 8px;
+}
+.feature-card p {
+  font-family: "Caveat", cursive;
+  font-size: 18px;
+  color: var(--text-secondary);
+}
+footer {
+  background: var(--bg-wood);
+  border-top: 3px solid var(--ink);
+  padding: 24px 40px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">whattodrink<span class="ampersand">·</span></div>
+  <nav class="nav-links">
+    <a href="#">今晚</a>
+    <a href="#">酒吧</a>
+    <a href="#">心情</a>
+    <a href="#">關於</a>
+  </nav>
+  <div class="style-badge">Ligne Claire</div>
+</header>
+
+<section class="hero">
+
+  <div class="hero-text">
+    <div class="eyebrow">Tonight's Special Brew · 今晚精選</div>
+    <h1 class="hero-title">讓天意<br>決定你<br><span class="highlight">今晚喝</span></h1>
+    <p class="hero-sub">命運今晚在瓶底寫好了字 — 揭開酒標就知道，該喝哪一杯。</p>
+    <div class="cta-row">
+      <button class="btn-primary">讓天意決定 →</button>
+      <button class="btn-secondary">自己選</button>
+    </div>
+  </div>
+
+  <div class="illustration">
+    <!-- SVG viewBox: 0 0 560 600. Coordinate plan:
+         - background wall: implicit (body bg)
+         - shelf with back-row bottle silhouettes: y=20-80
+         - main bottle (long neck, label): x=180-380, y=20-540
+         - main mug (with handle): x=80-280, y=240-560
+         - small side bottle: x=400-460, y=300-440
+         - foreground jar: x=420-510, y=380-500
+         - paper slip top-left
+         - pendant lights
+         - 3 small left bottles in front -->
+    <svg viewBox="0 0 560 600" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="halftone" x="0" y="0" width="9" height="9" patternUnits="userSpaceOnUse">
+          <circle cx="4.5" cy="4.5" r="2" fill="#0A0A0A" opacity="0.5"/>
+        </pattern>
+        <!-- hand-drawn wobble filter for ink lines -->
+        <filter id="wobble" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.025" numOctaves="2" seed="3"/>
+          <feDisplacementMap in="SourceGraphic" scale="1.5"/>
+        </filter>
+      </defs>
+
+      <!-- ============ SHELF + BACK BOTTLES ============ -->
+      <!-- shelf line -->
+      <path d="M 0 90 Q 280 92 560 90" stroke="#2A1810" stroke-width="3" fill="none" filter="url(#wobble)"/>
+
+      <!-- back-row bottle silhouettes (5 bottles on shelf) -->
+      <g opacity="0.85" filter="url(#wobble)">
+        <!-- bottle 1 -->
+        <path d="M 60 35 L 65 30 L 75 30 L 80 35 L 80 50 L 84 60 L 84 88 L 56 88 L 56 60 L 60 50 Z"
+              fill="#3A2A1F" stroke="#1A0F08" stroke-width="1.5"/>
+        <!-- bottle 2 (slightly taller) -->
+        <path d="M 130 25 L 135 20 L 145 20 L 150 25 L 150 45 L 154 55 L 154 88 L 126 88 L 126 55 L 130 45 Z"
+              fill="#2F1810" stroke="#1A0F08" stroke-width="1.5"/>
+        <!-- bottle 3 (middle, with cap visible) -->
+        <rect x="195" y="20" width="20" height="14" fill="#3A6B6B" stroke="#1A0F08" stroke-width="1.5"/>
+        <path d="M 195 34 L 195 50 L 199 60 L 199 88 L 211 88 L 211 60 L 215 50 L 215 34 Z"
+              fill="#4A2010" stroke="#1A0F08" stroke-width="1.5"/>
+        <!-- bottle 4 -->
+        <path d="M 270 30 L 275 25 L 285 25 L 290 30 L 290 50 L 294 60 L 294 88 L 266 88 L 266 60 L 270 50 Z"
+              fill="#3A2A1F" stroke="#1A0F08" stroke-width="1.5"/>
+        <!-- bottle 5 -->
+        <path d="M 340 35 L 345 30 L 355 30 L 360 35 L 360 50 L 364 60 L 364 88 L 336 88 L 336 60 L 340 50 Z"
+              fill="#2F1810" stroke="#1A0F08" stroke-width="1.5"/>
+      </g>
+
+      <!-- paper slip top-left -->
+      <g transform="translate(20,15) rotate(-8)" filter="url(#wobble)">
+        <rect x="0" y="0" width="80" height="60" fill="#E8DCC0" stroke="#2A1810" stroke-width="2"/>
+        <line x1="10" y1="15" x2="70" y2="15" stroke="#2A1810" stroke-width="1" opacity="0.5"/>
+        <line x1="10" y1="22" x2="65" y2="22" stroke="#2A1810" stroke-width="1" opacity="0.5"/>
+        <line x1="10" y1="29" x2="68" y2="29" stroke="#2A1810" stroke-width="1" opacity="0.5"/>
+        <line x1="10" y1="36" x2="60" y2="36" stroke="#2A1810" stroke-width="1" opacity="0.5"/>
+        <line x1="10" y1="43" x2="65" y2="43" stroke="#2A1810" stroke-width="1" opacity="0.5"/>
+      </g>
+
+      <!-- pendant lights (double cone, hanging from top) -->
+      <g transform="translate(95,-15)" filter="url(#wobble)">
+        <!-- cord -->
+        <line x1="0" y1="0" x2="0" y2="100" stroke="#1A0F08" stroke-width="2.5"/>
+        <!-- lamp head (trapezoid shade) -->
+        <path d="M -22 100 L 22 100 L 16 145 L -16 145 Z" fill="#2A1810" stroke="#1A0F08" stroke-width="3" stroke-linejoin="round"/>
+        <!-- light glow -->
+        <ellipse cx="0" cy="147" rx="18" ry="3" fill="#FFD27A" opacity="0.6"/>
+        <path d="M -18 150 L 18 150" stroke="#FFD27A" stroke-width="4" opacity="0.4"/>
+        <!-- light cone glow -->
+        <path d="M -16 150 L -50 220 L 50 220 L 16 150 Z" fill="#FFD27A" opacity="0.15"/>
+        <!-- small ring on shade -->
+        <line x1="-20" y1="100" x2="20" y2="100" stroke="#1A0F08" stroke-width="2"/>
+      </g>
+      <!-- second pendant light -->
+      <g transform="translate(420,-15)" filter="url(#wobble)">
+        <line x1="0" y1="0" x2="0" y2="100" stroke="#1A0F08" stroke-width="2.5"/>
+        <path d="M -18 100 L 18 100 L 13 140 L -13 140 Z" fill="#2A1810" stroke="#1A0F08" stroke-width="3" stroke-linejoin="round"/>
+        <ellipse cx="0" cy="142" rx="14" ry="3" fill="#FFD27A" opacity="0.6"/>
+        <path d="M -15 145 L 15 145" stroke="#FFD27A" stroke-width="3" opacity="0.4"/>
+        <path d="M -13 145 L -42 200 L 42 200 L 13 145 Z" fill="#FFD27A" opacity="0.15"/>
+        <line x1="-16" y1="100" x2="16" y2="100" stroke="#1A0F08" stroke-width="2"/>
+      </g>
+
+      <!-- ============ MAIN BOTTLE (long neck) ============ -->
+      <g transform="translate(190,30)">
+        <!-- ground shadow -->
+        <ellipse cx="100" cy="510" rx="80" ry="10" fill="#0A0A0A" opacity="0.3"/>
+
+        <!-- crown cap with crimped edge -->
+        <g filter="url(#wobble)">
+          <rect x="75" y="-5" width="50" height="22" fill="#3A6B6B" stroke="#1A0F08" stroke-width="3" rx="2"/>
+          <!-- crimped bumps -->
+          <path d="M 75 17 L 79 22 L 83 17 L 87 22 L 91 17 L 95 22 L 99 17 L 103 22 L 107 17 L 111 22 L 115 17 L 119 22 L 125 17"
+                fill="none" stroke="#1A0F08" stroke-width="1.5"/>
+          <!-- cap highlight -->
+          <line x1="80" y1="0" x2="80" y2="15" stroke="#5A8B8B" stroke-width="2"/>
+        </g>
+
+        <!-- bottle silhouette: long neck + shoulder + curved body -->
+        <g filter="url(#wobble)">
+          <path d="M 80 17 L 80 50 Q 80 55 78 60 Q 60 90 55 130 L 55 470
+                   Q 55 495 80 500 L 120 500 Q 145 495 145 470 L 145 130
+                   Q 140 90 122 60 Q 120 55 120 50 L 120 17 Z"
+                fill="#8B3A1A" stroke="#1A0F08" stroke-width="3.5" stroke-linejoin="round"/>
+
+          <!-- vertical highlight (right side) -->
+          <line x1="135" y1="100" x2="135" y2="460" stroke="#D4801F" stroke-width="3" opacity="0.7"/>
+
+          <!-- scattered dirty spots on bottle -->
+          <ellipse cx="78" cy="80" rx="3" ry="4" fill="#2A1008" opacity="0.5"/>
+          <ellipse cx="92" cy="140" rx="2" ry="3" fill="#2A1008" opacity="0.6"/>
+          <ellipse cx="110" cy="95" rx="3" ry="2" fill="#2A1008" opacity="0.5"/>
+          <ellipse cx="70" cy="200" rx="2" ry="3" fill="#2A1008" opacity="0.5"/>
+          <ellipse cx="125" cy="180" rx="3" ry="2" fill="#2A1008" opacity="0.6"/>
+          <ellipse cx="100" cy="280" rx="2" ry="2" fill="#2A1008" opacity="0.5"/>
+        </g>
+
+        <!-- foil neck wrap (teal) -->
+        <g filter="url(#wobble)">
+          <path d="M 70 60 Q 100 56 130 60 L 128 78 Q 100 73 72 78 Z"
+                fill="#3A6B6B" stroke="#1A0F08" stroke-width="2.5"/>
+          <line x1="75" y1="65" x2="125" y2="65" stroke="#F5E8D0" stroke-width="0.5" opacity="0.6"/>
+          <line x1="75" y1="70" x2="125" y2="70" stroke="#F5E8D0" stroke-width="0.5" opacity="0.5"/>
+        </g>
+
+        <!-- ===== BIG LABEL ===== -->
+        <g filter="url(#wobble)">
+          <!-- label background -->
+          <rect x="50" y="160" width="100" height="180" fill="#5A8A8A" stroke="#1A0F08" stroke-width="3"/>
+          <!-- label inner frame -->
+          <rect x="56" y="166" width="88" height="168" fill="none" stroke="#F5E8D0" stroke-width="1.2"/>
+          <!-- corner dots -->
+          <circle cx="56" cy="166" r="1.5" fill="#F5E8D0"/>
+          <circle cx="144" cy="166" r="1.5" fill="#F5E8D0"/>
+          <circle cx="56" cy="334" r="1.5" fill="#F5E8D0"/>
+          <circle cx="144" cy="334" r="1.5" fill="#F5E8D0"/>
+
+          <!-- top logo: abstract flying bird / human -->
+          <g transform="translate(100,188)" fill="#3A2010" stroke="#1A0F08" stroke-width="1.5" stroke-linejoin="round">
+            <path d="M -10 0 Q -8 -4 -3 -2 Q 0 -6 3 -2 Q 8 -4 10 0 L 5 3 Q 3 6 0 4 Q -3 6 -5 3 Z"/>
+            <circle cx="0" cy="-7" r="2"/>
+          </g>
+
+          <!-- main title -->
+          <text x="100" y="222" text-anchor="middle" font-family="Alfa Slab One, serif" font-size="18" fill="#F5E8D0" letter-spacing="1.5" stroke="#1A0F08" stroke-width="0.8">KUMCIIBI</text>
+
+          <!-- subtitle 1 -->
+          <text x="100" y="248" text-anchor="middle" font-family="Playfair Display, serif" font-style="italic" font-size="11" fill="#2A1810" letter-spacing="1">MILLAKE</text>
+
+          <!-- divider -->
+          <line x1="64" y1="260" x2="136" y2="260" stroke="#F5E8D0" stroke-width="0.8" opacity="0.7"/>
+
+          <!-- subtitle 2 -->
+          <text x="100" y="285" text-anchor="middle" font-family="Caveat, cursive" font-size="16" fill="#2A1810" letter-spacing="0.5">LOFTER DRY</text>
+
+          <!-- decorative star -->
+          <text x="100" y="310" text-anchor="middle" font-family="Alfa Slab One, serif" font-size="14" fill="#F5E8D0">✦</text>
+
+          <!-- bottom decoration -->
+          <text x="100" y="332" text-anchor="middle" font-family="Caveat, cursive" font-size="10" fill="#F5E8D0">EST. 2026</text>
+        </g>
+      </g>
+
+      <!-- ============ MAIN MUG (with handle, 5 facets) ============ -->
+      <g transform="translate(40,280)">
+        <!-- shadow -->
+        <ellipse cx="120" cy="280" rx="100" ry="10" fill="#0A0A0A" opacity="0.3"/>
+
+        <g filter="url(#wobble)">
+          <!-- handle (D-shape) -->
+          <path d="M 220 60 Q 260 60 265 110 Q 270 170 240 200 Q 230 215 215 215 L 215 195 Q 250 195 250 130 Q 250 80 220 80 Z"
+                fill="#E89B2C" stroke="#1A0F08" stroke-width="3.5"/>
+          <!-- handle inner double-line accent -->
+          <path d="M 230 95 Q 245 95 248 130" fill="none" stroke="#1A0F08" stroke-width="1.5" opacity="0.6"/>
+          <path d="M 230 175 Q 245 175 248 145" fill="none" stroke="#1A0F08" stroke-width="1.5" opacity="0.6"/>
+
+          <!-- mug body (slightly trapezoidal: top wider than bottom) -->
+          <path d="M 20 60 L 220 60 L 215 270 Q 215 285 200 285 L 40 285 Q 25 285 25 270 Z"
+                fill="#E89B2C" stroke="#1A0F08" stroke-width="3.5" stroke-linejoin="round"/>
+
+          <!-- highlight (top) -->
+          <path d="M 30 75 L 210 75" stroke="#FFD27A" stroke-width="6" opacity="0.65"/>
+
+          <!-- 5 vertical facets -->
+          <line x1="55" y1="65" x2="52" y2="280" stroke="#1A0F08" stroke-width="2.2"/>
+          <line x1="90" y1="65" x2="89" y2="280" stroke="#1A0F08" stroke-width="2.2"/>
+          <line x1="125" y1="65" x2="126" y2="280" stroke="#1A0F08" stroke-width="2.2"/>
+          <line x1="160" y1="65" x2="162" y2="280" stroke="#1A0F08" stroke-width="2.2"/>
+          <line x1="195" y1="65" x2="197" y2="280" stroke="#1A0F08" stroke-width="2.2"/>
+
+          <!-- curved liquid surface -->
+          <path d="M 25 95 Q 120 105 215 95" fill="none" stroke="#1A0F08" stroke-width="2.5"/>
+          <!-- white foam line under liquid surface -->
+          <path d="M 28 100 Q 120 109 212 100" stroke="#FFF8E7" stroke-width="2.5" fill="none"/>
+
+          <!-- bubbles in liquid (20+) -->
+          <g fill="#3A2410">
+            <circle cx="40" cy="115" r="1.2"/><circle cx="55" cy="130" r="1.5"/><circle cx="70" cy="118" r="1"/>
+            <circle cx="85" cy="135" r="1.3"/><circle cx="100" cy="125" r="1.5"/><circle cx="115" cy="140" r="1"/>
+            <circle cx="130" cy="120" r="1.4"/><circle cx="145" cy="135" r="1.1"/><circle cx="160" cy="125" r="1.3"/>
+            <circle cx="175" cy="142" r="1.5"/><circle cx="190" cy="120" r="1.1"/><circle cx="205" cy="130" r="1.3"/>
+            <circle cx="50" cy="155" r="1.2"/><circle cx="75" cy="165" r="1.4"/><circle cx="100" cy="155" r="1"/>
+            <circle cx="125" cy="170" r="1.3"/><circle cx="150" cy="160" r="1.4"/><circle cx="175" cy="170" r="1.1"/>
+            <circle cx="200" cy="158" r="1.2"/><circle cx="65" cy="190" r="1.3"/><circle cx="90" cy="200" r="1"/>
+            <circle cx="120" cy="195" r="1.4"/><circle cx="150" cy="205" r="1.2"/><circle cx="180" cy="195" r="1.3"/>
+          </g>
+
+          <!-- foam: cotton-clump on rim, overflowing -->
+          <path d="M 12 65 Q 5 50 18 42 Q 30 32 45 38 Q 60 30 75 40 Q 90 32 105 40 Q 120 30 135 38 Q 150 32 165 40 Q 180 32 195 38 Q 210 32 220 45 Q 235 50 230 65 L 12 65 Z"
+                fill="#FFF8E7" stroke="#1A0F08" stroke-width="3" stroke-linejoin="round"/>
+          <!-- foam shadow at base -->
+          <path d="M 15 60 Q 120 64 225 60" stroke="#E8DCC0" stroke-width="2" fill="none" opacity="0.7"/>
+
+          <!-- foam drip on RIGHT side (signature drip) -->
+          <path d="M 215 65 Q 222 80 218 100 Q 215 115 220 130 Q 218 140 213 135 Q 210 115 213 95 Q 210 78 215 65 Z"
+                fill="#FFF8E7" stroke="#1A0F08" stroke-width="2.5" stroke-linejoin="round"/>
+
+          <!-- 5 small circles at bottom (decoration) -->
+          <g stroke="#1A0F08" stroke-width="1.5" fill="none">
+            <circle cx="70" cy="270" r="3"/>
+            <circle cx="95" cy="270" r="3"/>
+            <circle cx="120" cy="270" r="3"/>
+            <circle cx="145" cy="270" r="3"/>
+            <circle cx="170" cy="270" r="3"/>
+          </g>
+        </g>
+      </g>
+
+      <!-- ============ SIDE BOTTLE (small, right) ============ -->
+      <g transform="translate(420,310) rotate(8)" filter="url(#wobble)">
+        <rect x="15" y="0" width="20" height="10" fill="#3A6B6B" stroke="#1A0F08" stroke-width="1.5"/>
+        <path d="M 18 10 L 18 30 L 15 38 L 15 130 L 35 130 L 35 38 L 32 30 L 32 10 Z"
+              fill="#5A2A10" stroke="#1A0F08" stroke-width="2"/>
+        <rect x="16" y="60" width="18" height="40" fill="#5A8A8A" stroke="#1A0F08" stroke-width="1.5"/>
+      </g>
+
+      <!-- ============ GLASS JAR (right, with yellow content) ============ -->
+      <g transform="translate(450,340)" filter="url(#wobble)">
+        <!-- jar body (taller, glass-like) -->
+        <rect x="0" y="0" width="90" height="160" fill="#E8DCC0" stroke="#1A0F08" stroke-width="3" rx="4" fill-opacity="0.65"/>
+        <!-- jar lid -->
+        <rect x="-3" y="-12" width="96" height="18" fill="#3A6B6B" stroke="#1A0F08" stroke-width="3" rx="2"/>
+        <line x1="0" y1="-3" x2="90" y2="-3" stroke="#1A0F08" stroke-width="1" opacity="0.5"/>
+        <!-- yellow content (cookies/nuts) inside -->
+        <rect x="8" y="80" width="74" height="70" fill="#E89B2C" stroke="#1A0F08" stroke-width="2" rx="3"/>
+        <!-- chunky shapes inside (nuts/cookies) -->
+        <circle cx="22" cy="100" r="7" fill="#FFD27A" stroke="#1A0F08" stroke-width="1.5"/>
+        <circle cx="40" cy="112" r="6" fill="#FFD27A" stroke="#1A0F08" stroke-width="1.5"/>
+        <circle cx="60" cy="102" r="5" fill="#FFD27A" stroke="#1A0F08" stroke-width="1.5"/>
+        <circle cx="72" cy="118" r="6" fill="#FFD27A" stroke="#1A0F08" stroke-width="1.5"/>
+        <rect x="20" y="128" width="14" height="9" fill="#FFD27A" stroke="#1A0F08" stroke-width="1.2" rx="2" transform="rotate(20 27 132)"/>
+        <rect x="48" y="132" width="14" height="9" fill="#FFD27A" stroke="#1A0F08" stroke-width="1.2" rx="2" transform="rotate(-15 55 136)"/>
+        <!-- glass highlight (left side) -->
+        <line x1="10" y1="20" x2="10" y2="60" stroke="#FFFFFF" stroke-width="3" opacity="0.6"/>
+        <line x1="10" y1="75" x2="10" y2="78" stroke="#FFFFFF" stroke-width="3" opacity="0.4"/>
+      </g>
+
+      <!-- ============ 3 SMALL FRONT BOTTLES (left side) ============ -->
+      <g transform="translate(60,420)" filter="url(#wobble)">
+        <!-- bottle 1 (short) -->
+        <rect x="0" y="0" width="12" height="6" fill="#3A6B6B" stroke="#1A0F08" stroke-width="1"/>
+        <path d="M 2 6 L 2 18 L 0 25 L 0 100 L 14 100 L 14 25 L 12 18 L 12 6 Z"
+              fill="#3A2A1F" stroke="#1A0F08" stroke-width="1.5"/>
+        <!-- bottle 2 (tall) -->
+        <rect x="22" y="-10" width="10" height="6" fill="#3A6B6B" stroke="#1A0F08" stroke-width="1"/>
+        <path d="M 24 -4 L 24 12 L 22 18 L 22 110 L 32 110 L 32 18 L 30 12 L 30 -4 Z"
+              fill="#5A2A10" stroke="#1A0F08" stroke-width="1.5"/>
+        <!-- bottle 3 (round) -->
+        <circle cx="50" cy="60" r="22" fill="#5A2A10" stroke="#1A0F08" stroke-width="2"/>
+        <rect x="44" y="32" width="12" height="10" fill="#3A6B6B" stroke="#1A0F08" stroke-width="1.5"/>
+      </g>
+
+      <!-- scattered stars -->
+      <g fill="#F5E8D0" stroke="#1A0F08" stroke-width="1.5">
+        <path d="M 30 130 L 33 140 L 43 143 L 33 146 L 30 156 L 27 146 L 17 143 L 27 140 Z"/>
+        <path d="M 490 460 L 493 470 L 503 473 L 493 476 L 490 486 L 487 476 L 477 473 L 487 470 Z"/>
+        <path d="M 220 50 L 222 56 L 228 58 L 222 60 L 220 66 L 218 60 L 212 58 L 218 56 Z"/>
+        <path d="M 410 130 L 412 136 L 418 138 L 412 140 L 410 146 L 408 140 L 402 138 L 408 136 Z"/>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<div class="wood-counter"></div>
+
+<section class="features">
+  <div class="features-grid">
+    <div class="feature-card" style="--rot: -2deg;">
+      <div class="num">01</div>
+      <h3>拍照選酒</h3>
+      <p>拍下酒標，AI 幫你挑</p>
+    </div>
+    <div class="feature-card" style="--rot: 1.5deg;">
+      <div class="num">02</div>
+      <h3>心情推薦</h3>
+      <p>說一個情緒字，今晚就喝這杯</p>
+    </div>
+    <div class="feature-card" style="--rot: -1deg;">
+      <div class="num">03</div>
+      <h3>本地酒吧</h3>
+      <p>香港巷弄裡的小酒館</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  © 2026 WhattoDrink · 理性飲酒 · 未成年請勿飲酒
+</footer>
+
+</body>
+</html>

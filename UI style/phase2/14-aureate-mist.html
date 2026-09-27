@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>今晚喝咩？— Whattodrink (Aureate Mist v2)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Noto+Serif+TC:wght@300;400;500;700&family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@500&display=swap"
+  />
+  <style>
+    /* ============================================================
+       AUREATE MIST v2 — Watercolor aesthetic
+       Reference: Stitch screen f370098b2b754f42ae293f34edf23376
+       Key principles:
+       - Pale gold + dusty pink + sage green washes
+       - Wet-on-wet color bleeds
+       - Lots of white space
+       - Contemplative, elegant mood
+       - Cormorant Garamond serif (display)
+       - No bold colors, no hard edges
+       Enhanced: 2026-09-03
+       ============================================================ */
+
+    :root {
+      --c-bg: #fafaf5;
+      --c-bg-2: #f5f0e5;
+      --c-bg-3: #ede5d5;
+      --c-paper: #ffffff;
+      --c-gold: #d4a948;
+      --c-gold-soft: #e8c878;
+      --c-gold-deep: #a87830;
+      --c-pink: #d8a8a0;
+      --c-pink-soft: #f0c8c0;
+      --c-sage: #a8b890;
+      --c-sage-soft: #c0c8a8;
+      --c-ink: #4a4030;
+      --c-ink-soft: #8a8070;
+      --c-ink-muted: #b0a890;
+
+      --r-sm: 4px; --r: 8px; --r-md: 12px; --r-lg: 16px; --r-pill: 9999px;
+
+      --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px;
+      --s-6: 24px; --s-7: 32px; --s-8: 40px; --s-9: 48px; --s-10: 64px;
+      --s-11: 80px; --s-12: 96px;
+      --container-margin: 32px;
+      --container-max: 1280px;
+
+      --font-display: "Cormorant Garamond", "Noto Serif TC", Georgia, serif;
+      --font-sans: "Inter", "Noto Sans TC", sans-serif;
+      --font-mono: "DM Mono", ui-monospace, monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--c-bg);
+      color: var(--c-ink);
+      font-size: 16px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      min-height: 100vh;
+      position: relative;
+    }
+    /* Very subtle paper grain */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.04;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      mix-blend-mode: multiply;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+    img, svg { display: block; max-width: 100%; }
+
+    /* Typography */
+    .display {
+      font-family: var(--font-display);
+      font-weight: 300;
+      font-style: italic;
+      letter-spacing: -0.02em;
+      line-height: 0.95;
+      font-size: clamp(48px, 8vw, 80px);
+      color: var(--c-ink);
+    }
+    .h1 {
+      font-family: var(--font-display);
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      line-height: 1.1;
+      font-size: clamp(32px, 5vw, 44px);
+    }
+    .h2 {
+      font-family: var(--font-display);
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+      font-size: clamp(24px, 3.5vw, 32px);
+    }
+    .h3 {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: 22px;
+      line-height: 1.3;
+    }
+    .body { font-weight: 400; font-size: 15px; line-height: 1.7; color: var(--c-ink-soft); }
+    .body-lg { font-weight: 400; font-size: 17px; line-height: 1.65; color: var(--c-ink-soft); }
+    .label {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      font-size: 11px;
+      color: var(--c-gold-deep);
+    }
+    .label-sm {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-size: 10px;
+      color: var(--c-gold-deep);
+    }
+    .muted { color: var(--c-ink-muted); }
+    .accent-gold { color: var(--c-gold-deep); }
+    .italic { font-style: italic; }
+
+    .container {
+      max-width: var(--container-max);
+      margin: 0 auto;
+      padding: 0 var(--container-margin);
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    .topbar {
+      padding: var(--s-5) 0;
+      border-bottom: 1px solid var(--c-bg-3);
+    }
+    .topbar__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s-6);
+    }
+    .wordmark {
+      display: flex;
+      align-items: baseline;
+      gap: 0;
+      font-family: var(--font-display);
+      font-weight: 400;
+      font-style: italic;
+      font-size: 24px;
+      color: var(--c-ink);
+    }
+    .wordmark__sep { color: var(--c-gold); margin: 0 6px; font-style: italic; }
+    .nav { display: none; gap: var(--s-7); }
+    .nav__item {
+      position: relative;
+      padding: var(--s-2) 0;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--c-ink-soft);
+    }
+    .nav__item:hover { color: var(--c-ink); }
+    .nav__item--active { color: var(--c-gold-deep); }
+    .nav__item--active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 1px;
+      background: var(--c-gold);
+    }
+    @media (min-width: 768px) { .nav { display: flex; } }
+    .lang-switch { display: flex; gap: 8px; }
+    .lang-switch__btn {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--c-ink-soft);
+      padding: 4px 6px;
+    }
+    .lang-switch__btn--active { color: var(--c-gold-deep); border-bottom: 1px solid var(--c-gold); }
+
+    .hero { padding: var(--s-12) 0; }
+    .hero__grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-9);
+      align-items: center;
+    }
+    @media (min-width: 960px) { .hero__grid { grid-template-columns: 1.1fr 1fr; } }
+    .hero__sub {
+      margin-top: var(--s-5);
+      max-width: 42ch;
+      color: var(--c-ink-soft);
+      font-style: italic;
+    }
+    .hero__cta-row {
+      margin-top: var(--s-7);
+      display: flex;
+      gap: var(--s-3);
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s-2);
+      padding: 12px 24px;
+      font-family: var(--font-mono);
+      font-weight: 500;
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      border-radius: var(--r-pill);
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: 1px solid;
+    }
+    .btn--gold { background: var(--c-gold); color: var(--c-paper); border-color: var(--c-gold-deep); }
+    .btn--gold:hover { background: var(--c-gold-deep); }
+    .btn--ghost { background: transparent; color: var(--c-ink); border-color: var(--c-ink-soft); }
+    .btn--ghost:hover { color: var(--c-gold-deep); border-color: var(--c-gold-deep); }
+    .btn--sm { padding: 8px 16px; font-size: 10px; }
+
+    .hero__art {
+      position: relative;
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    .hero__art-svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .section { padding: var(--s-11) 0; position: relative; }
+    .section--gold { background: var(--c-bg-2); }
+    .section--pink { background: var(--c-pink-soft); }
+    .section--sage { background: var(--c-sage-soft); }
+    .section__head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: var(--s-6);
+      margin-bottom: var(--s-8);
+      padding-bottom: var(--s-4);
+      border-bottom: 1px solid var(--c-ink-muted);
+    }
+    .section__head-text { max-width: 60ch; }
+    .section__rule-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      color: var(--c-gold-deep);
+      text-transform: uppercase;
+    }
+    .section__head-meta {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 16px;
+      color: var(--c-ink-soft);
+    }
+
+    .bento {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-5);
+    }
+    @media (min-width: 768px) {
+      .bento { grid-template-columns: 2fr 1fr; }
+    }
+    .bento__card {
+      position: relative;
+      background: var(--c-paper);
+      border: 1px solid var(--c-ink-muted);
+      border-radius: var(--r-md);
+      padding: var(--s-6);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-3);
+    }
+    .bento__stamp {
+      display: inline-block;
+      padding: 3px 12px;
+      background: transparent;
+      color: var(--c-gold-deep);
+      border: 1px solid var(--c-gold);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      align-self: flex-start;
+    }
+    .bento__card-body {
+      padding: var(--s-2) 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-3);
+      flex: 1;
+    }
+    .bento__card-art {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 110px;
+    }
+    .bento__card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: var(--s-3);
+      border-top: 1px solid var(--c-ink-muted);
+    }
+    .bento__num {
+      font-family: var(--font-display);
+      font-weight: 300;
+      font-style: italic;
+      font-size: 64px;
+      line-height: 1;
+      color: var(--c-gold-deep);
+    }
+
+    .how {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-4);
+    }
+    @media (min-width: 768px) {
+      .how { grid-template-columns: 1fr auto 1fr auto 1fr; align-items: stretch; }
+    }
+    .how__step {
+      background: var(--c-paper);
+      border: 1px solid var(--c-ink-muted);
+      border-radius: var(--r-md);
+      padding: var(--s-6);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-2);
+    }
+    .how__num {
+      font-family: var(--font-display);
+      font-weight: 300;
+      font-style: italic;
+      font-size: 40px;
+      color: var(--c-gold-deep);
+      line-height: 1;
+    }
+    .how__arrow {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: var(--c-ink-soft);
+    }
+    .how__arrow-text { font-size: 24px; }
+    @media (min-width: 768px) { .how__arrow { display: flex; } }
+
+    .footer {
+      background: var(--c-bg-2);
+      border-top: 1px solid var(--c-ink-muted);
+      padding: var(--s-8) 0;
+    }
+    .footer__inner {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-6);
+      align-items: flex-start;
+    }
+    @media (min-width: 768px) {
+      .footer__inner { flex-direction: row; justify-content: space-between; align-items: center; }
+    }
+    .socials { display: flex; gap: var(--s-3); }
+    .socials__btn {
+      width: 40px;
+      height: 40px;
+      border: 1px solid var(--c-ink-soft);
+      border-radius: var(--r-pill);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--c-ink-soft);
+      transition: all 0.15s ease;
+    }
+    .socials__btn:hover {
+      color: var(--c-gold-deep);
+      border-color: var(--c-gold-deep);
+      transform: translateY(-2px);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar" role="banner">
+    <div class="container topbar__inner">
+      <a href="#" class="wordmark" aria-label="Whattodrink home">
+        whattodrink<span class="wordmark__sep">·</span>HK
+      </a>
+      <nav class="nav" aria-label="主導航">
+        <a href="#" class="nav__item nav__item--active">今晚喝咩</a>
+        <a href="#" class="nav__item">拍照選酒</a>
+        <a href="#" class="nav__item">心情推薦</a>
+      </nav>
+      <div class="lang-switch" role="group" aria-label="語言切換">
+        <button class="lang-switch__btn lang-switch__btn--active" type="button" aria-pressed="true">繁</button>
+        <button class="lang-switch__btn" type="button" aria-pressed="false">简</button>
+        <button class="lang-switch__btn" type="button" aria-pressed="false">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <div class="hero__grid">
+        <div>
+          <div class="label" style="margin-bottom: var(--s-3)">— AUREATE MIST —</div>
+          <h1 class="display">今晚<br /><em class="italic">喝咩？</em></h1>
+          <p class="body-lg hero__sub">
+            像一抹金色的霧，慢慢散開——讓命運幫你揀返杯啱你嘅酒。
+          </p>
+          <div class="hero__cta-row">
+            <a href="#" class="btn btn--gold">隨機抽一杯</a>
+            <a href="#" class="btn btn--ghost">睇下點用</a>
+          </div>
+        </div>
+
+        <div class="hero__art" aria-hidden="true">
+          <svg class="hero__art-svg" viewBox="0 0 480 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Aureate mist watercolor beer">
+            <defs>
+              <radialGradient id="goldWash" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#d4a948" stop-opacity="0.6"/>
+                <stop offset="100%" stop-color="#d4a948" stop-opacity="0"/>
+              </radialGradient>
+              <radialGradient id="pinkWash" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#d8a8a0" stop-opacity="0.5"/>
+                <stop offset="100%" stop-color="#d8a8a0" stop-opacity="0"/>
+              </radialGradient>
+              <radialGradient id="sageWash" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#a8b890" stop-opacity="0.4"/>
+                <stop offset="100%" stop-color="#a8b890" stop-opacity="0"/>
+              </radialGradient>
+              <filter id="softWatercolor">
+                <feGaussianBlur stdDeviation="3"/>
+              </filter>
+            </defs>
+
+            <rect x="0" y="0" width="480" height="540" fill="#fafaf5"/>
+
+            <!-- Watercolor washes -->
+            <ellipse cx="240" cy="200" rx="180" ry="120" fill="url(#goldWash)" filter="url(#softWatercolor)"/>
+            <ellipse cx="120" cy="350" rx="120" ry="80" fill="url(#pinkWash)" filter="url(#softWatercolor)"/>
+            <ellipse cx="380" cy="400" rx="100" ry="70" fill="url(#sageWash)" filter="url(#softWatercolor)"/>
+
+            <!-- Beer mug (soft watercolor outline) -->
+            <g opacity="0.85">
+              <path d="M 175 200 L 170 360 Q 170 380 190 380 L 300 380 Q 320 380 320 360 L 315 200 Z" fill="#f0e4c8" filter="url(#softWatercolor)"/>
+              <path d="M 178 270 L 175 358 Q 175 376 192 376 L 298 376 Q 315 376 315 358 L 312 270 Z" fill="#d4a948" fill-opacity="0.5" filter="url(#softWatercolor)"/>
+              <path d="M 165 200 Q 162 175 185 170 Q 195 155 215 165 Q 235 150 255 165 Q 275 150 295 165 Q 315 155 325 170 Q 335 175 335 200 Z" fill="#f0e4c8" filter="url(#softWatercolor)"/>
+              <circle cx="195" cy="290" r="4" fill="#f0e4c8" opacity="0.7"/>
+              <circle cx="235" cy="320" r="5" fill="#f0e4c8" opacity="0.7"/>
+              <circle cx="275" cy="350" r="4" fill="#f0e4c8" opacity="0.6"/>
+              <path d="M 320 250 Q 360 250 360 290 Q 360 330 320 330" fill="none" stroke="#a87830" stroke-width="8" stroke-linecap="round" opacity="0.5"/>
+              <circle cx="245" cy="320" r="14" fill="#d4a948" opacity="0.6"/>
+              <text x="245" y="325" text-anchor="middle" fill="#4a4030" font-family="Cormorant Garamond" font-weight="500" font-style="italic" font-size="14">W·D</text>
+            </g>
+
+            <!-- Dusty pink petals -->
+            <g fill="#d8a8a0" opacity="0.5">
+              <ellipse cx="60" cy="120" rx="12" ry="6" transform="rotate(30 60 120)"/>
+              <ellipse cx="420" cy="180" rx="10" ry="5" transform="rotate(-20 420 180)"/>
+              <ellipse cx="80" cy="430" rx="14" ry="7" transform="rotate(45 80 430)"/>
+            </g>
+
+            <!-- Sage leaves -->
+            <g fill="#a8b890" opacity="0.6">
+              <ellipse cx="430" cy="300" rx="20" ry="8" transform="rotate(-30 430 300)"/>
+              <line x1="430" y1="280" x2="430" y2="320" stroke="#5a6a3a" stroke-width="1"/>
+            </g>
+
+            <!-- Bottom elegant wordmark -->
+            <text x="32" y="510" fill="#4a4030" font-family="Cormorant Garamond" font-style="italic" font-size="32" letter-spacing="-0.01em">Whattodrink</text>
+            <text x="32" y="528" fill="#a87830" font-family="Cormorant Garamond" font-style="italic" font-size="13" letter-spacing="0.1em">— a contemplative hong kong —</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--gold">
+    <div class="container">
+      <div class="section__head">
+        <div>
+          <div class="section__rule-num">— UR 1.1 · 3 paths —</div>
+          <h2 class="h1" style="margin-top: 8px">三個方法，揀返你今晚嗰杯</h2>
+          <p class="body muted" style="margin-top: 12px">
+            隨機抽、影相認、講心情——三種入場方式，揀你最啱嗰個。
+          </p>
+        </div>
+        <div class="section__head-meta">ur 1.4 · no. 14</div>
+      </div>
+      <div class="bento">
+        <article class="bento__card">
+          <span class="bento__stamp">— 01 —</span>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 200 140" width="80%">
+                <rect x="60" y="60" width="50" height="60" fill="#d4a948" fill-opacity="0.5"/>
+                <path d="M 120 50 L 120 130 L 150 130 L 150 50 Z" fill="#fafaf5"/>
+                <path d="M 122 70 L 119 100 L 148 100 L 145 70 Z" fill="#d4a948" fill-opacity="0.5"/>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div>
+                <div class="label-sm">隨機 · 0 sec</div>
+                <div class="h3" style="margin-top: 4px">由命運揀返杯</div>
+              </div>
+              <a href="#" class="btn btn--gold btn--sm">立即試</a>
+            </div>
+          </div>
+        </article>
+        <article class="bento__card">
+          <span class="bento__stamp">— 02 —</span>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 100 100" width="60%">
+                <rect x="25" y="10" width="50" height="80" rx="6" fill="#a8b890" fill-opacity="0.5"/>
+                <circle cx="50" cy="50" r="10" fill="#d4a948" fill-opacity="0.5"/>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div>
+                <div class="label-sm">影相 · 5 sec</div>
+                <div class="h3" style="margin-top: 4px">影張相即刻知</div>
+              </div>
+              <a href="#" class="btn btn--ghost btn--sm">試下</a>
+            </div>
+          </div>
+        </article>
+        <article class="bento__card">
+          <span class="bento__stamp">— 03 —</span>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 100 100" width="60%">
+                <path d="M 20 50 Q 20 20 50 20 Q 80 20 80 50 Q 80 80 50 80 L 35 80 L 25 90 L 30 80 Q 20 80 20 50 Z" fill="#d8a8a0" fill-opacity="0.5"/>
+                <rect x="38" y="45" width="24" height="22" fill="#d4a948" fill-opacity="0.5"/>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div>
+                <div class="label-sm">心情 · 1 min</div>
+                <div class="h3" style="margin-top: 4px">講你而家點</div>
+              </div>
+              <a href="#" class="btn btn--ghost btn--sm">揀返杯</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section__head">
+        <div>
+          <div class="section__rule-num">— UR 1.1 · 3 steps —</div>
+          <h2 class="h1" style="margin-top: 8px">點樣運作</h2>
+        </div>
+        <div class="section__head-meta">a quiet flow</div>
+      </div>
+      <div class="how">
+        <article class="how__step">
+          <div class="how__num">01</div>
+          <div class="h3">揀方法</div>
+          <p class="body">隨機抽、影相、講心情——揀你而家想點。</p>
+        </article>
+        <div class="how__arrow"><span class="how__arrow-text">~</span></div>
+        <article class="how__step">
+          <div class="how__num">02</div>
+          <div class="h3">收結果</div>
+          <p class="body">用 token 即時換返杯啱你場合嘅酒款。</p>
+        </article>
+        <div class="how__arrow"><span class="how__arrow-text">~</span></div>
+        <article class="how__step">
+          <div class="how__num">03</div>
+          <div class="h3">記低</div>
+          <p class="body">記低你嘅心情，之後可以翻睇飲過咩。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer" role="contentinfo">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <a href="#" class="wordmark" aria-label="Whattodrink">
+          whattodrink<span class="wordmark__sep">·</span>HK
+        </a>
+        <div class="label">© 2026 · HK · Aureate mist</div>
+      </div>
+      <div class="socials">
+        <a href="#" class="socials__btn" aria-label="Instagram">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="14" height="14" rx="3"/>
+            <circle cx="10" cy="10" r="3.5"/>
+            <circle cx="14.5" cy="5.5" r="0.5" fill="currentColor"/>
+          </svg>
+        </a>
+        <a href="#" class="socials__btn" aria-label="Threads">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M 5 8 Q 10 4 14 7 Q 17 10 14 13 Q 10 16 6 13"/>
+          </svg>
+        </a>
+        <a href="#" class="socials__btn" aria-label="小紅書">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <text x="10" y="14" text-anchor="middle" font-family="Inter" font-weight="800" font-size="9" fill="currentColor" stroke="none">紅</text>
+            <rect x="3" y="3" width="14" height="14" rx="3"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

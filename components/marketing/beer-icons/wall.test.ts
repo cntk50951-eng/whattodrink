@@ -2,25 +2,35 @@ import { describe, expect, it } from "vitest";
 
 // vitest 無 @/ alias（見 memory），測檔一律相對路徑。
 import { BEERS } from "../../../lib/beers";
+import { AguilaIcon } from "./aguila";
 import { AndesIcon } from "./andes";
 import { AntarcticaIcon } from "./antarctica-original";
 import { AsahiIcon } from "./asahi-super-dry";
+import { BalboaIcon } from "./balboa";
+import { CaribIcon } from "./carib";
 import { ClubColombiaIcon } from "./club-colombia";
 import { CraftIpaIcon } from "./craft-ipa";
 import { CristalIcon } from "./cristal";
 import { CusquenaIcon } from "./cusquena-dorada";
 import { Dassai45Icon } from "./dassai-45";
 import { GuinnessDraughtIcon } from "./guinness-draught";
+import { GalloIcon } from "./gallo";
 import { HeinekenIcon } from "./heineken";
+import { ImperialIcon } from "./imperial";
 import { ItaipavaIcon } from "./itaipava";
 import { KakuHighballIcon } from "./kaku-highball";
 import { KaiserIcon } from "./kaiser";
 import { PacenaIcon } from "./pacena";
 import { PilsenCallaoIcon } from "./pilsen-callao";
+import { PokerIcon } from "./poker";
+import { PolarIcon } from "./cerveza-polar";
 import { QuilmesIcon } from "./quilmes";
+import { RedStripeIcon } from "./red-stripe";
+import { RegionalIcon } from "./regional-pilsen";
 import { ModeloIcon } from "./modelo-especial";
 import { NegraModeloIcon } from "./negra-modelo";
 import { TsingtaoIcon } from "./tsingtao-classic";
+import { TonaIcon } from "./tona";
 import { Yamazaki12YearIcon } from "./yamazaki-12-year";
 import { BEER_WALL, iconForDrinkName, iconForPickId } from "./wall";
 
@@ -112,6 +122,36 @@ describe("batch3 南美拉格十枚", () => {
   it("does not steal the champagne namesake (Cristal 誠實回 null)", () => {
     expect(iconForDrinkName("Louis Roederer Cristal")).toBeNull();
     expect(iconForDrinkName("水晶啤酒")).toBe(CristalIcon);
+  });
+});
+
+describe("batch4 中美加勒比十枚", () => {
+  it("maps the ten new pickIds to their components", () => {
+    expect(iconForPickId("aguila")).toBe(AguilaIcon);
+    expect(iconForPickId("poker")).toBe(PokerIcon);
+    expect(iconForPickId("polar")).toBe(PolarIcon);
+    expect(iconForPickId("regional")).toBe(RegionalIcon);
+    expect(iconForPickId("balboa")).toBe(BalboaIcon);
+    expect(iconForPickId("imperial")).toBe(ImperialIcon);
+    expect(iconForPickId("tona")).toBe(TonaIcon);
+    expect(iconForPickId("gallo")).toBe(GalloIcon);
+    expect(iconForPickId("carib")).toBe(CaribIcon);
+    expect(iconForPickId("red-stripe")).toBe(RedStripeIcon);
+  });
+
+  it("resolves free-text names via the new aliases", () => {
+    expect(iconForDrinkName("Aguila Original")).toBe(AguilaIcon);
+    expect(iconForDrinkName("Cerveza Polar")).toBe(PolarIcon);
+    expect(iconForDrinkName("Regional Pilsen")).toBe(RegionalIcon);
+    expect(iconForDrinkName("Toña Nicaragua")).toBe(TonaIcon);
+    expect(iconForDrinkName("Gallo Famosa")).toBe(GalloIcon);
+    expect(iconForDrinkName("Red Stripe Jamaica")).toBe(RedStripeIcon);
+  });
+
+  it("keeps the two eagles apart (Aguila vs Imperial Aguilita)", () => {
+    expect(iconForDrinkName("Aguila")).toBe(AguilaIcon);
+    expect(iconForDrinkName("Aguilita")).toBe(ImperialIcon);
+    expect(iconForDrinkName("cerveza imperial")).toBe(ImperialIcon);
   });
 });
 

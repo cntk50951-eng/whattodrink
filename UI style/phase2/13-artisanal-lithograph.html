@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>今晚喝咩？— Whattodrink (Artisanal Lithograph v2)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Archivo+Black&family=Space+Grotesk:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&family=DM+Mono:wght@500;700&display=swap"
+  />
+  <style>
+    /* ============================================================
+       ARTISANAL LITHOGRAPH v2 — Riso print aesthetic
+       Reference: Stitch screen 2622b4293f8349a5860c99437d1fa833
+       Key principles:
+       - Limited spot color palette (fluorescent pink + teal)
+       - Visible ink grain
+       - Slight misregistration (1-3px offset)
+       - Flat color blocks, no gradients
+       - Cream paper background
+       Enhanced: 2026-09-03
+       ============================================================ */
+
+    :root {
+      --c-paper: #f0e8d8;
+      --c-paper-2: #e8dcc0;
+      --c-pink: #ff5a8a;
+      --c-pink-bright: #ff7ba3;
+      --c-pink-deep: #d4406a;
+      --c-teal: #2a8a8a;
+      --c-teal-bright: #4aa8a8;
+      --c-teal-deep: #1a6060;
+      --c-purple: #8a4a8a;
+      --c-ink: #1a1a1a;
+      --c-ink-soft: #4a4a4a;
+
+      --r: 0;
+      --r-pill: 9999px;
+
+      --shadow-pink: 3px 3px 0 0 var(--c-pink);
+      --shadow-teal: 3px 3px 0 0 var(--c-teal);
+
+      --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px;
+      --s-6: 24px; --s-7: 32px; --s-8: 40px; --s-9: 48px; --s-10: 64px;
+      --s-11: 80px; --s-12: 96px;
+      --container-margin: 32px;
+      --container-max: 1280px;
+
+      --font-display: "Archivo Black", "Space Grotesk", sans-serif;
+      --font-sans: "Inter", "Noto Sans TC", sans-serif;
+      --font-mono: "DM Mono", ui-monospace, monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--c-paper);
+      color: var(--c-ink);
+      font-size: 16px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+    /* Ink grain */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.15;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      mix-blend-mode: multiply;
+    }
+    /* Subtle paper texture */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.03;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23p)'/></svg>");
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+    img, svg { display: block; max-width: 100%; }
+
+    .display {
+      font-family: var(--font-display);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 0.9;
+      font-size: clamp(48px, 8vw, 80px);
+      color: var(--c-ink);
+    }
+    .h1 {
+      font-family: var(--font-display);
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+      font-size: clamp(32px, 5vw, 44px);
+    }
+    .h2 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      font-size: clamp(24px, 3.5vw, 32px);
+    }
+    .h3 { font-weight: 800; line-height: 1.3; font-size: 18px; }
+    .body { font-weight: 500; font-size: 15px; line-height: 1.65; }
+    .body-lg { font-weight: 500; font-size: 16px; line-height: 1.6; }
+    .label {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-size: 11px;
+    }
+    .label-sm {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 10px;
+    }
+    .muted { color: var(--c-ink-soft); }
+
+    .container {
+      max-width: var(--container-max);
+      margin: 0 auto;
+      padding: 0 var(--container-margin);
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    .topbar {
+      background: var(--c-ink);
+      color: var(--c-paper);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topbar__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s-6);
+      padding: var(--s-4) 0;
+    }
+    .wordmark {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      font-family: var(--font-display);
+      font-size: 20px;
+      letter-spacing: 0.02em;
+      color: var(--c-pink);
+    }
+    .wordmark__sep { color: var(--c-teal); margin: 0 4px; }
+    .nav { display: none; gap: var(--s-7); }
+    .nav__item {
+      position: relative;
+      padding: var(--s-2) 0;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--c-paper);
+      opacity: 0.7;
+    }
+    .nav__item:hover { opacity: 1; }
+    .nav__item--active { opacity: 1; color: var(--c-teal); }
+    .nav__item--active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 3px;
+      background: var(--c-teal);
+    }
+    @media (min-width: 768px) { .nav { display: flex; } }
+    .lang-switch {
+      display: flex;
+      background: var(--c-paper);
+    }
+    .lang-switch__btn {
+      padding: 4px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--c-ink);
+      background: var(--c-paper);
+      border-right: 1.5px solid var(--c-ink);
+    }
+    .lang-switch__btn:last-child { border-right: none; }
+    .lang-switch__btn--active { background: var(--c-pink); color: var(--c-paper); }
+
+    .hero { padding: var(--s-10) 0; }
+    .hero__grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-7);
+      align-items: center;
+    }
+    @media (min-width: 960px) { .hero__grid { grid-template-columns: 1.1fr 1fr; } }
+    .hero__eyebrow {
+      display: inline-block;
+      padding: 6px 14px;
+      background: var(--c-pink);
+      color: var(--c-paper);
+      margin-bottom: var(--s-5);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .hero__sub {
+      margin-top: var(--s-5);
+      max-width: 38ch;
+      color: var(--c-ink);
+    }
+    .hero__cta-row {
+      margin-top: var(--s-7);
+      display: flex;
+      gap: var(--s-3);
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s-2);
+      padding: 14px 28px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      transition: all 0.15s ease;
+      cursor: pointer;
+      border: 0;
+    }
+    .btn:hover { transform: translate(-3px, -3px); }
+    .btn--pink { background: var(--c-pink); color: var(--c-paper); box-shadow: var(--shadow-teal); }
+    .btn--pink:hover { background: var(--c-pink-deep); box-shadow: 5px 5px 0 0 var(--c-teal); }
+    .btn--teal { background: transparent; color: var(--c-teal); border: 2px solid var(--c-teal); }
+    .btn--teal:hover { background: var(--c-teal); color: var(--c-paper); }
+    .btn--paper { background: var(--c-paper); color: var(--c-ink); border: 2px solid var(--c-ink); }
+    .btn--sm { padding: 8px 16px; font-size: 10px; }
+
+    .hero__art {
+      position: relative;
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    .hero__art-svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .section { padding: var(--s-10) 0; position: relative; }
+    .section--pink { background: var(--c-pink); color: var(--c-paper); }
+    .section--teal { background: var(--c-teal); color: var(--c-paper); }
+    .section--paper2 { background: var(--c-paper-2); }
+    .section--ink { background: var(--c-ink); color: var(--c-paper); }
+    .section__head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: var(--s-6);
+      margin-bottom: var(--s-8);
+      padding-bottom: var(--s-4);
+      border-bottom: 2px solid currentColor;
+    }
+    .section__head-text { max-width: 60ch; }
+    .section__rule-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      color: var(--c-pink);
+      text-transform: uppercase;
+    }
+    .section--pink .section__rule-num { color: var(--c-paper); }
+    .section--teal .section__rule-num { color: var(--c-paper); }
+    .section--ink .section__rule-num { color: var(--c-pink); }
+
+    .bento {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-4);
+    }
+    @media (min-width: 768px) {
+      .bento { grid-template-columns: 2fr 1fr; }
+    }
+    .bento__card {
+      position: relative;
+      background: var(--c-paper);
+      border: 2px solid var(--c-ink);
+      padding: var(--s-5);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-3);
+    }
+    .bento__card--pink { background: var(--c-pink); color: var(--c-paper); border-color: var(--c-ink); }
+    .bento__card--teal { background: var(--c-teal); color: var(--c-paper); border-color: var(--c-ink); }
+    .bento__stamp {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 3px 10px;
+      background: var(--c-ink);
+      color: var(--c-paper);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+    }
+    .bento__card--pink .bento__stamp { background: var(--c-paper); color: var(--c-pink); }
+    .bento__card--teal .bento__stamp { background: var(--c-paper); color: var(--c-teal); }
+    .bento__card-body {
+      padding: var(--s-2) 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-3);
+      flex: 1;
+    }
+    .bento__card-art {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 110px;
+    }
+    .bento__card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: var(--s-3);
+      border-top: 2px solid currentColor;
+    }
+    .bento__num {
+      font-family: var(--font-display);
+      font-size: 56px;
+      line-height: 1;
+      color: var(--c-pink);
+    }
+    .bento__card--pink .bento__num { color: var(--c-paper); }
+    .bento__card--teal .bento__num { color: var(--c-paper); }
+
+    .how {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-4);
+    }
+    @media (min-width: 768px) {
+      .how { grid-template-columns: 1fr auto 1fr auto 1fr; align-items: stretch; }
+    }
+    .how__step {
+      background: var(--c-paper);
+      border: 2px solid var(--c-ink);
+      padding: var(--s-5);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-2);
+    }
+    .how__num {
+      font-family: var(--font-display);
+      font-size: 40px;
+      color: var(--c-pink);
+      line-height: 1;
+    }
+    .how__arrow {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: var(--c-ink);
+    }
+    .how__arrow-text { font-family: var(--font-display); font-size: 28px; }
+    @media (min-width: 768px) { .how__arrow { display: flex; } }
+
+    .footer {
+      background: var(--c-ink);
+      color: var(--c-paper);
+      padding: var(--s-8) 0;
+    }
+    .footer__inner {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-6);
+      align-items: flex-start;
+    }
+    @media (min-width: 768px) {
+      .footer__inner { flex-direction: row; justify-content: space-between; align-items: center; }
+    }
+    .socials { display: flex; gap: var(--s-3); }
+    .socials__btn {
+      width: 40px;
+      height: 40px;
+      border: 2px solid var(--c-paper);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--c-paper);
+      transition: all 0.15s ease;
+    }
+    .socials__btn:hover { background: var(--c-pink); color: var(--c-paper); border-color: var(--c-pink); transform: translate(-2px, -2px); }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar" role="banner">
+    <div class="container topbar__inner">
+      <a href="#" class="wordmark" aria-label="Whattodrink home">
+        WHATTODRINK<span class="wordmark__sep">/</span>HK
+      </a>
+      <nav class="nav" aria-label="主導航">
+        <a href="#" class="nav__item nav__item--active">今晚喝咩</a>
+        <a href="#" class="nav__item">拍照選酒</a>
+        <a href="#" class="nav__item">心情推薦</a>
+      </nav>
+      <div class="lang-switch" role="group" aria-label="語言切換">
+        <button class="lang-switch__btn lang-switch__btn--active" type="button" aria-pressed="true">繁</button>
+        <button class="lang-switch__btn" type="button" aria-pressed="false">简</button>
+        <button class="lang-switch__btn" type="button" aria-pressed="false">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <div class="hero__grid">
+        <div>
+          <div class="hero__eyebrow">RISO 2-COLOR · NO. 13</div>
+          <h1 class="display">今晚<br />喝咩？</h1>
+          <p class="body-lg hero__sub">
+            螢光粉 × 湖水藍 — 兩色印刷的香港午後。讓命運幫你揀返杯啱你嘅酒。
+          </p>
+          <div class="hero__cta-row">
+            <a href="#" class="btn btn--pink">隨機抽一杯</a>
+            <a href="#" class="btn btn--teal">睇下點用</a>
+          </div>
+        </div>
+
+        <div class="hero__art" aria-hidden="true">
+          <svg class="hero__art-svg" viewBox="0 0 480 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Riso print beer illustration">
+            <defs>
+              <pattern id="inkGrain" x="0" y="0" width="6" height="6" patternUnits="userSpaceOnUse">
+                <circle cx="3" cy="3" r="0.8" fill="#1a1a1a" opacity="0.4"/>
+              </pattern>
+              <filter id="misreg" x="-5%" y="-5%" width="110%" height="110%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.01" numOctaves="1"/>
+                <feDisplacementMap in="SourceGraphic" scale="1.5"/>
+              </filter>
+            </defs>
+
+            <!-- Cream paper background -->
+            <rect x="0" y="0" width="480" height="540" fill="#f0e8d8"/>
+
+            <!-- Pink layer (printed first, offset slightly) -->
+            <g transform="translate(-2, 0)" opacity="0.92">
+              <rect x="160" y="220" width="170" height="220" fill="#ff5a8a"/>
+              <rect x="160" y="220" width="170" height="40" fill="#ff5a8a"/>
+            </g>
+
+            <!-- Teal layer (printed second, offset other direction) -->
+            <g transform="translate(2, 1)" opacity="0.92">
+              <rect x="162" y="222" width="170" height="220" fill="#2a8a8a"/>
+              <!-- Only parts of teal show (where pink isn't covering) -->
+            </g>
+
+            <!-- MUG (riso style with 2 color separation) -->
+            <g>
+              <!-- Pink pass: body shape -->
+              <g transform="translate(-3, 1)">
+                <path d="M 160 220 L 158 380 Q 158 400 178 400 L 312 400 Q 332 400 332 380 L 330 220 Z" fill="#ff5a8a" opacity="0.85"/>
+                <path d="M 160 220 L 158 380 Q 158 400 178 400 L 312 400 Q 332 400 332 380 L 330 220 Z" fill="url(#inkGrain)"/>
+                <path d="M 152 220 Q 148 195 175 188 Q 185 168 210 180 Q 230 162 258 180 Q 280 162 300 180 Q 325 168 340 188 Q 350 200 348 220 Z" fill="#ff5a8a" opacity="0.85"/>
+                <path d="M 152 220 Q 148 195 175 188 Q 185 168 210 180 Q 230 162 258 180 Q 280 162 300 180 Q 325 168 340 188 Q 350 200 348 220 Z" fill="url(#inkGrain)"/>
+              </g>
+
+              <!-- Teal pass: liquid (offset for misregistration) -->
+              <g transform="translate(2, 3)">
+                <path d="M 163 290 L 161 378 Q 161 396 179 396 L 311 396 Q 329 396 329 378 L 327 290 Z" fill="#2a8a8a" opacity="0.88"/>
+                <path d="M 163 290 L 161 378 Q 161 396 179 396 L 311 396 Q 329 396 329 378 L 327 290 Z" fill="url(#inkGrain)"/>
+              </g>
+
+              <!-- Pink pass: bubbles in liquid -->
+              <g>
+                <circle cx="200" cy="320" r="6" fill="#ff5a8a"/>
+                <circle cx="240" cy="350" r="8" fill="#ff5a8a"/>
+                <circle cx="280" cy="330" r="5" fill="#ff5a8a"/>
+                <circle cx="200" cy="370" r="4" fill="#ff5a8a"/>
+                <circle cx="260" cy="380" r="6" fill="#ff5a8a"/>
+              </g>
+
+              <!-- Teal pass: handle -->
+              <g transform="translate(2, 2)">
+                <path d="M 332 260 Q 380 260 380 300 Q 380 340 332 340" fill="none" stroke="#2a8a8a" stroke-width="14" stroke-linecap="round"/>
+              </g>
+              <path d="M 332 260 Q 380 260 380 300 Q 380 340 332 340" fill="none" stroke="#2a8a8a" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+
+              <!-- W·D badge (teal pass) -->
+              <g transform="translate(1, -1)">
+                <circle cx="245" cy="360" r="22" fill="#2a8a8a" opacity="0.9"/>
+              </g>
+              <circle cx="245" cy="360" r="18" fill="none" stroke="#ff5a8a" stroke-width="2" opacity="0.9"/>
+              <text x="245" y="367" text-anchor="middle" fill="#1a1a1a" font-family="Archivo Black" font-weight="900" font-size="16">W·D</text>
+
+              <!-- "COLD" caption (pink) -->
+              <g transform="translate(-1, 1)">
+                <rect x="175" y="400" width="140" height="22" fill="#ff5a8a"/>
+                <text x="245" y="416" text-anchor="middle" fill="#f0e8d8" font-family="DM Mono" font-weight="700" font-size="10" letter-spacing="0.22em">COLD · ON TAP</text>
+              </g>
+            </g>
+
+            <!-- Misregistration arrows (annotation) -->
+            <g font-family="DM Mono" font-size="9" fill="#1a1a1a" opacity="0.7">
+              <text x="60" y="50" letter-spacing="0.14em">↙ PINK LAYER</text>
+              <text x="320" y="490" letter-spacing="0.14em">TEAL LAYER ↘</text>
+            </g>
+
+            <!-- Bottom wordmark (split color) -->
+            <rect x="0" y="510" width="240" height="30" fill="#ff5a8a"/>
+            <rect x="240" y="510" width="240" height="30" fill="#2a8a8a"/>
+            <text x="32" y="530" fill="#f0e8d8" font-family="Archivo Black" font-size="14">WHATTODRINK</text>
+            <text x="252" y="530" fill="#f0e8d8" font-family="Archivo Black" font-size="14">HK</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--pink">
+    <div class="container">
+      <div class="section__head">
+        <div>
+          <div class="section__rule-num">UR 1.1 · 3 PATHS</div>
+          <h2 class="h1" style="margin-top: 8px">三個方法，揀返你今晚嗰杯</h2>
+        </div>
+      </div>
+      <div class="bento">
+        <article class="bento__card">
+          <div class="bento__stamp">PATH 01</div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 200 140" width="80%">
+                <g transform="translate(-2, 0)">
+                  <rect x="60" y="60" width="50" height="60" fill="#ff5a8a" opacity="0.85"/>
+                </g>
+                <g transform="translate(2, 0)">
+                  <path d="M 120 50 L 120 130 L 150 130 L 150 50 Z" fill="#2a8a8a" opacity="0.88"/>
+                </g>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div>
+                <div class="label-sm">隨機 · 0 sec</div>
+                <div class="h3">由命運揀返杯</div>
+              </div>
+              <a href="#" class="btn btn--pink btn--sm">立即試</a>
+            </div>
+          </div>
+        </article>
+        <article class="bento__card bento__card--teal">
+          <div class="bento__stamp">PATH 02</div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 100 100" width="60%">
+                <g transform="translate(2, 0)">
+                  <rect x="25" y="10" width="50" height="80" fill="#2a8a8a" opacity="0.9"/>
+                </g>
+                <g transform="translate(-2, 0)">
+                  <circle cx="50" cy="50" r="10" fill="#ff5a8a" opacity="0.85"/>
+                </g>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div>
+                <div class="label-sm">影相 · 5 sec</div>
+                <div class="h3">影張相即刻知</div>
+              </div>
+              <a href="#" class="btn btn--teal btn--sm">試下</a>
+            </div>
+          </div>
+        </article>
+        <article class="bento__card bento__card--pink">
+          <div class="bento__stamp">PATH 03</div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 100 100" width="60%">
+                <g transform="translate(2, 0)">
+                  <path d="M 20 50 Q 20 20 50 20 Q 80 20 80 50 Q 80 80 50 80 L 35 80 L 25 90 L 30 80 Q 20 80 20 50 Z" fill="#ff5a8a" opacity="0.85"/>
+                </g>
+                <g transform="translate(-2, 0)">
+                  <circle cx="50" cy="55" r="5" fill="#2a8a8a" opacity="0.88"/>
+                </g>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div>
+                <div class="label-sm">心情 · 1 min</div>
+                <div class="h3">講你而家點</div>
+              </div>
+              <a href="#" class="btn btn--paper btn--sm">揀返杯</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--ink">
+    <div class="container">
+      <div class="section__head">
+        <div>
+          <div class="section__rule-num">UR 1.1 · 3 STEPS</div>
+          <h2 class="h1" style="margin-top: 8px">點樣運作</h2>
+        </div>
+      </div>
+      <div class="how">
+        <article class="how__step">
+          <div class="how__num">01</div>
+          <div class="h3">揀方法</div>
+          <p class="body muted">隨機抽、影相、講心情——揀你而家想點。</p>
+        </article>
+        <div class="how__arrow"><span class="how__arrow-text">→</span></div>
+        <article class="how__step">
+          <div class="how__num">02</div>
+          <div class="h3">收結果</div>
+          <p class="body muted">用 token 即時換返杯啱你場合嘅酒款。</p>
+        </article>
+        <div class="how__arrow"><span class="how__arrow-text">→</span></div>
+        <article class="how__step">
+          <div class="how__num">03</div>
+          <div class="h3">記低</div>
+          <p class="body muted">記低你嘅心情，之後可以翻睇飲過咩。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer" role="contentinfo">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <a href="#" class="wordmark" aria-label="Whattodrink">
+          WHATTODRINK<span class="wordmark__sep">/</span>HK
+        </a>
+        <div class="label" style="color: var(--c-pink)">© 2026 · HK · RISO EDITION</div>
+      </div>
+      <div class="socials">
+        <a href="#" class="socials__btn" aria-label="Instagram">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="14" height="14"/>
+            <circle cx="10" cy="10" r="3.5"/>
+            <circle cx="14.5" cy="5.5" r="0.5" fill="currentColor"/>
+          </svg>
+        </a>
+        <a href="#" class="socials__btn" aria-label="Threads">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M 5 8 Q 10 4 14 7 Q 17 10 14 13 Q 10 16 6 13"/>
+          </svg>
+        </a>
+        <a href="#" class="socials__btn" aria-label="小紅書">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <text x="10" y="14" text-anchor="middle" font-family="Inter" font-weight="800" font-size="9" fill="currentColor" stroke="none">紅</text>
+            <rect x="3" y="3" width="14" height="14"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

@@ -71,6 +71,74 @@
   animation: v2-pulse 2s ease-out infinite;
 }
 
+/* UR A.21 自釘按模式變色（匿名沿舊藍）：在線綠／隱身灰，呼吸環同色。 */
+.v2selfOnline {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #16a34a;
+  border: 3px solid #ffffff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  position: relative;
+}
+
+.v2selfOnline::after {
+  content: "";
+  position: absolute;
+  inset: -9px;
+  border-radius: 9999px;
+  border: 2px solid rgb(22 163 74 / 0.55);
+  animation: v2-pulse 2s ease-out infinite;
+}
+
+.v2selfStealth {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #6b7280;
+  border: 3px solid #ffffff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  position: relative;
+}
+
+.v2selfStealth::after {
+  content: "";
+  position: absolute;
+  inset: -9px;
+  border-radius: 9999px;
+  border: 2px solid rgb(107 114 128 / 0.55);
+  animation: v2-pulse 2s ease-out infinite;
+}
+
+/* UR A.21 好友實時釘：白底首字＋綠環＋綠呼吸光環（區別於打卡釘的墨環）；
+ * 位移過渡 1.2s linear（30s fix 間平滑跟隨；reduced-motion 下關）。 */
+.v2friend {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid #16a34a;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  color: #0f172a;
+  position: relative;
+  transition: transform 1.2s linear;
+}
+
+.v2friend::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: 9999px;
+  border: 2px solid rgb(22 163 74 / 0.5);
+  animation: v2-pulse 2s ease-out infinite;
+  pointer-events: none;
+}
+
 /* 他人釘：白底首字圓＋品牌環＋右上綠點 */
 .v2pin {
   width: 40px;
@@ -180,6 +248,32 @@
   height: 32px;
 }
 
+/* UR C.9 錨徽：商圈名＋數 pill（深 slate 沿簇徽系，中性不搶釘色） */
+.v2area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  max-width: 128px;
+  background: #0f172a;
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  border-radius: 9999px;
+  padding: 6px 12px;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
+}
+
+.v2area b {
+  color: #f59e0b;
+  font-weight: 800;
+}
+
 /* 橫滑 pill 列隱藏滾動條（功能保留，可滑） */
 .v2noscroll {
   scrollbar-width: none;
@@ -201,7 +295,45 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .v2self::after {
+  .v2self::after,
+  .v2selfOnline::after,
+  .v2selfStealth::after,
+  .v2friend::after {
     animation: none;
+  }
+  .v2friend {
+    transition: none;
+  }
+}
+
+/* UR C.11 round-6：腳印流（淺 slate 色序列淡入；朝向＋左右交替由調用方內聯；
+   heat 退役刪淨；reduced-motion 下靜止淺顯）。
+   round-13 休眠：動畫取消另立需求，渲染已撤，本塊暫留（Stadia 休眠先例），
+   重啟時直接可用；reduced-motion 下 display:none 照舊。 */
+.v2step {
+  color: #64748b;
+  opacity: 0;
+  animation: v2stepfade 2.4s ease-in-out infinite;
+}
+
+@keyframes v2stepfade {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.95;
+  }
+  70% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* round-11：靜止腳印只是噪聲（序號釘已承載路徑信息），直接隱藏不佔位。 */
+  .v2step {
+    display: none;
   }
 }
