@@ -24,6 +24,7 @@ export default async function proxy(request: NextRequest) {
     request.nextUrl.pathname,
     request.nextUrl.search,
     parseHomeUi(process.env.HOME_UI),
+    routing.locales,
   );
   if (homeTarget !== null) {
     return NextResponse.redirect(new URL(homeTarget, request.url));

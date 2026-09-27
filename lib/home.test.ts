@@ -34,4 +34,24 @@ describe("resolveHomeTarget (UR C.7)", () => {
     expect(resolveHomeTarget("/", "?pick=1", "v2")).toBeNull();
     expect(resolveHomeTarget("/", "?shoot=1", "v2")).toBeNull();
   });
+
+  it("locale 根帶語言跳（不丟語言）", () => {
+    const locales = ["zh-Hant", "zh-Hans", "en"];
+    expect(resolveHomeTarget("/zh-Hans", "", "v2", locales)).toBe("/zh-Hans/v2");
+    expect(resolveHomeTarget("/en", "", "v2", locales)).toBe("/en/v2");
+    expect(resolveHomeTarget("/zh-Hant", "", "v2", locales)).toBe("/zh-Hant/v2");
+  });
+
+  it("locale 根尾斜杠與深鏈同規", () => {
+    const locales = ["zh-Hant", "zh-Hans", "en"];
+    expect(resolveHomeTarget("/zh-Hans/", "", "v2", locales)).toBe("/zh-Hans/v2");
+    expect(resolveHomeTarget("/zh-Hans", "?pick=1", "v2", locales)).toBeNull();
+  });
+
+  it("未知前綴與子路徑不碰", () => {
+    const locales = ["zh-Hant", "zh-Hans", "en"];
+    expect(resolveHomeTarget("/fr", "", "v2", locales)).toBeNull();
+    expect(resolveHomeTarget("/zh-Hans/wall", "", "v2", locales)).toBeNull();
+    expect(resolveHomeTarget("/zh-Hans", "", "v1", locales)).toBeNull();
+  });
 });

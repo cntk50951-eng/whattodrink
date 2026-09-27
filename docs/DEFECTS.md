@@ -40,7 +40,22 @@
 | DEF-20260926-014 | v2打卡後酒圖標只顯示emoji無品牌圖 | Closed | P1 | 2026-09-26 / @yuki | UR C.4 | v2 want 卡寫死 emoji 圓＋快照直用；C.4 目錄取新＋BeerImg＋地圖釘圖；用戶驗收通過，已合入 main |
 | DEF-20260926-015 | v2地圖釘 createRoot 同步 unmount 撞渲染期報錯 | Closed | P1 | 2026-09-26 / @yuki | UR A.20 | microtask 延後＋try/catch；用戶驗收通過，已合入 main |
 | DEF-20260926-016 | Vercel main 部署紅（wall.ts 引缺失模塊） | Closed | P0 | 2026-09-26 / @yuki | 插畫並行線 | 部分推送：wall.ts／index.ts 接線先行，15 枚 .tsx 未進倉；`a8e28c2` 補齊樹後 worktree 驗 tsc 淨＋253 綠 |
+| DEF-20260927-002 | locale 根首頁不跳 v2（/zh-Hans 落 v1） | Closed | P1 | 2026-09-27 / @yuki | UR C.7 | 跳轉判斷只認裸 `/`，as-needed 下語言根被放行；修為認段＋帶語言跳；單測＋4，七路實測，用戶驗收通過，已合入 main |
 | DEF-20260927-001 | v2 他人打卡弹窗 UI 亂＋信息不全 | Fixed | P1 | 2026-09-27 / @yuki | UR C.10 | `openPin` 丟字段＋他人卡停 C.1 骨架（排查已實證，見詳情） |
+
+### DEF-20260927-002 locale 根首頁不跳 v2（/zh-Hans 落 v1）
+
+- **状态**：Closed（2026-09-27 用戶驗收通過：七路實測全中，已合入 main）
+- **严重度**：P1 主要（非默認語言用戶首頁永遠 v1）
+- **发现日期 / 报告人**：2026-09-27 / @yuki
+- **复现步骤**：開 `http://localhost:3000/zh-Hans`（或 `/en`）：落 v1 簡中首頁，不跳 v2
+- **期望**：`/zh-Hans`→307→`/zh-Hans/v2`（帶語言）；`/?pick=1` 類深鏈照直通 v1
+- **实际**：`resolveHomeTarget` 只認 `pathname === "/"`，`localePrefix as-needed` 下語言根全被放行
+- **初判根因**：同上（as-needed  Path 結構漏考慮）
+- **确诊根因**：同上。修為認 locale 段（`routing.locales` 傳入）＋帶語言跳（免 cookie 未種丟語言）；未知前綴／子路／查詢串一概不碰
+- **关联 UR**：UR C.7
+- **修复验证**：單測＋4（locale 根／尾斜杠／未知前綴／v1 檔）；dev 重啟七路實測：`/`、`/zh-Hans`、`/en`、`/zh-Hant`→307 對應 v2，`/v2`、`/zh-Hans/v2`→200，`/zh-Hans?pick=1`→200；三閘綠
+- **回归范围**：proxy 全路由（v1 深鏈＋各語言根已覆蓋）；`routing.locales` 只讀引用
 
 ### DEF-20250925-001 登出→重登录后打卡酒类消失
 
