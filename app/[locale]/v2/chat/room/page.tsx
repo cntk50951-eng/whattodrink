@@ -1,44 +1,55 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
-import { useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useLiveFriends } from "@/hooks/useLiveFriends";
-import { ChatThread } from "@/components/v2/ChatThread";
+import { readActivePeer } from "@/lib/chatPeer";
+import { ChatRoomLive } from "@/components/v2/ChatRoomLive";
 import styles from "@/components/v2/v2.module.css";
 
 /**
- * UR C.15 好友聊天完整頁（v2 獨立路由；直連 URL 即可開聊）。
- * 好友解析：`useLiveFriends(true)` 直讀（server 已做互好友＋非隱身＋鮮活三刀；
- * 匿名／非法 id 即 `[]`）；解析不到走回退對象（暱稱 `chatFallbackName`＋id 前 4，
- * 保直接 URL 永遠可渲染，POC 測試便利，註記見下）。
- * 真通道未建——線程內發送一律本地樂觀追加，零寫庫（C-chat-2 才接 Realtime）。
+ * UR D.7 零 id 聊天房（路由永遠是乾淨的 `/v2/chat/room`）。
+ * peer 身份走 sessionStorage（進房前由地圖釘／列表行寫入，tab 關即焚）；
+ * 直接進／過期無 peer 即回列表。好友解析沿 C.15（live 互好友三刀），
+ * 解析不到走純回退名（不露任何 id）。頁根 fixed 全屏蓋掉 v1 上下（沿 V2Home 口徑）。
+ *
+ * 身份讀取走 `useSyncExternalStore`（server 快照 null，hydration 不炸；
+ * 讀 session 是外部系統同步，不用 effect 設值，lint 乾淨）。
  */
 export default function V2ChatRoomPage() {
   const t = useTranslations("v2");
   const locale = useLocale();
-  const params = useParams<{ friendId: string }>();
-  const friendId = Array.isArray(params.friendId) ? params.friendId[0] : (params.friendId ?? "");
+  const router = useRouter();
   const listHref = locale === "zh-Hant" ? "/v2/chat" : `/${locale}/v2/chat`;
 
-  const { friends } = useLiveFriends(true);
-  const live = friends.find((f) => f.user_id === friendId);
+  const [voiceNote, setVoiceNote] = useState(false);
+  const peerId = useSyncExternalStore(
+    () => () => {},
+    () => readActivePeer(),
+    () => null,
+  );
+  const { friends } = useLiveFriends(peerId !== null);
+  useEffect(() => {
+    if (peerId === null) router.replace(listHref);
+  }, [peerId, router, listHref]);
+  if (peerId === null) return null;
+
+  const live = friends.find((f) => f.user_id === peerId);
   const peer =
     live !== undefined
       ? { nickname: live.nickname, avatarUrl: live.avatar_url }
-      : { nickname: `${t("chatFallbackName")} ${friendId.slice(0, 4)}`, avatarUrl: null };
+      : { nickname: t("chatFallbackName"), avatarUrl: null };
   const hasAvatar = peer.avatarUrl !== null && /^https?:\/\//.test(peer.avatarUrl);
 
-  const [voiceNote, setVoiceNote] = useState(false);
-
   return (
-    <div className={`${styles.v2scope} flex h-dvh flex-col gap-3 bg-background p-4`}>
+    <div className={`${styles.v2scope} fixed inset-0 isolate z-[1000] flex h-dvh flex-col gap-3 overflow-hidden bg-background p-4`}>
       <header className="flex shrink-0 items-center gap-2">
         <Button variant="ghost" size="icon" aria-label={t("back")} render={<Link href={listHref} />} nativeButton={false}>
           <ChevronLeft size={18} aria-hidden className="size-[18px]" />
@@ -61,8 +72,9 @@ export default function V2ChatRoomPage() {
         </p>
       )}
 
-      <ChatThread
-        threadKey={friendId}
+      {/* UR D.3 真通道（歷史＋Realtime＋樂觀發送；mock 已退役，見 ChatRoomLive） */}
+      <ChatRoomLive
+        peerId={peerId}
         peer={peer}
         onVoice={() => {
           setVoiceNote(true);

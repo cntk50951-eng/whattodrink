@@ -459,6 +459,265 @@ paths:
           $ref: "#/components/responses/TranscribeMissingKeys"
         "502":
           $ref: "#/components/responses/TranscribeProviderError"
+  /api/v1/conversations:
+    post:
+      operationId: createConversation
+      summary: 建會話（find-or-create；需登录，D.2）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  type: string
+                  description: 對方 user id（須 accepted 互好友＋雙非隱身，否則 403）
+      responses:
+        "201":
+          description: 建會話成功（created=false 即既有會話去重命中）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationRef"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非好友／隱身（陌生人永不）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 找不到该用户
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+    get:
+      operationId: listConversations
+      summary: 消息列表（需登录，D.2：對方簡檔＋末條＋未讀數）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: cursor
+          in: query
+          description: 上一頁最后一个會話的不透明游标（base64url JSON），第一页不传
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 一页會話（末動倒序；只含未藏未過期）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationPage"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/conversations/{id}/read:
+    patch:
+      operationId: markConversationRead
+      summary: 讀水位（需登录，D.2）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [last_read_at]
+              properties:
+                last_read_at:
+                  type: integer
+                  description: 已讀到的毫秒 epoch（server 不猜時鐘）
+      responses:
+        "200":
+          description: 水位已更新
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  last_read_at:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 非成員（fail-closed，不透露存在性）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/conversations/{id}:
+    delete:
+      operationId: hideConversation
+      summary: 刪會話（只藏自己，需登录，D.2）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 已藏（對方不受影響）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 非成員（fail-closed）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/conversations/{id}/messages:
+    get:
+      operationId: listMessages
+      summary: 對話記錄（倒序 keyset 回正序，需登录，D.3）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: cursor
+          in: query
+          description: 上一頁最舊一條的不透明游标，第一页不传
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 一页消息（由舊到新；壞行已跳過）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessagePage"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 非成員（fail-closed）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+    post:
+      operationId: sendMessage
+      summary: 發送（首期只收 text，需登录，D.3：隱身任一端 403＋限流＋冪等）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, body, client_msg_id]
+              properties:
+                kind:
+                  type: string
+                  enum: [text]
+                body:
+                  type: string
+                  maxLength: 2000
+                client_msg_id:
+                  type: string
+                  description: 冪等鍵（同會話同鍵重發回既有行，不 double）
+      responses:
+        "201":
+          description: 發送成功（duplicate=true 即冪等命中回既有行）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    $ref: "#/components/schemas/ChatMessage"
+                  duplicate:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 隱身任一端（不可收發）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 非成員（fail-closed）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 限流（30/min 或 200/day）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
 components:
   schemas:
     WallAuthor:
@@ -547,6 +806,92 @@ components:
       properties:
         is_friend:
           type: boolean
+    ConversationRef:
+      type: object
+      required: [id, created]
+      description: 會話引用（D.2 find-or-create；created=false 即去重命中既有）
+      properties:
+        id:
+          type: string
+          format: uuid
+        created:
+          type: boolean
+    ChatPeer:
+      type: object
+      required: [user_id, nickname, avatar_url]
+      description: 對方公開三列（精確坐標／email 永不回，D.2）
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+    ChatMessage:
+      type: object
+      required: [id, sender_id, kind, body, created_at]
+      description: 單條消息（created_at 為毫秒 epoch；D.2）
+      properties:
+        id:
+          type: string
+          format: uuid
+        sender_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [text, image, audio]
+        body:
+          type: string
+          nullable: true
+        created_at:
+          type: integer
+    Conversation:
+      type: object
+      required: [id, peer, last_message, unread, muted, updated_at]
+      description: 會話行（未讀由水位現算；updated_at＝末動毫秒 epoch，排序鍵，D.2）
+      properties:
+        id:
+          type: string
+          format: uuid
+        peer:
+          $ref: "#/components/schemas/ChatPeer"
+          nullable: true
+        last_message:
+          $ref: "#/components/schemas/ChatMessage"
+          nullable: true
+        unread:
+          type: integer
+        muted:
+          type: boolean
+        updated_at:
+          type: integer
+    ConversationPage:
+      type: object
+      required: [conversations, nextCursor]
+      properties:
+        conversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Conversation"
+        nextCursor:
+          type: string
+          nullable: true
+          description: 下一頁 cursor；null＝到底了
+    MessagePage:
+      type: object
+      required: [messages, nextCursor]
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+        nextCursor:
+          type: string
+          nullable: true
+          description: 下一頁 cursor（更舊）；null＝到底了
     FriendResult:
       type: object
       required: [status]

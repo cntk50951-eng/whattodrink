@@ -7,12 +7,21 @@ import { Check, CheckCheck, Mic, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Input } from "@/components/ui/input";
 import { appendLocalEcho, formatChatTime, mockThread, type ChatMessage } from "@/lib/chat";
 
 export type ChatPeer = {
   nickname: string;
   avatarUrl: string | null;
+};
+
+/**
+ * UR D.3 受控源（加法，可選）：`external` 在即走真通道——消息由父層
+ *（`ChatRoomLive`：歷史＋Realtime＋樂觀發送）供給，`send` 轉調 `onSend`；
+ * 不傳即沿舊本地 mock（C.15／D.7 行為不動，向下兼容）。
+ */
+export type ChatExternalSource = {
+  messages: ChatMessage[];
+  onSend: (text: string) => void;
 };
 
 /**
@@ -24,14 +33,24 @@ export function ChatThread({
   threadKey,
   peer,
   onVoice,
+  external = null,
 }: {
   /** 換對象即重置線程（路由按 friendId remount，本鍵是雙保險） */
   threadKey: string;
   peer: ChatPeer;
   onVoice: () => void;
+  external?: ChatExternalSource | null;
 }) {
   const t2 = useTranslations("v2");
   const [draft, setDraft] = useState("");
+  const areaRef = useRef<HTMLTextAreaElement | null>(null);
+  // UR D.7：輸入框自動增高（1→5 行，上限 128px；DOM 直寫，無 setState 不觸 lint）。
+  const autoresize = (): void => {
+    const el = areaRef.current;
+    if (el === null) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  };
   // 首幀空數組保 SSR／首屏一致，mount 後 microtask  hydrate（沿 UR1.8 口徑）。
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const seqRef = useRef(0);
@@ -44,6 +63,9 @@ export function ChatThread({
       window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
 
+  // 受控源開關：external 在即渲染父層消息（D.3 真通道），否則沿舊本地 mock。
+  const shown = external?.messages ?? messages;
+
   useEffect(() => {
     seqRef.current = 0;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 代提交保綠：threadKey 切換重置會話屬 props-sync 正當場景，待 C.15 隊友改 key-remount 後刪此行
@@ -53,28 +75,38 @@ export function ChatThread({
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "end" });
-  }, [messages, reducedMotion, threadKey]);
+  }, [shown, reducedMotion, threadKey]);
 
   function send(text: string): void {
     const body = text.trim();
     if (body === "") return;
+    if (external !== null) {
+      external.onSend(body);
+      setDraft("");
+      const el = areaRef.current;
+      if (el !== null) el.style.height = "auto";
+      return;
+    }
     seqRef.current += 1;
     setMessages((prev) => appendLocalEcho(prev, `local-${seqRef.current}`, body, Date.now()));
     setDraft("");
+    // 高度回 1 行（下輪 onChange 再撐開；直接清避免殘留高）。
+    const el = areaRef.current;
+    if (el !== null) el.style.height = "auto";
   }
 
-  const lastMeId = [...messages].reverse().find((m) => m.role === "me")?.id ?? null;
+  const lastMeId = [...shown].reverse().find((m) => m.role === "me")?.id ?? null;
 
   return (
     <>
       <ScrollArea className="min-h-24 flex-1">
         <div className="flex flex-col gap-2 pr-3">
-          <div className="flex items-center gap-2" aria-hidden={messages.length > 0}>
+          <div className="flex items-center gap-2" aria-hidden={shown.length > 0}>
             <span className="h-px flex-1 bg-border" />
             <span className="text-xs text-muted-foreground">{t2("chatToday")}</span>
             <span className="h-px flex-1 bg-border" />
           </div>
-          {messages.map((m) =>
+          {shown.map((m) =>
             m.role === "me" ? (
               <div key={m.id} className="flex flex-col items-end gap-0.5">
                 <div className="max-w-[80%] rounded-2xl rounded-br-md bg-foreground px-3 py-2 text-sm text-background">
@@ -113,19 +145,33 @@ export function ChatThread({
           {t2("chatHi")}
         </Button>
       </div>
+      {/* UR D.7：輸入條吸底（sticky＋安全區＋毛玻璃；鍵盤彈起不亂跑）。 */}
       <form
-        className="flex shrink-0 items-center gap-2"
+        className="sticky bottom-0 z-10 flex shrink-0 items-center gap-2 bg-background/95 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur"
         onSubmit={(e) => {
           e.preventDefault();
           send(draft);
         }}
       >
-        <Input
+        {/* UR D.7：多行輸入（textarea 自動增高；Enter 發送／Shift+Enter 換行；
+            中文組字中 Enter 不誤發）。 */}
+        <textarea
+          ref={areaRef}
+          rows={1}
           aria-label={t2("chatPlaceholder")}
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            autoresize();
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" || e.shiftKey) return;
+            if (e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            send(draft);
+          }}
           placeholder={t2("chatPlaceholder")}
-          className="h-10 rounded-full border-input bg-card px-4"
+          className="max-h-32 min-h-10 w-full flex-1 resize-none rounded-2xl border border-input bg-card px-4 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
         />
         <Button
           type="submit"

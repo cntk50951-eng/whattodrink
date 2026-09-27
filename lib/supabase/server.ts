@@ -63,6 +63,18 @@ export async function getUserId(): Promise<string | null> {
 }
 
 /**
+ * 建會話專用 service client（UR D.2：建會話要一次寫會話＋雙成員行，
+ * RLS 表達不了「對方必須是 accepted 好友」的校驗，故建會話走 service_role；
+ * route 層先驗關係再寫，secret 永不出 server，沿架構 §4）。
+ */
+export async function createServiceClient() {
+  const { createClient: createSupabaseJs } = await import("@supabase/supabase-js");
+  const env = requireSupabaseEnv();
+  return createSupabaseJs(env.url, env.secretKey, {
+    auth: { persistSession: false },
+  });
+}
+/**
  * 帶鑒權的 Supabase client（與 getUserId 同雙通道）。
  * Route Handler 內寫庫前用此 client，RLS 才能以 `auth.uid()` 生效；
  * 僅 cookie 的 `createClient()` 在 Bearer 場景會因無 session 而 42501。
