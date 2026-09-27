@@ -259,6 +259,8 @@
     "stackTitle": "{n} check-ins here",
     "stackHint": "Tap a row to open, or spread them on the map",
     "stackSpread": "Spread on map",
+    "cityName_mo": "Macao",
+    "logout": "Log out",
     "cityName": "Hong Kong",
     "meOnline": "Online",
     "meLocating": "Locating…",
@@ -333,7 +335,10 @@
     "chatDelivered": "Delivered",
     "chatListTitle": "Chats",
     "chatListEmpty": "Friend list coming soon — tap a friend pin on the map to start",
-    "chatFallbackName": "Buddy"
+    "chatFallbackName": "Buddy",
+    "chatFriendsOnly": "Online friends",
+    "chatFriendsEmpty": "No friends online right now",
+    "chatOpen": "Chat"
   },
   "terms": {
     "title": "Three modes, which one?",

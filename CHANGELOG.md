@@ -12,6 +12,9 @@
   - `v2.chatSoon/chatToday/chatRead/chatDelivered`×3（`chatSoon` 屬 A.21 缺 key 修漏）；數據文檔無需更新（零新增持久化，會話態 mock）
   - EPIC B 確認：B 是邀請即時流非聊天線，聊天通道即本 UR（A.21 遺留另開）
   - round-2（用戶拍板完整頁代 Sheet）：`ChatThread` 新＋`/v2/chat` 列表 stub＋`/v2/chat/[friendId]` 完整頁（未知 id 回退保直接 URL 可渲染）；pin 改路由跳轉；`V2ChatSheet.tsx` 刪；`chatListTitle/chatListEmpty/chatFallbackName`×3；關聯 DEF-20260927-007
+- **UR C.17 v2 在線朋友模式＋好友信息卡 [WIP]**
+  - pills 第 6 顆 toggle：開時藏自釘／打卡／足跡＋`fitPoints` 飛全員視野（跨區縮放；無人 toast 不進空圖）；`V2FriendCard` 新（頭像＋在線＋最近上線＋聊天鍵進頁，離線自動收）；`formatSeenAgo`（Intl 三語零 key）＋3 單測；`chatFriendsOnly/chatFriendsEmpty/chatOpen`×3；DB 免改（`updated_at` 現成）；數據文檔無需更新（零新增持久化）
+  - 並行註記：同伴 C.16 同文件施工中途 tsc 紅過一次（自修復）；我方 `avatar_url` 蛇形三錯即修（顺手解掉擋同伴 build 的錯）；V2Home hunks 原生 diff 逐個驗分離
 - **UR C.14 v2實時位置視覺層級 round-2（重疊自動散開＋+N堆疊列表）[WIP，未驗收未提交]**
   - `lib/mapSpread.ts`（新，純函數）：`planSpread`（像素碰撞即 Vogel 螺旋自動散開，組內 id 序確定性，超 cap 收堆疊）＋`avoidLive`（live 像素徑向避讓，活人永不動）＋`lib/mapSpread.test.ts` 9 單測＋1 快照
   - `V2MapView`：z>11 小組自動散開（免徽→fit→散三段舞）＋超 cap 組 +N 徽（`v2stack` 白底琥珀環）＋自/友/想喝/序號釘 live 避讓＋`onStackClick`＋`spreadStack`（復用 C.6 地理圓周散 pin）；刪退役 `clusterPoints`／`V2_CLUSTER_PX` 接線

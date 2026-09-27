@@ -15,12 +15,14 @@ describe("areaOf (UR C.9)", () => {
     expect(areaOf(22.445, 114.022)?.id).toBe("yuen-long");
   });
 
-  it("錨表 city／country 全填（國家層模型預留）", () => {
+  it("錨表 city／country 全填（國家層模型預留；UR C.16 起含澳門一錨）", () => {
     expect(AREA_ANCHORS.length).toBeGreaterThan(0);
     for (const a of AREA_ANCHORS) {
-      expect(a.city).toBe("香港");
+      expect(["香港", "澳門"]).toContain(a.city);
       expect(a.country).toBe("中國");
     }
+    // 澳門坐標歸議會前地，不再誤判香港錨
+    expect(areaOf(22.1938, 113.5399)?.id).toBe("senado");
   });
 
   it("錨 id 唯一", () => {
