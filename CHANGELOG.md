@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- **UR C.12 v2 捏合縮放歸地圖 [✓，用户真機验收，merged]**：v2 獨立 layout 鎖 viewport＋容器 touch none＋底部 touch-manipulation；v1／瓦片零文件；三閘285綠／lint 0 error／build 39頁
 - **UR C.10 v2他人打卡卡升級（與自家Sheet同構信息）[WIP]**
   - `lib/me.ts`加法`parseGender`（自由串轉三態，非法回secret）＋`lib/me.test.ts` 3單測
   - `V2Card other`加avatarUrl／avatarEmoji／gender／checkedInAt＋`openPin`雙源映射補齊（`PinJson`字段已夠，零後端）；他人浮動卡重排（用戶行＋酒圖hero＋時間地點，乾杯／邀約／額度原行為，容器不動）
