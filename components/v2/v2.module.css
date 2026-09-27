@@ -43,9 +43,11 @@
   inset: 0;
 }
 
-/* Leaflet 容器觸控：豎滑還給頁面，雙指縮放＋橫拖歸地圖（沿 UR1.3 配方）。 */
+/* Leaflet 容器觸控：UR C.12 改回 none（Leaflet 全接管捏合／雙擊／拖）。
+ * C.1 的 pan-y pinch-zoom 在 v2 全屏下退役——它明示瀏覽器可接 pinch，
+ * 圖上捏合變 race；v1 那份原樣不動。 */
 .v2map :global(.leaflet-container) {
-  touch-action: pan-y pinch-zoom;
+  touch-action: none;
   font: inherit;
 }
 
