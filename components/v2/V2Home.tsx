@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import {
   Camera,
@@ -34,8 +35,6 @@ import { useMyMode } from "@/hooks/useMyMode";
 import { useFriendRelation } from "@/hooks/useFriendRelation";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useLiveFriends } from "@/hooks/useLiveFriends";
-import { V2ChatSheet } from "./V2ChatSheet";
-import type { ChatFriend } from "./V2ChatSheet";
 import { LOGOUT_CLEAR_EVENT } from "@/lib/auth/clear";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -86,6 +85,7 @@ import { buzz, BUZZ_CHEERS, BUZZ_FOUND } from "@/lib/haptics";
 import { V2MapView } from "./V2MapView";
 import type { V2MapApi } from "./V2MapView";
 import { apiPinsToMarkers, mockToMarkers } from "./v2Pins";
+import type { V2Marker } from "./v2Pins";
 import styles from "./v2.module.css";
 
 /** UR2.0 mock 性別標記文案 key（三態，數據源見 lib/me.ts；沿 v1 DrinkMap 同表）。 */
@@ -189,6 +189,7 @@ export function V2Home() {
   const tm = useTranslations("mode");
   const t2 = useTranslations("v2");
   const locale = useLocale();
+  const router = useRouter();
 
   // UR A.21：watch 常開（心跳要活位置；副作用是自釘跟人走，沿 v1 live-follow 口徑）。
   const { status: geoStatus, position: geoPos } = useGeolocation({ watch: true });
@@ -205,7 +206,6 @@ export function V2Home() {
     position: geoStatus === "success" ? geoPos : null,
   });
   const { friends: liveFriends } = useLiveFriends(presence === "online");
-  const [chatFriend, setChatFriend] = useState<ChatFriend | null>(null);
   // 初始中心：首個定位 fix 飛我一次（C.11 fitHk 之後不再搶鏡頭）。
   const centeredRef = useRef(false);
   useEffect(() => {
@@ -245,6 +245,8 @@ export function V2Home() {
 
   // UR C.4 自打卡底部 Sheet：按記錄 at 認正在看的條；換酒批／刪除確認隨層開關
   const [wantSheetAt, setWantSheetAt] = useState<number | null>(null);
+  // UR C.14 round-2：+N 堆疊列表 Sheet（同點超 cap 組的成員 id，含代表）。
+  const [stackIds, setStackIds] = useState<string[] | null>(null);
   // UR C.11 round-3：詳情返回目錄（目錄來才記 "stops"；地圖釘直開為 null 不帶返回鈕）。
   const [wantReturnTo, setWantReturnTo] = useState<"stops" | null>(null);
   const [swapOpen, setSwapOpen] = useState(false);
@@ -720,11 +722,10 @@ export function V2Home() {
     });
   }
 
-  // UR A.21：點好友呼吸釘開打招呼 Sheet（通道未建，寫入零行；見 V2ChatSheet）。
+  // UR C.15：點好友呼吸釘進聊天完整頁（Sheet 已退役；路由直連可分享）。
   function openChat(userId: string): void {
-    const f = liveFriends.find((x) => x.user_id === userId);
-    if (f === undefined) return;
-    setChatFriend({ user_id: f.user_id, nickname: f.nickname, avatarUrl: f.avatar_url });
+    const prefix = locale === "zh-Hant" ? "" : `/${locale}`;
+    router.push(`${prefix}/v2/chat/${encodeURIComponent(userId)}`);
   }
 
   const friendMarkers = useMemo(
@@ -871,6 +872,7 @@ export function V2Home() {
         presence={presence}
         friends={friendMarkers}
         onFriendClick={openChat}
+        onStackClick={(ids) => setStackIds(ids)}
       />
 
       {/* 頂部簇：頭像＋城市＋模式一行，pills 緊貼下方（DEF-012 round-2：
@@ -1684,12 +1686,71 @@ export function V2Home() {
         </SheetContent>
       </Sheet>
 
-      {/* UR A.21 打招呼 Sheet（點好友呼吸釘開；通道未建，見組件註）。 */}
-      <V2ChatSheet
-        friend={chatFriend}
-        onClose={() => setChatFriend(null)}
-        onSoon={() => flashNote(t2("chatSoon"))}
-      />
+      {/* UR C.14 round-2：+N 堆疊列表 Sheet（同點超 cap 組；行點開卡，另可一鍵散開） */}
+      <Sheet
+        open={stackIds !== null}
+        onOpenChange={(v) => {
+          if (!v) setStackIds(null);
+        }}
+      >
+        <SheetContent side="bottom" className={`${styles.v2scope} max-h-[70svh] gap-4 overflow-y-auto rounded-t-2xl p-4 sm:mx-auto sm:w-full sm:max-w-md`}>
+          {(() => {
+            if (stackIds === null) return null;
+            const rows = stackIds
+              .map((id) => others.find((o) => o.id === id))
+              .filter((r): r is V2Marker => r !== undefined);
+            return (
+              <>
+                <div aria-hidden className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
+                <SheetHeader className="text-left">
+                  <SheetTitle>{t("stackTitle", { n: rows.length })}</SheetTitle>
+                  <SheetDescription>{t("stackHint")}</SheetDescription>
+                </SheetHeader>
+                <div className="flex flex-col gap-2">
+                  {rows.map((m) => (
+                    <Button
+                      key={m.id}
+                      variant="outline"
+                      onClick={() => {
+                        setStackIds(null);
+                        openPin(m.id);
+                      }}
+                      className="h-auto w-full justify-start gap-3 p-2"
+                    >
+                      <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-xl">
+                        {m.drinkEmoji ?? m.label}
+                      </span>
+                      <span className="min-w-0 flex-1 text-left">
+                        <span className="block truncate text-sm font-bold">
+                          {m.drink ?? m.label}
+                        </span>
+                        {m.online && (
+                          <span className="block truncate pt-0.5 text-xs font-normal text-muted-foreground">
+                            {t("onlineNow")}
+                          </span>
+                        )}
+                      </span>
+                      <ChevronRight size={16} aria-hidden className="shrink-0 text-muted-foreground" />
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    if (stackIds !== null) mapApi.current?.spreadStack(stackIds);
+                    setStackIds(null);
+                  }}
+                >
+                  {t("stackSpread")}
+                </Button>
+              </>
+            );
+          })()}
+        </SheetContent>
+      </Sheet>
+
     </div>
   );
 }

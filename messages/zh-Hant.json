@@ -256,6 +256,9 @@
     "trailTitle": "我的足跡 · {n} 站",
     "trailBack": "返回",
     "trailEmpty": "仲未有足跡，去飲返杯啦！",
+    "stackTitle": "呢度有 {n} 個打卡",
+    "stackHint": "點一行開卡，或一鍵喺地圖散開",
+    "stackSpread": "喺地圖上散開",
     "cityName": "香港",
     "meOnline": "在線",
     "meLocating": "定位緊…",
@@ -323,7 +326,14 @@
     "chatHi": "👋 Say Hi",
     "chatPlaceholder": "輸入訊息…",
     "chatSend": "發送",
-    "chatVoice": "語音"
+    "chatVoice": "語音",
+    "chatSoon": "聊天通道即將上線，敬請期待",
+    "chatToday": "今日",
+    "chatRead": "已讀",
+    "chatDelivered": "已送達",
+    "chatListTitle": "聊天",
+    "chatListEmpty": "好友列表即將上線，先返地圖㩒好友頭像開聊",
+    "chatFallbackName": "酒友"
   },
   "terms": {
     "title": "三種模式，點揀？",

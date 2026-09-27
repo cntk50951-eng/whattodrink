@@ -9,6 +9,7 @@
 import type { LatLng } from "./geo";
 import type { WantRecord } from "./wantRecord";
 import { parseWantHistory } from "./wantRecord";
+import { groupByAnchor, groupByCity, groupByCountry } from "./geoAreas";
 
 export type TrailStop = {
   id: string;
@@ -97,6 +98,72 @@ export function interpolateFootprints(
         step: step++,
       });
     }
+  }
+  return out;
+}
+
+/**
+ * UR C.13 區域足跡腳印（跨地区时只显示跨地区段，区内不显示；减少数量，灰色）。
+ * - 全局按 at 排序，连续不分断
+ * - 若跨国家/城市/区，则仅在跨区段插脚印（区内不插），保证跨地区可见且不拥挤
+ * - perLeg 2、cap 20，减少数量，有走动效果即可
+ */
+export function footprintsByArea(
+  stops: readonly TrailStop[],
+  perLeg = 2,
+  cap = 20,
+): FootStep[] {
+  if (stops.length < 2 || perLeg <= 0 || cap <= 0) return [];
+  const sorted = [...stops].sort((a, b) => a.at - b.at);
+  const points = sorted.map((s) => s.position);
+  // 判定层级：国家>城市>区
+  const countryGroups = groupByCountry(points);
+  const cityGroups = groupByCity(points);
+  const anchorGroups = groupByAnchor(points);
+  let level: "country" | "city" | "anchor" = "anchor";
+  if (countryGroups.length > 1) level = "country";
+  else if (cityGroups.length > 1) level = "city";
+  else if (anchorGroups.length > 1) level = "anchor";
+  else {
+    // 单区单点，无跨区，仍按全局插少量
+    return interpolateFootprints(points, perLeg, cap);
+  }
+  // 仅在跨区段插脚印
+  const out: FootStep[] = [];
+  let step = 0;
+  for (let i = 0; i < sorted.length - 1 && out.length < cap; i++) {
+    const a = sorted[i]!;
+    const b = sorted[i + 1]!;
+    let sameRegion = false;
+    if (level === "country") {
+      const ca = groupByCountry([a.position])[0]?.country;
+      const cb = groupByCountry([b.position])[0]?.country;
+      sameRegion = ca === cb;
+    } else if (level === "city") {
+      const ca = groupByCity([a.position])[0]?.city;
+      const cb = groupByCity([b.position])[0]?.city;
+      sameRegion = ca === cb;
+    } else {
+      const aa = groupByAnchor([a.position])[0]?.anchor.id;
+      const ab = groupByAnchor([b.position])[0]?.anchor.id;
+      sameRegion = aa === ab;
+    }
+    if (sameRegion) continue;
+    const angle = (Math.atan2(b.position.lng - a.position.lng, b.position.lat - a.position.lat) * 180) / Math.PI;
+    const per = Math.min(perLeg, Math.floor((cap - out.length) / 1) || 1);
+    for (let k = 1; k <= per && out.length < cap; k++) {
+      const t = k / (per + 1);
+      out.push({
+        lat: a.position.lat + (b.position.lat - a.position.lat) * t,
+        lng: a.position.lng + (b.position.lng - a.position.lng) * t,
+        angle,
+        step: step++,
+      });
+    }
+  }
+  // 若跨区段为 0（如 2 点同区），退回全局少量
+  if (out.length === 0) {
+    return interpolateFootprints(points, perLeg, cap);
   }
   return out;
 }

@@ -53,65 +53,95 @@
 
 /* 自己：藍點＋呼吸環 */
 .v2self {
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
   border-radius: 9999px;
   background: #2563eb;
-  border: 3px solid #ffffff;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  border: 4px solid #ffffff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.45);
   position: relative;
 }
 
+/* UR C.14 自釘：28px 實心＋白暈＋雙呼吸環（::before/::after 錯峰，
+ * 與打卡釘的靜態酒圖徹底分形；友釘另見下）。 */
 .v2self::after {
   content: "";
   position: absolute;
-  inset: -9px;
+  inset: -11px;
   border-radius: 9999px;
-  border: 2px solid rgb(37 99 235 / 0.55);
-  animation: v2-pulse 2s ease-out infinite;
+  border: 3px solid rgb(37 99 235 / 0.7);
+  animation: v2-pulse 1.6s ease-out infinite;
+}
+
+.v2self::before {
+  content: "";
+  position: absolute;
+  inset: -11px;
+  border-radius: 9999px;
+  border: 3px solid rgb(37 99 235 / 0.4);
+  animation: v2-pulse 1.6s ease-out 0.8s infinite;
 }
 
 /* UR A.21 自釘按模式變色（匿名沿舊藍）：在線綠／隱身灰，呼吸環同色。 */
 .v2selfOnline {
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
   border-radius: 9999px;
   background: #16a34a;
-  border: 3px solid #ffffff;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  border: 4px solid #ffffff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.45);
   position: relative;
 }
 
 .v2selfOnline::after {
   content: "";
   position: absolute;
-  inset: -9px;
+  inset: -12px;
   border-radius: 9999px;
-  border: 2px solid rgb(22 163 74 / 0.55);
-  animation: v2-pulse 2s ease-out infinite;
+  border: 3px solid rgb(22 163 74 / 0.75);
+  animation: v2-pulse 1.6s ease-out infinite;
+}
+
+.v2selfOnline::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  border-radius: 9999px;
+  border: 3px solid rgb(22 163 74 / 0.4);
+  animation: v2-pulse 1.6s ease-out 0.8s infinite;
 }
 
 .v2selfStealth {
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
   border-radius: 9999px;
   background: #6b7280;
-  border: 3px solid #ffffff;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  border: 4px solid #ffffff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.45);
   position: relative;
 }
 
 .v2selfStealth::after {
   content: "";
   position: absolute;
-  inset: -9px;
+  inset: -12px;
   border-radius: 9999px;
-  border: 2px solid rgb(107 114 128 / 0.55);
-  animation: v2-pulse 2s ease-out infinite;
+  border: 3px solid rgb(107 114 128 / 0.75);
+  animation: v2-pulse 1.6s ease-out infinite;
+}
+
+.v2selfStealth::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  border-radius: 9999px;
+  border: 3px solid rgb(107 114 128 / 0.4);
+  animation: v2-pulse 1.6s ease-out 0.8s infinite;
 }
 
 /* UR A.21 好友實時釘：白底首字＋綠環＋綠呼吸光環（區別於打卡釘的墨環）；
- * 位移過渡 1.2s linear（30s fix 間平滑跟隨；reduced-motion 下關）。 */
+ * 位移過渡 1.2s linear（30s fix 間平滑跟隨；reduced-motion 下關）。
+ * UR C.14：呼吸環加粗＋2.8s 慢節奏（與自釘 1.6s 雙環快節奏分形，一眼分自／友）。 */
 .v2friend {
   width: 40px;
   height: 40px;
@@ -132,11 +162,28 @@
 .v2friend::after {
   content: "";
   position: absolute;
-  inset: -7px;
+  inset: -8px;
   border-radius: 9999px;
-  border: 2px solid rgb(22 163 74 / 0.5);
-  animation: v2-pulse 2s ease-out infinite;
+  border: 3px solid rgb(22 163 74 / 0.7);
+  animation: v2-pulse 2.8s ease-out infinite;
   pointer-events: none;
+}
+
+/* UR C.14 round-2 +N 堆疊徽：白底琥珀環＋深字（與深色 v2cluster 反色，
+ * 點徽開堆疊列表 Sheet；行點開卡照舊）。 */
+.v2stack {
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  background: #ffffff;
+  color: #0f172a;
+  border: 3px solid #d97706;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 17px;
 }
 
 /* 他人釘：白底首字圓＋品牌環＋右上綠點 */
@@ -296,8 +343,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .v2self::after,
+  .v2self::before,
   .v2selfOnline::after,
+  .v2selfOnline::before,
   .v2selfStealth::after,
+  .v2selfStealth::before,
   .v2friend::after {
     animation: none;
   }
@@ -306,34 +356,65 @@
   }
 }
 
-/* UR C.11 round-6：腳印流（淺 slate 色序列淡入；朝向＋左右交替由調用方內聯；
-   heat 退役刪淨；reduced-motion 下靜止淺顯）。
-   round-13 休眠：動畫取消另立需求，渲染已撤，本塊暫留（Stadia 休眠先例），
-   重啟時直接可用；reduced-motion 下 display:none 照舊。 */
+/* UR C.13 脚印 — 灰色脚印（grayscale 过滤）+ 虚线，连续不分断，慢速自然行走 */
 .v2step {
-  color: #64748b;
-  opacity: 0;
-  animation: v2stepfade 2.4s ease-in-out infinite;
+  font-size: 14px;
+  line-height: 1;
+  color: #6b7280;
+  filter: grayscale(1) brightness(0.85) drop-shadow(0 1px 2px rgb(0 0 0 / 0.3));
+  opacity: 0.75;
+  animation: v2stepfade 2.2s ease-in-out infinite;
+  will-change: opacity, transform;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  width: auto;
+  height: auto;
+  display: block;
+  text-align: center;
+}
+
+.v2stepMoving {
+  font-size: 18px;
+  line-height: 1;
+  color: #4b5563;
+  filter: grayscale(1) brightness(0.65) drop-shadow(0 2px 5px rgb(0 0 0 / 0.35));
+  will-change: transform;
+  animation: v2stepBounce 1.0s ease-in-out infinite alternate;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  width: auto;
+  height: auto;
+  display: block;
+  text-align: center;
 }
 
 @keyframes v2stepfade {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes v2stepBounce {
   0% {
-    opacity: 0;
-  }
-  30% {
-    opacity: 0.95;
-  }
-  70% {
-    opacity: 0.95;
+    transform: translateY(0) scale(1);
   }
   100% {
-    opacity: 0;
+    transform: translateY(-2px) scale(1.05);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* round-11：靜止腳印只是噪聲（序號釘已承載路徑信息），直接隱藏不佔位。 */
+  .v2step,
+  .v2stepMoving {
+    animation: none;
+  }
   .v2step {
-    display: none;
+    opacity: 0.9;
   }
 }
