@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>今晚喝咩？— Whattodrink (Ligne Claire Urban v2)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,800;0,900&family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&family=DM+Mono:wght@500;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    /* ============================================================
+       LIGNE CLAIRE URBAN v2 — City Field Notes
+       Stitch DS: assets/8285717179341923372
+       Sister of Ligne Claire Noir — same linework discipline
+       but applied to the city: tram rails, skyscraper outlines,
+       crosswalk stripes, monospace stamps
+       Enhanced: 2026-09-03
+       ============================================================ */
+
+    :root {
+      --color-paper: #f4ecd8;
+      --color-paper-2: #e8dec4;
+      --color-paper-3: #d8c8a0;
+      --color-grid: rgba(26, 26, 26, 0.06);
+      --color-ink: #1a1a1a;
+      --color-ink-soft: #3a3a3a;
+      --color-ink-muted: #6a6a6a;
+      --color-red: #d63a2e;
+      --color-navy: #1f3a5f;
+      --color-navy-deep: #0f2540;
+      --color-mustard: #c89030;
+      --color-mustard-light: #e0a838;
+
+      --stroke-w: 1.5px;
+      --stroke-w-thick: 2.5px;
+      --stroke: var(--stroke-w) solid var(--color-ink);
+      --stroke-thick: var(--stroke-w-thick) solid var(--color-ink);
+
+      --hard-sm: 2px 2px 0 0 var(--color-ink);
+      --hard-md: 4px 4px 0 0 var(--color-ink);
+      --hard-lg: 6px 6px 0 0 var(--color-ink);
+
+      --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px;
+      --s-6: 24px; --s-7: 32px; --s-8: 40px; --s-9: 48px; --s-10: 64px;
+      --s-11: 80px; --s-12: 96px;
+      --container-margin: 32px;
+      --container-max: 1280px;
+
+      --font-display: "Playfair Display", "Noto Sans TC", Georgia, serif;
+      --font-sans: "Inter", "Noto Sans TC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono: "JetBrains Mono", "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      font-size: 16px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      position: relative;
+      overflow-x: hidden;
+    }
+    /* Subtle blueprint grid texture */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      background-image:
+        linear-gradient(var(--color-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+      background-size: 32px 32px;
+      opacity: 0.4;
+    }
+    /* Paper grain */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.025;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      mix-blend-mode: multiply;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+    img, svg { display: block; max-width: 100%; }
+
+    /* Typography */
+    .display {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-style: italic;
+      letter-spacing: -0.04em;
+      line-height: 0.92;
+      font-size: clamp(48px, 8vw, 80px);
+    }
+    .h1 {
+      font-family: var(--font-display);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      font-size: clamp(32px, 5vw, 44px);
+    }
+    .h2 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      font-size: clamp(24px, 3.5vw, 32px);
+    }
+    .h3 { font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; font-size: 18px; }
+    .body { font-weight: 400; font-size: 15px; line-height: 1.65; }
+    .body-lg { font-weight: 400; font-size: 17px; line-height: 1.6; }
+    .label {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 11px;
+    }
+    .label-sm {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-size: 10px;
+    }
+    .mono { font-family: var(--font-mono); }
+    .muted { color: var(--color-ink-muted); }
+    .accent-red { color: var(--color-red); }
+
+    .container {
+      max-width: var(--container-max);
+      margin: 0 auto;
+      padding: 0 var(--container-margin);
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ============================================================
+       TOP NAVIGATION
+       ============================================================ */
+    .topbar {
+      background: var(--color-paper);
+      border-bottom: var(--stroke);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      background: rgba(244, 236, 216, 0.92);
+    }
+    .topbar__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s-6);
+      padding: var(--s-4) 0;
+    }
+    .wordmark {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-style: italic;
+      font-size: 20px;
+      letter-spacing: -0.02em;
+    }
+    .wordmark__dot {
+      display: inline-block;
+      width: 0.4em;
+      height: 0.4em;
+      background: var(--color-red);
+      margin: 0 0.08em;
+      transform: translateY(-0.05em);
+    }
+    .nav { display: none; gap: var(--s-7); }
+    .nav__item {
+      position: relative;
+      padding: var(--s-2) 0;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--color-ink-soft);
+    }
+    .nav__item:hover { color: var(--color-ink); }
+    .nav__item--active { color: var(--color-ink); }
+    .nav__item--active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 3px;
+      background: var(--color-ink);
+    }
+    .nav__item--active::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 2px;
+      height: 6px;
+      background: var(--color-mustard);
+      opacity: 0.3;
+      z-index: -1;
+    }
+    @media (min-width: 768px) { .nav { display: flex; } }
+    .lang-switch {
+      display: flex;
+      border: var(--stroke);
+      border-radius: 9999px;
+      overflow: hidden;
+      background: var(--color-paper);
+    }
+    .lang-switch__btn {
+      padding: 6px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      background: var(--color-paper);
+      color: var(--color-ink);
+      border-right: var(--stroke);
+      transition: all 0.15s ease;
+    }
+    .lang-switch__btn:last-child { border-right: none; }
+    .lang-switch__btn--active { background: var(--color-ink); color: var(--color-paper); }
+
+    /* ============================================================
+       HERO
+       ============================================================ */
+    .hero {
+      padding: var(--s-11) 0 var(--s-12);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero__grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-9);
+      align-items: center;
+    }
+    @media (min-width: 960px) {
+      .hero__grid { grid-template-columns: 1.1fr 1fr; }
+    }
+    .hero__zone-stamps {
+      display: flex;
+      gap: var(--s-3);
+      margin-bottom: var(--s-5);
+      flex-wrap: wrap;
+    }
+    .hero__zone-stamp {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border: var(--stroke);
+      background: var(--color-paper-2);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+    .hero__zone-stamp--red {
+      background: var(--color-red);
+      color: var(--color-paper);
+    }
+    .hero__zone-stamp-dot {
+      width: 5px;
+      height: 5px;
+      background: currentColor;
+      transform: rotate(45deg);
+    }
+    .hero__title-line {
+      display: block;
+      position: relative;
+    }
+    .hero__title-marker {
+      color: var(--color-red);
+      font-style: italic;
+    }
+    .hero__sub {
+      margin-top: var(--s-6);
+      max-width: 38ch;
+      color: var(--color-ink-soft);
+    }
+    .hero__cta-row {
+      margin-top: var(--s-8);
+      display: flex;
+      gap: var(--s-4);
+      flex-wrap: wrap;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s-2);
+      padding: 14px 24px;
+      font-family: var(--font-mono);
+      font-weight: 500;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      border: var(--stroke);
+      transition: all 0.12s ease;
+      cursor: pointer;
+    }
+    .btn:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: var(--hard-md);
+    }
+    .btn:active { transform: translate(0, 0); box-shadow: none; }
+    .btn--ink { background: var(--color-ink); color: var(--color-paper); }
+    .btn--ink:hover { background: var(--color-ink-soft); }
+    .btn--red { background: var(--color-red); color: var(--color-paper); }
+    .btn--red:hover { background: #a82820; }
+    .btn--ghost { background: var(--color-paper); color: var(--color-ink); }
+    .btn--ghost:hover { background: var(--color-paper-2); }
+    .btn--sm { padding: 8px 14px; font-size: 10px; }
+
+    /* ============================================================
+       HERO ART — City scene with tram, buildings, beer mug
+       ============================================================ */
+    .hero__art {
+      position: relative;
+      aspect-ratio: 1 / 1;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    .hero__art-shadow {
+      position: absolute;
+      inset: 6px -8px -8px 8px;
+      background: var(--color-ink);
+      z-index: 0;
+    }
+    .hero__art-frame {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: var(--color-paper-2);
+      border: var(--stroke-thick);
+      overflow: hidden;
+    }
+    .hero__art-stamp {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: var(--color-paper);
+      border: var(--stroke);
+      padding: 4px 8px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      z-index: 2;
+    }
+    .hero__art-coords {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      color: var(--color-ink-soft);
+      text-align: right;
+      z-index: 2;
+    }
+    .hero__art-tag {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: var(--color-ink);
+      color: var(--color-paper);
+      padding: 4px 10px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      z-index: 2;
+    }
+
+    /* ============================================================
+       SECTIONS — with mono stamps and chapter ornaments
+       ============================================================ */
+    .section {
+      padding: var(--s-11) 0;
+      position: relative;
+    }
+    .section--alt {
+      background: var(--color-paper-2);
+    }
+    .section__head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: var(--s-6);
+      margin-bottom: var(--s-9);
+      padding-bottom: var(--s-5);
+      border-bottom: var(--stroke);
+    }
+    .section__head-text { max-width: 60ch; }
+    .section__rule-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      color: var(--color-red);
+      margin-bottom: var(--s-3);
+      text-transform: uppercase;
+    }
+    .section__head-meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      color: var(--color-ink-muted);
+      text-transform: uppercase;
+    }
+
+    /* ============================================================
+       BENTO GRID — cards with mono zone stamps
+       ============================================================ */
+    .bento {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-auto-rows: minmax(220px, auto);
+      gap: var(--s-5);
+    }
+    @media (min-width: 768px) {
+      .bento { grid-template-columns: 2fr 1fr; grid-auto-rows: minmax(260px, auto); }
+    }
+    .bento__card {
+      position: relative;
+      background: var(--color-paper);
+      border: var(--stroke);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: var(--hard-md);
+      transition: all 0.2s ease;
+    }
+    .bento__card:hover {
+      transform: translate(-3px, -3px);
+      box-shadow: var(--hard-lg);
+    }
+    .bento__card-stamp {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      padding: 4px 8px;
+      background: var(--color-ink);
+      color: var(--color-paper);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      z-index: 2;
+    }
+    .bento__card-body {
+      padding: var(--s-6);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-4);
+      flex: 1;
+    }
+    .bento__card-art {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 140px;
+    }
+    .bento__card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: var(--s-4);
+      border-top: var(--stroke);
+    }
+    .bento__card-meta-text {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .bento__num {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-style: italic;
+      font-size: 56px;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      color: var(--color-red);
+    }
+    .bento__num--navy { color: var(--color-navy); }
+    .bento__num--ink { color: var(--color-ink); }
+
+    /* ============================================================
+       HOW IT WORKS — numbered steps with mono zone markers
+       ============================================================ */
+    .how {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-5);
+    }
+    @media (min-width: 768px) {
+      .how { grid-template-columns: 1fr auto 1fr auto 1fr; align-items: stretch; }
+    }
+    .how__step {
+      background: var(--color-paper);
+      border: var(--stroke);
+      padding: var(--s-6);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-3);
+      position: relative;
+      transition: all 0.2s ease;
+    }
+    .how__step:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: var(--hard-md);
+    }
+    .how__step::before {
+      content: "";
+      position: absolute;
+      top: -1px;
+      left: -1px;
+      width: 16px;
+      height: 16px;
+      background: var(--color-mustard);
+      border-right: var(--stroke);
+      border-bottom: var(--stroke);
+    }
+    .how__step-zone {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      color: var(--color-red);
+      padding-left: 24px;
+      text-transform: uppercase;
+    }
+    .how__num {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-style: italic;
+      font-size: 40px;
+      letter-spacing: -0.04em;
+      color: var(--color-red);
+      line-height: 1;
+    }
+    .how__arrow {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-ink);
+    }
+    @media (min-width: 768px) { .how__arrow { display: flex; } }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    .footer {
+      border-top: var(--stroke);
+      padding: var(--s-9) 0 var(--s-8);
+      background: var(--color-paper-2);
+    }
+    .footer__inner {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-6);
+      align-items: flex-start;
+    }
+    @media (min-width: 768px) {
+      .footer__inner {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
+    }
+    .footer__brand {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-2);
+    }
+    .footer__brand-meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: var(--color-ink-muted);
+      text-transform: uppercase;
+    }
+    .socials {
+      display: flex;
+      gap: var(--s-3);
+    }
+    .socials__btn {
+      width: 40px;
+      height: 40px;
+      border: var(--stroke);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--color-paper);
+      transition: all 0.15s ease;
+    }
+    .socials__btn:hover {
+      background: var(--color-ink);
+      color: var(--color-paper);
+      transform: translate(-2px, -2px);
+      box-shadow: var(--hard-sm);
+    }
+
+    /* Accessibility */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    /* Draw-lot animation — comic rattle + reveal (simplified sample per UR1.4) */
+    @keyframes rattle {
+      0%, 100% { transform: rotate(0deg); }
+      20% { transform: rotate(-2deg); }
+      40% { transform: rotate(2deg); }
+      60% { transform: rotate(-1.5deg); }
+      80% { transform: rotate(1.5deg); }
+    }
+    .shuffling { animation: rattle 0.12s linear infinite; transform-origin: center; }
+    .draw-out { min-height: 14px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Top navigation -->
+  <header class="topbar" role="banner">
+    <div class="container topbar__inner">
+      <a href="#" class="wordmark" aria-label="Whattodrink home">
+        WHATTO<span class="wordmark__dot" aria-hidden="true"></span>DRINK
+      </a>
+      <nav class="nav" aria-label="主導航">
+        <a href="#" class="nav__item nav__item--active">今晚喝咩</a>
+        <a href="#" class="nav__item">拍照選酒</a>
+        <a href="#" class="nav__item">心情推薦</a>
+      </nav>
+      <div class="lang-switch" role="group" aria-label="語言切換">
+        <button class="lang-switch__btn lang-switch__btn--active" type="button" aria-pressed="true">繁</button>
+        <button class="lang-switch__btn" type="button" aria-pressed="false">简</button>
+        <button class="lang-switch__btn" type="button" aria-pressed="false">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero__grid">
+        <div>
+          <div class="hero__zone-stamps">
+            <span class="hero__zone-stamp hero__zone-stamp--red">
+              <span class="hero__zone-stamp-dot" aria-hidden="true"></span>
+              ZONE 01 · KOWLOON
+            </span>
+            <span class="hero__zone-stamp">
+              <span class="hero__zone-stamp-dot" aria-hidden="true"></span>
+              22.302°N · 114.177°E
+            </span>
+          </div>
+          <h1 class="display">
+            <span class="hero__title-line">今晚</span>
+            <span class="hero__title-line">喝咩<span class="hero__title-marker">？</span></span>
+          </h1>
+          <p class="body-lg hero__sub">
+            搭叮叮返到屋企、或者轉個彎就到嘅酒吧——讓命運幫你揀返杯啱你嘅酒。獨酌定聚會，都唔使再揀到頭都大。
+          </p>
+          <div class="hero__cta-row">
+            <a href="#" class="btn btn--ink">隨機抽一杯</a>
+            <a href="#" class="btn btn--ghost">睇下點用</a>
+          </div>
+        </div>
+
+        <!-- Hero illustration: City scene with tram + beer mug -->
+        <div class="hero__art" aria-hidden="true">
+          <div class="hero__art-shadow"></div>
+          <div class="hero__art-frame">
+            <div class="hero__art-stamp">UR 1.4 #03</div>
+            <div class="hero__art-coords">FIELD NOTE 042<br>EXP 35mm · ƒ/2.8</div>
+
+            <svg viewBox="0 0 400 400" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="City field note beer illustration">
+              <defs>
+                <clipPath id="artClip">
+                  <rect x="0" y="0" width="400" height="400"/>
+                </clipPath>
+                <pattern id="grid" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#1a1a1a" stroke-width="0.3" opacity="0.15"/>
+                </pattern>
+                <pattern id="hatch" x="0" y="0" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                  <line x1="0" y1="0" x2="0" y2="5" stroke="#f4ecd8" stroke-width="1" opacity="0.55"/>
+                </pattern>
+              </defs>
+
+              <g clip-path="url(#artClip)">
+                <!-- Grid background -->
+                <rect x="0" y="0" width="400" height="400" fill="url(#grid)"/>
+
+                <!-- Sky -->
+                <rect x="0" y="0" width="400" height="240" fill="#f4ecd8"/>
+
+                <!-- Sun with rays -->
+                <g stroke="#1a1a1a" stroke-width="1.2">
+                  <circle cx="330" cy="60" r="22" fill="#c89030"/>
+                  <line x1="330" y1="26" x2="330" y2="14"/>
+                  <line x1="330" y1="94" x2="330" y2="106"/>
+                  <line x1="296" y1="60" x2="284" y2="60"/>
+                  <line x1="364" y1="60" x2="376" y2="60"/>
+                  <line x1="306" y1="36" x2="298" y2="28"/>
+                  <line x1="354" y1="36" x2="362" y2="28"/>
+                </g>
+                <!-- Hergé clouds -->
+                <g fill="none" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M 40 92 Q 55 77 75 84 Q 90 74 105 86"/>
+                  <path d="M 52 98 Q 65 88 82 94 Q 94 87 104 95"/>
+                  <path d="M 196 62 Q 208 52 222 57 Q 234 50 244 58"/>
+                </g>
+                <!-- Birds -->
+                <g fill="none" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round">
+                  <path d="M 140 72 Q 146 66 152 72 Q 158 66 164 72"/>
+                  <path d="M 170 86 Q 175 81 180 86 Q 185 81 190 86"/>
+                </g>
+
+                <!-- Road rules framing the crosswalk bars -->
+                <line x1="0" y1="278" x2="400" y2="278" stroke="#1a1a1a" stroke-width="1"/>
+                <line x1="0" y1="296" x2="400" y2="296" stroke="#1a1a1a" stroke-width="1"/>
+
+                <!-- Far buildings (simple boxes) -->
+                <g stroke="#1a1a1a" stroke-width="1.5" fill="#1f3a5f">
+                  <rect x="20" y="140" width="30" height="100"/>
+                  <rect x="55" y="120" width="35" height="120"/>
+                  <rect x="320" y="135" width="30" height="105"/>
+                  <rect x="355" y="150" width="30" height="90"/>
+                </g>
+
+                <!-- Building shade strips (paper hatch on navy) -->
+                <g fill="url(#hatch)" opacity="0.6">
+                  <rect x="42" y="140" width="8" height="100"/>
+                  <rect x="82" y="120" width="8" height="120"/>
+                  <rect x="342" y="135" width="8" height="105"/>
+                  <rect x="377" y="150" width="8" height="90"/>
+                </g>
+
+                <!-- Far building windows — dense grids, varied lit -->
+                <g fill="#c89030">
+                  <rect x="25" y="150" width="4" height="5" opacity="0.9"/>
+                  <rect x="34" y="150" width="4" height="5" opacity="0.4"/>
+                  <rect x="25" y="162" width="4" height="5" opacity="0.5"/>
+                  <rect x="34" y="162" width="4" height="5" opacity="0.85"/>
+                  <rect x="25" y="174" width="4" height="5" opacity="0.7"/>
+                  <rect x="34" y="174" width="4" height="5" opacity="0.4"/>
+                  <rect x="25" y="186" width="4" height="5" opacity="0.45"/>
+                  <rect x="34" y="186" width="4" height="5" opacity="0.9"/>
+                  <rect x="60" y="132" width="4" height="5" opacity="0.9"/>
+                  <rect x="69" y="132" width="4" height="5" opacity="0.5"/>
+                  <rect x="78" y="132" width="4" height="5" opacity="0.4"/>
+                  <rect x="60" y="144" width="4" height="5" opacity="0.4"/>
+                  <rect x="69" y="144" width="4" height="5" opacity="0.85"/>
+                  <rect x="78" y="144" width="4" height="5" opacity="0.6"/>
+                  <rect x="60" y="156" width="4" height="5" opacity="0.7"/>
+                  <rect x="69" y="156" width="4" height="5" opacity="0.4"/>
+                  <rect x="78" y="156" width="4" height="5" opacity="0.9"/>
+                  <rect x="325" y="147" width="4" height="5" opacity="0.85"/>
+                  <rect x="334" y="147" width="4" height="5" opacity="0.4"/>
+                  <rect x="325" y="159" width="4" height="5" opacity="0.5"/>
+                  <rect x="334" y="159" width="4" height="5" opacity="0.9"/>
+                  <rect x="325" y="171" width="4" height="5" opacity="0.4"/>
+                  <rect x="334" y="171" width="4" height="5" opacity="0.7"/>
+                  <rect x="360" y="162" width="4" height="5" opacity="0.9"/>
+                  <rect x="369" y="162" width="4" height="5" opacity="0.45"/>
+                  <rect x="360" y="174" width="4" height="5" opacity="0.6"/>
+                  <rect x="369" y="174" width="4" height="5" opacity="0.85"/>
+                </g>
+
+                <!-- Crosswalk lines (white) -->
+                <g fill="#f4ecd8">
+                  <rect x="40" y="285" width="30" height="4"/>
+                  <rect x="90" y="285" width="30" height="4"/>
+                  <rect x="140" y="285" width="30" height="4"/>
+                  <rect x="200" y="285" width="30" height="4"/>
+                  <rect x="260" y="285" width="30" height="4"/>
+                  <rect x="310" y="285" width="30" height="4"/>
+                  <rect x="360" y="285" width="30" height="4"/>
+                </g>
+
+                <!-- Tram rails -->
+                <line x1="0" y1="320" x2="400" y2="300" stroke="#1a1a1a" stroke-width="2"/>
+                <line x1="0" y1="340" x2="400" y2="320" stroke="#1a1a1a" stroke-width="2"/>
+
+                <!-- Tie bars (railroad ties) -->
+                <g fill="#5a4a30">
+                  <rect x="20" y="316" width="8" height="28" transform="skewX(-15)"/>
+                  <rect x="80" y="312" width="8" height="28" transform="skewX(-15)"/>
+                  <rect x="140" y="308" width="8" height="28" transform="skewX(-15)"/>
+                  <rect x="200" y="304" width="8" height="28" transform="skewX(-15)"/>
+                  <rect x="260" y="300" width="8" height="28" transform="skewX(-15)"/>
+                  <rect x="320" y="296" width="8" height="28" transform="skewX(-15)"/>
+                </g>
+
+                <!-- Beer mug — center -->
+                <g>
+                  <!-- Glass body -->
+                  <path d="M 130 140 L 128 280 Q 128 296 145 296 L 235 296 Q 252 296 252 280 L 250 140 Z"
+                        fill="#f4ecd8" stroke="#1a1a1a" stroke-width="1.5" stroke-linejoin="round"/>
+                  <!-- Volume — hatch shade on right -->
+                  <rect x="226" y="145" width="20" height="145" fill="url(#hatch)" opacity="0.5"/>
+                  <!-- Foam -->
+                  <path d="M 122 140 Q 118 115 140 110 Q 155 95 175 105 Q 195 92 215 105 Q 235 95 252 110 Q 260 115 258 140 Z"
+                        fill="#d63a2e" stroke="#1a1a1a" stroke-width="1.5" stroke-linejoin="round"/>
+                  <!-- Foam micro-bubbles -->
+                  <g fill="#f4ecd8" stroke="#1a1a1a" stroke-width="1">
+                    <circle cx="150" cy="118" r="2.6"/>
+                    <circle cx="175" cy="110" r="2.2"/>
+                    <circle cx="200" cy="116" r="2.6"/>
+                    <circle cx="225" cy="112" r="2.2"/>
+                    <circle cx="243" cy="120" r="2.4"/>
+                  </g>
+                  <!-- Foam highlights -->
+                  <ellipse cx="155" cy="118" rx="5" ry="2" fill="#f4ecd8" opacity="0.5"/>
+                  <ellipse cx="195" cy="110" rx="6" ry="2.5" fill="#f4ecd8" opacity="0.5"/>
+                  <ellipse cx="235" cy="118" rx="5" ry="2" fill="#f4ecd8" opacity="0.5"/>
+                  <!-- Liquid -->
+                  <path d="M 132 175 L 130 280 Q 130 294 145 294 L 235 294 Q 250 294 250 280 L 248 175 Z"
+                        fill="#c89030"/>
+                  <line x1="132" y1="175" x2="250" y2="175" stroke="#1a1a1a" stroke-width="1.5"/>
+                  <!-- Liquid strata lines -->
+                  <g stroke="#1a1a1a" stroke-width="1" opacity="0.5" stroke-linecap="round">
+                    <line x1="140" y1="210" x2="190" y2="210"/>
+                    <line x1="200" y1="240" x2="246" y2="240"/>
+                    <line x1="140" y1="265" x2="180" y2="265"/>
+                  </g>
+                  <!-- Bubbles -->
+                  <g stroke="#1a1a1a" stroke-width="1" fill="#f4ecd8" opacity="0.6">
+                    <circle cx="160" cy="210" r="4"/>
+                    <circle cx="190" cy="230" r="5"/>
+                    <circle cx="220" cy="215" r="3.5"/>
+                    <circle cx="170" cy="260" r="4"/>
+                    <circle cx="210" cy="275" r="4"/>
+                  </g>
+                  <!-- Vertical highlight -->
+                  <line x1="140" y1="195" x2="140" y2="285" stroke="#f4ecd8" stroke-width="2" opacity="0.4"/>
+                  <line x1="144" y1="210" x2="144" y2="280" stroke="#f4ecd8" stroke-width="1" opacity="0.3"/>
+                  <!-- Handle -->
+                  <path d="M 252 200 Q 290 200 290 240 Q 290 280 252 280"
+                        fill="none" stroke="#1a1a1a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <!-- W·D badge -->
+                  <circle cx="190" cy="240" r="16" fill="#f4ecd8" stroke="#1a1a1a" stroke-width="1.5"/>
+                  <circle cx="190" cy="240" r="12" fill="none" stroke="#d63a2e" stroke-width="1.2"/>
+                  <text x="190" y="245" text-anchor="middle" fill="#1a1a1a" font-family="Playfair Display, serif" font-weight="900" font-style="italic" font-size="11">W·D</text>
+                </g>
+
+                <!-- Overhead catenary wire -->
+                <line x1="0" y1="290" x2="400" y2="286" stroke="#1a1a1a" stroke-width="1"/>
+                <line x1="120" y1="289" x2="120" y2="295" stroke="#1a1a1a" stroke-width="1"/>
+                <line x1="240" y1="288" x2="240" y2="294" stroke="#1a1a1a" stroke-width="1"/>
+
+                <!-- Foreground: HK Tram -->
+                <g>
+                  <!-- Tram body -->
+                  <path d="M 60 320 L 55 360 L 175 360 L 180 320 Z" fill="#1f3a5f" stroke="#1a1a1a" stroke-width="1.5" stroke-linejoin="round"/>
+                  <!-- Tram top -->
+                  <rect x="55" y="315" width="130" height="8" fill="#1a1a1a" stroke="#1a1a1a" stroke-width="1"/>
+                  <!-- Tram windows -->
+                  <g fill="#f4ecd8" stroke="#1a1a1a" stroke-width="1">
+                    <rect x="65" y="325" width="15" height="14"/>
+                    <rect x="84" y="325" width="15" height="14"/>
+                    <rect x="103" y="325" width="15" height="14"/>
+                    <rect x="122" y="325" width="15" height="14"/>
+                    <rect x="141" y="325" width="15" height="14"/>
+                    <rect x="160" y="325" width="15" height="14"/>
+                  </g>
+                  <!-- Door seam + headlights + skirt -->
+                  <line x1="118" y1="322" x2="116" y2="360" stroke="#1a1a1a" stroke-width="1"/>
+                  <circle cx="62" cy="352" r="3.5" fill="#f4ecd8" stroke="#1a1a1a" stroke-width="1"/>
+                  <circle cx="178" cy="352" r="3.5" fill="#f4ecd8" stroke="#1a1a1a" stroke-width="1"/>
+                  <line x1="58" y1="358" x2="178" y2="358" stroke="#1a1a1a" stroke-width="1"/>
+                  <!-- Tram route number -->
+                  <rect x="65" y="345" width="25" height="10" fill="#d63a2e"/>
+                  <text x="77" y="353" text-anchor="middle" fill="#f4ecd8" font-family="JetBrains Mono, monospace" font-weight="700" font-size="7">H1</text>
+                  <!-- Tram wheels -->
+                  <circle cx="75" cy="365" r="6" fill="#1a1a1a" stroke="#1a1a1a" stroke-width="1"/>
+                  <circle cx="165" cy="365" r="6" fill="#1a1a1a" stroke="#1a1a1a" stroke-width="1"/>
+                  <circle cx="75" cy="365" r="2" fill="#f4ecd8"/>
+                  <circle cx="165" cy="365" r="2" fill="#f4ecd8"/>
+                  <!-- Tram pole -->
+                  <line x1="120" y1="295" x2="120" y2="315" stroke="#1a1a1a" stroke-width="1.5"/>
+                </g>
+
+                <!-- Foreground ground line -->
+                <line x1="0" y1="378" x2="400" y2="378" stroke="#1a1a1a" stroke-width="1.5"/>
+
+                <!-- Annotation lines (field note style) -->
+                <g stroke="#d63a2e" stroke-width="0.8" stroke-dasharray="3 2" fill="none" opacity="0.6">
+                  <line x1="80" y1="50" x2="190" y2="130"/>
+                  <line x1="280" y1="50" x2="200" y2="125"/>
+                </g>
+                <circle cx="80" cy="50" r="3" fill="none" stroke="#d63a2e" stroke-width="1"/>
+                <circle cx="280" cy="50" r="3" fill="none" stroke="#d63a2e" stroke-width="1"/>
+                <text x="80" y="40" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="500" font-size="8" fill="#d63a2e">A</text>
+                <text x="280" y="40" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="500" font-size="8" fill="#d63a2e">B</text>
+              </g>
+            </svg>
+
+            <div class="hero__art-tag">IPA · 4.5% · 1958</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bento Grid -->
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section__head">
+        <div class="section__head-text">
+          <div class="section__rule-num">UR 1.1 · 3 PATHS</div>
+          <h2 class="h1">三個方法，揀返你今晚嗰杯</h2>
+          <p class="body muted" style="margin-top: 12px">
+            隨機抽、影相認、講心情——三種入場方式，揀你最啱嗰個。
+          </p>
+        </div>
+        <div class="section__head-meta">UR 1.1 / ZONE 02 / KOWLOON</div>
+      </div>
+
+      <div class="bento">
+        <!-- Main card — random pick -->
+        <article class="bento__card">
+          <div class="bento__card-stamp">Z-01 / RANDOM</div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg id="drawArt" viewBox="0 0 240 200" width="100%" xmlns="http://www.w3.org/2000/svg">
+                <!-- Bottle + glass with map markers -->
+                <path d="M 40 60 L 40 75 Q 32 75 32 82 L 32 160 Q 32 170 42 170 L 92 170 Q 102 170 102 160 L 102 82 Q 102 75 94 75 L 94 60 Z"
+                      fill="#f4ecd8" stroke="#1a1a1a" stroke-width="1.5" stroke-linejoin="round"/>
+                <rect x="50" y="100" width="36" height="30" fill="#d63a2e" stroke="#1a1a1a" stroke-width="1"/>
+                <text x="68" y="120" text-anchor="middle" fill="#f4ecd8" font-family="Playfair Display, serif" font-weight="900" font-style="italic" font-size="10">W·D</text>
+                <path d="M 145 90 L 135 170 L 205 170 L 195 90 Z" fill="#f4ecd8" stroke="#1a1a1a" stroke-width="1.5" stroke-linejoin="round"/>
+                <line x1="140" y1="115" x2="200" y2="115" stroke="#1a1a1a" stroke-width="1.5"/>
+                <path d="M 138 90 Q 136 70 155 68 Q 170 55 185 70 Q 200 60 202 90 Z" fill="#d63a2e" stroke="#1a1a1a" stroke-width="1.5"/>
+                <path d="M 140 120 L 137 167 L 203 167 L 200 120 Z" fill="#c89030"/>
+                <!-- Map marker -->
+                <circle cx="225" cy="50" r="6" fill="none" stroke="#d63a2e" stroke-width="1.5"/>
+                <circle cx="225" cy="50" r="2" fill="#d63a2e"/>
+                <line x1="225" y1="56" x2="225" y2="100" stroke="#d63a2e" stroke-width="1" stroke-dasharray="2 2"/>
+                <text x="225" y="42" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="500" font-size="8" fill="#d63a2e">YOU</text>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div class="bento__card-meta-text">
+                <div class="label-sm muted">冇目標 · 0 SEC</div>
+                <div class="h3" style="margin-top: 4px">由命運揀返杯</div>
+                <div class="label-sm accent-red draw-out" id="drawOut" aria-live="polite">未開獎</div>
+              </div>
+              <a href="#" class="btn btn--ink btn--sm" id="drawBtn">立即試</a>
+            </div>
+          </div>
+        </article>
+
+        <!-- Photo pick card -->
+        <article class="bento__card">
+          <div class="bento__card-stamp">Z-02 / PHOTO</div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 160 200" width="80%" xmlns="http://www.w3.org/2000/svg">
+                <rect x="40" y="20" width="80" height="160" rx="6" fill="#f4ecd8" stroke="#1a1a1a" stroke-width="1.5"/>
+                <rect x="46" y="34" width="68" height="120" fill="#1f3a5f" stroke="#1a1a1a" stroke-width="1.5"/>
+                <circle cx="80" cy="90" r="20" fill="#f4ecd8" stroke="#1a1a1a" stroke-width="1.5"/>
+                <circle cx="80" cy="90" r="12" fill="#1a1a1a"/>
+                <circle cx="80" cy="90" r="5" fill="#d63a2e"/>
+                <line x1="72" y1="26" x2="88" y2="26" stroke="#1a1a1a" stroke-width="1.5"/>
+                <circle cx="80" cy="166" r="4" fill="none" stroke="#1a1a1a" stroke-width="1.5"/>
+                <circle cx="108" cy="46" r="2.5" fill="#d63a2e"/>
+                <!-- Scan frame -->
+                <g stroke="#c89030" stroke-width="1.5" fill="none">
+                  <path d="M 56 50 L 56 44 L 62 44"/>
+                  <path d="M 104 44 L 110 44 L 110 50"/>
+                  <path d="M 56 138 L 56 144 L 62 144"/>
+                  <path d="M 104 144 L 110 144 L 110 138"/>
+                </g>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div class="bento__card-meta-text">
+                <div class="label-sm muted">便利店 · 5 SEC</div>
+                <div class="h3" style="margin-top: 4px">影張相即刻知</div>
+              </div>
+              <a href="#" class="btn btn--ghost btn--sm">試下</a>
+            </div>
+          </div>
+        </article>
+
+        <!-- Mood pick card -->
+        <article class="bento__card">
+          <div class="bento__card-stamp">Z-03 / MOOD</div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 160 200" width="80%" xmlns="http://www.w3.org/2000/svg">
+                <path d="M 25 100 Q 25 50 80 50 Q 135 50 135 100 Q 135 145 80 145 L 60 145 L 48 158 L 52 145 Q 25 145 25 100 Z"
+                      fill="#f4ecd8" stroke="#1a1a1a" stroke-width="1.5" stroke-linejoin="round"/>
+                <circle cx="42" cy="162" r="5" fill="#f4ecd8" stroke="#1a1a1a" stroke-width="1.5"/>
+                <circle cx="32" cy="172" r="2.5" fill="#f4ecd8" stroke="#1a1a1a" stroke-width="1.5"/>
+                <rect x="62" y="80" width="36" height="38" fill="#d63a2e" stroke="#1a1a1a" stroke-width="1.5"/>
+                <line x1="62" y1="90" x2="98" y2="90" stroke="#1a1a1a" stroke-width="1.5"/>
+                <line x1="62" y1="105" x2="98" y2="105" stroke="#1a1a1a" stroke-width="1.5"/>
+                <path d="M 60 80 Q 58 68 70 66 Q 80 58 90 68 Q 100 64 100 80 Z" fill="#f4ecd8" stroke="#1a1a1a" stroke-width="1.5"/>
+                <path d="M 98 92 Q 108 92 108 100 Q 108 108 98 108" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/>
+                <!-- Mood indicators -->
+                <circle cx="42" cy="70" r="3" fill="#d63a2e"/>
+                <circle cx="55" cy="65" r="3" fill="#1f3a5f"/>
+                <circle cx="115" cy="65" r="3" fill="#c89030"/>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div class="bento__card-meta-text">
+                <div class="label-sm muted">揀唔到 · 1 MIN</div>
+                <div class="h3" style="margin-top: 4px">講你而家點</div>
+              </div>
+              <a href="#" class="btn btn--ghost btn--sm">揀返杯</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="section">
+    <div class="container">
+      <div class="section__head">
+        <div class="section__head-text">
+          <div class="section__rule-num">UR 1.1 · 3 STEPS</div>
+          <h2 class="h1">點樣運作</h2>
+          <p class="body muted" style="margin-top: 12px">
+            三個 step，由揀到飲到記，全程唔使 1 分鐘。
+          </p>
+        </div>
+        <div class="section__head-meta">UR 1.1 / ZONE 03 / ROUTE</div>
+      </div>
+
+      <div class="how">
+        <article class="how__step">
+          <div class="how__step-zone">ZONE / KWL</div>
+          <div class="how__num">01</div>
+          <div class="h3">揀方法</div>
+          <p class="body muted">隨機抽、影相、講心情——揀你而家想點。</p>
+        </article>
+        <div class="how__arrow" aria-hidden="true">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M 6 16 L 26 16 M 18 8 L 26 16 L 18 24"/>
+          </svg>
+        </div>
+        <article class="how__step">
+          <div class="how__step-zone">ZONE / CWB</div>
+          <div class="how__num">02</div>
+          <div class="h3">收結果</div>
+          <p class="body muted">用 token 即時換返杯啱你場合嘅酒款。</p>
+        </article>
+        <div class="how__arrow" aria-hidden="true">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M 6 16 L 26 16 M 18 8 L 26 16 L 18 24"/>
+          </svg>
+        </div>
+        <article class="how__step">
+          <div class="how__step-zone">ZONE / HKG</div>
+          <div class="how__num">03</div>
+          <div class="h3">記低</div>
+          <p class="body muted">記低你嘅心情，之後可以翻睇飲過咩。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer" role="contentinfo">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <a href="#" class="wordmark" aria-label="Whattodrink">
+          WHATTO<span class="wordmark__dot" aria-hidden="true"></span>DRINK
+        </a>
+        <div class="footer__brand-meta">© 2026 · HK · 22.302°N 114.177°E · KOWLOON</div>
+      </div>
+      <div class="socials" aria-label="社交媒體">
+        <a href="#" class="socials__btn" aria-label="Instagram">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="14" height="14"/>
+            <circle cx="10" cy="10" r="3.5"/>
+            <circle cx="14.5" cy="5.5" r="0.5" fill="currentColor"/>
+          </svg>
+        </a>
+        <a href="#" class="socials__btn" aria-label="Threads">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M 5 8 Q 10 4 14 7 Q 17 10 14 13 Q 10 16 6 13"/>
+          </svg>
+        </a>
+        <a href="#" class="socials__btn" aria-label="小紅書">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <text x="10" y="14" text-anchor="middle" font-family="Inter" font-weight="800" font-size="9" fill="currentColor" stroke="none">紅</text>
+            <rect x="3" y="3" width="14" height="14"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+  <script>
+    (function () {
+      var beers = ["IPA · 4.5%", "STOUT · 6.0%", "LAGER · 3.8%"];
+      var art = document.getElementById("drawArt");
+      var btn = document.getElementById("drawBtn");
+      var out = document.getElementById("drawOut");
+      if (!art || !btn || !out) return;
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        art.classList.remove("shuffling");
+        void art.offsetWidth;
+        art.classList.add("shuffling");
+        out.textContent = "···";
+        setTimeout(function () {
+          art.classList.remove("shuffling");
+          out.textContent = beers[Math.floor(Math.random() * beers.length)];
+        }, 900);
+      });
+    })();
+  </script>
+</body>
+</html>

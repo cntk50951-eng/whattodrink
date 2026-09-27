@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>今晚喝咩？— Whattodrink (Hand-Drawn Doodle v2)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+TC:wght@400;500;700;900&family=DM+Mono:wght@500;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    /* ============================================================
+       HAND-DRAWN DOODLE v2 — Notebook margin doodles
+       Reference: Stitch screen 507cd05b5b514f3d88c270af1f6e1815
+       Key principles:
+       - Soft cream paper background
+       - Wobbly SVG lines (feDisplacementMap)
+       - Caveat handwritten font for display
+       - Mustard + teal + soft pink accents
+       - Scattered tiny doodles (stars, hearts, bubbles, arrows)
+       - "Cheers!" speech bubble
+       - Hop cone, barley grain, beer mug doodles
+       Enhanced: 2026-09-03
+       ============================================================ */
+
+    :root {
+      --color-paper: #f5ecd5;
+      --color-paper-2: #ede0c0;
+      --color-paper-3: #e0d4a8;
+      --color-ink: #1a2530;
+      --color-ink-soft: #4a5568;
+      --color-ink-muted: #6a7280;
+      --color-mustard: #d8a838;
+      --color-mustard-soft: #e8c878;
+      --color-teal: #3a8a8a;
+      --color-teal-soft: #6ababa;
+      --color-pink: #e8a0a0;
+      --color-pink-soft: #f0c0c0;
+      --color-red: #c4302b;
+      --color-tape: #f0e0a8;
+
+      --r-sm: 4px; --r: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 24px; --r-pill: 9999px;
+
+      --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px;
+      --s-6: 24px; --s-7: 32px; --s-8: 40px; --s-9: 48px; --s-10: 64px;
+      --s-11: 80px; --s-12: 96px;
+      --container-margin: 32px;
+      --container-max: 1280px;
+
+      --font-hand: "Caveat", cursive;
+      --font-sans: "Inter", "Noto Sans TC", sans-serif;
+      --font-mono: "DM Mono", ui-monospace, monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      font-size: 16px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+    /* Subtle paper texture */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.06;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      mix-blend-mode: multiply;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+    img, svg { display: block; max-width: 100%; }
+
+    /* Typography — Caveat handwritten for display */
+    .display {
+      font-family: var(--font-hand);
+      font-weight: 700;
+      font-size: clamp(64px, 11vw, 110px);
+      line-height: 0.95;
+      color: var(--color-ink);
+    }
+    .h1 {
+      font-family: var(--font-hand);
+      font-weight: 700;
+      font-size: clamp(40px, 7vw, 56px);
+      line-height: 1;
+    }
+    .h2 {
+      font-family: var(--font-hand);
+      font-weight: 700;
+      font-size: clamp(28px, 4.5vw, 36px);
+      line-height: 1.1;
+    }
+    .h3 {
+      font-family: var(--font-hand);
+      font-weight: 700;
+      font-size: 22px;
+      line-height: 1.2;
+    }
+    .body { font-weight: 400; font-size: 15px; line-height: 1.6; }
+    .body-lg { font-weight: 400; font-size: 16px; line-height: 1.6; }
+    .label {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 11px;
+    }
+    .label-sm {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 10px;
+    }
+    .hand { font-family: var(--font-hand); font-weight: 700; }
+    .muted { color: var(--color-ink-muted); }
+    .accent-mustard { color: var(--color-mustard); }
+    .accent-teal { color: var(--color-teal); }
+    .accent-red { color: var(--color-red); }
+
+    .container {
+      max-width: var(--container-max);
+      margin: 0 auto;
+      padding: 0 var(--container-margin);
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ============================================================
+       TOP NAV
+       ============================================================ */
+    .topbar {
+      background: var(--color-paper);
+      border-bottom: 2px dashed var(--color-ink);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topbar__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s-6);
+      padding: var(--s-4) 0;
+    }
+    .wordmark {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      font-family: var(--font-hand);
+      font-weight: 700;
+      font-size: 32px;
+      color: var(--color-ink);
+    }
+    .wordmark__squiggle {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      background: var(--color-red);
+      transform: rotate(45deg);
+      margin: 0 6px;
+    }
+    .nav { display: none; gap: var(--s-7); }
+    .nav__item {
+      position: relative;
+      padding: var(--s-2) 0;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-ink-soft);
+    }
+    .nav__item:hover { color: var(--color-ink); }
+    .nav__item--active { color: var(--color-ink); }
+    .nav__item--active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -3px;
+      height: 4px;
+      background: var(--color-mustard);
+      border-radius: 2px;
+    }
+    @media (min-width: 768px) { .nav { display: flex; } }
+    .lang-switch {
+      display: flex;
+      border: 2px solid var(--color-ink);
+      border-radius: var(--r-pill);
+      padding: 2px;
+    }
+    .lang-switch__btn {
+      padding: 4px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--color-ink);
+      border-radius: var(--r-pill);
+    }
+    .lang-switch__btn--active { background: var(--color-mustard); }
+
+    /* ============================================================
+       HERO
+       ============================================================ */
+    .hero { padding: var(--s-10) 0; }
+    .hero__grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-7);
+      align-items: center;
+    }
+    @media (min-width: 960px) { .hero__grid { grid-template-columns: 1.1fr 1fr; } }
+    .hero__sub {
+      margin-top: var(--s-5);
+      max-width: 38ch;
+      color: var(--color-ink-soft);
+    }
+    .hero__cta-row {
+      margin-top: var(--s-7);
+      display: flex;
+      gap: var(--s-3);
+      flex-wrap: wrap;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s-2);
+      padding: 12px 22px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border: 2px solid var(--color-ink);
+      border-radius: var(--r-pill);
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+    .btn:hover { transform: translate(-2px, -2px); }
+    .btn--mustard { background: var(--color-mustard); color: var(--color-ink); }
+    .btn--paper { background: var(--color-paper); color: var(--color-ink); }
+    .btn--teal { background: var(--color-teal); color: var(--color-paper); }
+    .btn--red { background: var(--color-red); color: var(--color-paper); }
+    .btn--sm { padding: 8px 14px; font-size: 10px; }
+
+    /* ============================================================
+       HERO ART — Hand-drawn doodle illustration
+       ============================================================ */
+    .hero__art {
+      position: relative;
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    .hero__art-svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    /* ============================================================
+       SECTIONS
+       ============================================================ */
+    .section { padding: var(--s-10) 0; position: relative; }
+    .section--mustard { background: var(--color-mustard); }
+    .section--teal { background: var(--color-teal); color: var(--color-paper); }
+    .section--pink { background: var(--color-pink); }
+    .section--ink { background: var(--color-ink); color: var(--color-paper); }
+    .section__head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: var(--s-6);
+      margin-bottom: var(--s-8);
+      padding-bottom: var(--s-4);
+      border-bottom: 2px dashed currentColor;
+    }
+    .section__head-text { max-width: 60ch; }
+    .section__rule-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      color: var(--color-red);
+      text-transform: uppercase;
+    }
+    .section--teal .section__rule-num { color: var(--color-paper); }
+    .section--ink .section__rule-num { color: var(--color-mustard); }
+
+    /* ============================================================
+       BENTO GRID
+       ============================================================ */
+    .bento {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-auto-rows: minmax(220px, auto);
+      gap: var(--s-4);
+    }
+    @media (min-width: 768px) {
+      .bento { grid-template-columns: 2fr 1fr; grid-auto-rows: minmax(280px, auto); }
+    }
+    .bento__card {
+      position: relative;
+      background: var(--color-paper);
+      border: 2px solid var(--color-ink);
+      border-radius: var(--r-md);
+      padding: var(--s-5);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-3);
+      transition: all 0.2s ease;
+    }
+    .bento__card:hover { transform: rotate(-0.5deg) translate(-2px, -2px); }
+    .bento__card--teal { background: var(--color-teal); color: var(--color-paper); }
+    .bento__card--pink { background: var(--color-pink); color: var(--color-ink); }
+    .bento__stamp {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 3px 10px;
+      border: 1.5px solid currentColor;
+      border-radius: var(--r-pill);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+    }
+    .bento__card-body {
+      padding: var(--s-3) 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-3);
+      flex: 1;
+    }
+    .bento__card-art {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 110px;
+    }
+    .bento__card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: var(--s-3);
+      border-top: 1.5px dashed currentColor;
+    }
+    .bento__num {
+      font-family: var(--font-hand);
+      font-weight: 700;
+      font-size: 56px;
+      line-height: 1;
+      color: var(--color-red);
+    }
+    .bento__card--teal .bento__num { color: var(--color-mustard); }
+    .bento__card--pink .bento__num { color: var(--color-ink); }
+
+    .how {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-4);
+    }
+    @media (min-width: 768px) {
+      .how { grid-template-columns: 1fr auto 1fr auto 1fr; align-items: stretch; }
+    }
+    .how__step {
+      background: var(--color-paper);
+      border: 2px solid var(--color-ink);
+      border-radius: var(--r-md);
+      padding: var(--s-5);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-2);
+    }
+    .how__num {
+      font-family: var(--font-hand);
+      font-weight: 700;
+      font-size: 40px;
+      color: var(--color-red);
+      line-height: 1;
+    }
+    .how__arrow {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-hand);
+      font-size: 32px;
+      color: var(--color-ink);
+    }
+    @media (min-width: 768px) { .how__arrow { display: flex; } }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    .footer {
+      background: var(--color-paper);
+      border-top: 2px dashed var(--color-ink);
+      padding: var(--s-8) 0;
+    }
+    .footer__inner {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-6);
+      align-items: flex-start;
+    }
+    @media (min-width: 768px) {
+      .footer__inner { flex-direction: row; justify-content: space-between; align-items: center; }
+    }
+    .footer__brand { display: flex; flex-direction: column; gap: var(--s-2); }
+    .socials { display: flex; gap: var(--s-3); }
+    .socials__btn {
+      width: 40px;
+      height: 40px;
+      border: 2px solid var(--color-ink);
+      border-radius: var(--r-pill);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+    .socials__btn:hover {
+      background: var(--color-mustard);
+      transform: translate(-2px, -2px) rotate(5deg);
+    }
+
+    /* Accessibility */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    /* Draw-lot animation — doodle wobble + reveal (simplified sample per UR1.4) */
+    @keyframes doodleWobble {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-3deg); }
+      50% { transform: rotate(2deg); }
+      75% { transform: rotate(-2deg); }
+    }
+    .shuffling { animation: doodleWobble 0.14s linear infinite; transform-origin: center; }
+    .draw-out { min-height: 14px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar" role="banner">
+    <div class="container topbar__inner">
+      <a href="#" class="wordmark" aria-label="Whattodrink home">
+        whattodrink<span class="wordmark__squiggle" aria-hidden="true"></span>
+      </a>
+      <nav class="nav" aria-label="主導航">
+        <a href="#" class="nav__item nav__item--active">今晚喝咩</a>
+        <a href="#" class="nav__item">拍照選酒</a>
+        <a href="#" class="nav__item">心情推薦</a>
+      </nav>
+      <div class="lang-switch" role="group" aria-label="語言切換">
+        <button class="lang-switch__btn lang-switch__btn--active" type="button" aria-pressed="true">繁</button>
+        <button class="lang-switch__btn" type="button" aria-pressed="false">简</button>
+        <button class="lang-switch__btn" type="button" aria-pressed="false">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <div class="hero__grid">
+        <div>
+          <div class="hand" style="color: var(--color-red); font-size: 24px; margin-bottom: 12px">~ from my notebook ~</div>
+          <h1 class="display">今晚<br />喝咩？</h1>
+          <p class="body-lg hero__sub">
+            在筆記本寫下心情——讓命運幫你揀返杯啱你嘅酒 ✦
+          </p>
+          <div class="hero__cta-row">
+            <a href="#" class="btn btn--mustard">隨機抽一杯</a>
+            <a href="#" class="btn btn--paper">睇下點用</a>
+          </div>
+        </div>
+
+        <div class="hero__art" aria-hidden="true">
+          <svg class="hero__art-svg" viewBox="0 0 480 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Hand-drawn doodle beer illustration">
+            <defs>
+              <filter id="wobble" x="-5%" y="-5%" width="110%" height="110%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2"/>
+                <feDisplacementMap in="SourceGraphic" scale="2.5"/>
+              </filter>
+              <filter id="wobble2" x="-5%" y="-5%" width="110%" height="110%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="2"/>
+                <feDisplacementMap in="SourceGraphic" scale="1.5"/>
+              </filter>
+            </defs>
+
+            <rect x="0" y="0" width="480" height="480" fill="#f5ecd5"/>
+
+            <!-- Tape strip top-left -->
+            <rect x="30" y="20" width="80" height="22" fill="#f0e0a8" opacity="0.85" transform="rotate(-3 30 20)"/>
+            <text x="70" y="35" text-anchor="middle" font-family="Caveat" font-weight="700" font-size="14" fill="#1a2530" filter="url(#wobble2)" transform="rotate(-3 30 20)">9/2 (Tue)</text>
+
+            <!-- Scattered tiny doodles -->
+            <g stroke="#1a2530" stroke-width="1.5" fill="none" stroke-linecap="round" filter="url(#wobble2)">
+              <path d="M 50 80 L 55 95 L 70 95 L 58 105 L 63 120 L 50 110 L 37 120 L 42 105 L 30 95 L 45 95 Z"/>
+              <path d="M 420 100 Q 410 90 400 100 Q 390 110 420 130 Q 450 110 440 100 Q 430 90 420 100 Z" fill="#e8a0a0"/>
+              <path d="M 80 220 L 100 220 M 90 210 L 90 230 M 83 213 L 97 227 M 97 213 L 83 227"/>
+              <path d="M 400 240 Q 410 230 420 240 Q 430 250 440 240" />
+              <path d="M 60 400 Q 70 390 80 400 Q 90 410 100 400"/>
+              <circle cx="380" cy="400" r="3" fill="#3a8a8a"/>
+              <circle cx="370" cy="420" r="2" fill="#3a8a8a"/>
+              <circle cx="390" cy="430" r="2.5" fill="#3a8a8a"/>
+            </g>
+
+            <!-- Scattered bubbles, pink + teal, varied sizes -->
+            <g filter="url(#wobble2)">
+              <circle cx="120" cy="120" r="6" fill="none" stroke="#1a2530" stroke-width="1.5"/>
+              <circle cx="150" cy="152" r="4" fill="#3a8a8a"/>
+              <circle cx="212" cy="118" r="5" fill="#e8a0a0"/>
+              <circle cx="252" cy="88" r="4" fill="none" stroke="#1a2530" stroke-width="1.5"/>
+              <circle cx="300" cy="150" r="6" fill="none" stroke="#1a2530" stroke-width="1.5"/>
+              <circle cx="60" cy="160" r="5" fill="#e8a0a0"/>
+              <circle cx="200" cy="262" r="4" fill="none" stroke="#1a2530" stroke-width="1.5"/>
+              <circle cx="420" cy="180" r="5" fill="#3a8a8a"/>
+              <circle cx="440" cy="300" r="6" fill="none" stroke="#1a2530" stroke-width="1.5"/>
+              <circle cx="100" cy="262" r="4" fill="#3a8a8a"/>
+              <circle cx="60" cy="322" r="4" fill="none" stroke="#1a2530" stroke-width="1.5"/>
+              <circle cx="440" cy="380" r="3" fill="#3a8a8a"/>
+              <circle cx="300" cy="440" r="3" fill="#e8a0a0"/>
+              <circle cx="36" cy="250" r="3" fill="#e8a0a0"/>
+            </g>
+
+            <!-- Hand-drawn title "today:" -->
+            <text x="100" y="80" font-family="Caveat" font-weight="700" font-size="24" fill="#1a2530" filter="url(#wobble2)">today:</text>
+            <text x="80" y="180" font-family="Caveat" font-weight="600" font-size="20" fill="#1a2530" filter="url(#wobble2)">今晚飲咩？</text>
+            <text x="80" y="210" font-family="Caveat" font-weight="500" font-size="18" fill="#3a8a8a" filter="url(#wobble2)">~ ipa? pilsner? lager? ~</text>
+            <text x="80" y="240" font-family="Caveat" font-weight="500" font-size="18" fill="#3a8a8a" filter="url(#wobble2)">~ 隨便啦，命運決定 ~</text>
+
+            <!-- Beer mug (wobbly outline) -->
+            <g filter="url(#wobble)">
+              <path d="M 240 180 L 235 380 Q 235 400 250 400 L 360 400 Q 380 400 380 380 L 375 180 Z" fill="#f5ecd5" stroke="#1a2530" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M 243 250 L 240 378 Q 240 395 252 395 L 358 395 Q 373 395 373 378 L 370 250 Z" fill="#d8a838" stroke="#1a2530" stroke-width="2"/>
+              <path d="M 232 180 Q 230 155 250 150 Q 255 135 275 145 Q 295 130 315 145 Q 335 130 355 145 Q 370 135 380 150 Q 388 155 385 180 Z" fill="#f5ecd5" stroke="#1a2530" stroke-width="2.5" stroke-linejoin="round"/>
+              <!-- Foam bump curls -->
+              <g fill="none" stroke="#1a2530" stroke-width="1.5" stroke-linecap="round">
+                <path d="M 262 150 Q 268 140 278 144"/>
+                <path d="M 300 142 Q 308 134 316 140"/>
+                <path d="M 338 144 Q 346 136 354 142"/>
+              </g>
+              <!-- Foam drip, left edge -->
+              <path d="M 244 180 L 244 200 Q 244 208 248 208 L 251 208 L 251 180 Z" fill="#f5ecd5" stroke="#1a2530" stroke-width="2" stroke-linejoin="round"/>
+              <circle cx="265" cy="285" r="5" fill="#f5ecd5" stroke="#1a2530" stroke-width="1.5"/>
+              <circle cx="305" cy="320" r="6" fill="#f5ecd5" stroke="#1a2530" stroke-width="1.5"/>
+              <circle cx="340" cy="350" r="4" fill="#f5ecd5" stroke="#1a2530" stroke-width="1.5"/>
+              <circle cx="265" cy="350" r="4" fill="#f5ecd5" stroke="#1a2530" stroke-width="1.5"/>
+              <!-- Glass highlight waves -->
+              <g fill="none" stroke="#1a2530" stroke-width="2" opacity="0.5" stroke-linecap="round">
+                <path d="M 282 262 Q 272 300 284 340"/>
+                <path d="M 312 262 Q 302 300 314 340"/>
+              </g>
+              <!-- Handle — double line, open -->
+              <path d="M 380 252 Q 408 252 408 286 Q 408 320 380 320" fill="none" stroke="#1a2530" stroke-width="2.5" stroke-linecap="round"/>
+              <path d="M 388 263 Q 400 263 400 286 Q 400 309 388 309" fill="none" stroke="#1a2530" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+              <!-- Motion lines at base -->
+              <g fill="none" stroke="#1a2530" stroke-width="2" stroke-linecap="round">
+                <path d="M 228 408 Q 238 418 254 420"/>
+                <path d="M 244 404 Q 254 412 268 414"/>
+              </g>
+              <circle cx="305" cy="320" r="14" fill="#e8a0a0" stroke="#1a2530" stroke-width="2"/>
+              <text x="305" y="325" text-anchor="middle" fill="#1a2530" font-family="Caveat" font-weight="700" font-size="14">W·D</text>
+            </g>
+
+            <!-- Hop cone (left) -->
+            <g filter="url(#wobble)" stroke="#1a2530" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M 130 268 Q 125 288 128 304" fill="none"/>
+              <path d="M 128 302 Q 108 306 102 328 Q 118 334 130 320 Z" fill="#3a8a8a"/>
+              <path d="M 132 302 Q 152 306 158 328 Q 142 334 130 320 Z" fill="#6ababa"/>
+              <path d="M 126 326 Q 106 332 102 356 Q 120 360 130 346 Z" fill="#6ababa"/>
+              <path d="M 134 326 Q 154 332 158 356 Q 140 360 130 346 Z" fill="#3a8a8a"/>
+              <path d="M 122 340 Q 114 348 118 358 Q 126 354 128 346 Z" fill="#d8a838"/>
+              <path d="M 138 340 Q 146 348 142 358 Q 134 354 132 346 Z" fill="#d8a838"/>
+              <path d="M 130 346 Q 120 360 130 376 Q 140 360 130 346 Z" fill="#3a8a8a"/>
+            </g>
+
+            <!-- Barley sprigs (upper area) -->
+            <g filter="url(#wobble2)" stroke="#1a2530" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M 190 100 Q 188 150 190 202" fill="none" stroke-width="2"/>
+              <path d="M 188 122 Q 172 120 166 132 Q 178 138 188 132 Z" fill="#d8a838"/>
+              <path d="M 192 122 Q 208 120 214 132 Q 202 138 192 132 Z" fill="#e8c878"/>
+              <path d="M 188 146 Q 172 144 166 156 Q 178 162 188 156 Z" fill="#e8c878"/>
+              <path d="M 192 146 Q 208 144 214 156 Q 202 162 192 156 Z" fill="#d8a838"/>
+              <path d="M 188 170 Q 172 168 166 180 Q 178 186 188 180 Z" fill="#d8a838"/>
+              <path d="M 192 170 Q 208 168 214 180 Q 202 186 192 180 Z" fill="#e8c878"/>
+              <path d="M 244 108 Q 242 148 244 190" fill="none" stroke-width="2"/>
+              <path d="M 242 128 Q 228 126 223 137 Q 234 142 242 137 Z" fill="#e8c878"/>
+              <path d="M 246 128 Q 260 126 265 137 Q 254 142 246 137 Z" fill="#d8a838"/>
+              <path d="M 242 152 Q 228 150 223 161 Q 234 166 242 161 Z" fill="#d8a838"/>
+              <path d="M 246 152 Q 260 150 265 161 Q 254 166 246 161 Z" fill="#e8c878"/>
+            </g>
+
+            <!-- "Cheers!" speech bubble (top right) -->
+            <g transform="translate(330, 70)" filter="url(#wobble)">
+              <ellipse cx="50" cy="25" rx="55" ry="20" fill="#fff" stroke="#1a2530" stroke-width="2"/>
+              <polygon points="30,40 18,60 45,47" fill="#fff" stroke="#1a2530" stroke-width="2" stroke-linejoin="round"/>
+              <polygon points="30,40 45,47 45,42" fill="#fff" stroke="none"/>
+              <text x="52" y="34" text-anchor="middle" font-family="Caveat" font-weight="700" font-size="20" fill="#e8a0a0">cheers!</text>
+              <text x="50" y="32" text-anchor="middle" font-family="Caveat" font-weight="700" font-size="20" fill="#c4302b">cheers!</text>
+            </g>
+
+            <!-- Hand-drawn check list -->
+            <g font-family="Caveat" font-weight="600" font-size="18" fill="#1a2530" filter="url(#wobble2)">
+              <text x="80" y="430">☐ 揀方法</text>
+              <text x="80" y="455">☐ 收結果</text>
+              <text x="200" y="430">☐ 記低</text>
+            </g>
+
+            <!-- Underline accent -->
+            <path d="M 100 250 Q 150 247 200 252" fill="none" stroke="#c4302b" stroke-width="3" stroke-linecap="round" filter="url(#wobble2)"/>
+
+            <!-- Signature corner -->
+            <text x="350" y="465" font-family="Caveat" font-style="italic" font-size="16" fill="#1a2530" filter="url(#wobble2)">— W·D ✦ —</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--mustard">
+    <div class="container">
+      <div class="section__head">
+        <div>
+          <div class="section__rule-num">~ UR 1.1 · 3 paths ~</div>
+          <h2 class="h1" style="margin-top: 8px">三個方法，揀返你今晚嗰杯</h2>
+        </div>
+      </div>
+      <div class="bento">
+        <article class="bento__card">
+          <div class="bento__stamp">~ 01 ~</div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg id="drawArt" viewBox="0 0 200 140" width="80%">
+                <g filter="url(#wobble2)" stroke="#1a2530" stroke-width="2" fill="none">
+                  <rect x="60" y="60" width="50" height="60" fill="#d8a838"/>
+                  <path d="M 120 50 L 120 130 L 150 130 L 150 50 Z" fill="#f5ecd5"/>
+                  <line x1="60" y1="80" x2="110" y2="80"/>
+                </g>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div>
+                <div class="label-sm">隨機 · 0 sec</div>
+                <div class="h3">由命運揀返杯</div>
+                <div class="label-sm accent-red draw-out" id="drawOut" aria-live="polite">未開獎</div>
+              </div>
+              <a href="#" class="btn btn--mustard btn--sm" id="drawBtn">立即試</a>
+            </div>
+          </div>
+        </article>
+        <article class="bento__card bento__card--teal">
+          <div class="bento__stamp">~ 02 ~</div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 100 100" width="60%">
+                <g filter="url(#wobble2)" stroke="#f5ecd5" stroke-width="2" fill="none">
+                  <rect x="25" y="10" width="50" height="80" fill="#1a4040"/>
+                  <circle cx="50" cy="50" r="10" fill="#d8a838"/>
+                </g>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div>
+                <div class="label-sm">影相 · 5 sec</div>
+                <div class="h3">影張相即刻知</div>
+              </div>
+              <a href="#" class="btn btn--paper btn--sm">試下</a>
+            </div>
+          </div>
+        </article>
+        <article class="bento__card bento__card--pink">
+          <div class="bento__stamp">~ 03 ~</div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 100 100" width="60%">
+                <g filter="url(#wobble2)" stroke="#1a2530" stroke-width="2" fill="none">
+                  <path d="M 20 50 Q 20 20 50 20 Q 80 20 80 50 Q 80 80 50 80 L 35 80 L 25 90 L 30 80 Q 20 80 20 50 Z" fill="#f5ecd5"/>
+                  <text x="50" y="60" font-family="Caveat" font-size="20" fill="#1a2530" stroke="none" text-anchor="middle">feel</text>
+                </g>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div>
+                <div class="label-sm">心情 · 1 min</div>
+                <div class="h3">講你而家點</div>
+              </div>
+              <a href="#" class="btn btn--paper btn--sm">揀返杯</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section__head">
+        <div>
+          <div class="section__rule-num">~ UR 1.1 · 3 steps ~</div>
+          <h2 class="h1" style="margin-top: 8px">點樣運作</h2>
+        </div>
+      </div>
+      <div class="how">
+        <article class="how__step">
+          <div class="how__num">01</div>
+          <div class="h3">揀方法</div>
+          <p class="body">隨機抽、影相、講心情——揀你而家想點。</p>
+        </article>
+        <div class="how__arrow">→</div>
+        <article class="how__step">
+          <div class="how__num">02</div>
+          <div class="h3">收結果</div>
+          <p class="body">用 token 即時換返杯啱你場合嘅酒款。</p>
+        </article>
+        <div class="how__arrow">→</div>
+        <article class="how__step">
+          <div class="how__num">03</div>
+          <div class="h3">記低</div>
+          <p class="body">記低你嘅心情，之後可以翻睇飲過咩。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer" role="contentinfo">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <a href="#" class="wordmark" aria-label="Whattodrink">
+          whattodrink<span class="wordmark__squiggle" aria-hidden="true"></span>
+        </a>
+        <div class="label">© 2026 · HK · doodle edition</div>
+      </div>
+      <div class="socials">
+        <a href="#" class="socials__btn" aria-label="Instagram">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="14" height="14"/>
+            <circle cx="10" cy="10" r="3.5"/>
+            <circle cx="14.5" cy="5.5" r="0.5" fill="currentColor"/>
+          </svg>
+        </a>
+        <a href="#" class="socials__btn" aria-label="Threads">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M 5 8 Q 10 4 14 7 Q 17 10 14 13 Q 10 16 6 13"/>
+          </svg>
+        </a>
+        <a href="#" class="socials__btn" aria-label="小紅書">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <text x="10" y="14" text-anchor="middle" font-family="Inter" font-weight="800" font-size="9" fill="currentColor" stroke="none">紅</text>
+            <rect x="3" y="3" width="14" height="14"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+  <script>
+    (function () {
+      var beers = ["IPA · 4.5%", "STOUT · 6.0%", "LAGER · 3.8%"];
+      var art = document.getElementById("drawArt");
+      var btn = document.getElementById("drawBtn");
+      var out = document.getElementById("drawOut");
+      if (!art || !btn || !out) return;
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        art.classList.remove("shuffling");
+        void art.offsetWidth;
+        art.classList.add("shuffling");
+        out.textContent = "···";
+        setTimeout(function () {
+          art.classList.remove("shuffling");
+          out.textContent = beers[Math.floor(Math.random() * beers.length)];
+        }, 900);
+      });
+    })();
+  </script>
+</body>
+</html>

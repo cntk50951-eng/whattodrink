@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Whattodrink — Pop Art</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Work+Sans:wght@400;700&family=Noto+Sans+TC:wght@500;700;900&family=Bungee&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --red:    #E8332A;
+  --yellow: #FFC107;
+  --blue:   #2E9BD6;
+  --ink:    #0A0A0A;
+  --cream:  #F4ECD8;
+  --darkblue:#0D3A5C;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "Bangers", "Noto Sans TC", sans-serif;
+  background: var(--red);
+  color: var(--ink);
+  min-height: 100vh;
+  /* subtle paper grain */
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence baseFrequency='0.8' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.04 0 0 0 0 0.04 0 0 0 0 0.04 0 0 0 0.15 0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
+}
+
+/* HEADER */
+header {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 40px;
+  background: var(--yellow);
+  border-bottom: 5px solid var(--ink);
+  box-shadow: 0 4px 0 0 var(--ink);
+}
+.brand {
+  font-family: "Bangers", sans-serif;
+  font-size: 32px;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+  text-shadow: 3px 3px 0 var(--red);
+}
+.brand .accent { color: var(--red); }
+.nav-links {
+  display: flex;
+  gap: 32px;
+  font-family: "Bangers", sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+}
+.nav-links a { color: var(--ink); }
+.style-badge {
+  font-family: "Bangers", sans-serif;
+  font-size: 22px;
+  background: var(--cream);
+  color: var(--ink);
+  padding: 6px 18px;
+  border: 3px solid var(--ink);
+  transform: rotate(-3deg);
+  box-shadow: 4px 4px 0 0 var(--ink);
+}
+
+/* HERO */
+.hero {
+  position: relative;
+  min-height: calc(100vh - 100px);
+  overflow: hidden;
+  background: var(--red);
+}
+
+.hero-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.hero-text {
+  position: relative;
+  z-index: 5;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 60px 64px 40px;
+}
+
+.eyebrow {
+  display: inline-block;
+  font-family: "Bangers", "Noto Sans TC", sans-serif;
+  font-size: 22px;
+  background: var(--yellow);
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  padding: 4px 14px;
+  transform: rotate(-2deg);
+  box-shadow: 4px 4px 0 0 var(--ink);
+  margin-bottom: 28px;
+  letter-spacing: 0.05em;
+}
+
+.hero-title {
+  font-family: "Bangers", "Noto Sans TC", sans-serif;
+  font-size: clamp(56px, 9vw, 120px);
+  line-height: 0.95;
+  color: var(--cream);
+  margin-bottom: 24px;
+  letter-spacing: 0.02em;
+  -webkit-text-stroke: 2.5px var(--ink);
+  text-shadow:
+    6px 6px 0 var(--ink),
+    6px 6px 0 0 var(--ink);
+}
+.hero-title .yellow {
+  background: var(--yellow);
+  color: var(--ink);
+  -webkit-text-stroke: 0;
+  display: inline-block;
+  padding: 0 8px;
+  transform: rotate(-2deg);
+  text-shadow: 4px 4px 0 var(--ink);
+}
+
+.hero-sub {
+  font-family: "Work Sans", "Noto Sans TC", sans-serif;
+  font-size: 18px;
+  color: var(--cream);
+  max-width: 480px;
+  margin-bottom: 36px;
+  font-style: italic;
+}
+
+.cta-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+
+.btn-primary {
+  background: var(--yellow);
+  color: var(--ink);
+  border: 4px solid var(--ink);
+  padding: 18px 32px;
+  font-family: "Bangers", "Noto Sans TC", sans-serif;
+  font-size: 24px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  box-shadow: 6px 6px 0 0 var(--ink);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.btn-primary:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 0 var(--ink); }
+.btn-primary:active { transform: translate(3px, 3px); box-shadow: 0 0 0 0 var(--ink); }
+
+.btn-secondary {
+  background: var(--cream);
+  color: var(--ink);
+  border: 4px solid var(--ink);
+  padding: 14px 24px;
+  font-family: "Bangers", "Noto Sans TC", sans-serif;
+  font-size: 20px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 0 var(--ink);
+}
+
+/* ====== FEATURES ====== */
+.features {
+  position: relative;
+  background: var(--blue);
+  padding: 60px 64px;
+  border-top: 5px solid var(--ink);
+  border-bottom: 5px solid var(--ink);
+}
+.features-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.feature-card {
+  background: var(--cream);
+  border: 4px solid var(--ink);
+  padding: 28px;
+  box-shadow: 6px 6px 0 0 var(--ink);
+  transform: rotate(var(--rot, 0deg));
+  transition: transform 0.15s;
+}
+.feature-card:nth-child(1) { --rot: -1.5deg; }
+.feature-card:nth-child(2) { --rot: 1deg; }
+.feature-card:nth-child(3) { --rot: -0.5deg; }
+.feature-card:hover { transform: rotate(0deg) scale(1.02); }
+.feature-card .num {
+  font-family: "Bangers", sans-serif;
+  font-size: 36px;
+  color: var(--red);
+  -webkit-text-stroke: 1.5px var(--ink);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.feature-card h3 {
+  font-family: "Bangers", "Noto Sans TC", sans-serif;
+  font-size: 22px;
+  color: var(--ink);
+  letter-spacing: 0.05em;
+  margin: 8px 0;
+}
+.feature-card p {
+  font-family: "Work Sans", "Noto Sans TC", sans-serif;
+  font-size: 16px;
+  color: var(--ink);
+}
+
+footer {
+  background: var(--ink);
+  color: var(--yellow);
+  text-align: center;
+  padding: 20px;
+  font-family: "Bangers", sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.05em;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">whattodrink<span class="accent">·</span></div>
+  <nav class="nav-links">
+    <a href="#">今晚</a>
+    <a href="#">酒吧</a>
+    <a href="#">心情</a>
+    <a href="#">關於</a>
+  </nav>
+  <div class="style-badge">Pop Art</div>
+</header>
+
+<section class="hero">
+
+  <svg class="hero-svg" viewBox="0 0 1280 720" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <!-- Ben-Day halftone patterns at different sizes -->
+      <pattern id="halftone-black-on-light" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
+        <circle cx="4" cy="4" r="1.5" fill="#0A0A0A"/>
+      </pattern>
+      <pattern id="halftone-black-dense" x="0" y="0" width="6" height="6" patternUnits="userSpaceOnUse">
+        <circle cx="3" cy="3" r="1.6" fill="#0A0A0A"/>
+      </pattern>
+      <pattern id="halftone-red-on-red" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
+        <circle cx="5" cy="5" r="2" fill="#A02520"/>
+      </pattern>
+      <pattern id="halftone-yellow-on-yellow" x="0" y="0" width="12" height="12" patternUnits="userSpaceOnUse">
+        <circle cx="6" cy="6" r="2.2" fill="#C99500"/>
+      </pattern>
+    </defs>
+
+    <!-- ===== RED STARBURST (outer, big) ===== -->
+    <g>
+      <polygon points="640,360 740,200 800,250 850,80 920,180 1000,40 1000,200 1100,100 1080,280 1200,200 1140,360 1240,360 1140,460 1220,540 1100,540 1140,640 1020,600 1020,720 920,640 880,720 800,640 760,720 700,640 600,720 600,640 500,720 540,600 420,640 460,540 340,540 420,460 320,360 420,280 320,200 440,280 420,100 540,180 540,40 640,200"
+               fill="#E8332A" stroke="#0A0A0A" stroke-width="5" stroke-linejoin="round"/>
+      <polygon points="640,360 740,200 800,250 850,80 920,180 1000,40 1000,200 1100,100 1080,280 1200,200 1140,360 1240,360 1140,460 1220,540 1100,540 1140,640 1020,600 1020,720 920,640 880,720 800,640 760,720 700,640 600,720 600,640 500,720 540,600 420,640 460,540 340,540 420,460 320,360 420,280 320,200 440,280 420,100 540,180 540,40 640,200"
+               fill="url(#halftone-red-on-red)" opacity="0.5"/>
+    </g>
+
+    <!-- ===== YELLOW STARBURST (inner, ON TOP of red) ===== -->
+    <g>
+      <polygon points="640,360 700,260 750,290 770,180 820,240 880,150 880,260 960,200 940,300 1020,260 970,360 1050,360 970,440 1030,500 940,520 980,600 880,560 880,640 800,580 780,650 730,580 700,640 660,560 580,610 600,520 540,500 580,440 510,420 580,360"
+               fill="#FFC107" stroke="#0A0A0A" stroke-width="4" stroke-linejoin="round"/>
+      <polygon points="640,360 700,260 750,290 770,180 820,240 880,150 880,260 960,200 940,300 1020,260 970,360 1050,360 970,440 1030,500 940,520 980,600 880,560 880,640 800,580 780,650 730,580 700,640 660,560 580,610 600,520 540,500 580,440 510,420 580,360"
+               fill="url(#halftone-yellow-on-yellow)" opacity="0.45"/>
+    </g>
+
+    <!-- ===== BLACK SPEED LINES (radiating from center, classic comic) ===== -->
+    <g stroke="#0A0A0A" stroke-width="6" stroke-linecap="butt" fill="none">
+      <line x1="640" y1="360" x2="20"  y2="40"  />
+      <line x1="640" y1="360" x2="200" y2="0"   />
+      <line x1="640" y1="360" x2="400" y2="0"   />
+      <line x1="640" y1="360" x2="600" y2="0"   />
+      <line x1="640" y1="360" x2="680" y2="0"   />
+      <line x1="640" y1="360" x2="800" y2="0"   />
+      <line x1="640" y1="360" x2="1000" y2="0"  />
+      <line x1="640" y1="360" x2="1240" y2="60" />
+      <line x1="640" y1="360" x2="0"   y2="240" />
+      <line x1="640" y1="360" x2="0"   y2="400" />
+      <line x1="640" y1="360" x2="0"   y2="540" />
+      <line x1="640" y1="360" x2="1280" y2="240"/>
+      <line x1="640" y1="360" x2="1280" y2="400"/>
+      <line x1="640" y1="360" x2="1280" y2="540"/>
+    </g>
+
+    <!-- ===== MUG (dimpled, faceted, with handle) ===== -->
+    <g transform="translate(540,200)">
+      <!-- drop shadow with halftone (lower-left) -->
+      <ellipse cx="120" cy="510" rx="100" ry="20" fill="#0A0A0A" opacity="0.85"/>
+      <ellipse cx="80" cy="510" rx="80" ry="15" fill="url(#halftone-black-dense)" opacity="0.6"/>
+
+      <!-- handle (D-shape) — drawn first so it goes behind -->
+      <path d="M 220 120 Q 280 120 285 180 Q 290 280 250 320 Q 235 335 220 335 L 220 315 Q 250 310 255 220 Q 255 160 220 160 Z"
+            fill="#F4ECD8" stroke="#0A0A0A" stroke-width="5" stroke-linejoin="round"/>
+
+      <!-- main body (faceted, slightly trapezoidal) -->
+      <path d="M 30 80 L 220 80 L 215 470 L 30 470 Z"
+            fill="#F4ECD8" stroke="#0A0A0A" stroke-width="5" stroke-linejoin="round"/>
+
+      <!-- 3 strong vertical facets (between segments) -->
+      <line x1="78" y1="80" x2="75" y2="470" stroke="#0A0A0A" stroke-width="5" stroke-linecap="round"/>
+      <line x1="125" y1="80" x2="125" y2="470" stroke="#0A0A0A" stroke-width="5" stroke-linecap="round"/>
+      <line x1="172" y1="80" x2="175" y2="470" stroke="#0A0A0A" stroke-width="5" stroke-linecap="round"/>
+
+      <!-- liquid fill (golden) -->
+      <path d="M 35 160 L 215 160 L 211 470 L 35 470 Z" fill="#FFC107"/>
+
+      <!-- halftone shadow on left third of liquid (classic Lichtenstein) -->
+      <path d="M 35 160 L 100 160 L 95 470 L 35 470 Z" fill="url(#halftone-black-dense)" opacity="0.65"/>
+
+      <!-- liquid surface highlight (top) -->
+      <path d="M 35 165 Q 125 175 215 165" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+
+      <!-- bubbles in liquid -->
+      <g fill="#FFFFFF" stroke="#0A0A0A" stroke-width="1.5">
+        <circle cx="110" cy="220" r="3.5"/>
+        <circle cx="145" cy="250" r="3"/>
+        <circle cx="175" cy="220" r="3.5"/>
+        <circle cx="120" cy="290" r="2.5"/>
+        <circle cx="160" cy="310" r="3.5"/>
+        <circle cx="185" cy="280" r="2.5"/>
+        <circle cx="135" cy="350" r="3"/>
+        <circle cx="170" cy="380" r="2.5"/>
+        <circle cx="110" cy="400" r="3"/>
+        <circle cx="200" cy="420" r="3.5"/>
+        <circle cx="155" cy="450" r="2.5"/>
+      </g>
+
+      <!-- foam (cloud-clump) with stippling -->
+      <path d="M 14 90 Q 4 65 26 50 Q 50 30 75 42 Q 95 25 120 38 Q 145 22 170 38 Q 195 25 220 50 Q 245 60 235 85 Q 220 92 200 86 L 24 88 Z"
+            fill="#F4ECD8" stroke="#0A0A0A" stroke-width="5" stroke-linejoin="round"/>
+      <!-- dense foam stippling (lots of small black dots) -->
+      <g fill="#0A0A0A">
+        <circle cx="40" cy="70" r="1.5"/><circle cx="55" cy="78" r="1"/><circle cx="68" cy="68" r="1.5"/>
+        <circle cx="82" cy="75" r="1"/><circle cx="95" cy="80" r="1.5"/><circle cx="108" cy="70" r="1"/>
+        <circle cx="120" cy="78" r="1.5"/><circle cx="135" cy="72" r="1"/><circle cx="148" cy="80" r="1.5"/>
+        <circle cx="162" cy="70" r="1"/><circle cx="175" cy="78" r="1.5"/><circle cx="190" cy="72" r="1"/>
+        <circle cx="205" cy="80" r="1.5"/><circle cx="218" cy="74" r="1"/><circle cx="50" cy="60" r="1.2"/>
+        <circle cx="80" cy="55" r="1.2"/><circle cx="110" cy="50" r="1.2"/><circle cx="140" cy="55" r="1.2"/>
+        <circle cx="170" cy="48" r="1.2"/><circle cx="200" cy="58" r="1.2"/>
+        <circle cx="35" cy="85" r="1"/><circle cx="100" cy="88" r="1"/><circle cx="155" cy="85" r="1"/>
+        <circle cx="195" cy="87" r="1"/><circle cx="225" cy="82" r="1"/>
+      </g>
+
+      <!-- base rim -->
+      <rect x="22" y="468" width="200" height="22" fill="#F4ECD8" stroke="#0A0A0A" stroke-width="5" rx="2"/>
+      <line x1="22" y1="490" x2="222" y2="490" stroke="#0A0A0A" stroke-width="3"/>
+    </g>
+
+    <!-- ===== "BEER!" SPEECH BUBBLE (jagged starburst, top-right) ===== -->
+    <g transform="translate(880,90) rotate(8)">
+      <!-- jagged spiky burst polygon -->
+      <polygon points="120,0 145,30 195,5 175,55 230,55 200,90 250,110 200,130 240,170 180,160 200,210 140,190 145,230 100,200 70,230 60,180 10,170 40,130 0,90 30,55 -10,55 30,30 0,0 50,-5 50,15 100,-10"
+               fill="#F4ECD8" stroke="#0A0A0A" stroke-width="5" stroke-linejoin="round"/>
+      <!-- halftone stippling on bubble (corner shadow) -->
+      <polygon points="120,0 145,30 195,5 175,55 230,55 200,90 250,110 200,130 240,170 180,160 200,210 140,190 145,230 100,200 70,230 60,180 10,170 40,130 0,90 30,55 -10,55 30,30 0,0 50,-5 50,15 100,-10"
+               fill="url(#halftone-black-on-light)" opacity="0.4"/>
+      <!-- text BEER! -->
+      <text x="120" y="125" text-anchor="middle" font-family="Bangers, sans-serif" font-size="92" fill="#0A0A0A" letter-spacing="2" transform="rotate(-4 120 125)">BEER!</text>
+    </g>
+
+    <!-- additional black ink marks (flying) for action feel -->
+    <g fill="#0A0A0A">
+      <circle cx="240" cy="180" r="5"/>
+      <circle cx="200" cy="240" r="3"/>
+      <circle cx="300" cy="160" r="4"/>
+      <circle cx="1000" cy="180" r="5"/>
+      <circle cx="1050" cy="240" r="3"/>
+      <circle cx="950" cy="160" r="4"/>
+    </g>
+
+    <!-- ===== BLUE TABLE STRIP (bottom) with halftone ===== -->
+    <g>
+      <rect x="0" y="580" width="1280" height="140" fill="#2E9BD6"/>
+      <rect x="0" y="580" width="1280" height="140" fill="url(#halftone-black-on-light)" opacity="0.35"/>
+      <!-- top edge of table -->
+      <line x1="0" y1="580" x2="1280" y2="580" stroke="#0A0A0A" stroke-width="5"/>
+      <!-- table perspective lines -->
+      <line x1="0" y1="580" x2="40" y2="720" stroke="#0A0A0A" stroke-width="2" opacity="0.4"/>
+      <line x1="1280" y1="580" x2="1240" y2="720" stroke="#0A0A0A" stroke-width="2" opacity="0.4"/>
+    </g>
+  </svg>
+
+  <!-- text overlay -->
+  <div class="hero-text">
+    <div class="eyebrow">tonight's pick · 今晚精選</div>
+    <h1 class="hero-title">讓天意<br><span class="yellow">決定你</span><br>今晚喝</h1>
+    <p class="hero-sub">命運今晚在瓶底寫好了字 — 揭開酒標就知道。</p>
+    <div class="cta-row">
+      <button class="btn-primary">讓天意決定 →</button>
+      <button class="btn-secondary">自己選</button>
+    </div>
+  </div>
+
+</section>
+
+<section class="features">
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="num">01</div>
+      <h3>拍照選酒</h3>
+      <p>拍下酒標，AI 幫你挑</p>
+    </div>
+    <div class="feature-card">
+      <div class="num">02</div>
+      <h3>心情推薦</h3>
+      <p>說一個情緒字，今晚就喝這杯</p>
+    </div>
+    <div class="feature-card">
+      <div class="num">03</div>
+      <h3>本地酒吧</h3>
+      <p>香港巷弄裡的小酒館</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  © 2026 WhattoDrink · 理性飲酒 · 未成年請勿飲酒
+</footer>
+
+</body>
+</html>

@@ -302,6 +302,77 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/presence:
+    post:
+      operationId: postPresence
+      summary: 心跳上報位置（需登录；隱身 403 且不寫行，A.21）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng]
+              properties:
+                lat:
+                  type: number
+                  minimum: -90
+                  maximum: 90
+                lng:
+                  type: number
+                  minimum: -180
+                  maximum: 180
+      responses:
+        "200":
+          description: 已寫入 live_lat／live_lng＋last_seen_at（原子）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, seen_at]
+                properties:
+                  ok:
+                    type: boolean
+                  seen_at:
+                    type: string
+                    format: date-time
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 隱身模式不记录位置（A.16 双保险：前端不发＋此处拒）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/friends/live:
+    get:
+      operationId: getLiveFriends
+      summary: 在線好友實時位列表（需登录；互好友＋雙方非隱身＋5min 鮮，server 過濾；查看者隱身回 []，A.21）
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 可見好友實時位（空即無人可見，不過濾理由不回，避免探測）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [friends]
+                properties:
+                  friends:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LiveFriend"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
     get:
       operationId: getBeers
       summary: 酒目錄（公開，A.4-1 首條）
@@ -484,6 +555,26 @@ components:
         status:
           type: string
           enum: [pending, accepted]
+    LiveFriend:
+      type: object
+      required: [user_id, nickname, avatar_url, lat, lng, updated_at]
+      description: 在線好友實時位一行（server 已過濾互好友＋非隱身＋5min 鮮，A.21）
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        lat:
+          type: number
+        lng:
+          type: number
+        updated_at:
+          type: integer
+          description: last_seen_at epoch ms（鮮度憑證）
     MapPin:
       type: object
       required: [id, lat, lng, area, drinkName, drinkEmoji, nickname, avatarUrl, gender, checkedInAt, isOnline]

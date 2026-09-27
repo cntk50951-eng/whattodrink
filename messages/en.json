@@ -317,7 +317,13 @@
     "postTitle": "Post · stays",
     "postDesc": "Stays until you delete it",
     "back": "Back",
-    "wantPhotoSoon": "Photos coming soon — note this one down in words for now"
+    "wantPhotoSoon": "Photos coming soon — note this one down in words for now",
+    "chatOnline": "Online",
+    "chatEmpty": "Say hi to start",
+    "chatHi": "👋 Say Hi",
+    "chatPlaceholder": "Type a message…",
+    "chatSend": "Send",
+    "chatVoice": "Voice"
   },
   "terms": {
     "title": "Three modes, which one?",

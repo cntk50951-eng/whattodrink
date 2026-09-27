@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>今晚喝咩？— Whattodrink (Urban Sip v2)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,800;0,900&family=Noto+Sans+TC:wght@400;500;700;900&family=DM+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    /* ============================================================
+       URBAN SIP v2 — After-hours Urban Nightlife
+       Stitch DS: assets/14462006887197389619
+       Enhanced: 2026-09-03
+       Key principles: neon glow, frosted glass, dark base with
+       warm amber accent, sophisticated nightlife aesthetic
+       ============================================================ */
+
+    :root {
+      /* Core palette — dark base + warm amber + cool accent */
+      --color-bg: #0a0e1a;
+      --color-bg-2: #111827;
+      --color-surface: #1a1f2e;
+      --color-surface-2: #232839;
+      --color-surface-3: #2d3344;
+      --color-glass: rgba(26, 31, 46, 0.65);
+      --color-glass-border: rgba(255, 255, 255, 0.08);
+      --color-text: #f5f1e8;
+      --color-text-muted: #a8a89c;
+      --color-text-dim: #6a6a6a;
+      --color-amber: #e8a830;
+      --color-amber-bright: #ffc850;
+      --color-amber-deep: #8a5818;
+      --color-amber-glow: rgba(232, 168, 48, 0.4);
+      --color-pink: #ff5a8a;
+      --color-cyan: #4ad8e8;
+      --color-violet: #8a5af0;
+      --color-red: #e8443a;
+
+      /* Glow recipes */
+      --glow-amber-sm: 0 0 8px var(--color-amber-glow);
+      --glow-amber-md: 0 0 16px var(--color-amber-glow), 0 0 32px rgba(232, 168, 48, 0.2);
+      --glow-amber-lg: 0 0 24px var(--color-amber-glow), 0 0 48px rgba(232, 168, 48, 0.3);
+      --glow-amber-xl: 0 0 32px var(--color-amber), 0 0 64px rgba(232, 168, 48, 0.4);
+      --glow-pink-md: 0 0 16px rgba(255, 90, 138, 0.5);
+      --glow-cyan-md: 0 0 16px rgba(74, 216, 232, 0.5);
+
+      /* Spacing */
+      --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px;
+      --s-6: 24px; --s-7: 32px; --s-8: 40px; --s-9: 48px; --s-10: 64px;
+      --s-11: 80px; --s-12: 96px;
+      --container-margin: 32px;
+      --container-max: 1280px;
+
+      /* Radii */
+      --r-sm: 4px;
+      --r: 8px;
+      --r-md: 12px;
+      --r-lg: 16px;
+      --r-xl: 24px;
+      --r-pill: 9999px;
+
+      /* Type */
+      --font-display: "Playfair Display", "Noto Sans TC", Georgia, serif;
+      --font-sans: "Inter", "Noto Sans TC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+      --font-grotesk: "Space Grotesk", "Inter", sans-serif;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html {
+      scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-size: 16px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      position: relative;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    /* Subtle background gradient — atmospheric */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background:
+        radial-gradient(ellipse at 20% 0%, rgba(232, 168, 48, 0.08), transparent 50%),
+        radial-gradient(ellipse at 80% 50%, rgba(138, 90, 240, 0.06), transparent 50%),
+        radial-gradient(ellipse at 50% 100%, rgba(255, 90, 138, 0.04), transparent 50%);
+    }
+
+    /* Subtle film grain */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.04;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      mix-blend-mode: overlay;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: inherit;
+    }
+    img, svg { display: block; max-width: 100%; }
+
+    /* Typography */
+    .display {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-style: italic;
+      letter-spacing: -0.03em;
+      line-height: 0.95;
+      font-size: clamp(48px, 8vw, 80px);
+      color: var(--color-text);
+    }
+    .h1 {
+      font-family: var(--font-display);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+      font-size: clamp(32px, 5vw, 44px);
+    }
+    .h2 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      font-size: clamp(24px, 3.5vw, 32px);
+    }
+    .h3 {
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      line-height: 1.3;
+      font-size: 18px;
+    }
+    .body {
+      font-weight: 400;
+      font-size: 15px;
+      line-height: 1.65;
+    }
+    .body-lg {
+      font-weight: 400;
+      font-size: 17px;
+      line-height: 1.6;
+    }
+    .label {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 11px;
+    }
+    .label-sm {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-size: 10px;
+    }
+    .muted { color: var(--color-text-muted); }
+    .accent-amber { color: var(--color-amber); }
+    .accent-pink { color: var(--color-pink); }
+    .accent-cyan { color: var(--color-cyan); }
+
+    .container {
+      max-width: var(--container-max);
+      margin: 0 auto;
+      padding: 0 var(--container-margin);
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ============================================================
+       TOP NAV — frosted glass with subtle glow
+       ============================================================ */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--color-glass);
+      backdrop-filter: blur(16px) saturate(180%);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      border-bottom: 1px solid var(--color-glass-border);
+    }
+    .topbar__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s-6);
+      padding: var(--s-4) 0;
+    }
+    .wordmark {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-style: italic;
+      font-size: 20px;
+      letter-spacing: -0.02em;
+      color: var(--color-text);
+      text-shadow: var(--glow-amber-sm);
+    }
+    .wordmark__dot {
+      display: inline-block;
+      width: 0.4em;
+      height: 0.4em;
+      background: var(--color-amber);
+      border-radius: 50%;
+      margin: 0 0.08em;
+      box-shadow: 0 0 12px var(--color-amber);
+      transform: translateY(-0.05em);
+    }
+    .nav {
+      display: none;
+      gap: var(--s-7);
+    }
+    .nav__item {
+      position: relative;
+      padding: var(--s-2) 0;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--color-text-muted);
+      transition: color 0.15s ease;
+    }
+    .nav__item:hover { color: var(--color-text); }
+    .nav__item--active {
+      color: var(--color-amber);
+      text-shadow: var(--glow-amber-sm);
+    }
+    .nav__item--active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 2px;
+      background: var(--color-amber);
+      box-shadow: 0 0 8px var(--color-amber);
+    }
+    @media (min-width: 768px) {
+      .nav { display: flex; }
+    }
+    .lang-switch {
+      display: flex;
+      background: var(--color-surface);
+      border: 1px solid var(--color-glass-border);
+      border-radius: var(--r-pill);
+      padding: 3px;
+      gap: 2px;
+    }
+    .lang-switch__btn {
+      padding: 5px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      color: var(--color-text-muted);
+      border-radius: var(--r-pill);
+      transition: all 0.15s ease;
+    }
+    .lang-switch__btn:hover { color: var(--color-text); }
+    .lang-switch__btn--active {
+      background: var(--color-amber);
+      color: var(--color-bg);
+      box-shadow: var(--glow-amber-sm);
+    }
+
+    /* ============================================================
+       HERO
+       ============================================================ */
+    .hero {
+      padding: var(--s-12) 0 var(--s-11);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero__grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-9);
+      align-items: center;
+    }
+    @media (min-width: 960px) {
+      .hero__grid {
+        grid-template-columns: 1.1fr 1fr;
+      }
+    }
+    .hero__eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s-2);
+      padding: 8px 14px;
+      background: var(--color-glass);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--color-glass-border);
+      border-radius: var(--r-pill);
+      margin-bottom: var(--s-6);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--color-amber);
+    }
+    .hero__eyebrow-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--color-amber);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--color-amber);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+    .hero__title-amber {
+      color: var(--color-amber);
+      text-shadow: 0 0 32px var(--color-amber-glow);
+    }
+    .hero__sub {
+      margin-top: var(--s-6);
+      max-width: 38ch;
+      color: var(--color-text-muted);
+    }
+    .hero__cta-row {
+      margin-top: var(--s-8);
+      display: flex;
+      gap: var(--s-4);
+      flex-wrap: wrap;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s-2);
+      padding: 14px 28px;
+      font-family: var(--font-mono);
+      font-weight: 500;
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      border-radius: var(--r-pill);
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .btn--amber {
+      background: var(--color-amber);
+      color: var(--color-bg);
+      box-shadow: var(--glow-amber-md);
+    }
+    .btn--amber:hover {
+      background: var(--color-amber-bright);
+      box-shadow: var(--glow-amber-lg);
+      transform: translateY(-1px);
+    }
+    .btn--ghost {
+      background: var(--color-glass);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: var(--color-text);
+      border: 1px solid var(--color-glass-border);
+    }
+    .btn--ghost:hover {
+      border-color: var(--color-amber);
+      color: var(--color-amber);
+    }
+    .btn--outline {
+      background: transparent;
+      color: var(--color-text);
+      border: 1px solid var(--color-text-muted);
+    }
+    .btn--outline:hover {
+      border-color: var(--color-amber);
+      color: var(--color-amber);
+    }
+    .btn--sm {
+      padding: 8px 16px;
+      font-size: 10px;
+    }
+
+    /* ============================================================
+       HERO ART — sophisticated urban night scene
+       Frosted glass frame with detailed beer mug + city silhouette
+       ============================================================ */
+    .hero__art {
+      position: relative;
+      aspect-ratio: 1 / 1;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    .hero__art-glow {
+      position: absolute;
+      inset: -20px;
+      background: radial-gradient(circle, var(--color-amber-glow), transparent 60%);
+      filter: blur(40px);
+      z-index: 0;
+      pointer-events: none;
+    }
+    .hero__art-frame {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: var(--color-glass);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid var(--color-glass-border);
+      border-radius: var(--r-xl);
+      box-shadow: var(--glow-amber-md);
+      overflow: hidden;
+    }
+    .hero__art-tag {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: var(--color-amber);
+      color: var(--color-bg);
+      padding: 4px 10px;
+      border-radius: var(--r-pill);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      z-index: 2;
+    }
+    .hero__art-status {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--color-glass);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--color-glass-border);
+      border-radius: var(--r-pill);
+      padding: 4px 10px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--color-amber);
+      z-index: 2;
+    }
+    .hero__art-status-dot {
+      width: 5px;
+      height: 5px;
+      background: var(--color-amber);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--color-amber);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    .hero__art-caption {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      z-index: 2;
+    }
+    .hero__art-info {
+      background: var(--color-glass);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--color-glass-border);
+      border-radius: var(--r);
+      padding: 8px 12px;
+    }
+    .hero__art-info-name {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-style: italic;
+      font-size: 14px;
+      color: var(--color-amber);
+    }
+    .hero__art-info-meta {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    /* ============================================================
+       SECTIONS
+       ============================================================ */
+    .section {
+      padding: var(--s-11) 0;
+      position: relative;
+    }
+    .section--alt {
+      background: var(--color-bg-2);
+    }
+    .section--dark {
+      background: var(--color-bg);
+    }
+    .section__head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: var(--s-6);
+      margin-bottom: var(--s-9);
+      padding-bottom: var(--s-5);
+      border-bottom: 1px solid var(--color-glass-border);
+    }
+    .section__head-text {
+      max-width: 60ch;
+    }
+    .section__rule-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      color: var(--color-amber);
+      margin-bottom: var(--s-3);
+      text-transform: uppercase;
+    }
+    .section__head-meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+    }
+
+    /* ============================================================
+       BENTO GRID — frosted glass cards
+       ============================================================ */
+    .bento {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-auto-rows: minmax(220px, auto);
+      gap: var(--s-5);
+    }
+    @media (min-width: 768px) {
+      .bento {
+        grid-template-columns: 2fr 1fr;
+        grid-auto-rows: minmax(280px, auto);
+      }
+    }
+    .bento__card {
+      position: relative;
+      background: var(--color-glass);
+      backdrop-filter: blur(12px) saturate(160%);
+      -webkit-backdrop-filter: blur(12px) saturate(160%);
+      border: 1px solid var(--color-glass-border);
+      border-radius: var(--r-lg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: all 0.25s ease;
+    }
+    .bento__card:hover {
+      transform: translateY(-4px);
+      border-color: var(--color-amber);
+      box-shadow: var(--glow-amber-md);
+    }
+    .bento__card-band {
+      padding: var(--s-3) var(--s-5);
+      font-family: var(--font-mono);
+      font-weight: 500;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--color-glass-border);
+      color: var(--color-amber);
+    }
+    .bento__card-band--pink {
+      background: linear-gradient(90deg, rgba(255, 90, 138, 0.15), transparent);
+      color: var(--color-pink);
+    }
+    .bento__card-band--cyan {
+      background: linear-gradient(90deg, rgba(74, 216, 232, 0.15), transparent);
+      color: var(--color-cyan);
+    }
+    .bento__card-band--violet {
+      background: linear-gradient(90deg, rgba(138, 90, 240, 0.15), transparent);
+      color: var(--color-violet);
+    }
+    .bento__card-band-tag {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      opacity: 0.6;
+    }
+    .bento__card-body {
+      padding: var(--s-6);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-4);
+      flex: 1;
+    }
+    .bento__card-art {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 140px;
+    }
+    .bento__card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: var(--s-4);
+      border-top: 1px solid var(--color-glass-border);
+    }
+    .bento__card-meta-text {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .bento__num {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-style: italic;
+      font-size: 56px;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      color: var(--color-amber);
+      text-shadow: 0 0 16px var(--color-amber-glow);
+    }
+
+    /* ============================================================
+       HOW IT WORKS
+       ============================================================ */
+    .how {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-5);
+    }
+    @media (min-width: 768px) {
+      .how {
+        grid-template-columns: 1fr auto 1fr auto 1fr;
+        align-items: stretch;
+      }
+    }
+    .how__step {
+      background: var(--color-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--color-glass-border);
+      border-radius: var(--r-lg);
+      padding: var(--s-6);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-3);
+      position: relative;
+      transition: all 0.25s ease;
+    }
+    .how__step:hover {
+      border-color: var(--color-amber);
+      box-shadow: var(--glow-amber-sm);
+    }
+    .how__step::before {
+      content: "";
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 8px;
+      height: 8px;
+      background: var(--color-amber);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--color-amber);
+    }
+    .how__step-num {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      color: var(--color-amber);
+      text-transform: uppercase;
+    }
+    .how__num {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-style: italic;
+      font-size: 40px;
+      letter-spacing: -0.04em;
+      color: var(--color-amber);
+      text-shadow: 0 0 16px var(--color-amber-glow);
+      line-height: 1;
+    }
+    .how__arrow {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-amber);
+    }
+    .how__arrow svg { stroke: currentColor; filter: drop-shadow(0 0 4px var(--color-amber-glow)); }
+    @media (min-width: 768px) {
+      .how__arrow { display: flex; }
+    }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    .footer {
+      border-top: 1px solid var(--color-glass-border);
+      padding: var(--s-9) 0 var(--s-8);
+      background: var(--color-bg-2);
+    }
+    .footer__inner {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-6);
+      align-items: flex-start;
+    }
+    @media (min-width: 768px) {
+      .footer__inner {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
+    }
+    .footer__brand {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-2);
+    }
+    .socials {
+      display: flex;
+      gap: var(--s-3);
+    }
+    .socials__btn {
+      width: 40px;
+      height: 40px;
+      border: 1px solid var(--color-glass-border);
+      border-radius: var(--r-pill);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--color-glass);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: var(--color-text-muted);
+      transition: all 0.15s ease;
+    }
+    .socials__btn:hover {
+      color: var(--color-amber);
+      border-color: var(--color-amber);
+      box-shadow: var(--glow-amber-sm);
+      transform: translateY(-2px);
+    }
+
+    /* Accessibility */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    /* Draw-lot animation — neon flicker + reveal (simplified sample per UR1.4) */
+    @keyframes neonFlicker {
+      0%, 100% { opacity: 1; }
+      30% { opacity: 0.55; }
+      55% { opacity: 0.9; }
+      75% { opacity: 0.65; }
+    }
+    .shuffling { animation: neonFlicker 0.15s linear infinite; }
+    .draw-out { min-height: 14px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Top navigation -->
+  <header class="topbar" role="banner">
+    <div class="container topbar__inner">
+      <a href="#" class="wordmark" aria-label="Whattodrink home">
+        WHATTO<span class="wordmark__dot" aria-hidden="true"></span>DRINK
+      </a>
+      <nav class="nav" aria-label="主導航">
+        <a href="#" class="nav__item nav__item--active">今晚喝咩</a>
+        <a href="#" class="nav__item">拍照選酒</a>
+        <a href="#" class="nav__item">心情推薦</a>
+      </nav>
+      <div class="lang-switch" role="group" aria-label="語言切換">
+        <button class="lang-switch__btn lang-switch__btn--active" type="button" aria-pressed="true">繁</button>
+        <button class="lang-switch__btn" type="button" aria-pressed="false">简</button>
+        <button class="lang-switch__btn" type="button" aria-pressed="false">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero__grid">
+        <div>
+          <div class="hero__eyebrow">
+            <span class="hero__eyebrow-dot" aria-hidden="true"></span>
+            Tonight · Open Late
+          </div>
+          <h1 class="display">
+            今晚<br />
+            <span class="hero__title-amber">喝咩？</span>
+          </h1>
+          <p class="body-lg hero__sub">
+            放工之後，燈光暗落嚟。讓命運幫你揀返杯啱你嘅酒。獨酌定聚會，都唔使再揀到頭都大。
+          </p>
+          <div class="hero__cta-row">
+            <a href="#" class="btn btn--amber">隨機抽一杯</a>
+            <a href="#" class="btn btn--ghost">睇下點用</a>
+          </div>
+        </div>
+
+        <!-- Sophisticated urban night scene -->
+        <div class="hero__art" aria-hidden="true">
+          <div class="hero__art-glow"></div>
+          <div class="hero__art-frame">
+            <div class="hero__art-tag">UR 1.4 #02</div>
+            <div class="hero__art-status">
+              <span class="hero__art-status-dot" aria-hidden="true"></span>
+              Open
+            </div>
+
+            <svg viewBox="0 0 400 400" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Urban night beer illustration">
+              <defs>
+                <!-- Amber gradient for beer liquid -->
+                <linearGradient id="amberLiquid" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#ffc850"/>
+                  <stop offset="50%" stop-color="#e8a830"/>
+                  <stop offset="100%" stop-color="#8a5818"/>
+                </linearGradient>
+
+                <!-- Glass gradient -->
+                <linearGradient id="glassGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="rgba(232,168,48,0.3)"/>
+                  <stop offset="50%" stop-color="rgba(232,168,48,0.05)"/>
+                  <stop offset="100%" stop-color="rgba(232,168,48,0.2)"/>
+                </linearGradient>
+
+                <!-- City silhouette gradient -->
+                <linearGradient id="cityGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#0a0e1a"/>
+                  <stop offset="100%" stop-color="#1a1f2e"/>
+                </linearGradient>
+
+                <!-- Glow filter -->
+                <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="4" result="blur"/>
+                  <feMerge>
+                    <feMergeNode in="blur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+
+                <!-- Strong glow for neon signs -->
+                <filter id="strongGlow" x="-100%" y="-100%" width="300%" height="300%">
+                  <feGaussianBlur stdDeviation="6" result="blur"/>
+                  <feMerge>
+                    <feMergeNode in="blur"/>
+                    <feMergeNode in="blur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+
+                <!-- Mug body clip -->
+                <clipPath id="mugClip">
+                  <path d="M 130 140 L 128 320 Q 128 338 145 338 L 255 338 Q 272 338 272 320 L 270 140 Z"/>
+                </clipPath>
+              </defs>
+
+              <!-- Star field + haze bands -->
+              <g fill="#f5f1e8">
+                <circle cx="40" cy="40" r="1.2" opacity="0.8"/>
+                <circle cx="90" cy="25" r="0.9" opacity="0.5"/>
+                <circle cx="150" cy="45" r="1.4" opacity="0.9"/>
+                <circle cx="210" cy="28" r="0.9" opacity="0.5"/>
+                <circle cx="260" cy="50" r="1.2" opacity="0.7"/>
+                <circle cx="310" cy="30" r="1.5" opacity="0.9"/>
+                <circle cx="360" cy="55" r="1" opacity="0.6"/>
+                <circle cx="120" cy="70" r="0.8" opacity="0.4"/>
+                <circle cx="240" cy="75" r="0.8" opacity="0.4"/>
+                <circle cx="335" cy="95" r="1.1" opacity="0.7"/>
+                <circle cx="20" cy="120" r="0.9" opacity="0.5"/>
+                <circle cx="180" cy="60" r="1" fill="#4ad8e8" opacity="0.7"/>
+                <circle cx="290" cy="110" r="1" fill="#ff5a8a" opacity="0.7"/>
+              </g>
+              <g>
+                <ellipse cx="320" cy="120" rx="95" ry="10" fill="#8a5af0" opacity="0.12"/>
+                <ellipse cx="80" cy="300" rx="110" ry="12" fill="#4ad8e8" opacity="0.08"/>
+              </g>
+
+              <!-- City silhouette in background -->
+              <g opacity="0.6">
+                <!-- Far buildings -->
+                <rect x="20" y="180" width="40" height="140" fill="url(#cityGrad)"/>
+                <rect x="65" y="160" width="35" height="160" fill="url(#cityGrad)"/>
+                <rect x="105" y="200" width="30" height="120" fill="url(#cityGrad)"/>
+                <rect x="270" y="170" width="40" height="150" fill="url(#cityGrad)"/>
+                <rect x="315" y="190" width="35" height="130" fill="url(#cityGrad)"/>
+                <rect x="355" y="200" width="30" height="120" fill="url(#cityGrad)"/>
+              </g>
+
+              <!-- Rooftop antenna + blinking beacon -->
+              <line x1="82" y1="160" x2="82" y2="130" stroke="#e8a830" stroke-width="1.5"/>
+              <line x1="74" y1="138" x2="90" y2="138" stroke="#e8a830" stroke-width="1"/>
+              <circle cx="82" cy="126" r="3" fill="#ff5a8a" filter="url(#neonGlow)">
+                <animate attributeName="opacity" values="1;0.2;1" dur="1.6s" repeatCount="indefinite"/>
+              </circle>
+
+              <!-- Building windows — varied sizes, some lit warm, most dark -->
+              <g fill="#e8a830">
+                <rect x="30" y="200" width="4" height="5" opacity="0.9"/>
+                <rect x="40" y="212" width="3" height="3" opacity="0.45"/>
+                <rect x="30" y="224" width="3" height="4" opacity="0.7"/>
+                <rect x="50" y="242" width="4" height="3" opacity="0.5"/>
+                <rect x="40" y="260" width="3" height="5" opacity="0.85"/>
+                <rect x="75" y="182" width="4" height="5" opacity="0.9"/>
+                <rect x="86" y="202" width="3" height="3" opacity="0.4"/>
+                <rect x="75" y="222" width="3" height="4" opacity="0.65"/>
+                <rect x="115" y="222" width="4" height="3" opacity="0.5"/>
+                <rect x="125" y="242" width="3" height="5" opacity="0.8"/>
+                <rect x="280" y="192" width="4" height="5" opacity="0.9"/>
+                <rect x="296" y="212" width="3" height="3" opacity="0.45"/>
+                <rect x="325" y="202" width="4" height="4" opacity="0.7"/>
+                <rect x="336" y="222" width="3" height="5" opacity="0.85"/>
+                <rect x="365" y="222" width="4" height="3" opacity="0.5"/>
+                <rect x="375" y="242" width="3" height="4" opacity="0.7"/>
+                <rect x="355" y="262" width="4" height="5" opacity="0.9"/>
+              </g>
+
+              <!-- Neighbouring windows (pink/cyan) -->
+              <g fill="#ff5a8a">
+                <rect x="50" y="280" width="3" height="4" opacity="0.7"/>
+                <rect x="85" y="242" width="4" height="3" opacity="0.5"/>
+                <rect x="115" y="262" width="3" height="5" opacity="0.8"/>
+              </g>
+              <g fill="#4ad8e8">
+                <rect x="295" y="242" width="3" height="4" opacity="0.7"/>
+                <rect x="325" y="262" width="4" height="3" opacity="0.5"/>
+                <rect x="365" y="282" width="3" height="4" opacity="0.8"/>
+              </g>
+
+              <!-- Vertical neon sign on right building -->
+              <rect x="276" y="230" width="28" height="76" fill="#0a0e1a" opacity="0.85" stroke="#ff5a8a" stroke-width="1"/>
+              <g filter="url(#neonGlow)">
+                <text x="290" y="298" fill="#ff5a8a" font-family="DM Mono, monospace" font-weight="700" font-size="15" letter-spacing="3" text-anchor="middle" transform="rotate(-90 290 298)">BAR · 酒</text>
+              </g>
+
+              <!-- Mug glow halo -->
+              <ellipse cx="200" cy="280" rx="90" ry="80" fill="url(#amberLiquid)" opacity="0.15" filter="url(#neonGlow)"/>
+
+              <!-- Beer mug — glass body -->
+              <path d="M 130 140 L 128 320 Q 128 338 145 338 L 255 338 Q 272 338 272 320 L 270 140 Z"
+                    fill="url(#glassGrad)" stroke="#e8a830" stroke-width="1.5" stroke-linejoin="round"/>
+
+              <!-- Glass body subtle outline -->
+              <path d="M 130 140 L 128 320 Q 128 338 145 338 L 255 338 Q 272 338 272 320 L 270 140"
+                    fill="none" stroke="#4ad8e8" stroke-width="0.5" opacity="0.3" stroke-linejoin="round"/>
+
+              <!-- Foam (top) -->
+              <path d="M 122 140 Q 118 110 140 105 Q 155 88 175 100 Q 195 85 215 100 Q 235 88 255 100 Q 272 105 278 140 Z"
+                    fill="#f5f1e8" stroke="#e8a830" stroke-width="1.5" stroke-linejoin="round"/>
+
+              <!-- Foam highlights -->
+              <ellipse cx="160" cy="115" rx="6" ry="3" fill="#ffffff" opacity="0.5"/>
+              <ellipse cx="200" cy="108" rx="5" ry="2.5" fill="#ffffff" opacity="0.5"/>
+              <ellipse cx="240" cy="115" rx="6" ry="3" fill="#ffffff" opacity="0.5"/>
+
+              <!-- Foam bubble texture -->
+              <g fill="#e8a830" opacity="0.45">
+                <circle cx="145" cy="128" r="2.5"/>
+                <circle cx="165" cy="132" r="1.8"/>
+                <circle cx="185" cy="126" r="2.2"/>
+                <circle cx="208" cy="130" r="2.5"/>
+                <circle cx="230" cy="128" r="1.8"/>
+                <circle cx="250" cy="132" r="2.2"/>
+              </g>
+
+              <!-- Liquid (amber) -->
+              <path d="M 132 180 Q 200 175 268 180 L 268 320 Q 268 336 256 336 L 144 336 Q 132 336 132 320 Z"
+                    fill="url(#amberLiquid)"/>
+
+              <!-- Liquid surface line -->
+              <path d="M 132 180 Q 200 175 268 180" fill="none" stroke="#ffc850" stroke-width="1.5" opacity="0.6"/>
+
+              <!-- Deep liquid glow at bottom -->
+              <ellipse cx="200" cy="312" rx="58" ry="14" fill="#ffc850" opacity="0.22" filter="url(#neonGlow)"/>
+
+              <!-- Bubbles in liquid -->
+              <g stroke="#f5f1e8" stroke-width="1" fill="#f5f1e8" opacity="0.5">
+                <circle cx="160" cy="220" r="5"/>
+                <circle cx="195" cy="245" r="7"/>
+                <circle cx="235" cy="225" r="4"/>
+                <circle cx="170" cy="280" r="5"/>
+                <circle cx="220" cy="295" r="6"/>
+                <circle cx="245" cy="270" r="4"/>
+                <circle cx="155" cy="310" r="3"/>
+                <circle cx="200" cy="320" r="4"/>
+              </g>
+
+              <!-- Glass left highlight (vertical streak) -->
+              <line x1="140" y1="200" x2="140" y2="320" stroke="#ffc850" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+              <line x1="144" y1="220" x2="144" y2="315" stroke="#ffc850" stroke-width="1" opacity="0.3" stroke-linecap="round"/>
+
+              <!-- Glass right edge -->
+              <line x1="265" y1="200" x2="265" y2="320" stroke="#4ad8e8" stroke-width="0.5" opacity="0.4"/>
+
+              <!-- Condensation droplets on glass exterior -->
+              <g fill="#f5f1e8" stroke="#ffc850" stroke-width="0.5">
+                <circle cx="150" cy="230" r="2.5" opacity="0.7"/>
+                <circle cx="158" cy="255" r="1.8" opacity="0.6"/>
+                <circle cx="246" cy="240" r="2.2" opacity="0.7"/>
+                <circle cx="240" cy="290" r="1.8" opacity="0.6"/>
+                <circle cx="152" cy="300" r="2" opacity="0.65"/>
+                <circle cx="228" cy="200" r="1.5" opacity="0.55"/>
+              </g>
+
+              <!-- Handle (D-shape) -->
+              <path d="M 272 200 Q 320 200 320 250 Q 320 300 272 300"
+                    fill="none" stroke="#e8a830" stroke-width="8" stroke-linecap="round" filter="url(#neonGlow)"/>
+              <path d="M 272 200 Q 320 200 320 250 Q 320 300 272 300"
+                    fill="none" stroke="#e8a830" stroke-width="2" stroke-linecap="round"/>
+              <!-- Handle inner highlight -->
+              <path d="M 280 210 Q 312 210 312 250 Q 312 290 280 290"
+                    fill="none" stroke="#ffc850" stroke-width="0.5" opacity="0.5"/>
+
+              <!-- W·D badge -->
+              <circle cx="200" cy="260" r="22" fill="#0a0e1a" stroke="#e8a830" stroke-width="2" filter="url(#neonGlow)"/>
+              <circle cx="200" cy="260" r="16" fill="none" stroke="#e8a830" stroke-width="1"/>
+              <text x="200" y="266" text-anchor="middle" fill="#e8a830" font-family="Playfair Display, serif" font-weight="900" font-style="italic" font-size="16" letter-spacing="0.04em">W·D</text>
+
+              <!-- "COLD" caption strip at bottom -->
+              <rect x="145" y="300" width="110" height="20" fill="#0a0e1a" stroke="#e8a830" stroke-width="1" rx="2"/>
+              <text x="200" y="313" text-anchor="middle" fill="#e8a830" font-family="DM Mono, monospace" font-weight="500" font-size="9" letter-spacing="0.2em">COLD · ON TAP</text>
+
+              <!-- Bar counter line + mug reflection -->
+              <line x1="60" y1="346" x2="340" y2="346" stroke="#e8a830" stroke-width="1" opacity="0.35"/>
+              <path d="M 128 350 L 272 350 L 256 384 L 144 384 Z" fill="url(#amberLiquid)" opacity="0.12"/>
+
+              <!-- Floating sparkle (top right) -->
+              <g filter="url(#strongGlow)">
+                <circle cx="350" cy="80" r="2" fill="#e8a830"/>
+              </g>
+              <g filter="url(#neonGlow)">
+                <circle cx="60" cy="100" r="1.5" fill="#ff5a8a"/>
+              </g>
+            </svg>
+
+            <div class="hero__art-caption">
+              <div class="hero__art-info">
+                <div class="hero__art-info-name">COLD BREW · 042</div>
+                <div class="hero__art-info-meta">Last Pour · 23:48</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bento Grid -->
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section__head">
+        <div class="section__head-text">
+          <div class="section__rule-num">UR 1.1 · 3 PATHS</div>
+          <h2 class="h1">三個方法，揀返你今晚嗰杯</h2>
+          <p class="body muted" style="margin-top: 12px">
+            隨機抽、影相認、講心情——三種入場方式，揀你最啱嗰個。
+          </p>
+        </div>
+        <div class="section__head-meta">03 / USE CASES</div>
+      </div>
+
+      <div class="bento">
+        <!-- Main card — random pick -->
+        <article class="bento__card">
+          <div class="bento__card-band bento__card-band--pink">
+            <span>主卡 · 隨機抽一杯</span>
+            <span class="bento__card-band-tag">PATH 01</span>
+          </div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg id="drawArt" viewBox="0 0 240 200" width="100%" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="miniAmber" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#ffc850"/>
+                    <stop offset="100%" stop-color="#8a5818"/>
+                  </linearGradient>
+                </defs>
+                <!-- Bottle -->
+                <path d="M 50 60 L 50 75 Q 44 75 44 82 L 44 160 Q 44 168 52 168 L 92 168 Q 100 168 100 160 L 100 82 Q 100 75 94 75 L 94 60 Z"
+                      fill="#1a1f2e" stroke="#e8a830" stroke-width="1.5" stroke-linejoin="round"/>
+                <rect x="50" y="90" width="44" height="40" fill="#ff5a8a"/>
+                <text x="72" y="115" text-anchor="middle" fill="#f5f1e8" font-family="Playfair Display, serif" font-weight="900" font-style="italic" font-size="11">W·D</text>
+                <!-- Glass -->
+                <path d="M 145 90 L 135 168 L 205 168 L 195 90 Z" fill="rgba(232,168,48,0.1)" stroke="#e8a830" stroke-width="1.5" stroke-linejoin="round"/>
+                <line x1="140" y1="115" x2="200" y2="115" stroke="#e8a830" stroke-width="1.5"/>
+                <path d="M 138 90 Q 136 70 155 68 Q 170 55 185 70 Q 200 60 202 90 Z" fill="#e8a830" stroke="#e8a830" stroke-width="1.5"/>
+                <!-- Liquid -->
+                <path d="M 140 120 L 137 165 L 203 165 L 200 120 Z" fill="url(#miniAmber)"/>
+                <circle cx="165" cy="145" r="3" fill="#f5f1e8" opacity="0.6"/>
+                <circle cx="180" cy="155" r="2" fill="#f5f1e8" opacity="0.5"/>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div class="bento__card-meta-text">
+                <div class="label-sm muted">冇目標 · 0 SEC</div>
+                <div class="h3" style="margin-top: 4px">由命運揀返杯</div>
+                <div class="label-sm accent-amber draw-out" id="drawOut" aria-live="polite">未開獎</div>
+              </div>
+              <a href="#" class="btn btn--amber btn--sm" id="drawBtn">立即試</a>
+            </div>
+          </div>
+        </article>
+
+        <!-- Photo pick card -->
+        <article class="bento__card">
+          <div class="bento__card-band bento__card-band--cyan">
+            <span>次卡 · 拍照選酒</span>
+            <span class="bento__card-band-tag">PATH 02</span>
+          </div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 160 200" width="80%" xmlns="http://www.w3.org/2000/svg">
+                <!-- Phone -->
+                <rect x="40" y="20" width="80" height="160" rx="8" fill="#1a1f2e" stroke="#e8a830" stroke-width="1.5"/>
+                <rect x="46" y="34" width="68" height="120" fill="#0a0e1a" stroke="#e8a830" stroke-width="1"/>
+                <circle cx="80" cy="90" r="20" fill="#1a1f2e" stroke="#4ad8e8" stroke-width="2"/>
+                <circle cx="80" cy="90" r="12" fill="#0a0e1a"/>
+                <circle cx="80" cy="90" r="6" fill="#ff5a8a"/>
+                <rect x="72" y="26" width="16" height="3" fill="#e8a830" rx="1"/>
+                <circle cx="80" cy="166" r="4" fill="none" stroke="#e8a830" stroke-width="1"/>
+                <circle cx="108" cy="46" r="2.5" fill="#ff5a8a"/>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div class="bento__card-meta-text">
+                <div class="label-sm muted">便利店 · 5 SEC</div>
+                <div class="h3" style="margin-top: 4px">影張相即刻知</div>
+              </div>
+              <a href="#" class="btn btn--ghost btn--sm">試下</a>
+            </div>
+          </div>
+        </article>
+
+        <!-- Mood pick card -->
+        <article class="bento__card">
+          <div class="bento__card-band bento__card-band--violet">
+            <span>次卡 · 心情推薦</span>
+            <span class="bento__card-band-tag">PATH 03</span>
+          </div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 160 200" width="80%" xmlns="http://www.w3.org/2000/svg">
+                <!-- Thought bubble -->
+                <path d="M 25 100 Q 25 50 80 50 Q 135 50 135 100 Q 135 145 80 145 L 60 145 L 48 158 L 52 145 Q 25 145 25 100 Z"
+                      fill="rgba(232,168,48,0.1)" stroke="#e8a830" stroke-width="1.5" stroke-linejoin="round"/>
+                <circle cx="42" cy="162" r="5" fill="rgba(232,168,48,0.1)" stroke="#e8a830" stroke-width="1.5"/>
+                <circle cx="32" cy="172" r="2.5" fill="rgba(232,168,48,0.1)" stroke="#e8a830" stroke-width="1.5"/>
+                <!-- Mini mug inside -->
+                <rect x="62" y="80" width="36" height="38" fill="#e8a830"/>
+                <line x1="62" y1="90" x2="98" y2="90" stroke="#0a0e1a" stroke-width="1"/>
+                <line x1="62" y1="105" x2="98" y2="105" stroke="#0a0e1a" stroke-width="1"/>
+                <path d="M 60 80 Q 58 68 70 66 Q 80 58 90 68 Q 100 64 100 80 Z" fill="#f5f1e8" stroke="#e8a830" stroke-width="1.5"/>
+                <path d="M 98 92 Q 108 92 108 100 Q 108 108 98 108" fill="none" stroke="#e8a830" stroke-width="2" stroke-linecap="round"/>
+                <!-- Mood dots -->
+                <circle cx="42" cy="70" r="3" fill="#ff5a8a"/>
+                <circle cx="55" cy="65" r="3" fill="#4ad8e8"/>
+                <circle cx="115" cy="65" r="3" fill="#8a5af0"/>
+                <circle cx="128" cy="70" r="3" fill="#e8a830"/>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div class="bento__card-meta-text">
+                <div class="label-sm muted">揀唔到 · 1 MIN</div>
+                <div class="h3" style="margin-top: 4px">講你而家點</div>
+              </div>
+              <a href="#" class="btn btn--ghost btn--sm">揀返杯</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="section section--dark">
+    <div class="container">
+      <div class="section__head">
+        <div class="section__head-text">
+          <div class="section__rule-num">UR 1.1 · 3 STEPS</div>
+          <h2 class="h1">點樣運作</h2>
+          <p class="body muted" style="margin-top: 12px">
+            三步由亂揀到記錄，全程唔使 1 分鐘。
+          </p>
+        </div>
+        <div class="section__head-meta">03 / STEPS</div>
+      </div>
+
+      <div class="how">
+        <article class="how__step">
+          <div class="how__step-num">STEP 01</div>
+          <div class="how__num">01</div>
+          <div class="h3">揀方法</div>
+          <p class="body muted">隨機抽、影相、講心情——揀你而家想點。</p>
+        </article>
+        <div class="how__arrow" aria-hidden="true">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#e8a830" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M 6 16 L 26 16 M 18 8 L 26 16 L 18 24"/>
+          </svg>
+        </div>
+        <article class="how__step">
+          <div class="how__step-num">STEP 02</div>
+          <div class="how__num">02</div>
+          <div class="h3">收結果</div>
+          <p class="body muted">用 token 即時換返杯啱你場合嘅酒款。</p>
+        </article>
+        <div class="how__arrow" aria-hidden="true">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#e8a830" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M 6 16 L 26 16 M 18 8 L 26 16 L 18 24"/>
+          </svg>
+        </div>
+        <article class="how__step">
+          <div class="how__step-num">STEP 03</div>
+          <div class="how__num">03</div>
+          <div class="h3">記低</div>
+          <p class="body muted">記低你嘅心情，之後可以翻睇飲過咩。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer" role="contentinfo">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <a href="#" class="wordmark" aria-label="Whattodrink">
+          WHATTO<span class="wordmark__dot" aria-hidden="true"></span>DRINK
+        </a>
+        <div class="label muted">© 2026 WHATTO·DRINK · HONG KONG</div>
+      </div>
+      <div class="socials" aria-label="社交媒體">
+        <a href="#" class="socials__btn" aria-label="Instagram">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="14" height="14" rx="3"/>
+            <circle cx="10" cy="10" r="3.5"/>
+            <circle cx="14.5" cy="5.5" r="0.5" fill="currentColor"/>
+          </svg>
+        </a>
+        <a href="#" class="socials__btn" aria-label="Threads">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M 5 8 Q 10 4 14 7 Q 17 10 14 13 Q 10 16 6 13"/>
+          </svg>
+        </a>
+        <a href="#" class="socials__btn" aria-label="小紅書">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <text x="10" y="14" text-anchor="middle" font-family="Inter" font-weight="800" font-size="9" fill="currentColor" stroke="none">紅</text>
+            <rect x="3" y="3" width="14" height="14" rx="3"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+  <script>
+    (function () {
+      var beers = ["IPA · 4.5%", "STOUT · 6.0%", "LAGER · 3.8%"];
+      var art = document.getElementById("drawArt");
+      var btn = document.getElementById("drawBtn");
+      var out = document.getElementById("drawOut");
+      if (!art || !btn || !out) return;
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        art.classList.remove("shuffling");
+        void art.offsetWidth;
+        art.classList.add("shuffling");
+        out.textContent = "···";
+        setTimeout(function () {
+          art.classList.remove("shuffling");
+          out.textContent = beers[Math.floor(Math.random() * beers.length)];
+        }, 900);
+      });
+    })();
+  </script>
+</body>
+</html>

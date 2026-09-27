@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>今晚喝咩？— Whattodrink (Liquid Neon v2)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Orbitron:wght@500;700;900&family=Space+Grotesk:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&family=DM+Mono:wght@500;700&display=swap"
+  />
+  <style>
+    /* ============================================================
+       LIQUID NEON v2 — Pure neon tube sign aesthetic
+       Dark base, intense glow, electric atmosphere
+       Enhanced: 2026-09-03
+       ============================================================ */
+
+    :root {
+      --c-bg: #05050f;
+      --c-bg-2: #0a0a1a;
+      --c-surface: #0e0e22;
+      --c-text: #e0e8f0;
+      --c-text-muted: #6a7080;
+      --c-pink: #ff1a8c;
+      --c-pink-bright: #ff4da3;
+      --c-cyan: #00f0ff;
+      --c-cyan-bright: #4af5ff;
+      --c-purple: #a855f7;
+      --c-yellow: #ffd700;
+
+      --glow-pink-sm: 0 0 6px var(--c-pink);
+      --glow-pink-md: 0 0 12px var(--c-pink), 0 0 24px rgba(255, 26, 140, 0.5);
+      --glow-pink-lg: 0 0 20px var(--c-pink), 0 0 40px rgba(255, 26, 140, 0.6);
+      --glow-cyan-sm: 0 0 6px var(--c-cyan);
+      --glow-cyan-md: 0 0 12px var(--c-cyan), 0 0 24px rgba(0, 240, 255, 0.5);
+      --glow-cyan-lg: 0 0 20px var(--c-cyan), 0 0 40px rgba(0, 240, 255, 0.6);
+      --glow-purple-md: 0 0 12px var(--c-purple), 0 0 24px rgba(168, 85, 247, 0.5);
+      --glow-yellow-md: 0 0 12px var(--c-yellow), 0 0 24px rgba(255, 215, 0, 0.5);
+
+      --r: 8px;
+      --r-md: 12px;
+      --r-lg: 16px;
+      --r-pill: 9999px;
+
+      --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px;
+      --s-6: 24px; --s-7: 32px; --s-8: 40px; --s-9: 48px; --s-10: 64px;
+      --s-11: 80px; --s-12: 96px;
+      --container-margin: 32px;
+      --container-max: 1280px;
+
+      --font-display: "Orbitron", "Space Grotesk", sans-serif;
+      --font-sans: "Inter", "Noto Sans TC", sans-serif;
+      --font-mono: "DM Mono", ui-monospace, monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--c-bg);
+      color: var(--c-text);
+      font-size: 16px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background:
+        radial-gradient(ellipse at 15% 10%, rgba(255, 26, 140, 0.15), transparent 50%),
+        radial-gradient(ellipse at 85% 30%, rgba(0, 240, 255, 0.12), transparent 50%),
+        radial-gradient(ellipse at 50% 90%, rgba(168, 85, 247, 0.15), transparent 50%);
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+    img, svg { display: block; max-width: 100%; }
+
+    .display {
+      font-family: var(--font-display);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 0.92;
+      font-size: clamp(48px, 8vw, 80px);
+      color: var(--c-pink);
+      text-shadow: var(--glow-pink-md);
+    }
+    .h1 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+      font-size: clamp(32px, 5vw, 44px);
+    }
+    .h2 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      line-height: 1.15;
+      font-size: clamp(24px, 3.5vw, 32px);
+    }
+    .h3 { font-weight: 700; line-height: 1.3; font-size: 18px; }
+    .body { font-weight: 400; font-size: 15px; line-height: 1.65; }
+    .body-lg { font-weight: 400; font-size: 17px; line-height: 1.6; }
+    .label {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 11px;
+    }
+    .label-sm {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-size: 10px;
+    }
+    .muted { color: var(--c-text-muted); }
+    .neon-pink { color: var(--c-pink); text-shadow: var(--glow-pink-sm); }
+    .neon-cyan { color: var(--c-cyan); text-shadow: var(--glow-cyan-sm); }
+    .neon-purple { color: var(--c-purple); text-shadow: 0 0 6px var(--c-purple); }
+
+    .container {
+      max-width: var(--container-max);
+      margin: 0 auto;
+      padding: 0 var(--container-margin);
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    .topbar {
+      background: rgba(14, 14, 34, 0.6);
+      backdrop-filter: blur(16px) saturate(180%);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      border-bottom: 1px solid rgba(255, 26, 140, 0.3);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topbar__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s-6);
+      padding: var(--s-4) 0;
+    }
+    .wordmark {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 18px;
+      letter-spacing: 0.04em;
+      color: var(--c-cyan);
+      text-shadow: var(--glow-cyan-sm);
+    }
+    .wordmark__bolt {
+      display: inline-block;
+      width: 4px;
+      height: 16px;
+      background: var(--c-pink);
+      box-shadow: var(--glow-pink-sm);
+      margin: 0 6px;
+      transform: skewX(-15deg);
+    }
+    .nav { display: none; gap: var(--s-7); }
+    .nav__item {
+      position: relative;
+      padding: var(--s-2) 0;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--c-text-muted);
+    }
+    .nav__item:hover { color: var(--c-text); }
+    .nav__item--active { color: var(--c-cyan); text-shadow: var(--glow-cyan-sm); }
+    .nav__item--active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 2px;
+      background: var(--c-cyan);
+      box-shadow: var(--glow-cyan-sm);
+    }
+    @media (min-width: 768px) { .nav { display: flex; } }
+    .lang-switch {
+      display: flex;
+      background: rgba(0, 240, 255, 0.1);
+      border: 1px solid var(--c-cyan);
+      border-radius: var(--r-pill);
+      padding: 3px;
+      gap: 2px;
+      box-shadow: 0 0 6px rgba(0, 240, 255, 0.3);
+    }
+    .lang-switch__btn {
+      padding: 5px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--c-text);
+      border-radius: var(--r-pill);
+    }
+    .lang-switch__btn--active {
+      background: var(--c-cyan);
+      color: var(--c-bg);
+      box-shadow: var(--glow-cyan-sm);
+    }
+
+    .hero { padding: var(--s-10) 0; }
+    .hero__grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-7);
+      align-items: center;
+    }
+    @media (min-width: 960px) { .hero__grid { grid-template-columns: 1.1fr 1fr; } }
+    .hero__eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s-2);
+      padding: 6px 14px;
+      border: 1px solid var(--c-cyan);
+      border-radius: var(--r-pill);
+      margin-bottom: var(--s-5);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      color: var(--c-cyan);
+      text-shadow: var(--glow-cyan-sm);
+      text-transform: uppercase;
+    }
+    .hero__eyebrow-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--c-cyan);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--c-cyan);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    .hero__sub {
+      margin-top: var(--s-5);
+      max-width: 38ch;
+      color: var(--c-text-muted);
+    }
+    .hero__cta-row {
+      margin-top: var(--s-7);
+      display: flex;
+      gap: var(--s-3);
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s-2);
+      padding: 14px 28px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      border-radius: var(--r-pill);
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .btn--pink { background: var(--c-pink); color: var(--c-bg); box-shadow: var(--glow-pink-md); }
+    .btn--pink:hover { box-shadow: var(--glow-pink-lg); transform: translateY(-2px); }
+    .btn--cyan { background: transparent; color: var(--c-cyan); border: 2px solid var(--c-cyan); box-shadow: var(--glow-cyan-md); }
+    .btn--cyan:hover { background: var(--c-cyan); color: var(--c-bg); }
+    .btn--purple { background: var(--c-purple); color: var(--c-text); box-shadow: var(--glow-purple-md); }
+    .btn--sm { padding: 8px 16px; font-size: 10px; }
+
+    .hero__art {
+      position: relative;
+      aspect-ratio: 1 / 1;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    .hero__art-glow {
+      position: absolute;
+      inset: -30px;
+      background: radial-gradient(circle, rgba(255, 26, 140, 0.4), transparent 70%);
+      filter: blur(60px);
+      z-index: 0;
+      animation: glow-pulse 4s ease-in-out infinite;
+    }
+    @keyframes glow-pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+    .hero__art-frame {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: rgba(14, 14, 34, 0.5);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 26, 140, 0.3);
+      border-radius: var(--r-lg);
+      box-shadow: var(--glow-pink-md);
+      overflow: hidden;
+    }
+    .hero__art-tag {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: var(--c-pink);
+      color: var(--c-bg);
+      padding: 4px 12px;
+      border-radius: var(--r-pill);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      z-index: 2;
+    }
+    .hero__art-status {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(14, 14, 34, 0.6);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--c-cyan);
+      border-radius: var(--r-pill);
+      padding: 4px 10px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--c-cyan);
+      text-shadow: var(--glow-cyan-sm);
+      z-index: 2;
+    }
+    .hero__art-svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .section {
+      padding: var(--s-10) 0;
+      position: relative;
+    }
+    .section--dark { background: var(--c-bg-2); }
+    .section--ink { background: #000; }
+    .section--purple { background: var(--c-purple); }
+    .section__head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: var(--s-6);
+      margin-bottom: var(--s-8);
+      padding-bottom: var(--s-4);
+      border-bottom: 1px solid rgba(255, 26, 140, 0.2);
+    }
+    .section__head-text { max-width: 60ch; }
+    .section__rule-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      color: var(--c-cyan);
+      text-transform: uppercase;
+    }
+    .section__head-meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      color: var(--c-text-muted);
+      text-transform: uppercase;
+    }
+
+    .bento {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-4);
+    }
+    @media (min-width: 768px) {
+      .bento { grid-template-columns: 2fr 1fr; }
+    }
+    .bento__card {
+      position: relative;
+      background: rgba(14, 14, 34, 0.5);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 26, 140, 0.2);
+      border-radius: var(--r-lg);
+      padding: var(--s-5);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-3);
+      transition: all 0.25s ease;
+    }
+    .bento__card:hover {
+      transform: translateY(-4px);
+      border-color: var(--c-pink);
+      box-shadow: var(--glow-pink-md);
+    }
+    .bento__card--cyan:hover { border-color: var(--c-cyan); box-shadow: var(--glow-cyan-md); }
+    .bento__card--purple:hover { border-color: var(--c-purple); box-shadow: var(--glow-purple-md); }
+    .bento__card-band {
+      padding: var(--s-3) var(--s-5);
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 26, 140, 0.2);
+      color: var(--c-pink);
+    }
+    .bento__card-band--cyan { color: var(--c-cyan); border-color: rgba(0, 240, 255, 0.2); }
+    .bento__card-band--purple { color: var(--c-purple); border-color: rgba(168, 85, 247, 0.2); }
+    .bento__card-band-tag {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      opacity: 0.6;
+    }
+    .bento__card-body {
+      padding: var(--s-6) var(--s-6) var(--s-6);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-3);
+      flex: 1;
+    }
+    .bento__card-art {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 110px;
+    }
+    .bento__card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: var(--s-3);
+      border-top: 1px solid rgba(255, 26, 140, 0.2);
+    }
+    .bento__num {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 56px;
+      line-height: 1;
+      color: var(--c-pink);
+      text-shadow: var(--glow-pink-md);
+    }
+
+    .how {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--s-4);
+    }
+    @media (min-width: 768px) {
+      .how { grid-template-columns: 1fr auto 1fr auto 1fr; align-items: stretch; }
+    }
+    .how__step {
+      background: rgba(14, 14, 34, 0.5);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 26, 140, 0.2);
+      border-radius: var(--r-lg);
+      padding: var(--s-5);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-2);
+      position: relative;
+      transition: all 0.25s ease;
+    }
+    .how__step:hover { border-color: var(--c-cyan); box-shadow: var(--glow-cyan-md); }
+    .how__step::before {
+      content: "";
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 8px;
+      height: 8px;
+      background: var(--c-pink);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--c-pink);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .how__step-num {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      color: var(--c-cyan);
+      text-transform: uppercase;
+    }
+    .how__num {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 40px;
+      color: var(--c-pink);
+      text-shadow: var(--glow-pink-md);
+      line-height: 1;
+    }
+    .how__arrow {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: var(--c-cyan);
+    }
+    .how__arrow svg { filter: drop-shadow(0 0 4px var(--c-cyan)); }
+    @media (min-width: 768px) { .how__arrow { display: flex; } }
+
+    .footer {
+      border-top: 1px solid rgba(255, 26, 140, 0.2);
+      padding: var(--s-8) 0;
+      background: var(--c-bg-2);
+    }
+    .footer__inner {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-6);
+      align-items: flex-start;
+    }
+    @media (min-width: 768px) {
+      .footer__inner { flex-direction: row; justify-content: space-between; align-items: center; }
+    }
+    .socials { display: flex; gap: var(--s-3); }
+    .socials__btn {
+      width: 40px;
+      height: 40px;
+      border: 1px solid rgba(255, 26, 140, 0.3);
+      border-radius: var(--r-pill);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(14, 14, 34, 0.5);
+      backdrop-filter: blur(8px);
+      color: var(--c-text-muted);
+      transition: all 0.15s ease;
+    }
+    .socials__btn:hover {
+      color: var(--c-pink);
+      border-color: var(--c-pink);
+      box-shadow: var(--glow-pink-sm);
+      transform: translateY(-2px);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar" role="banner">
+    <div class="container topbar__inner">
+      <a href="#" class="wordmark" aria-label="Whattodrink home">
+        WHATTODRINK<span class="wordmark__bolt" aria-hidden="true"></span>
+      </a>
+      <nav class="nav" aria-label="主導航">
+        <a href="#" class="nav__item nav__item--active">今晚喝咩</a>
+        <a href="#" class="nav__item">拍照選酒</a>
+        <a href="#" class="nav__item">心情推薦</a>
+      </nav>
+      <div class="lang-switch" role="group" aria-label="語言切換">
+        <button class="lang-switch__btn lang-switch__btn--active" type="button" aria-pressed="true">繁</button>
+        <button class="lang-switch__btn" type="button" aria-pressed="false">简</button>
+        <button class="lang-switch__btn" type="button" aria-pressed="false">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <div class="hero__grid">
+        <div>
+          <div class="hero__eyebrow">
+            <span class="hero__eyebrow-dot" aria-hidden="true"></span>
+            NEON · 10
+          </div>
+          <h1 class="display">今晚<br />喝咩？</h1>
+          <p class="body-lg hero__sub">
+            霓虹管在深夜亮起。讓命運幫你揀返杯啱你嘅酒。獨酌定聚會，都唔使再揀到頭都大。
+          </p>
+          <div class="hero__cta-row">
+            <a href="#" class="btn btn--pink">隨機抽一杯</a>
+            <a href="#" class="btn btn--cyan">睇下點用</a>
+          </div>
+        </div>
+
+        <div class="hero__art" aria-hidden="true">
+          <div class="hero__art-glow"></div>
+          <div class="hero__art-frame">
+            <div class="hero__art-tag">UR 1.4 #10</div>
+            <div class="hero__art-status">
+              <span class="hero__eyebrow-dot" aria-hidden="true"></span>
+              ON
+            </div>
+
+            <svg class="hero__art-svg" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Neon tube beer illustration">
+              <defs>
+                <filter id="strongGlow" x="-100%" y="-100%" width="300%" height="300%">
+                  <feGaussianBlur stdDeviation="6" result="blur"/>
+                  <feMerge>
+                    <feMergeNode in="blur"/>
+                    <feMergeNode in="blur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+                <filter id="subtleGlow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="2" result="blur"/>
+                  <feMerge>
+                    <feMergeNode in="blur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+                <linearGradient id="beerLiquid" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#ff4da3"/>
+                  <stop offset="100%" stop-color="#a00a5a"/>
+                </linearGradient>
+              </defs>
+
+              <!-- Background grid (cyber floor) -->
+              <g stroke="#00f0ff" stroke-width="0.3" opacity="0.3">
+                <line x1="0" y1="280" x2="400" y2="240"/>
+                <line x1="0" y1="300" x2="400" y2="260"/>
+                <line x1="0" y1="320" x2="400" y2="280"/>
+                <line x1="0" y1="340" x2="400" y2="300"/>
+                <line x1="100" y1="400" x2="60" y2="240"/>
+                <line x1="200" y1="400" x2="200" y2="240"/>
+                <line x1="300" y1="400" x2="340" y2="240"/>
+              </g>
+
+              <!-- Far neon signs (background) -->
+              <g filter="url(#subtleGlow)">
+                <text x="30" y="50" font-family="Orbitron" font-weight="900" font-size="14" fill="#00f0ff" opacity="0.4">CYBER</text>
+                <text x="320" y="70" font-family="Orbitron" font-weight="900" font-size="12" fill="#a855f7" opacity="0.4">EST 2000</text>
+              </g>
+
+              <!-- NEON "BEER!" text (hero) -->
+              <g filter="url(#strongGlow)">
+                <text x="200" y="100" text-anchor="middle" font-family="Orbitron" font-weight="900" font-size="42" fill="#ff1a8c" letter-spacing="0.04em">BEER!</text>
+              </g>
+
+              <!-- Beer mug — neon tube style -->
+              <g filter="url(#strongGlow)">
+                <!-- Mug outline (neon pink tube) -->
+                <path d="M 130 140 L 128 320 Q 128 336 145 336 L 255 336 Q 272 336 272 320 L 270 140" fill="none" stroke="#ff1a8c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- Mug body (transparent fill) -->
+                <path d="M 130 140 L 128 320 Q 128 336 145 336 L 255 336 Q 272 336 272 320 L 270 140 Z" fill="#ff1a8c" fill-opacity="0.08" stroke="none"/>
+                <!-- Foam (cyan neon) -->
+                <path d="M 122 140 Q 118 110 140 105 Q 155 90 175 100 Q 195 88 215 100 Q 235 90 255 100 Q 272 105 278 140 Z" fill="none" stroke="#00f0ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- Liquid (electric gradient) -->
+                <path d="M 132 195 L 130 318 Q 130 334 145 334 L 255 334 Q 270 334 270 318 L 268 195 Z" fill="url(#beerLiquid)" fill-opacity="0.3" stroke="none"/>
+                <!-- Liquid surface (neon line) -->
+                <path d="M 132 195 Q 200 188 268 195" fill="none" stroke="#ff1a8c" stroke-width="2" opacity="0.8"/>
+                <!-- Bubbles (electric dots) -->
+                <g fill="#00f0ff" filter="url(#subtleGlow)">
+                  <circle cx="160" cy="230" r="3"/>
+                  <circle cx="200" cy="260" r="4"/>
+                  <circle cx="240" cy="240" r="3"/>
+                  <circle cx="170" cy="290" r="3"/>
+                  <circle cx="225" cy="305" r="4"/>
+                  <circle cx="155" cy="320" r="2"/>
+                  <circle cx="210" cy="325" r="3"/>
+                </g>
+                <!-- Handle (neon pink tube) -->
+                <path d="M 272 220 Q 320 220 320 260 Q 320 300 272 300" fill="none" stroke="#ff1a8c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              </g>
+
+              <!-- W·D holographic badge -->
+              <g filter="url(#strongGlow)">
+                <circle cx="200" cy="275" r="22" fill="none" stroke="#a855f7" stroke-width="2.5"/>
+                <circle cx="200" cy="275" r="16" fill="none" stroke="#00f0ff" stroke-width="1.5" opacity="0.6"/>
+                <text x="200" y="281" text-anchor="middle" fill="#ffffff" font-family="Orbitron" font-weight="900" font-size="16" letter-spacing="0.04em">W·D</text>
+              </g>
+
+              <!-- "COLD" caption -->
+              <g filter="url(#subtleGlow)">
+                <rect x="145" y="312" width="110" height="18" fill="none" stroke="#00f0ff" stroke-width="1" rx="2"/>
+                <text x="200" y="325" text-anchor="middle" fill="#00f0ff" font-family="DM Mono" font-weight="700" font-size="9" letter-spacing="0.22em">COLD · ON TAP</text>
+              </g>
+
+              <!-- Decorative star sparkles -->
+              <g fill="#ffffff" filter="url(#subtleGlow)">
+                <circle cx="100" cy="120" r="2"/>
+                <circle cx="340" cy="140" r="1.5"/>
+                <circle cx="80" cy="240" r="1.5"/>
+                <circle cx="350" cy="260" r="2"/>
+              </g>
+
+              <!-- Floating particles -->
+              <g fill="#ff1a8c" opacity="0.6">
+                <circle cx="60" cy="180" r="1"/>
+                <circle cx="340" cy="200" r="1.5"/>
+                <circle cx="50" cy="320" r="1"/>
+                <circle cx="360" cy="340" r="1"/>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--dark">
+    <div class="container">
+      <div class="section__head">
+        <div>
+          <div class="section__rule-num">UR 1.1 · 3 PATHS</div>
+          <h2 class="h1" style="margin-top: 8px">三個方法，揀返你今晚嗰杯</h2>
+        </div>
+        <div class="section__head-meta">03 / USE CASES</div>
+      </div>
+
+      <div class="bento">
+        <article class="bento__card">
+          <div class="bento__card-band">
+            <span>主卡 · 隨機抽一杯</span>
+            <span class="bento__card-band-tag">PATH 01</span>
+          </div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 240 200" width="100%">
+                <g fill="none" stroke="#ff1a8c" stroke-width="2">
+                  <path d="M 40 60 L 40 75 Q 32 75 32 82 L 32 160 Q 32 170 42 170 L 92 170 Q 102 170 102 160 L 102 82 Q 102 75 94 75 L 94 60 Z"/>
+                  <rect x="50" y="100" width="36" height="30" fill="#ff1a8c" fill-opacity="0.3"/>
+                  <path d="M 145 90 L 135 170 L 205 170 L 195 90 Z" stroke="#00f0ff"/>
+                  <path d="M 138 90 Q 136 70 155 68 Q 170 55 185 70 Q 200 60 202 90 Z" stroke="#00f0ff"/>
+                </g>
+                <text x="68" y="120" text-anchor="middle" fill="#00f0ff" font-family="Orbitron" font-size="10" font-weight="900">W·D</text>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div>
+                <div class="label-sm muted">冇目標 · 0 SEC</div>
+                <div class="h3" style="margin-top: 4px">由命運揀返杯</div>
+              </div>
+              <a href="#" class="btn btn--pink btn--sm">立即試</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="bento__card bento__card--cyan">
+          <div class="bento__card-band bento__card-band--cyan">
+            <span>次卡 · 拍照選酒</span>
+            <span class="bento__card-band-tag">PATH 02</span>
+          </div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 160 200" width="80%">
+                <g fill="none" stroke="#00f0ff" stroke-width="2">
+                  <rect x="40" y="20" width="80" height="160" rx="8"/>
+                  <circle cx="80" cy="90" r="20" stroke="#00f0ff"/>
+                  <circle cx="80" cy="90" r="6" fill="#ff1a8c" stroke="none"/>
+                </g>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div>
+                <div class="label-sm muted">便利店 · 5 SEC</div>
+                <div class="h3" style="margin-top: 4px">影張相即刻知</div>
+              </div>
+              <a href="#" class="btn btn--cyan btn--sm">試下</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="bento__card bento__card--purple">
+          <div class="bento__card-band bento__card-band--purple">
+            <span>次卡 · 心情推薦</span>
+            <span class="bento__card-band-tag">PATH 03</span>
+          </div>
+          <div class="bento__card-body">
+            <div class="bento__card-art">
+              <svg viewBox="0 0 160 200" width="80%">
+                <g fill="none" stroke="#a855f7" stroke-width="2">
+                  <path d="M 25 100 Q 25 50 80 50 Q 135 50 135 100 Q 135 145 80 145 L 60 145 L 48 158 L 52 145 Q 25 145 25 100 Z"/>
+                </g>
+                <text x="80" y="105" text-anchor="middle" fill="#ff1a8c" font-family="Orbitron" font-size="14" font-weight="900">mood</text>
+              </svg>
+            </div>
+            <div class="bento__card-meta">
+              <div>
+                <div class="label-sm muted">揀唔到 · 1 MIN</div>
+                <div class="h3" style="margin-top: 4px">講你而家點</div>
+              </div>
+              <a href="#" class="btn btn--purple btn--sm">揀返杯</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--ink">
+    <div class="container">
+      <div class="section__head">
+        <div>
+          <div class="section__rule-num">UR 1.1 · 3 STEPS</div>
+          <h2 class="h1" style="margin-top: 8px">點樣運作</h2>
+        </div>
+        <div class="section__head-meta">03 / STEPS</div>
+      </div>
+
+      <div class="how">
+        <article class="how__step">
+          <div class="how__step-num">STEP 01</div>
+          <div class="how__num">01</div>
+          <div class="h3">揀方法</div>
+          <p class="body muted">隨機抽、影相、講心情——揀你而家想點。</p>
+        </article>
+        <div class="how__arrow">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#00f0ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M 6 16 L 26 16 M 18 8 L 26 16 L 18 24"/>
+          </svg>
+        </div>
+        <article class="how__step">
+          <div class="how__step-num">STEP 02</div>
+          <div class="how__num">02</div>
+          <div class="h3">收結果</div>
+          <p class="body muted">用 token 即時換返杯啱你場合嘅酒款。</p>
+        </article>
+        <div class="how__arrow">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#00f0ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M 6 16 L 26 16 M 18 8 L 26 16 L 18 24"/>
+          </svg>
+        </div>
+        <article class="how__step">
+          <div class="how__step-num">STEP 03</div>
+          <div class="how__num">03</div>
+          <div class="h3">記低</div>
+          <p class="body muted">記低你嘅心情，之後可以翻睇飲過咩。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer" role="contentinfo">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <a href="#" class="wordmark" aria-label="Whattodrink">
+          WHATTODRINK<span class="wordmark__bolt" aria-hidden="true"></span>
+        </a>
+        <div class="label">© 2026 · HK · NEON EDITION</div>
+      </div>
+      <div class="socials">
+        <a href="#" class="socials__btn" aria-label="Instagram">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="14" height="14" rx="3"/>
+            <circle cx="10" cy="10" r="3.5"/>
+            <circle cx="14.5" cy="5.5" r="0.5" fill="currentColor"/>
+          </svg>
+        </a>
+        <a href="#" class="socials__btn" aria-label="Threads">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M 5 8 Q 10 4 14 7 Q 17 10 14 13 Q 10 16 6 13"/>
+          </svg>
+        </a>
+        <a href="#" class="socials__btn" aria-label="小紅書">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <text x="10" y="14" text-anchor="middle" font-family="Inter" font-weight="800" font-size="9" fill="currentColor" stroke="none">紅</text>
+            <rect x="3" y="3" width="14" height="14" rx="3"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,13 +1,16 @@
 import type { ComponentType } from "react";
 import { AsahiIcon } from "./asahi-super-dry";
+import { AguilaIcon } from "./aguila";
 import { AndesIcon } from "./andes";
 import { AntarcticaIcon } from "./antarctica-original";
+import { BalboaIcon } from "./balboa";
 import { BlueGirlIcon } from "./blue-girl";
 import { BohemiaIcon } from "./bohemia";
 import { BrahmaIcon } from "./brahma";
 import { BudLightIcon } from "./bud-light";
 import { BudweiserIcon } from "./budweiser";
 import { CarlsbergIcon } from "./carlsberg";
+import { CaribIcon } from "./carib";
 import { ClubColombiaIcon } from "./club-colombia";
 import { CoorsLightIcon } from "./coors-light";
 import { CoronaIcon } from "./corona-extra";
@@ -17,9 +20,11 @@ import { CusquenaIcon } from "./cusquena-dorada";
 import { Dassai45Icon } from "./dassai-45";
 import { DosEquisIcon } from "./dos-equis";
 import { GuinnessDraughtIcon } from "./guinness-draught";
+import { GalloIcon } from "./gallo";
 import { HarbinIcon } from "./harbin";
 import { HeinekenIcon } from "./heineken";
 import { HoegaardenIcon } from "./hoegaarden";
+import { ImperialIcon } from "./imperial";
 import { IndioIcon } from "./indio";
 import { ItaipavaIcon } from "./itaipava";
 import { KaiserIcon } from "./kaiser";
@@ -32,12 +37,17 @@ import { NegraModeloIcon } from "./negra-modelo";
 import { PacificoIcon } from "./pacifico";
 import { PacenaIcon } from "./pacena";
 import { PilsenCallaoIcon } from "./pilsen-callao";
+import { PokerIcon } from "./poker";
+import { PolarIcon } from "./cerveza-polar";
 import { QuilmesIcon } from "./quilmes";
+import { RedStripeIcon } from "./red-stripe";
+import { RegionalIcon } from "./regional-pilsen";
 import { SapporoIcon } from "./sapporo";
 import { SkolIcon } from "./skol";
 import { SnowIcon } from "./snow";
 import { SolIcon } from "./sol";
 import { TecateIcon } from "./tecate";
+import { TonaIcon } from "./tona";
 import { TsingtaoIcon } from "./tsingtao-classic";
 import { VictoriaIcon } from "./victoria";
 import { YanjingIcon } from "./yanjing";
@@ -115,6 +125,17 @@ export const BEER_WALL: BeerWallEntry[] = [
   { en: "Cusqueña Dorada", cn: "金日太陽", pickId: "cusquena", type: "淡拉格", Icon: CusquenaIcon },
   { en: "Pilsen Callao", cn: "綠旗皇冠", pickId: "pilsen-callao", type: "淡拉格", Icon: PilsenCallaoIcon },
   { en: "Club Colombia Dorada", cn: "紅金花絲", pickId: "club-colombia", type: "淡拉格", Icon: ClubColombiaIcon },
+  /* Batch4（隊列第四批：中美加勒比 10；Imperial 不收 aguila 別名，歸 Aguila 專用） */
+  { en: "Aguila Original", cn: "黃鷹飛", pickId: "aguila", type: "淡拉格", Icon: AguilaIcon },
+  { en: "Poker", cn: "綠牌同花", pickId: "poker", type: "淡拉格", Icon: PokerIcon },
+  { en: "Cerveza Polar", cn: "白熊藍標", pickId: "polar", type: "淡拉格", Icon: PolarIcon },
+  { en: "Regional Pilsen", cn: "紅白5度", pickId: "regional", type: "淡拉格", Icon: RegionalIcon },
+  { en: "Balboa", cn: "紅衣探險家", pickId: "balboa", type: "淡拉格", Icon: BalboaIcon },
+  { en: "Imperial", cn: "黃黑鷹", pickId: "imperial", type: "淡拉格", Icon: ImperialIcon },
+  { en: "Toña", cn: "紅字火山", pickId: "tona", type: "淡拉格", Icon: TonaIcon },
+  { en: "Gallo", cn: "黑金雞頭", pickId: "gallo", type: "淡拉格", Icon: GalloIcon },
+  { en: "Carib Lager", cn: "藍海金浪", pickId: "carib", type: "淡拉格", Icon: CaribIcon },
+  { en: "Red Stripe", cn: "斜紅帶", pickId: "red-stripe", type: "淡拉格", Icon: RedStripeIcon },
 ];
 
 /** Android-safe asset slug: `Modelo Especial` → `modelo_especial`. */
@@ -194,6 +215,17 @@ const BRAND_ALIASES: BrandAlias[] = [
   { slug: "cusque-a-dorada", latin: ["cusqueña", "cusquena"], cjk: ["库斯科", "庫斯科"] },
   { slug: "pilsen-callao", latin: ["pilsen callao", "callao"], cjk: ["卡亚俄", "卡亞俄"] },
   { slug: "club-colombia-dorada", latin: ["club colombia"], cjk: ["哥伦比亚俱乐部", "哥倫比亞俱樂部"] },
+  /* Batch4：中美加勒比 10（Toña 轉寫 to-a；裸 regional／polar 不收，防泛詞誤殺） */
+  { slug: "aguila-original", latin: ["aguila", "aguila original"], cjk: ["鷹牌", "鹰牌"] },
+  { slug: "poker", latin: ["poker"], cjk: ["撲克", "扑克"] },
+  { slug: "cerveza-polar", latin: ["cerveza polar", "polar pilsen"], cjk: ["北極熊", "北极熊"] },
+  { slug: "regional-pilsen", latin: ["regional pilsen", "cerveza regional"], cjk: ["雷吉奧納爾", "雷吉奥纳尔"] },
+  { slug: "balboa", latin: ["balboa"], cjk: ["巴爾博亞", "巴尔博亚"] },
+  { slug: "imperial", latin: ["imperial", "cerveza imperial", "aguilita"], cjk: ["帝國", "帝国"] },
+  { slug: "to-a", latin: ["toña", "tona"], cjk: ["托尼亞", "托尼亚"] },
+  { slug: "gallo", latin: ["gallo", "famosa"], cjk: ["公雞", "公鸡"] },
+  { slug: "carib-lager", latin: ["carib", "carib lager"], cjk: ["加勒比"] },
+  { slug: "red-stripe", latin: ["red stripe"], cjk: ["紅帶", "红带"] },
 ];
 
 // beerSlug 产下划线（asahi_super_dry），别名表用连字符书写，建表时统一。

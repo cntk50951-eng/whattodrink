@@ -18,6 +18,7 @@ import {
   ZOOM_MAX,
   ZOOM_MIN,
   haversineMeters,
+  isWithinHongKong,
 } from "@/lib/geo";
 import {
   parseMapProvider,
@@ -26,6 +27,7 @@ import {
 } from "@/lib/maps/provider";
 import type { LatLng } from "@/lib/geo";
 import { clusterPoints } from "@/lib/clusters";
+import { ANCHOR_ZOOM_MAX, groupByAnchor } from "@/lib/geoAreas";
 import type { BeerIconComponent } from "@/components/marketing/beer-icons/wall";
 import { iconForDrinkName } from "@/components/marketing/beer-icons/wall";
 import type { V2Marker } from "./v2Pins";
@@ -50,14 +52,31 @@ export type V2TrailMarker = {
   lat: number;
   lng: number;
   n: number;
+  /** UR C.11 round-6：打卡時間 epoch ms（組內最新為向，腳印方向即時間方向）。 */
+  at: number;
 };
 
 export type V2MapApi = {
   recenter: () => void;
   fitHk: () => void;
+  /** UR C.11：一鍵足跡——飛到剛好裝下給定點（沿 C.9 fitMembers 口徑）。 */
+  fitPoints: (points: LatLng[]) => void;
   flyTo: (at: LatLng, zoom?: number) => void;
   getCenter: () => LatLng | null;
 };
+
+/** UR A.21 好友實時釘模型（父層 `useLiveFriends` 直供；server 已過濾）。 */
+export type V2FriendMarker = {
+  /** users.id（server 回顯原樣，點擊原樣交回）。 */
+  id: string;
+  lat: number;
+  lng: number;
+  /** 暱稱首字（父層切好，模塊不碰字符串）。 */
+  label: string;
+};
+
+/** UR A.21 自釘呈現：匿名沿舊藍，在線綠，隱身灰（fail-closed 未知態走灰）。 */
+export type SelfPresence = "online" | "stealth" | "anon";
 
 type V2MapViewProps = {
   others: V2Marker[];
@@ -66,6 +85,13 @@ type V2MapViewProps = {
   self: LatLng | null;
   onPinClick: (id: string) => void;
   onWantClick: (id: string) => void;
+  /** UR C.11：地圖 ready 回調（父層等 ready 才飛全軌跡，不輪詢）。 */
+  onReady?: () => void;
+  /** UR C.11 round-7：點地圖本體（父層清足跡；pin 上點不觸發，見 init 守衛）。 */
+  onMapTap?: () => void;
+  presence: SelfPresence;
+  friends: V2FriendMarker[];
+  onFriendClick: (id: string) => void;
 };
 
 /** HTML 转义（divIcon  innerHTML 拼昵称首字用，用户内容不可信）。 */
@@ -122,14 +148,13 @@ function unmountRootsAsync(roots: Root[]): void {
  * 操作經 ref 暴露（父層按鈕調）。 reduced-motion 讀掛載時一次。
  */
 export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView(
-  { others, wants, trail, self, onPinClick, onWantClick },
+  { others, wants, trail, self, onPinClick, onWantClick, onReady, onMapTap, presence, friends, onFriendClick },
   ref,
 ) {
   const holderRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
   const layerRef = useRef<Leaflet.LayerGroup | null>(null);
-  const trailRef = useRef<Leaflet.Polyline | null>(null);
   // UR A.20：divIcon 是 HTML 字串，本地 SVG 組件用 createRoot 注入佔位槽；
   // 圖層重建／卸載時逐個 unmount（render 內不許寫 ref，只在 effect 內動）。
   const artRoots = useRef<Root[]>([]);
@@ -144,10 +169,24 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
   // 地理真 pin 摆开显示。切簇即換，點空地／數據失配即清。
   const [spreadIds, setSpreadIds] = useState<string[] | null>(null);
   // 回調 ref 化（marker 點擊閉包讀最新，不重建圖層樹；render 內不許寫 ref）。
-  const cbRef = useRef({ onPinClick, onWantClick });
+  const cbRef = useRef({ onPinClick, onWantClick, onReady, onMapTap, onFriendClick });
   useEffect(() => {
-    cbRef.current = { onPinClick, onWantClick };
+    cbRef.current = { onPinClick, onWantClick, onReady, onMapTap, onFriendClick };
   });
+  // UR A.21 好友常駐層（獨立於主 layer 重建；marker 複用＋setLatLng，
+  // CSS 位移過渡即平滑跟隨，不拆層不閃爍）。
+  const friendLayerRef = useRef<Leaflet.LayerGroup | null>(null);
+  const friendMarksRef = useRef(new Map<string, Leaflet.Marker>());
+  // 常駐層只生死於掛載／卸載（init 的 map.remove() 另管圖本體，互不干擾）。
+  useEffect(() => {
+    return () => {
+      friendLayerRef.current?.remove();
+      friendLayerRef.current = null;
+      // ref 指 Leaflet 對象非 React 節點，無 stale 語義，disable 沿 BeerIcon 口徑。
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      friendMarksRef.current.clear();
+    };
+  }, []);
   // init 是異步 import：ready 前 markers effect 直接返回，ready 後重跑一次
   const [mapReady, setMapReady] = useState(false);
   // UR C.6 round-6：縮放結束重算聚合（簇是像素概念，不跟 zoom 簇永遠不散；
@@ -180,6 +219,29 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
           ],
           { padding: [24, 24] },
         );
+      },
+      fitPoints(points: LatLng[]) {
+        const map = mapRef.current;
+        const L = leafletRef.current;
+        if (map === null || L === null || points.length === 0) return;
+        const bounds = L.latLngBounds(
+          points.map((p) => [p.lat, p.lng] as [number, number]),
+        );
+        if (!bounds.isValid()) return;
+        const sw = bounds.getSouthWest();
+        const ne = bounds.getNorthEast();
+        if (sw.equals(ne)) {
+          bounds.extend([sw.lat - 0.0015, sw.lng - 0.0015]);
+          bounds.extend([ne.lat + 0.0015, ne.lng + 0.0015]);
+        }
+        const reduced = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+        map.fitBounds(bounds, {
+          padding: [56, 56],
+          maxZoom: ZOOM_MAX,
+          animate: !reduced,
+        });
       },
       flyTo(at: LatLng, zoom?: number) {
         const map = mapRef.current;
@@ -257,17 +319,29 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       map.on("zoomend", () => {
         setZoomTick((t) => t + 1);
       });
+      // UR C.11 round-7：點地圖本體通知父層清足跡（pin 圖標內點擊不透，
+      // marker 自有 handler；此處只認地圖本體）。
+      map.on("click", (e: Leaflet.LeafletMouseEvent) => {
+        const t = e.originalEvent?.target as HTMLElement | null;
+        if (
+          t !== null &&
+          typeof t.closest === "function" &&
+          t.closest(".leaflet-marker-icon") !== null
+        )
+          return;
+        cbRef.current.onMapTap?.();
+      });
       // 沉浸高地圖下整屏手勢：UR C.12 改 none（沿 module css 同值，重要性保底；
       // C.1 pan-y 配方退役理由見 css 註）。
       holder.style.setProperty("touch-action", "none", "important");
       holder.dataset.ready = "1";
       mapRef.current = map;
       setMapReady(true);
+      cbRef.current.onReady?.();
     });
     return () => {
       cancelled = true;
       layerRef.current?.remove();
-      trailRef.current?.remove();
       map?.remove();
       mapRef.current = null;
       delete holder.dataset.ready;
@@ -294,7 +368,6 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
     const L = leafletRef.current;
     if (!mapReady || map === null || L === null) return;
     layerRef.current?.remove();
-    trailRef.current?.remove();
     unmountRootsAsync(artRoots.current);
     artRoots.current = [];
     const layer = L.layerGroup();
@@ -303,7 +376,6 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
 
     // UR C.6 round-5：散 pin 名單失配（數據刷新致 id 對不上）同步清，
     // 否則僵尸散 pin 赖着不走（必要同步，沿 BeerIcon 同款註記口徑）。
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     const liveSpread =
       spreadIds === null ? null : others.filter((o) => spreadIds.includes(o.id));
     if (spreadIds !== null && (liveSpread === null || liveSpread.length === 0)) {
@@ -314,16 +386,58 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
     const spreadSet =
       spread === null ? null : new Set(spread.map((o) => o.id));
 
-    // 他人：像素聚合（沿 UR2.8），單釘原樣、多釘數字簇（點徽 fit＋散 pin）。
-    // 散 pin 成員不進聚合（否則徽還在，散了白散）；members 下標認 rest 數組。
+    // 他人：層級分組（UR C.9）——z≤11 商圈錨徽（名＋數），以上像素簇沿用。
+    // 散 pin 成員不進任何分組（否則徽還在，散了白散）；members 下標認 rest 數組。
     const rest =
       spreadSet === null ? others : others.filter((o) => !spreadSet.has(o.id));
+    // 成員 bounds fit（錨徽／簇徽共用；沿 C.6 口徑：padding＋maxZoom＋同點 pad）。
+    const fitMembers = (ms: V2Marker[]): void => {
+      const latlngs = ms.map((m) => [m.lat, m.lng] as [number, number]);
+      const bounds = L.latLngBounds(latlngs);
+      if (!bounds.isValid()) return;
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      if (sw.equals(ne)) {
+        bounds.extend([sw.lat - 0.0015, sw.lng - 0.0015]);
+        bounds.extend([ne.lat + 0.0015, ne.lng + 0.0015]);
+      }
+      const reduced =
+        typeof window !== "undefined" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      map.fitBounds(bounds, {
+        padding: [56, 56],
+        maxZoom: ZOOM_MAX,
+        animate: !reduced,
+      });
+    };
+    const zoom = map.getZoom();
+    if (zoom <= ANCHOR_ZOOM_MAX) {
+      for (const g of groupByAnchor(rest)) {
+        if (g.members.length === 0) continue;
+        const ms = g.members.map((i) => rest[i] as V2Marker);
+        const badge = L.marker([g.anchor.lat, g.anchor.lng], {
+          title: `${g.anchor.name} ${ms.length}`,
+          icon: L.divIcon({
+            className: "",
+            html: `<div class="${styles.v2area}">${esc(g.anchor.name)}<b>${ms.length}</b></div>`,
+            iconSize: [132, 40],
+            iconAnchor: [66, 20],
+          }),
+        });
+        // 點錨徽 fit 成員區（zoomend 重算自然降級到街區簇／單枚）。
+        badge.on("click", () => {
+          fitMembers(ms);
+          setSpreadIds(null);
+        });
+        badge.addTo(layer);
+      }
+    } else {
     const pixels = rest.map((m) =>
       map.latLngToContainerPoint([m.lat, m.lng]),
     );
     for (const cluster of clusterPoints(pixels, V2_CLUSTER_PX)) {
       if (cluster.members.length === 1) {
-        const m = others[cluster.members[0] as number] as V2Marker;
+        const m = rest[cluster.members[0] as number] as V2Marker;
         const content = otherPinContent(m);
         const marker = L.marker([m.lat, m.lng], {
           title: m.id,
@@ -355,24 +469,7 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       // （最大相距 <40m，fit 也分不開）再把各枚擺開成地理真 pin。
       badge.on("click", () => {
         const ms = cluster.members.map((i) => rest[i] as V2Marker);
-        const latlngs = ms.map((m) => [m.lat, m.lng] as [number, number]);
-        const bounds = L.latLngBounds(latlngs);
-        if (!bounds.isValid()) return;
-        const sw = bounds.getSouthWest();
-        const ne = bounds.getNorthEast();
-        if (sw.equals(ne)) {
-          // 同點扎堆：南／北各擴 ~150m，落街區級視野看該點
-          bounds.extend([sw.lat - 0.0015, sw.lng - 0.0015]);
-          bounds.extend([ne.lat + 0.0015, ne.lng + 0.0015]);
-        }
-        const reduced =
-          typeof window !== "undefined" &&
-          window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        map.fitBounds(bounds, {
-          padding: [56, 56],
-          maxZoom: ZOOM_MAX,
-          animate: !reduced,
-        });
+        fitMembers(ms);
         let maxD = 0;
         for (let a = 0; a < ms.length; a += 1) {
           for (let b = a + 1; b < ms.length; b += 1) {
@@ -390,6 +487,7 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       });
       badge.addTo(layer);
     }
+    } // else: z>11 像素聚類（上之錨分支對應）
 
     // UR C.6 round-5 同點散 pin：均分圓周擺開 ~20m（街區 zoom 可分，
     // 位移可忽略）；地理真 pin，點枚開卡照舊，縮放自跟地圖不擾。
@@ -448,9 +546,11 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       marker.addTo(layer);
     }
 
-    // 足跡：序號釘＋連線（≥2 站才連，沿 UR3.4 口徑）
+    // 足跡：序號釘＋錨徽（沿 C.9 口徑，單站退回序號釘）；境外站恒獨立（不過錨）。
+    // round-13：腳印動畫取消（用戶另立需求管理）——渲染调用全撤，
+    // `interpolateFootprints`＋`V2TrailMarker.at`＋CSS 留給動畫需求（零引用，lint 安全）。
     if (trail !== null && trail.length > 0) {
-      for (const s of trail) {
+      const numPin = (s: V2TrailMarker): void => {
         L.marker([s.lat, s.lng], {
           interactive: false,
           icon: L.divIcon({
@@ -460,22 +560,72 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
             iconAnchor: [14, 14],
           }),
         }).addTo(layer);
-      }
-      if (trail.length >= 2) {
-        trailRef.current = L.polyline(
-          trail.map((s) => [s.lat, s.lng] as [number, number]),
-          { color: "#2563eb", weight: 3, opacity: 0.85 },
-        ).addTo(map);
+      };
+      const hk = trail.filter((s) =>
+        isWithinHongKong({ lat: s.lat, lng: s.lng }),
+      );
+      const far = trail.filter(
+        (s) => !isWithinHongKong({ lat: s.lat, lng: s.lng }),
+      );
+      if (zoom <= ANCHOR_ZOOM_MAX) {
+        for (const g of groupByAnchor(hk)) {
+          if (g.members.length === 0) continue;
+          if (g.members.length === 1) {
+            const s = hk[g.members[0] as number] as V2TrailMarker;
+            numPin(s);
+            continue;
+          }
+          const ms = g.members.map((i) => hk[i] as V2TrailMarker);
+          const badge = L.marker([g.anchor.lat, g.anchor.lng], {
+            title: `${g.anchor.name} ${ms.length}`,
+            icon: L.divIcon({
+              className: "",
+              html: `<div class="${styles.v2area}">${esc(g.anchor.name)}<b>${ms.length}</b></div>`,
+              iconSize: [132, 40],
+              iconAnchor: [66, 20],
+            }),
+          });
+          // 點徽 fit 成員（沿 C.9 fitMembers 口徑內聯：C.9 未合入前不碰其函數，合入後合併）。
+          badge.on("click", () => {
+            const latlngs = ms.map((m) => [m.lat, m.lng] as [number, number]);
+            const bounds = L.latLngBounds(latlngs);
+            if (!bounds.isValid()) return;
+            const sw = bounds.getSouthWest();
+            const ne = bounds.getNorthEast();
+            if (sw.equals(ne)) {
+              bounds.extend([sw.lat - 0.0015, sw.lng - 0.0015]);
+              bounds.extend([ne.lat + 0.0015, ne.lng + 0.0015]);
+            }
+            const reduced = window.matchMedia(
+              "(prefers-reduced-motion: reduce)",
+            ).matches;
+            map.fitBounds(bounds, {
+              padding: [56, 56],
+              maxZoom: ZOOM_MAX,
+              animate: !reduced,
+            });
+          });
+          badge.addTo(layer);
+        }
+        for (const s of far) numPin(s);
+      } else {
+        for (const s of trail) numPin(s);
       }
     }
 
-    // 自己：藍點（watch 跟隨由父層 position 驅動重建）
+    // 自己：按呈現態變色（UR A.21：匿名藍／在線綠／隱身灰；呼吸環同色）
     if (self !== null) {
+      const selfCls =
+        presence === "online"
+          ? styles.v2selfOnline
+          : presence === "stealth"
+            ? styles.v2selfStealth
+            : styles.v2self;
       L.marker([self.lat, self.lng], {
         interactive: false,
         icon: L.divIcon({
           className: "",
-          html: `<div class="${styles.v2self}"></div>`,
+          html: `<div class="${selfCls}"></div>`,
           iconSize: [18, 18],
           iconAnchor: [9, 9],
         }),
@@ -493,7 +643,46 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       root.render(<Icon className="size-full" />);
       artRoots.current.push(root);
     }
-  }, [mapReady, others, wants, trail, self, spreadIds, zoomTick]);
+  }, [mapReady, others, wants, trail, self, presence, spreadIds, zoomTick]);
+
+  // UR A.21 好友常駐層對帳：增量增刪改（marker 複用；setLatLng 配 CSS
+  // 位移過渡即跟隨滑行）。主 layer 重建不碰此層；卸載／init 清場由下負責。
+  useEffect(() => {
+    const map = mapRef.current;
+    const L = leafletRef.current;
+    if (!mapReady || map === null || L === null) return;
+    if (friendLayerRef.current === null) {
+      friendLayerRef.current = L.layerGroup().addTo(map);
+    }
+    const layer = friendLayerRef.current;
+    const marks = friendMarksRef.current;
+    const seen = new Set<string>();
+    for (const f of friends) {
+      seen.add(f.id);
+      const hit = marks.get(f.id);
+      if (hit !== undefined) {
+        hit.setLatLng([f.lat, f.lng]);
+        continue;
+      }
+      const mk = L.marker([f.lat, f.lng], {
+        title: f.id,
+        icon: L.divIcon({
+          className: "",
+          html: `<div class="${styles.v2friend}">${esc(f.label)}</div>`,
+          iconSize: [40, 40],
+          iconAnchor: [20, 20],
+        }),
+      });
+      mk.on("click", () => cbRef.current.onFriendClick(f.id));
+      mk.addTo(layer);
+      marks.set(f.id, mk);
+    }
+    for (const [id, mk] of marks) {
+      if (seen.has(id)) continue;
+      layer.removeLayer(mk);
+      marks.delete(id);
+    }
+  }, [mapReady, friends]);
 
   return <div ref={holderRef} className={styles.v2map} />;
 });
