@@ -12,6 +12,12 @@
 - 本地四路實測：／→307、/?pick=1→200、/v2→200、HOME_UI=v1→200。
 - 三閘：263綠／lint 0 error／build 39頁；用户驗收通過。
 
+## round-2 locale 根漏跳（DEF-20260927-002，2026-09-27）
+
+- 情境：用戶報 `/zh-Hans` 不跳。根因：as-needed 下非默認語言首頁帶前綴，判斷只認裸 `/`。
+- 修正：認 locale 段＋帶語言跳（cookie 未種前跳裸 `/v2` 會丟語言）；未知前綴／子路／查詢串不碰。
+- 教訓：i18n 路由寫死 `/` 斷言前，先讀 `routing.ts` 的 `localePrefix` 模式。
+
 ## 關聯
 
-- 關聯 UR C.7 [✓]，已合入 main（插畫並行施工，只交 C.7 hunks）
+- 關聯 UR C.7 [✓]（round-2 同批合入 main）；缺陷 DEF-20260927-002（Closed）
