@@ -2611,7 +2611,7 @@ EPIC E　拍照打卡（v2 內聯相機＋濾鏡＋美顏，拒絕跳頁）
 > 用戶指令（2026-09-27）：拍照不跳單獨頁，shadcn 組件內聯；開相機前問權限；默認後置（非自拍）；要 IG／Snapshot 級特效美顏，路線另議。
 > 現有彈藥：`lib/camera.ts`（權限錯誤分類＋consent key＋無設備判定，v1 實證）＋`components/camera/camera-flow.tsx`（918 行舊流程，邏輯可抄，UI 不沿用）。
 
-UR E.1　v2 相機 Sheet（權限門＋後置＋拍攝＋濾鏡）[WIP]
+UR E.1　v2 相機 Sheet（權限門＋後置＋拍攝＋濾鏡）[✓]
 
 ### 範圍（v2-only：新 `components/v2/V2CameraSheet.tsx`＋`lib/photoFilters.ts` 純函數＋單測）
 1. 容器：shadcn Sheet（底部彈，沿 C.4/C.10 語言）；TabBar 拍照大圓改開 Sheet 不跳頁；舊 `/camera` 路由保留（直接訪問 fallback，不動 v1）
@@ -2631,6 +2631,7 @@ UR E.1　v2 相機 Sheet（權限門＋後置＋拍攝＋濾鏡）[WIP]
 - 2026-09-27：建檔置 []（用戶指令 E 線首件；待問答定容器＋特效範圍後置 [WIP]）
 - 2026-09-27：問答定案（濾鏡＋美顏開關／照片進打卡鏈／分兩期：E.1 前端閉環＋本地三件套，E.2 後端＋他人可見）置 [WIP]；實作完待驗（`V2CameraSheet` 三段式＋`photoFilters` 6 款＋美顏＋文字＋語音 mini 錄製、`WantRecord` 加三件套＋解析、`dropWant` 雙分支併入、自家卡顯真圖文音、TabBar 改開 Sheet；lint 淨／350 綠／build 綠；待用戶真機＋桌面親驗，未提交）
 - 2026-09-27：驗收返工（用戶判不合格兩條）：①缺 `v2scope` 導致 Sheet 掉回 v1 主題——補根 class；②取流時 video 未掛載致黑屏——改掛載後補掛 srcObject＋play；lint 淨／build 綠；待用戶複驗
+- 2026-09-27：置 [✓]（用戶複驗通過，指令提交；PR #38 `719fa39` 已合入，split-car 純我方 11 文件；E.2 後端＋他人可見另開）
 
 *改動記錄*
 - 2026-09-27：建檔置 []（用戶指令 E 線首件；待問答定容器＋特效範圍後置 [WIP]）
