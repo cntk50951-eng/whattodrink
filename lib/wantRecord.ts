@@ -29,7 +29,17 @@ export type WantRecord = {
   expiresAt?: number | null;
   /** DB id（mine 回顯時有，本地舊檔無） */
   id?: string;
+  /** UR E.1 拍照三件套（本地閉環；E.2 才同步後端＋他人可見）。
+   * photo 為 jpeg dataURL（抓幀已壓 ≤1024，解析另設 400k 上限防配額爆）。 */
+  photoDataUrl?: string;
+  /** 文字备注（≤500，沿 MAX_NOTE_CHARS）。 */
+  note?: string;
+  /** 語音备注（本地 object URL，切會話即失，E.2 轉持久化）。 */
+  audio?: { url: string; seconds: number };
 };
+
+/** E.1 解析上限（超長照片擋掉保配額，記錄本身保留）。 */
+export const WANT_PHOTO_MAX_CHARS = 400_000;
 
 export const WANT_STORAGE_KEY = "wtd-want-record";
 
@@ -90,6 +100,31 @@ export function parseWantRecord(raw: unknown): WantRecord | null {
   if (typeof outer.expiresAt === "number" && Number.isFinite(outer.expiresAt)) record.expiresAt = outer.expiresAt;
   else if (outer.expiresAt === null) record.expiresAt = null;
   if (typeof outer.id === "string" && outer.id.length > 0) record.id = outer.id;
+  // UR E.1 三件套（白名單制，壞值丟字段留記錄；沿 icon_url 教訓）。
+  if (
+    typeof outer.photoDataUrl === "string" &&
+    outer.photoDataUrl.startsWith("data:image/") &&
+    outer.photoDataUrl.length <= WANT_PHOTO_MAX_CHARS
+  ) {
+    record.photoDataUrl = outer.photoDataUrl;
+  }
+  if (typeof outer.note === "string" && outer.note.length > 0) {
+    record.note = outer.note.slice(0, 500);
+  }
+  const audio = outer.audio;
+  if (typeof audio === "object" && audio !== null) {
+    const a = audio as Record<string, unknown>;
+    if (
+      typeof a.url === "string" &&
+      a.url.length > 0 &&
+      typeof a.seconds === "number" &&
+      Number.isFinite(a.seconds) &&
+      a.seconds >= 0 &&
+      a.seconds <= 60
+    ) {
+      record.audio = { url: a.url, seconds: a.seconds };
+    }
+  }
   return record;
 }
 

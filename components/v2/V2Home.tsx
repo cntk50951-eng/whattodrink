@@ -100,6 +100,8 @@ import { hasUnseenWall, loadWall, loadWallSeenAt } from "@/lib/posts";
 import { buzz, BUZZ_CHEERS, BUZZ_FOUND } from "@/lib/haptics";
 import { V2MapView } from "./V2MapView";
 import type { V2MapApi } from "./V2MapView";
+import { V2CameraSheet } from "./V2CameraSheet";
+import type { StagedShot } from "./V2CameraSheet";
 import { apiPinsToMarkers, mockToMarkers } from "./v2Pins";
 import type { V2Marker } from "./v2Pins";
 import styles from "./v2.module.css";
@@ -272,6 +274,9 @@ export function V2Home() {
   const [wantSheetAt, setWantSheetAt] = useState<number | null>(null);
   // UR C.14 round-2：+N 堆疊列表 Sheet（同點超 cap 組的成員 id，含代表）。
   const [stackIds, setStackIds] = useState<string[] | null>(null);
+  // UR E.1：相機 Sheet 開關＋拍好的三件套（確認後帶進選酒，打卡落鏈時併入記錄）。
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [stagedShot, setStagedShot] = useState<StagedShot | null>(null);
   // UR C.11 round-3：詳情返回目錄（目錄來才記 "stops"；地圖釘直開為 null 不帶返回鈕）。
   const [wantReturnTo, setWantReturnTo] = useState<"stops" | null>(null);
   const [swapOpen, setSwapOpen] = useState(false);
@@ -854,6 +859,19 @@ export function V2Home() {
       setPickStage("login");
       return;
     }
+    // UR E.1：相機三件套隨單（讀即清，單次有效；空 note／無語音不寫字段）。
+    const shot = stagedShot;
+    setStagedShot(null);
+    const shotExtra =
+      shot === null
+        ? {}
+        : {
+            ...(shot.photoDataUrl !== "" ? { photoDataUrl: shot.photoDataUrl } : {}),
+            ...(shot.note !== "" ? { note: shot.note } : {}),
+            ...(shot.audioUrl !== null
+              ? { audio: { url: shot.audioUrl, seconds: shot.audioSeconds } }
+              : {}),
+          };
     // UR C.18：同 tick 連點只收一次（ref 即時，state 慢半拍擋不住）。
     if (submittingRef.current) return;
     submittingRef.current = true;
@@ -911,6 +929,7 @@ export function V2Home() {
           visibility: row.visibility,
           expiresAt: row.expires_at !== null ? Date.parse(row.expires_at) : null,
           id: row.id,
+          ...shotExtra,
         };
         // 登入以 DB 為準：只進會話態，不寫本地（沿 A.10）。
         setWantHistory((prev) => [...prev, record].sort((a, b) => a.at - b.at));
@@ -926,6 +945,7 @@ export function V2Home() {
           kind,
           visibility: "public",
           expiresAt: kind === "flash" ? Date.now() + 24 * 3600_000 : null,
+          ...shotExtra,
         };
         const next = upsertWantHistory(wantHistory, record);
         setWantHistory(next);
@@ -1235,11 +1255,17 @@ export function V2Home() {
             {t2("tabHot")}
             {wallDot && <Badge className="absolute top-0.5 right-1/3 h-2 min-w-2 p-0" />}
           </Link>
-          <Link href="/camera" aria-label={t2("tabShoot")} className="flex justify-center">
+          {/* UR E.1：TabBar 拍照改開相機 Sheet（不跳頁；舊 /camera 路由保留直接訪問）。 */}
+          <Button
+            variant="ghost"
+            aria-label={t2("tabShoot")}
+            onClick={() => setCameraOpen(true)}
+            className="flex justify-center"
+          >
             <span className="-mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-card shadow-md ring-1 ring-foreground/10">
               <Camera size={22} aria-hidden />
             </span>
-          </Link>
+          </Button>
           {/* UR C.11：足跡與心情換位（地圖／熱門／拍照／足跡／心情） */}
           <Button
             variant="ghost"
@@ -1687,11 +1713,27 @@ export function V2Home() {
                   )}
                   <span className="text-xs text-muted-foreground">{t("wantFrozenNote")}</span>
                 </div>
-                {/* 未來快拍入口佔位（純展示，不發請求） */}
-                <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
-                  <Camera size={16} aria-hidden />
-                  {t2("wantPhotoSoon")}
-                </div>
+                {/* UR E.1：有實拍即顯真圖＋文字＋語音（本地三件套；E.2 才同步後端）。
+                    無圖沿舊佔位。 */}
+                {rec.photoDataUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={rec.photoDataUrl}
+                    alt=""
+                    className="aspect-[3/4] w-full rounded-xl object-cover"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                    <Camera size={16} aria-hidden />
+                    {t2("wantPhotoSoon")}
+                  </div>
+                )}
+                {rec.note && (
+                  <p className="rounded-xl bg-muted px-3 py-2 text-sm">{rec.note}</p>
+                )}
+                {rec.audio && (
+                  <audio controls src={rec.audio.url} className="h-9 w-full" />
+                )}
                 <div className="flex flex-wrap items-center gap-2">
                   <Button variant="outline" size="sm" onClick={handleSwapToggle}>
                     <Dices size={15} aria-hidden />
@@ -1880,6 +1922,17 @@ export function V2Home() {
           })()}
         </SheetContent>
       </Sheet>
+
+      {/* UR E.1 相機 Sheet（確認即暫存三件套＋關 Sheet＋開選酒，酒定後落鏈）。 */}
+      <V2CameraSheet
+        open={cameraOpen}
+        onOpenChange={setCameraOpen}
+        onConfirm={(shot) => {
+          setStagedShot(shot);
+          setCameraOpen(false);
+          openPick();
+        }}
+      />
 
     </div>
   );

@@ -279,8 +279,7 @@
     "friendsOnly": "只看好友",
     "friendsAll": "全部动态",
     "loginRequiredBody": "打卡需要登录，登录后记录会跟随你的账号，换设备也不丢",
-    "loginCta": "去登录",
-    "cancel": "取消"
+    "loginCta": "去登录"
   },
   "mode": {
     "guardTitle": "隐身模式仅可浏览",
@@ -340,7 +339,28 @@
     "chatFriendsEmpty": "暂时未见在线朋友",
     "chatOpen": "聊天",
     "chatRoomFailed": "会话打不开，稍后再试",
-    "checkinSubmitting": "发布中…"
+    "checkinSubmitting": "发布中…",
+    "camTitle": "拍照打卡",
+    "camWhy": "相机只用来拍下这一杯，照片存在你的打卡里",
+    "camEnable": "开启相机",
+    "camDenied": "相机被拒，去系统设置打开再试",
+    "camNoDevice": "找不到相机",
+    "camRetry": "重试",
+    "cancel": "取消",
+    "camCapture": "拍照",
+    "camRetake": "重拍",
+    "camConfirm": "完成，去选酒",
+    "camNotePh": "写下这一杯…（可不写）",
+    "camBeauty": "自然美颜",
+    "camVoice": "录语音",
+    "camVoiceStop": "停止",
+    "camVoiceClear": "删除语音",
+    "camFilter_none": "原相机",
+    "camFilter_clear": "清新",
+    "camFilter_film": "胶片",
+    "camFilter_bw": "黑白",
+    "camFilter_warm": "暖阳",
+    "camFilter_cool": "冷调"
   },
   "terms": {
     "title": "三种模式，怎么选？",

@@ -279,8 +279,7 @@
     "friendsOnly": "Friends only",
     "friendsAll": "Everyone",
     "loginRequiredBody": "Check-ins need an account — your pins follow your account across devices",
-    "loginCta": "Sign in",
-    "cancel": "Cancel"
+    "loginCta": "Sign in"
   },
   "mode": {
     "guardTitle": "Stealth mode is read-only",
@@ -340,7 +339,28 @@
     "chatFriendsEmpty": "No friends online right now",
     "chatOpen": "Chat",
     "chatRoomFailed": "Could not open this chat, try again later",
-    "checkinSubmitting": "Posting…"
+    "checkinSubmitting": "Posting…",
+    "camTitle": "Photo check-in",
+    "camWhy": "Camera is only used to capture this drink, saved to your check-in",
+    "camEnable": "Open camera",
+    "camDenied": "Camera was blocked — enable it in system settings and retry",
+    "camNoDevice": "No camera found",
+    "camRetry": "Retry",
+    "cancel": "Cancel",
+    "camCapture": "Snap",
+    "camRetake": "Retake",
+    "camConfirm": "Done, pick a drink",
+    "camNotePh": "Note this drink… (optional)",
+    "camBeauty": "Natural glow",
+    "camVoice": "Voice note",
+    "camVoiceStop": "Stop",
+    "camVoiceClear": "Delete voice",
+    "camFilter_none": "Original",
+    "camFilter_clear": "Fresh",
+    "camFilter_film": "Film",
+    "camFilter_bw": "B&W",
+    "camFilter_warm": "Warm",
+    "camFilter_cool": "Cool"
   },
   "terms": {
     "title": "Three modes, which one?",

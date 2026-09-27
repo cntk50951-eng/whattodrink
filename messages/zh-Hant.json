@@ -279,8 +279,7 @@
     "friendsOnly": "淨睇好友",
     "friendsAll": "全部動態",
     "loginRequiredBody": "打卡需要登入，登入後記錄會跟隨你嘅賬號，換設備都唔會丟",
-    "loginCta": "去登入",
-    "cancel": "取消"
+    "loginCta": "去登入"
   },
   "mode": {
     "guardTitle": "隱身模式僅可瀏覽",
@@ -340,7 +339,28 @@
     "chatFriendsEmpty": "暫時未見在線朋友",
     "chatOpen": "聊天",
     "chatRoomFailed": "會話打不開，稍後再試",
-    "checkinSubmitting": "發布中…"
+    "checkinSubmitting": "發布中…",
+    "camTitle": "拍照打卡",
+    "camWhy": "相機只用來拍下這一杯，照片存在你的打卡裡",
+    "camEnable": "開啟相機",
+    "camDenied": "相機被拒，去系統設置打開再試",
+    "camNoDevice": "搵唔到相機",
+    "camRetry": "重試",
+    "cancel": "取消",
+    "camCapture": "拍照",
+    "camRetake": "重拍",
+    "camConfirm": "完成，去選酒",
+    "camNotePh": "寫低呢杯…（可唔寫）",
+    "camBeauty": "自然美顏",
+    "camVoice": "錄語音",
+    "camVoiceStop": "停止",
+    "camVoiceClear": "刪除語音",
+    "camFilter_none": "原相機",
+    "camFilter_clear": "清新",
+    "camFilter_film": "膠片",
+    "camFilter_bw": "黑白",
+    "camFilter_warm": "暖陽",
+    "camFilter_cool": "冷調"
   },
   "terms": {
     "title": "三種模式，點揀？",
