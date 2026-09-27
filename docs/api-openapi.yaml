@@ -302,6 +302,27 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/Internal"
+    get:
+      operationId: listFriends
+      summary: 好友列表（在線＋離線全量，需登录，D.4；只吐四列，精確坐標永不進列表）
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: accepted 互好友（online＝非隱身＋5min 心跳窗）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  friends:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FriendListItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
   /api/v1/presence:
     post:
       operationId: postPresence
@@ -829,6 +850,21 @@ components:
         avatar_url:
           type: string
           nullable: true
+    FriendListItem:
+      type: object
+      required: [user_id, nickname, avatar_url, online]
+      description: 好友列表行（D.4；online＝非隱身＋5min 窗）
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        online:
+          type: boolean
     ChatMessage:
       type: object
       required: [id, sender_id, kind, body, created_at]

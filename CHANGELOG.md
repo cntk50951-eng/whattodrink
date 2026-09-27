@@ -14,6 +14,9 @@
   - 單測：`parseCreateMessageBody`＋4 測（chat.test 14 綠）；待雙號聯驗＋合入
   - `lib/api/chat.ts` 新（`directKey`／parse／cursor／mapper）＋12 單測；`createServiceClient` 加法；`POST+GET /conversations`、`PATCH /:id/read`、`DELETE /:id`（RLS＋陌生人 fail-closed＋冪等＋水位）；openapi 補 4 端點＋6 schemas；三閘：build 綠／lint 0 error／338 綠；待用戶帶 session curl 驗
   - 並行註記：同伴 D.7 room 重構刪改 `[friendId]` 頁（我方零碰零恢復）；`server.ts` edit 切斷註釋即修（教訓：oldString 含註釋頭即整段吞，錨點只取標題行）；`Error`→`ErrorBody` 誤引即修；build 撞同伴進行中 build 等 90s 重跑
+- **UR D.4 好友消息列表＋未讀＋已讀✓✓ [WIP]**
+  - 列表轉正（全好友＋在線置頂＋末句方向＋未讀＋骨架＋標題好友列表）＋pill 改導航＋`friendsOnly` 退役；`GET /friends`＋`read-status`＋水位輪詢＋✓✓＋失敗重試＋`?friend=` 深鏈；`chatMe/chatRetry/groups/locate`×4 組；三閘綠；待複驗＋合入
+  - 並行註記：D.4 未提交文檔＋代碼三度被整樹回退（messages keys／V2Home hunks／本 UR 區），已逐項重建即驗；寫後即驗列為強制步
 - **UR C.15 v2 好友聊天靜態殼 [WIP]**
   - `components/ui` 補裝 `avatar`＋`scroll-area`＋`input`（registry-first，base-ui 後端；CLI 誤裝 `cn` 包＋`from "cn"` 已修正回 `@/lib/utils`，死依賴卸載）
   - `lib/chat.ts` 新（`mockThread`／`appendLocalEcho`／`formatChatTime` 純函數）＋`lib/chat.test.ts` 4 單測

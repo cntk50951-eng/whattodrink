@@ -4,6 +4,8 @@
  * `pending`／`blocked`／自查一律不算。A.19 引導浮層復用同一函數。
  */
 
+import { ONLINE_WINDOW_MS } from "./nearby";
+
 export type FriendshipRow = {
   user_id: unknown;
   friend_id: unknown;
@@ -146,4 +148,33 @@ export function hideOnlineForViewer(
   if (authorId === null) return false;
   if (viewerId !== null && viewerId === authorId) return false;
   return !friendIds.includes(authorId);
+}
+
+export type FriendListItem = {
+  user_id: string;
+  nickname: string;
+  avatar_url: string | null;
+  /** 在線＝非隱身＋5min 窗內有心跳（沿 live 三刀口徑，server 已過濾此處只映射）。 */
+  online: boolean;
+};
+
+/**
+ * UR D.4 好友列表行映射：壞行回 null（呼叫方跳過）；只吐四列
+ * （精確坐標永不進列表，定位走地圖深鏈用 live 數據，隱私分離）。
+ */
+export function toFriendListItem(raw: unknown, nowMs: number): FriendListItem | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.id !== "string" || r.id.length === 0) return null;
+  if (typeof r.nickname !== "string" || r.nickname.length === 0) return null;
+  if (r.avatar_url !== null && typeof r.avatar_url !== "string") return null;
+  const seenAt = typeof r.last_seen_at === "string" ? Date.parse(r.last_seen_at) : NaN;
+  const fresh =
+    Number.isFinite(seenAt) && nowMs - seenAt >= 0 && nowMs - seenAt <= ONLINE_WINDOW_MS;
+  return {
+    user_id: r.id,
+    nickname: r.nickname,
+    avatar_url: r.avatar_url,
+    online: r.mode !== "stealth" && fresh,
+  };
 }

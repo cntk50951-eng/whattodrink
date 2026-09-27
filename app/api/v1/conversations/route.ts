@@ -162,12 +162,15 @@ export async function GET(req: Request): Promise<Response> {
     conversations: { id: string; expires_at: string };
   };
   const items: ConversationJson[] = [];
+  // DEF-011 續：對方成員行走 service（RLS 只許讀自己行，authed 查不到對方；
+  // 到此已用 authed 自行驗過我是成員，fail-closed 不動，見上）。
+  const svc = await createServiceClient();
   for (const r of ((myRows ?? []) as unknown[]) as MyRow[]) {
     if (isConversationExpired(r.conversations.expires_at, nowMs)) continue;
     const convId = r.conversation_id;
     const lastReadMs = Date.parse(r.last_read_at);
     // 對方成員 id（1v1 取非我；group 預留取首個非我，peer 置該人）
-    const { data: members } = await supabase
+    const { data: members } = await svc
       .from("conversation_members")
       .select("user_id")
       .eq("conversation_id", convId);
@@ -176,7 +179,7 @@ export async function GET(req: Request): Promise<Response> {
     ).map((m) => m.user_id).find((id) => id !== userId) ?? null;
     let peer = null;
     if (peerId !== null) {
-      const { data: prow } = await supabase
+      const { data: prow } = await svc
         .from("users")
         .select("id,nickname,avatar_url")
         .eq("id", peerId)

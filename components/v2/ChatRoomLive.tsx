@@ -35,8 +35,10 @@ export function ChatRoomLive({
   const [convId, setConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [failed, setFailed] = useState(false);
+  // UR D.4：對方讀水位（頁內已讀✓✓翻態源；開房＋收信＋10s 輪詢三路刷新）。
+  const [peerReadAt, setPeerReadAt] = useState<number | null>(null);
   const seqRef = useRef(0);
-  const pendingRef = useRef(new Map<string, string>());
+  const pendingRef = useRef(new Map<string, { clientMsgId: string; text: string }>());
 
   const toChat = useCallback(
     (m: ServerMessage, me: string | null): ChatMessage => ({
@@ -48,6 +50,17 @@ export function ChatRoomLive({
     }),
     [],
   );
+
+  const fetchReadStatus = useCallback(async (cid: string): Promise<void> => {
+    try {
+      const r = await fetch(`/api/v1/conversations/${encodeURIComponent(cid)}/read-status`, {
+        credentials: "include",
+      });
+      if (!r.ok) return;
+      const j = (await r.json()) as { peer_last_read_at?: unknown };
+      if (typeof j.peer_last_read_at === "number") setPeerReadAt(j.peer_last_read_at);
+    } catch {}
+  }, []);
 
   // 開房：建會話→拉歷史→順手寫讀水位（D.4 的 UI 在後，本呼叫先行鋪路）。
   useEffect(() => {
@@ -78,6 +91,7 @@ export function ChatRoomLive({
         const hJson = (await hRes.json()) as { messages?: ServerMessage[] };
         if (!Array.isArray(hJson.messages) || cancelled) return;
         setMessages(hJson.messages.map((m) => toChat(m, myId)));
+        void fetchReadStatus(cJson.id);
         // 讀水位：開房即已讀到最新（fire-and-forget，失敗不擋）
         const last = hJson.messages[hJson.messages.length - 1];
         if (last !== undefined) {
@@ -95,7 +109,7 @@ export function ChatRoomLive({
     return () => {
       cancelled = true;
     };
-  }, [peerId, toChat]);
+  }, [peerId, toChat, fetchReadStatus]);
 
   // Realtime：本會話 INSERT 即插（去重：id 既有／client  echo 跳過）。
   useEffect(() => {
@@ -135,7 +149,7 @@ export function ChatRoomLive({
                   (m) =>
                     m.role === "me" &&
                     typeof row.client_msg_id === "string" &&
-                    pendingRef.current.get(m.id) === row.client_msg_id,
+                    pendingRef.current.get(m.id)?.clientMsgId === row.client_msg_id,
                 );
                 const mapped: ChatMessage = {
                   id: row.id,
@@ -178,42 +192,67 @@ export function ChatRoomLive({
     };
   }, [convId]);
 
-  async function sendText(text: string): Promise<void> {
-    const body = text.trim();
-    if (body === "" || convId === null) return;
-    seqRef.current += 1;
-    const tempId = `local-${seqRef.current}`;
-    const clientMsgId = `c-${Date.now()}-${seqRef.current}`;
-    pendingRef.current.set(tempId, clientMsgId);
-    setMessages((prev) => [
-      ...prev,
-      { id: tempId, role: "me", text: body, at: Date.now(), read: false },
-    ]);
+  // UR D.4：水位輪詢（對方在房外已讀→我房內翻✓✓；10s 一次，hidden 暫停，卸載清）。
+  useEffect(() => {
+    if (convId === null) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 開房即同步一次水位屬 props-sync（沿本文件開房重置豁免口徑），後續走 interval
+    void fetchReadStatus(convId);
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== "hidden") void fetchReadStatus(convId);
+    }, 10_000);
+    return () => window.clearInterval(id);
+  }, [convId, fetchReadStatus]);
+
+  /** POST 一次（成功換真行；失敗留行掛 failed＋重試鍵，D.4 收 D.3 缺口）。 */
+  async function postOne(tempId: string, clientMsgId: string, body: string): Promise<void> {
+    const cid = convId;
+    if (cid === null) return;
     try {
-      const res = await fetch(`/api/v1/conversations/${encodeURIComponent(convId)}/messages`, {
+      const res = await fetch(`/api/v1/conversations/${encodeURIComponent(cid)}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ kind: "text", body, client_msg_id: clientMsgId }),
       });
-      pendingRef.current.delete(tempId);
       if (!res.ok) throw new Error(`send ${res.status}`);
       const json = (await res.json()) as { message?: ServerMessage };
       if (json.message === undefined) throw new Error("bad send json");
+      pendingRef.current.delete(tempId);
       const myId = await myUserId();
       const mapped = toChat(json.message, myId);
       setMessages((prev) => {
         if (prev.some((m) => m.id === mapped.id)) {
           return prev.filter((m) => m.id !== tempId);
         }
-        return prev.map((m) => (m.id === tempId ? mapped : m));
+        return prev.map((m) =>
+          m.id === tempId ? { ...mapped, failed: false } : m,
+        );
       });
     } catch {
-      // 失敗撤樂觀位（文字不丟：交回下輪 send？不——靜默吞即丟字；此處撤位＋console，
-      // D.3 已知缺口：失敗態 UI（重試鍵）排 D.4  polishing，見 UR）
-      pendingRef.current.delete(tempId);
-      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, failed: true } : m)));
     }
+  }
+
+  async function sendText(text: string): Promise<void> {
+    const body = text.trim();
+    if (body === "" || convId === null) return;
+    seqRef.current += 1;
+    const tempId = `local-${seqRef.current}`;
+    const clientMsgId = `c-${Date.now()}-${seqRef.current}`;
+    pendingRef.current.set(tempId, { clientMsgId, text: body });
+    setMessages((prev) => [
+      ...prev,
+      { id: tempId, role: "me", text: body, at: Date.now(), read: false },
+    ]);
+    await postOne(tempId, clientMsgId, body);
+  }
+
+  /** 重試用同一 client_msg_id（冪等不 double）。 */
+  async function retrySend(tempId: string): Promise<void> {
+    const pend = pendingRef.current.get(tempId);
+    if (pend === undefined || convId === null) return;
+    setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, failed: false } : m)));
+    await postOne(tempId, pend.clientMsgId, pend.text);
   }
 
   if (failed) {
@@ -228,7 +267,12 @@ export function ChatRoomLive({
       threadKey={convId ?? peerId}
       peer={peer}
       onVoice={onVoice}
-      external={{ messages, onSend: (t) => void sendText(t) }}
+      external={{
+        messages,
+        onSend: (t) => void sendText(t),
+        onRetry: (id) => void retrySend(id),
+        readAt: peerReadAt,
+      }}
     />
   );
 }
