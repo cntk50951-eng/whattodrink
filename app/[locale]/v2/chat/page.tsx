@@ -17,7 +17,7 @@ import styles from "@/components/v2/v2.module.css";
 type ConvoRow = {
   id: string;
   peer: { user_id: string } | null;
-  last_message: { body: string | null; created_at: number } | null;
+  last_message: { body: string | null; created_at: number; mine: boolean } | null;
   unread: number;
   updated_at: number;
 };
@@ -100,7 +100,9 @@ export default function V2ChatListPage() {
     const hasAvatar = e.avatar_url !== null && /^https?:\/\//.test(e.avatar_url);
     const convo = convoByPeer.get(e.user_id) ?? null;
     const lm = convo?.last_message ?? null;
-    const snippet = lm?.body ?? t("chatEmpty");
+    // UR D.4 fix：末句帶方向（我發的加「我：」前綴，用戶明確要一眼分清收發）。
+    const snippet =
+      lm === null ? t("chatEmpty") : `${lm.mine ? `${t("chatMe")}: ` : ""}${lm.body ?? ""}`;
     const time = lm !== null ? formatListTime(lm.created_at, nowMs) : "";
     const unread = convo?.unread ?? 0;
     return (

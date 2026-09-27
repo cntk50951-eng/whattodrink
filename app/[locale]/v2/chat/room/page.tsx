@@ -30,6 +30,12 @@ export default function V2ChatRoomPage() {
   const listHref = locale === "zh-Hant" ? "/v2/chat" : `/${locale}/v2/chat`;
 
   const [voiceNote, setVoiceNote] = useState(false);
+  // UR D.4 fix：離線好友不在 live 表——頭像名走 `GET /friends` 全量解析，
+  // live 只定在線態；都沒有才回退酒友（DEF-007 鏈路外之直接 URL 仍可渲染）。
+  const [peerProfile, setPeerProfile] = useState<{
+    nickname: string;
+    avatarUrl: string | null;
+  } | null>(null);
   const peerId = useSyncExternalStore(
     () => () => {},
     () => readActivePeer(),
@@ -39,13 +45,35 @@ export default function V2ChatRoomPage() {
   useEffect(() => {
     if (peerId === null) router.replace(listHref);
   }, [peerId, router, listHref]);
+  useEffect(() => {
+    if (peerId === null) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/v1/friends", { credentials: "include" });
+        if (!res.ok || cancelled) return;
+        const json = (await res.json()) as {
+          friends?: { user_id: string; nickname: string; avatar_url: string | null }[];
+        };
+        const hit = Array.isArray(json.friends)
+          ? json.friends.find((f) => f.user_id === peerId)
+          : undefined;
+        if (!cancelled && hit !== undefined) {
+          setPeerProfile({ nickname: hit.nickname, avatarUrl: hit.avatar_url });
+        }
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [peerId]);
   if (peerId === null) return null;
 
   const live = friends.find((f) => f.user_id === peerId);
   const peer =
     live !== undefined
       ? { nickname: live.nickname, avatarUrl: live.avatar_url }
-      : { nickname: t("chatFallbackName"), avatarUrl: null };
+      : (peerProfile ?? { nickname: t("chatFallbackName"), avatarUrl: null });
   const hasAvatar = peer.avatarUrl !== null && /^https?:\/\//.test(peer.avatarUrl);
 
   return (

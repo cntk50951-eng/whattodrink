@@ -13,13 +13,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -72,6 +65,29 @@ export function V2GatheringForm() {
   const [searching, setSearching] = useState(false);
   const queryTimer = useRef<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const miniMapRef = useRef<HTMLDivElement | null>(null);
+  const miniLeafletRef = useRef<typeof import("leaflet") | null>(null);
+  const miniMapInstRef = useRef<import("leaflet").Map | null>(null);
+  const miniMarkerRef = useRef<import("leaflet").Marker | null>(null);
+  const miniMarkersRef = useRef<import("leaflet").Marker[]>([]);
+
+  async function doSearch(q: string) {
+    const term = q.trim();
+    if (term.length < 1) {
+      setResults([]);
+      return;
+    }
+    setSearching(true);
+    try {
+      const res = await fetch(`/api/v1/places/search?q=${encodeURIComponent(term)}`);
+      const json = (await res.json()) as { places?: Place[]; error?: unknown };
+      setResults(Array.isArray(json.places) ? json.places : []);
+    } catch {
+      setResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }
 
   // debounced search via Amap proxy
   useEffect(() => {
@@ -81,22 +97,110 @@ export function V2GatheringForm() {
       return;
     }
     if (queryTimer.current) window.clearTimeout(queryTimer.current);
-    queryTimer.current = window.setTimeout(async () => {
-      setSearching(true);
-      try {
-        const res = await fetch(`/api/v1/places/search?q=${encodeURIComponent(query)}`);
-        const json = (await res.json()) as { places?: Place[]; error?: unknown };
-        setResults(Array.isArray(json.places) ? json.places : []);
-      } catch {
-        setResults([]);
-      } finally {
-        setSearching(false);
-      }
+    queryTimer.current = window.setTimeout(() => {
+      void doSearch(query);
     }, 350);
     return () => {
       if (queryTimer.current) window.clearTimeout(queryTimer.current);
     };
   }, [query, placeOpen]);
+
+  // 小地图：搜索定位 + 点选定位（Leaflet + 高德/ Nominatim 双源）
+  useEffect(() => {
+    if (!placeOpen) return;
+    let cancelled = false;
+    (async () => {
+      const L = await import("leaflet");
+      if (cancelled) return;
+      miniLeafletRef.current = L;
+      // 避免重复初始化
+      if (miniMapInstRef.current !== null || miniMapRef.current === null) return;
+      const map = L.map(miniMapRef.current, {
+        zoomControl: true,
+        attributionControl: false,
+      }).setView(place ? [Number(place.lat), Number(place.lon)] : [22.2819, 114.158], 13);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+      }).addTo(map);
+      map.on("click", async (e: import("leaflet").LeafletMouseEvent) => {
+        const { lat, lng } = e.latlng;
+        try {
+          const res = await fetch(`/api/v1/places/reverse?lat=${lat}&lng=${lng}`);
+          const json = (await res.json()) as { display_name?: string; lat?: string; lon?: string };
+          const p: Place = {
+            place_id: `rev-${lat.toFixed(5)}-${lng.toFixed(5)}`,
+            display_name: json.display_name ?? `${lat.toFixed(5)},${lng.toFixed(5)}`,
+            name: json.display_name?.split(",")[0] ?? `${lat.toFixed(5)},${lng.toFixed(5)}`,
+            address: json.display_name ?? "",
+            lat: String(lat),
+            lon: String(lng),
+            category: "map-pick",
+            source: (json as unknown as { source?: string }).source ?? "nominatim",
+          };
+          setPlace(p);
+        } catch {
+          const p: Place = {
+            place_id: `rev-${lat.toFixed(5)}-${lng.toFixed(5)}`,
+            display_name: `${lat.toFixed(5)},${lng.toFixed(5)}`,
+            name: `${lat.toFixed(5)},${lng.toFixed(5)}`,
+            address: "",
+            lat: String(lat),
+            lon: String(lng),
+            category: "map-pick",
+            source: "nominatim",
+          };
+          setPlace(p);
+        }
+      });
+      miniMapInstRef.current = map;
+      // 初始选中点
+      if (place) {
+        const m = L.marker([Number(place.lat), Number(place.lon)]).addTo(map);
+        miniMarkerRef.current = m;
+      }
+      setTimeout(() => map.invalidateSize(), 200);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [placeOpen]);
+
+  // 选中结果 → 地图飞点 + 高亮
+  useEffect(() => {
+    const L = miniLeafletRef.current;
+    const map = miniMapInstRef.current;
+    if (!L || !map) return;
+    // 清旧结果点
+    for (const mm of miniMarkersRef.current) map.removeLayer(mm);
+    miniMarkersRef.current = [];
+    for (const r of results) {
+      const mm = L.marker([Number(r.lat), Number(r.lon)], { title: r.name }).addTo(map);
+      mm.on("click", () => setPlace(r));
+      miniMarkersRef.current.push(mm);
+    }
+    if (results.length > 0) {
+      const first = results[0]!;
+      map.flyTo([Number(first.lat), Number(first.lon)], 15, { duration: 0.5 });
+    }
+  }, [results]);
+
+  // 选中地点 → 地图主标记更新
+  useEffect(() => {
+    const L = miniLeafletRef.current;
+    const map = miniMapInstRef.current;
+    if (!L || !map || !place) return;
+    if (miniMarkerRef.current) map.removeLayer(miniMarkerRef.current);
+    const m = L.marker([Number(place.lat), Number(place.lon)], {
+      icon: L.divIcon({
+        className: "",
+        html: '<div style="width:28px;height:28px;border-radius:999px;background:#ff5a1f;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;color:white;font-size:14px">📍</div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+      }),
+    }).addTo(map);
+    miniMarkerRef.current = m;
+    map.flyTo([Number(place.lat), Number(place.lon)], 15, { duration: 0.5 });
+  }, [place]);
 
   function validateCurrent(): string | null {
     if (step === 0) {
@@ -266,23 +370,26 @@ export function V2GatheringForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{t("fieldTheme")} <span className="text-destructive">*</span></Label>
-                  <Select value={theme} onValueChange={(v) => setTheme(v as GatheringTheme)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(THEME_META).map(([k, m]) => (
-                        <SelectItem key={k} value={k}>
-                          <span className="flex items-center gap-2">
-                            <span>{m.icon}</span> {m.label}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="rounded-lg bg-muted p-3 text-xs leading-relaxed text-muted-foreground">
-                    {THEME_META[theme].icon} {THEME_META[theme].desc}
+                  <Label>
+                    {t("fieldTheme")} <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                    {Object.entries(THEME_META).map(([k, m]) => {
+                      const active = theme === k;
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => setTheme(k as GatheringTheme)}
+                          className={`rounded-lg border p-3 text-left transition-colors ${active ? "border-primary bg-primary/10 ring-1 ring-primary" : "border-border bg-card hover:bg-muted"}`}
+                        >
+                          <div className="flex items-center gap-2 text-sm font-medium">
+                            <span>{m.icon}</span> {m.label} {active && <Check className="ml-auto size-4 text-primary" />}
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{m.desc}</p>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -297,6 +404,7 @@ export function V2GatheringForm() {
                     placeholder="想认识爱 CityWalk 的朋友，带什么都欢迎，一起在中环聊聊天"
                     maxLength={200}
                     rows={4}
+                    className="resize-none min-h-[96px]"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>简介必填，10–200 字</span>
@@ -361,27 +469,49 @@ export function V2GatheringForm() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>{t("fieldVisibility")}</Label>
-                    <Select value={visibility} onValueChange={(v) => setVisibility(v as "public" | "friends")}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="public">{t("visibilityPublic")}</SelectItem>
-                        <SelectItem value="friends">{t("visibilityFriends")}</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant={visibility === "public" ? "default" : "outline"}
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setVisibility("public")}
+                      >
+                        {t("visibilityPublic")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={visibility === "friends" ? "default" : "outline"}
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setVisibility("friends")}
+                      >
+                        {t("visibilityFriends")}
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>{t("fieldApproval")}</Label>
-                    <Select value={approval} onValueChange={(v) => setApproval(v as "manual" | "auto")}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="manual">{t("approvalManual")}</SelectItem>
-                        <SelectItem value="auto">{t("approvalAuto")}</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant={approval === "manual" ? "default" : "outline"}
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setApproval("manual")}
+                      >
+                        {t("approvalManual")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={approval === "auto" ? "default" : "outline"}
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setApproval("auto")}
+                      >
+                        {t("approvalAuto")}
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
@@ -452,14 +582,14 @@ export function V2GatheringForm() {
         </div>
       </div>
 
-      {/* Place picker dialog */}
+      {/* Place picker dialog（小地图 + 搜索定位） */}
       <Dialog open={placeOpen} onOpenChange={setPlaceOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MapPin className="size-4" /> {t("pickPlace")}
             </DialogTitle>
-            <DialogDescription>{t("pickPlaceHint")} · 高德搜索，拒绝手输与私宅</DialogDescription>
+            <DialogDescription>{t("pickPlaceHint")} · 高德搜索 + 小地图点选，拒绝手输与私宅</DialogDescription>
           </DialogHeader>
           <div className="flex gap-2">
             <div className="relative flex-1">
@@ -469,14 +599,22 @@ export function V2GatheringForm() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="搜索中环、尖沙咀、铜锣湾..."
                 className="pl-8"
-                onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void doSearch(query);
+                  }
+                }}
               />
             </div>
-            <Button onClick={() => setQuery((q) => q)} variant="secondary" type="button" disabled>
-              {searching ? <Loader2 className="size-4 animate-spin" /> : "高德"}
+            <Button onClick={() => void doSearch(query)} variant="secondary" type="button" disabled={searching}>
+              {searching ? <Loader2 className="size-4 animate-spin" /> : "搜索"}
             </Button>
           </div>
-          <div className="max-h-[50vh] space-y-2 overflow-auto pr-1">
+          {/* 小地图 */}
+          <div ref={miniMapRef} className="h-[220px] w-full overflow-hidden rounded-lg border" />
+          <p className="text-xs text-muted-foreground">在地图上点选亦可定位（点击后自动逆地理至地址），搜索结果会在地图上以标记显示。</p>
+          <div className="max-h-[28vh] space-y-2 overflow-auto pr-1">
             {searching && <p className="py-6 text-center text-sm text-muted-foreground">搜索中…</p>}
             {!searching &&
               results.map((r) => (
