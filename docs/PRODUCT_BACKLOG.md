@@ -2395,3 +2395,48 @@ UR C.17　v2 在線朋友模式＋好友信息卡（先看人再聊）[WIP]
 
 *改動記錄*
 - 2026-09-27：建檔即開工置 [WIP]（用户三件＋跨區縮放追加；版本沿 C.15 只做 v2；DB 免改已實證；同伴 C.16 同文件施工中，hunks 逐個驗分離）
+
+---
+
+UR C.18　v2 打卡提交：成功飛新釘＋啤酒冒泡 loading [WIP]
+
+DEF-20260927-011 落條即修（版本問答：只改 v2，一律飛新釘；v1 同病另開 UR，不搭車）。
+
+### 範圍（v2-only：`components/v2/V2Home.tsx`＋`v2.module.css`＋`v2.checkinSubmitting`×3）
+1. 成功收尾：DB 成功／本地回退雙分支 `flyTo(position, 15)`（用戶拍板一律飛，不判視野）；403／未登入中途返回不飛
+2. 提交期：`checkinSubmitting` 態＋`submittingRef` 連點守衛（ref 防同 tick，state 驅 UI）＋全屏冒泡罩（三粒 `v2-rise` 上升氣泡＋`發布中…`，成功／失敗／403 全 dismiss；`role=status`＋`aria-live`；reduced-motion 靜止）
+3. 罩層級 `z-[1000]`（沿疊加層口徑）＋吞點擊（防提交期誤觸地圖）
+
+### 非目標
+- v1 任何文件（`DrinkMap.dropWantWithKind` 同病另開 UR）、後端改動、新路由、守衛邏輯改動
+
+### AC
+- AC1：地圖拖偏後打卡→成功飛新釘；reduced-motion 下直接 setView 到位（`flyTo` 內建降級？無——`V2MapApi.flyTo` 未讀 reduced，需驗；若無降級本 UR 內補）
+- AC2：慢網下點發布即見冒泡＋文案；成功／失敗／403 罩自動消失；連點只發一次
+- AC3：三閘綠；用戶瀏覽器親驗；`git status` 無 v1
+
+*改動記錄*
+- 2026-09-27：建檔即開工置 [WIP]（DEF-011；版本問答只改 v2＋一律飛；AC1 留 `flyTo` reduced 降級待驗項）
+- 2026-09-27 fix（用戶驗收：罩被選酒 Sheet 蓋住）：根因 V2Home `isolate` 自建 stacking context＋Sheet 是 body 級 portal（DEF-002/008/012 同款）——罩改 `createPortal(document.body)`＋`z-[1100]`（沿 ModePrompt 口徑；初幀 false，SSR 安全）；決策記此
+
+---
+
+UR C.19　v2 足跡虛線行軍蟻動效（CSS 描邊偏移，零 rAF）[WIP]
+
+用戶指令：足跡虛線太死，加動態效果。現狀：`footLayer` 灰色靜態虛線（`dashArray 8 10`，C.13 簡化後；rAF 舊動畫已退役清場）。本 UR 只動虛線本身，不碰 C.13 腳印節點系（隊友施工中，互不踩）。
+
+### 範圍（v2-only：`V2MapView` 取 path 加 class＋`v2.module.css` keyframes）
+1. polyline 上圖後取 SVG path（`getElement()`）加 `v2trailMarch` class；`@keyframes` 循環 `stroke-dashoffset`（一行程＝一段虛實 18px，無縫 loop）
+2. 方向：沿時間舊→新（path 點序本就是 `at` 升序）；`prefers-reduced-motion` 下靜止
+3. 清理：layer 重建／卸載摘 class（沿現有 polylineRef 清理口徑，不留野引用）
+
+### 非目標
+- rAF／JS 驅動描邊（舊 anim 系已退役，不復活）、腳印节点（C.13 的）、線型／顏色大改、v1 任何文件
+
+### AC
+- AC1：足跡開時虛線有方向地流動（舊→新），縮放／重建不斷流
+- AC2：reduced-motion 下靜止虛線；單點／空無線不炸；三閘綠；用戶瀏覽器親驗
+
+*改動記錄*
+- 2026-09-27：建檔置 []（用戶指令虛線動效；C.13 腳印系另主，本 UR 只做描邊；待問答定方向＋速度後置 [WIP]）
+- 2026-09-27：問答定案（行軍蟻舊→新）置 [WIP]；實作完待驗（path 取節點掛 `v2trailMarch` class＋`stroke-dashoffset 0→-18` 無縫 loop 1.2s、`reduced-motion` 靜止；tsc 淨／lint 0 error／build 綠；待用戶瀏覽器親驗，未提交）

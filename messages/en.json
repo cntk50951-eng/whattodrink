@@ -338,7 +338,8 @@
     "chatFallbackName": "Buddy",
     "chatFriendsOnly": "Online friends",
     "chatFriendsEmpty": "No friends online right now",
-    "chatOpen": "Chat"
+    "chatOpen": "Chat",
+    "checkinSubmitting": "Posting…"
   },
   "terms": {
     "title": "Three modes, which one?",

@@ -338,7 +338,8 @@
     "chatFallbackName": "酒友",
     "chatFriendsOnly": "在線朋友",
     "chatFriendsEmpty": "暫時未見在線朋友",
-    "chatOpen": "聊天"
+    "chatOpen": "聊天",
+    "checkinSubmitting": "發布中…"
   },
   "terms": {
     "title": "三種模式，點揀？",

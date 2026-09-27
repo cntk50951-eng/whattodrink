@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -228,6 +229,9 @@ export function V2Home() {
   // UR C.17：只看在線朋友（藏自釘＋打卡＋足跡，朋友層獨顯）＋好友信息卡目標。
   const [friendsOnly, setFriendsOnly] = useState(false);
   const [friendCardId, setFriendCardId] = useState<string | null>(null);
+  // UR C.18：打卡提交中（冒泡罩開關＋連點守衛；ref 防同 tick 連點，state 驅 UI）。
+  const [checkinSubmitting, setCheckinSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   // 初始中心：首個定位 fix 飛我一次（C.11 fitHk 之後不再搶鏡頭）。
   const centeredRef = useRef(false);
   useEffect(() => {
@@ -846,12 +850,22 @@ export function V2Home() {
       setPickStage("login");
       return;
     }
+    // UR C.18：同 tick 連點只收一次（ref 即時，state 慢半拍擋不住）。
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setCheckinSubmitting(true);
     void (async () => {
       const center = mapApi.current?.getCenter() ?? DEFAULT_CENTER;
       const position =
         geoStatus === "success" && geoPos !== null && isWithinHongKong(geoPos)
           ? geoPos
           : center;
+      // UR C.18：成功必飛新釘（一律飛，用戶拍板；dismiss 罩＋解鎖走 finally 語義——
+      // 各 return／catch 逐一收尾，不用外層 try（內層 try 已佔 POST 語義）。
+      const done = () => {
+        submittingRef.current = false;
+        setCheckinSubmitting(false);
+      };
       try {
         const res = await fetch("/api/v1/checkins", {
           method: "POST",
@@ -869,6 +883,7 @@ export function V2Home() {
           setFriendState("unknown");
           setAddState("idle");
           setGuard({ action: "checkin", target: null });
+          done();
           return;
         }
         if (!res.ok) throw new Error(`checkins ${res.status}`);
@@ -896,6 +911,8 @@ export function V2Home() {
         // 登入以 DB 為準：只進會話態，不寫本地（沿 A.10）。
         setWantHistory((prev) => [...prev, record].sort((a, b) => a.at - b.at));
         setPickOpen(false);
+        mapApi.current?.flyTo(position, 15);
+        done();
       } catch {
         // 離線回退：本地快照（沿 v1 同配方）。
         const record: WantRecord = {
@@ -910,6 +927,8 @@ export function V2Home() {
         setWantHistory(next);
         saveWantHistory(next);
         setPickOpen(false);
+        mapApi.current?.flyTo(position, 15);
+        done();
       }
     })();
   }
@@ -972,6 +991,30 @@ export function V2Home() {
         onClose={() => setFriendCardId(null)}
         onChat={goChat}
       />
+
+      {/* UR C.18 打卡提交冒泡罩（POST 期唯一反饋；成功／失敗／403 全 dismiss，見 dropWant）。
+          DEF-012 同款坑：V2Home 根 `isolate` 自建 stacking context，罩放裡面再大也壓不住
+          body 級 Sheet portal——走 portal 逃出＋z1100（沿 ModePrompt DEF-008 口徑）。
+          初幀 false 故 SSR 無 document 問題（開罩只發生在客戶端交互後）。 */}
+      {checkinSubmitting &&
+        createPortal(
+          <div
+            role="status"
+            aria-live="polite"
+            aria-label={t2("checkinSubmitting")}
+            className="fixed inset-0 z-[1100] flex items-center justify-center bg-background/60 backdrop-blur-[2px]"
+          >
+            <div className="flex flex-col items-center gap-3 rounded-3xl bg-card px-8 py-6 shadow-xl ring-1 ring-foreground/10">
+              <div className={styles.v2bubbles} aria-hidden>
+                <span className={styles.v2bubble} />
+                <span className={styles.v2bubble} />
+                <span className={styles.v2bubble} />
+              </div>
+              <p className="text-sm font-bold">{t2("checkinSubmitting")}</p>
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {/* 頂部簇：頭像＋城市＋模式一行，pills 緊貼下方（DEF-012 round-2：
           之前兩段 absolute 留大縫＋不對齊，收進同一容器沿 Snap 緊湊左對齊） */}
