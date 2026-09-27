@@ -290,3 +290,35 @@ describe("swapWantBeer / removeWantAt", () => {
     expect(removeWantAt([GOOD], 1)).toEqual([GOOD]);
   });
 });
+
+describe("parseWantRecord 三件套 (UR E.1)", () => {
+  const TRIPLE = {
+    ...GOOD,
+    photoDataUrl: "data:image/jpeg;base64,/9j/",
+    note: "今晚第一杯",
+    audio: { url: "blob:mock", seconds: 12 },
+  };
+  it("三件套合法即保留", () => {
+    const r = parseWantRecord(TRIPLE);
+    expect(r?.photoDataUrl).toBe(TRIPLE.photoDataUrl);
+    expect(r?.note).toBe("今晚第一杯");
+    expect(r?.audio).toEqual({ url: "blob:mock", seconds: 12 });
+  });
+  it("壞值丟字段留記錄（非圖／超長圖／note 截斷／壞語音）", () => {
+    const r = parseWantRecord({
+      ...GOOD,
+      photoDataUrl: "http://x/y.jpg",
+      note: "a".repeat(600),
+      audio: { url: "", seconds: 99 },
+    });
+    expect(r).not.toBeNull();
+    expect(r?.photoDataUrl).toBeUndefined();
+    expect(r?.note?.length).toBe(500);
+    expect(r?.audio).toBeUndefined();
+    const big = parseWantRecord({
+      ...GOOD,
+      photoDataUrl: `data:image/jpeg;base64,${"a".repeat(400_001)}`,
+    });
+    expect(big?.photoDataUrl).toBeUndefined();
+  });
+});
