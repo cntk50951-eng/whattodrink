@@ -409,12 +409,77 @@
   }
 }
 
+/* UR C.19 足跡虛線行軍蟻：描邊偏移 0→-18（一段虛實 18px，dashArray 8 10），
+ * 偏移遞減即虛線沿 path 點序（at 升序＝舊→新）流動，無縫 loop。 */
+.v2trailMarch {
+  animation: v2trailmarch 1.2s linear infinite;
+}
+
+@keyframes v2trailmarch {
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .v2step,
-  .v2stepMoving {
+  .v2stepMoving,
+  .v2trailMarch {
     animation: none;
   }
   .v2step {
     opacity: 0.9;
+  }
+}
+
+/* UR C.18 打卡提交冒泡罩：三粒上升氣泡（transform／opacity only，中性 token 高光） */
+.v2bubbles {
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+.v2bubble {
+  position: absolute;
+  bottom: 0;
+  border-radius: 9999px;
+  background: var(--primary);
+  opacity: 0;
+  animation: v2-rise 1.6s ease-in infinite;
+}
+.v2bubble:nth-child(1) {
+  left: 12px;
+  width: 10px;
+  height: 10px;
+  animation-delay: 0s;
+}
+.v2bubble:nth-child(2) {
+  left: 27px;
+  width: 14px;
+  height: 14px;
+  animation-delay: 0.5s;
+}
+.v2bubble:nth-child(3) {
+  left: 44px;
+  width: 8px;
+  height: 8px;
+  animation-delay: 1s;
+}
+@keyframes v2-rise {
+  0% {
+    transform: translateY(0) scale(0.6);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-48px) scale(1);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v2bubble {
+    animation: none;
+    opacity: 0.5;
   }
 }

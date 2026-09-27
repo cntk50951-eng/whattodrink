@@ -276,9 +276,15 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       flyTo(at: LatLng, zoom?: number) {
         const map = mapRef.current;
         if (map === null) return;
-        map.flyTo([at.lat, at.lng], zoom ?? Math.max(map.getZoom(), 14), {
-          duration: 0.8,
-        });
+        const z = zoom ?? Math.max(map.getZoom(), 14);
+        // UR C.18：reduced-motion 下直接 setView（本站硬規則；fitPoints 同口徑）。
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          map.setView([at.lat, at.lng], z);
+        } else {
+          map.flyTo([at.lat, at.lng], z, {
+            duration: 0.8,
+          });
+        }
       },
       getCenter() {
         const map = mapRef.current;
@@ -857,6 +863,11 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       lineCap: "round",
       pane: "footPane",
     }).addTo(layer);
+    // UR C.19：行軍蟻（path 上圖後取 SVG 節點掛動效 class；重建即重取，
+    // 摘層 DOM 同亡，無野引用；reduced-motion 由 css 關）。
+    polylineRef.current
+      .getElement()
+      ?.classList.add(styles.v2trailMarch);
   }, [mapReady, trail]);
 
   return <div ref={holderRef} className={styles.v2map} />;
