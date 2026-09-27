@@ -11,6 +11,11 @@
 - **查 product backlog**：`docs/PRODUCT_BACKLOG.md` 有沒有對應 epic / UR
 - **查 UR 狀態**（見 `ur-status.md`）：要碰的 UR 無 tag 先補 `[]`；開工（第一個實作動作前）置 `[WIP]`
 - **不要假設**：用戶說「做個 X」時，先確認他腦中的 X 是哪個 X
+- **版本指向門禁（v1／v2，硬性，用戶指令 2026-09-27）**：
+  需求涉及用戶可見行為／UI，但沒說改 v1、v2 還是都要——禁止默認（尤其禁止「v2 順手改 v1」或反之），
+  必須在 Step 2 用 AskUserQuestion 問清（選項至少：只改 v1／只改 v2／兩邊都要，每項一句影響說明），
+  拿到答案才准進 Step 4（寫第一行代碼）。免問例外：純共用層改動（lib 純函數／API 契約／DB migration，
+  無任何 UI 面）＋純文檔／config——但 commit message 留痕（如 `[shared-only]`）。违反即返工。
 
 ### 開工門禁 · 記憶回顧（硬性，未做不許進 Step 4）
 

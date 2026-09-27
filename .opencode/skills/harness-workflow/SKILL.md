@@ -20,6 +20,7 @@ At the **start of every development task**, follow these steps strictly:
 
 - **Never auto commit / push** without user confirmation (Step 10)
 - **V1/V2 isolation (EPIC C, hard rule, both directions)**: v2 work never modifies v1 files (routes/pages/components/styles/i18n keys); v1 keeps iterating freely; shared-layer (`lib/`/`hooks/`/API) changes must stay backward compatible (additive only) + pass v1/v2 dual regression. See `.harness/workflow.md` Step 4 (V1/V2 isolation) + backlog EPIC C.
+- **版本指向門禁 v1／v2（硬性，用戶指令 2026-09-27）**：需求涉及用戶可見行為／UI 但沒說改 v1、v2 還是都要——禁止默認，必須 Step 2 用 AskUserQuestion 問清（只改 v1／只改 v2／兩邊都要＋各一句影響說明）才准進 Step 4。免問：純共用層／純文檔／config（commit 留痕）。見 `.harness/workflow.md` Step 1。
 - **UI changes**: 由用户自行在浏览器验证，OpenCode 不自动执行 agent-browser / playwright 截图（Step 10a–10b 由用户手动完成）
 - **New lib / new version**: look up the latest API first via `mcp__context7__resolve-library-id` + `mcp__context7__query-docs` (Step 3), never rely on training data
 - **Logic errors**: fix immediately, then re-run Step 3→7
