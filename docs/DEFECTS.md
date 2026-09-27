@@ -40,6 +40,7 @@
 | DEF-20260926-014 | v2打卡後酒圖標只顯示emoji無品牌圖 | Closed | P1 | 2026-09-26 / @yuki | UR C.4 | v2 want 卡寫死 emoji 圓＋快照直用；C.4 目錄取新＋BeerImg＋地圖釘圖；用戶驗收通過，已合入 main |
 | DEF-20260926-015 | v2地圖釘 createRoot 同步 unmount 撞渲染期報錯 | Closed | P1 | 2026-09-26 / @yuki | UR A.20 | microtask 延後＋try/catch；用戶驗收通過，已合入 main |
 | DEF-20260926-016 | Vercel main 部署紅（wall.ts 引缺失模塊） | Closed | P0 | 2026-09-26 / @yuki | 插畫並行線 | 部分推送：wall.ts／index.ts 接線先行，15 枚 .tsx 未進倉；`a8e28c2` 補齊樹後 worktree 驗 tsc 淨＋253 綠 |
+| DEF-20260927-001 | v2 他人打卡弹窗 UI 亂＋信息不全 | Fixed | P1 | 2026-09-27 / @yuki | UR C.10 | `openPin` 丟字段＋他人卡停 C.1 骨架（排查已實證，見詳情） |
 
 ### DEF-20250925-001 登出→重登录后打卡酒类消失
 
@@ -319,3 +320,19 @@
 - **关联 UR**：UR A.16
 - **修复验证**：三閘全綠（test 220／lint 0 error／build 過），待用户复验（首屏即見 pill＋一點展開三檔）
 - **回归范围**：城市卡展开、登入态、`GET /me`、`ModePrompt` 守衛浮層
+
+### DEF-20260927-001 v2 他人打卡弹窗 UI 亂＋信息不全
+
+- **状态**：Fixed（2026-09-27 用戶瀏覽器親驗通過，已合入 main；待用户复验关闭）
+- **严重度**：P1 主要（v2 社交主链入口：點人→乾杯／邀約全經此卡）
+- **发现日期 / 报告人**：2026-09-27 / @yuki
+- **复现步骤**：
+  1. 開 `/v2`，點任一他人 pin
+  2. 看彈出的打卡卡
+- **期望**：與自家打卡卡同構信息（誰＋喝什麼＋何時何地＋乾杯／邀約），排版一致
+- **实际**：僅 emoji＋暱稱＋區＋酒名距離＋按鈕；無頭像性別、無時間、無酒圖，觀感與自家卡迥異（用戶原話「UI 是亂的」）
+- **初判根因**：`V2Home openPin` 丟棄 `PinJson` 已有字段（avatarUrl／gender／checkedInAt 全不用）；他人卡 UI 停在 C.1 骨架（C.4 只升級了自家 Sheet）——以前端映射＋UI 為主，零後端
+- **确诊根因**：同上，已實證：`PinJson`（`lib/api/pins.ts:33`）含 nickname／avatarUrl／gender／checkedInAt／area／drinkName 全字段；`openPin`（`V2Home.tsx:358`）僅取 7 字段；他人卡（`V2Home.tsx:840`）僅渲染 title／sub／drink／距離／在線／按鈕，無用戶行／酒圖／時間
+- **关联 UR**：UR C.10
+- **修复验证**：返工後三閘全綠（test 548／lint 0 error／tsc 淨／build 綠；548 含並行線新增）；2026-09-27 用户亲验通过（他人卡進 Sheet 後 X＋結構與自家一致）
+- **回归范围**：v2 自家 Sheet（不動）、v1 他人卡（版本問答定案前不動）、乾杯／邀約／守衛行為

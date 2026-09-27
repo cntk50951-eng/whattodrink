@@ -22,3 +22,11 @@ export const MOCK_ME: MeProfile = {
   gender: "secret",
   mock: true,
 };
+
+/**
+ * UR C.10：api 回的 gender 是自由串，轉三態。非法／空／缺一律 `secret`
+ * （沿 MOCK_ME 占位口徑：不替用戶定性別；卡片性別 pill 永遠可渲染）。
+ */
+export function parseGender(raw: unknown): Gender {
+  return raw === "male" || raw === "female" ? raw : "secret";
+}

@@ -5,7 +5,11 @@
 ## [Unreleased]
 
 ### Added
-- **UR C.8 v2底图试水（OSM↔高德可切换＋自动回退）[WIP]**
+- **UR C.10 v2他人打卡卡升級（與自家Sheet同構信息）[WIP]**
+  - `lib/me.ts`加法`parseGender`（自由串轉三態，非法回secret）＋`lib/me.test.ts` 3單測
+  - `V2Card other`加avatarUrl／avatarEmoji／gender／checkedInAt＋`openPin`雙源映射補齊（`PinJson`字段已夠，零後端）；他人浮動卡重排（用戶行＋酒圖hero＋時間地點，乾杯／邀約／額度原行為，容器不動）
+  - 關聯 DEF-20260927-001（Fixing）；數據文檔無需更新（零新增持久化，卡片只消費既有pins字段）
+- **UR C.8 v2底图试水（OSM↔高德可切换＋自动回退）[✓，用户已验收，merged]**
   - `lib/maps/provider.ts`（新，共用加法）：`parseMapProvider`（`NEXT_PUBLIC_MAP_PROVIDER`，缺省／非法回osm）＋`tileSpecFor`（amap走高德style=8中文瓦片，attribution高德）＋`shouldFallbackToOsm`（连错5次回退）；`lib/maps/provider.test.ts` 8單測
   - `components/v2/V2MapView.tsx`：init走工厂建层＋tileerror连错自动拆层换OSM（tileload清零）；pins／聚合／镜头零动；v1零文件（`DrinkMap`未碰）
   - `.env.example`加开关说明（缺省osm；Vercel改值需redeploy，沿C.7口径）；數據文檔無需更新（零新增持久化，瓦片源非前端數據）

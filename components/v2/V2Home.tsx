@@ -26,15 +26,8 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMyMode } from "@/hooks/useMyMode";
@@ -52,6 +45,7 @@ import type { LatLng } from "@/lib/geo";
 import { resolveCityCode } from "@/lib/city";
 import {
   BEER_CATEGORIES,
+  beerByName,
   fetchBeers,
   pickNextBatch,
   pickRandomBatch,
@@ -78,7 +72,8 @@ import {
   formatWantTime,
 } from "@/lib/wantRecord";
 import type { WantRecord } from "@/lib/wantRecord";
-import { MOCK_ME } from "@/lib/me";
+import { MOCK_ME, parseGender } from "@/lib/me";
+import type { Gender } from "@/lib/me";
 import { trailStops } from "@/lib/trail";
 import { iconForDrinkName, iconForPickId } from "@/components/marketing/beer-icons/wall";
 import { WallIcon } from "@/components/marketing/beer-icons/doodle";
@@ -108,6 +103,14 @@ type V2Card =
       online: boolean;
       lat: number;
       lng: number;
+      /** UR C.10：真頭像（api avatarUrl，無則首字圓回退；MOCK 走 avatarEmoji）。 */
+      avatarUrl: string | null;
+      /** UR C.10：MOCK emoji 頭像（api 源為 null）。 */
+      avatarEmoji: string | null;
+      /** UR C.10：三態（api 自由串經 parseGender，MOCK 直用）。 */
+      gender: Gender;
+      /** UR C.10：打卡時間 epoch ms（無則不渲染時間行）。 */
+      checkedInAt: number | null;
     };
 
 type GuardState = {
@@ -356,6 +359,8 @@ export function V2Home() {
     cityCode === null ? "cityName" : (`cityName_${cityCode}` as const);
 
   function openPin(id: string): void {
+    // 他人卡進 Sheet：關自家 Sheet（互斥， latest tap 贏）。
+    setWantSheetAt(null);
     const api = apiPins.find((p) => p.id === id);
     if (api !== undefined) {
       setCard({
@@ -368,6 +373,15 @@ export function V2Home() {
         online: api.isOnline,
         lat: api.lat,
         lng: api.lng,
+        // UR C.10：PinJson 字段全用上（此前丟棄致信息不全）。
+        avatarUrl: api.avatarUrl,
+        avatarEmoji: null,
+        gender: parseGender(api.gender),
+        checkedInAt:
+          typeof api.checkedInAt === "number" &&
+          Number.isFinite(api.checkedInAt)
+            ? api.checkedInAt
+            : null,
       });
       mapApi.current?.flyTo({ lat: api.lat, lng: api.lng });
       return;
@@ -384,6 +398,11 @@ export function V2Home() {
         online: false,
         lat: m.position.lat,
         lng: m.position.lng,
+        // UR C.10：MOCK 源字段直用（avatarEmoji／gender／checkedInAt 既有）。
+        avatarUrl: null,
+        avatarEmoji: m.avatarEmoji,
+        gender: m.gender,
+        checkedInAt: m.checkedInAt,
       });
       mapApi.current?.flyTo({ lat: m.position.lat, lng: m.position.lng });
     }
@@ -394,6 +413,8 @@ export function V2Home() {
     const at = Number(id.replace("want-", ""));
     const rec = wantHistory.find((w) => w.at === at);
     if (rec === undefined) return;
+    // 自家 Sheet 開時關他人卡（互斥）。
+    setCard(null);
     setSwapOpen(false);
     setSwapBatch([]);
     setConfirmDelete(false);
@@ -836,57 +857,6 @@ export function V2Home() {
         </p>
       )}
 
-      {/* pin 卡（底部浮層，非錨定） */}
-      {card !== null && (
-        <Card className="absolute inset-x-3 bottom-24 z-[1000] shadow-lg">
-          <CardHeader className="flex-row items-center gap-3">
-            <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-xl ring-1 ring-foreground/10">
-              {card.emoji}
-            </span>
-            <div className="min-w-0 flex-1">
-              <CardTitle className="truncate">{card.title}</CardTitle>
-              <CardDescription className="truncate">{card.sub}</CardDescription>
-            </div>
-            <Button size="icon-sm" variant="ghost" aria-label={t("close")} onClick={() => setCard(null)}>
-              <X aria-hidden />
-            </Button>
-          </CardHeader>
-          <Separator />
-          <CardContent className="flex flex-wrap items-center gap-2">
-            {card.kind === "other" && (
-              <>
-                <span className="text-sm font-medium">
-                  {card.drink}
-                  {selfPos !== null && (
-                    <> · {formatDistance(haversineMeters(selfPos, { lat: card.lat, lng: card.lng }))}</>
-                  )}
-                </span>
-                {card.online && <Badge>{t("onlineNow")}</Badge>}
-                <span className="flex w-full gap-2 pt-1">
-                  <Button
-                    size="sm"
-                    onClick={() => handleCheers(card.id)}
-                    disabled={!canCheers(sentIds)}
-                  >
-                    {sentIds.includes(card.id) ? t("cheersSent") : t("cheers")}
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => handleInvite(card.id)}>
-                    {invites[card.id] === "accepted"
-                      ? t("inviteAccepted")
-                      : invites[card.id] === "sent"
-                        ? t("inviteSent")
-                        : t("inviteCta")}
-                  </Button>
-                </span>
-                <span className="w-full text-xs text-muted-foreground">
-                  {canCheers(sentIds) ? t("cheersLeft", { n: cheersRemaining(sentIds) }) : t("cheersLimitReached")}
-                </span>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
       {/* 底部 CTA 列 */}
       {card === null && (
         <div className="absolute inset-x-3 bottom-20 z-[1000] flex items-end gap-2">
@@ -1179,16 +1149,121 @@ export function V2Home() {
 
       {/* UR C.4 自打卡底部 Sheet（snapshot 式：品牌圖＋用戶資訊＋換酒＋刪除＋圖片佔位槽） */}
       <Sheet
-        open={wantSheetAt !== null}
+        open={wantSheetAt !== null || (card !== null && card.kind === "other")}
         onOpenChange={(v) => {
           if (v) return;
           setWantSheetAt(null);
+          setCard(null);
           setSwapOpen(false);
           setConfirmDelete(false);
         }}
       >
         <SheetContent side="bottom" className={`${styles.v2scope} max-h-[85svh] gap-4 overflow-y-auto rounded-t-2xl p-4 sm:mx-auto sm:w-full sm:max-w-md`}>
           {(() => {
+            // UR C.10 返工：他人卡進同一 Sheet（grabber／Header／X 共用，
+            // 與自家同容器，錯位按構造消失；浮動卡退役）。
+            if (card !== null && card.kind === "other") {
+              return (
+                <>
+                  <div aria-hidden className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
+                  <SheetHeader className="text-left">
+                    <SheetTitle className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      <span className="truncate">{card.title}</span>
+                      <Badge variant="outline">{t(GENDER_KEY[card.gender])}</Badge>
+                      {card.online && <Badge>{t("onlineNow")}</Badge>}
+                    </SheetTitle>
+                    <SheetDescription>
+                      {card.checkedInAt !== null
+                        ? formatWantTime(card.checkedInAt, locale)
+                        : ""}
+                    </SheetDescription>
+                  </SheetHeader>
+                  <div className="flex items-center gap-3">
+                    <span className="w-28 shrink-0 overflow-hidden rounded-xl border bg-card p-1">
+                      {(() => {
+                        const hero =
+                          card.drink !== "" ? beerByName(card.drink) : null;
+                        return hero !== null ? (
+                          <BeerImg key={hero.id} beer={hero} tall />
+                        ) : (
+                          <span aria-hidden className="flex aspect-[3/4] w-full items-center justify-center text-4xl">
+                            {card.emoji}
+                          </span>
+                        );
+                      })()}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-base font-bold">
+                        {card.drink !== "" ? card.drink : card.title}
+                      </p>
+                      <p className="flex flex-wrap items-center gap-1.5 pt-1.5 text-sm text-muted-foreground">
+                        {card.avatarUrl !== null &&
+                        /^https?:\/\//.test(card.avatarUrl) ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={card.avatarUrl}
+                            alt=""
+                            loading="lazy"
+                            className="h-6 w-6 rounded-full object-cover"
+                          />
+                        ) : (
+                          <span aria-hidden className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-sm">
+                            {card.avatarEmoji ?? card.title.slice(0, 1)}
+                          </span>
+                        )}
+                        {card.title}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1.5 text-sm">
+                    {card.sub !== "" && (
+                      <span className="flex items-center gap-1.5">
+                        <MapPin size={15} aria-hidden />
+                        <span className="min-w-0 truncate">{card.sub}</span>
+                      </span>
+                    )}
+                    {selfPos !== null && (
+                      <span className="flex items-center gap-1.5">
+                        <Footprints size={15} aria-hidden />
+                        {formatDistance(
+                          haversineMeters(selfPos, {
+                            lat: card.lat,
+                            lng: card.lng,
+                          }),
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleCheers(card.id)}
+                      disabled={!canCheers(sentIds)}
+                    >
+                      {sentIds.includes(card.id)
+                        ? t("cheersSent")
+                        : t("cheers")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleInvite(card.id)}
+                    >
+                      {invites[card.id] === "accepted"
+                        ? t("inviteAccepted")
+                        : invites[card.id] === "sent"
+                          ? t("inviteSent")
+                          : t("inviteCta")}
+                    </Button>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {canCheers(sentIds)
+                      ? t("cheersLeft", { n: cheersRemaining(sentIds) })
+                      : t("cheersLimitReached")}
+                  </span>
+                </>
+              );
+            }
             const rec =
               wantSheetAt === null
                 ? undefined
