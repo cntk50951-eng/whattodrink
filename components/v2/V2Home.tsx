@@ -16,6 +16,7 @@ import {
   Flame,
   Footprints,
   Globe,
+  LoaderCircle,
   LocateFixed,
   LogOut,
   Map as MapIcon,
@@ -101,7 +102,7 @@ import { buzz, BUZZ_CHEERS, BUZZ_FOUND } from "@/lib/haptics";
 import { V2MapView } from "./V2MapView";
 import type { V2MapApi } from "./V2MapView";
 import { V2CameraSheet } from "./V2CameraSheet";
-import type { StagedShot } from "./V2CameraSheet";
+import type { PublishResult, PublishShot } from "./V2CameraSheet";
 import { apiPinsToMarkers, mockToMarkers } from "./v2Pins";
 import type { V2Marker } from "./v2Pins";
 import styles from "./v2.module.css";
@@ -252,6 +253,14 @@ export function V2Home() {
   const [sentIds, setSentIds] = useState<string[]>([]);
   const [invites, setInvites] = useState<Partial<Record<string, "sent" | "accepted">>>({});
   const [card, setCard] = useState<V2Card | null>(null);
+  // UR E.2：他人三件套詳情（開卡按需拉；403／空即無，不擋卡片本體）。
+  const [otherDetail, setOtherDetail] = useState<{
+    photoUrl: string | null;
+    note: string | null;
+    audioUrl: string | null;
+    audioSeconds: number | null;
+  } | null>(null);
+  const otherDetailFor = useRef<string | null>(null);
   const [trailOn, setTrailOn] = useState(false);
   // UR C.11：一鍵足跡——登入浮層開關／地圖 ready tick／?trail=1 續跑 intent／目錄 Sheet。
   const [trailLoginOpen, setTrailLoginOpen] = useState(false);
@@ -276,9 +285,8 @@ export function V2Home() {
   const [wantSheetAt, setWantSheetAt] = useState<number | null>(null);
   // UR C.14 round-2：+N 堆疊列表 Sheet（同點超 cap 組的成員 id，含代表）。
   const [stackIds, setStackIds] = useState<string[] | null>(null);
-  // UR E.1：相機 Sheet 開關＋拍好的三件套（確認後帶進選酒，打卡落鏈時併入記錄）。
+  // UR E.3：相機一页流直发（shot 随参，无 staged 中转；酒可空）。
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [stagedShot, setStagedShot] = useState<StagedShot | null>(null);
   // UR C.11 round-3：詳情返回目錄（目錄來才記 "stops"；地圖釘直開為 null 不帶返回鈕）。
   const [wantReturnTo, setWantReturnTo] = useState<"stops" | null>(null);
   const [swapOpen, setSwapOpen] = useState(false);
@@ -337,6 +345,8 @@ export function V2Home() {
     const handler = (): void => {
       setWantHistory([]);
       setCard(null);
+      setOtherDetail(null);
+      otherDetailFor.current = null;
       setSentIds([]);
       setInvites({});
       setGuard(null);
@@ -412,17 +422,19 @@ export function V2Home() {
       // UR C.4＋A.20：釘圖與 Sheet 同源（resolveFreshBeer 目錄取新，換酒即換釘圖）；
       // 本地 SVG 組件一併帶下（地圖 createRoot 注入），無圖回 img／emoji 舊鏈
       wantHistory.map((w) => {
-        const fresh = resolveFreshBeer(w.beer);
+        // UR E.3：无酒打卡钉走照片主视觉（📷 通用钉，无品牌图链）。
+        const fresh = w.beer === null ? null : resolveFreshBeer(w.beer);
         return {
           id: `want-${w.at}`,
           lat: w.position.lat,
           lng: w.position.lng,
-          emoji: fresh.emoji,
+          emoji: fresh === null ? "📷" : fresh.emoji,
           iconUrl:
+            fresh !== null &&
             fresh.icon_url !== undefined && fresh.icon_url !== null && fresh.icon_url !== ""
               ? fresh.icon_url
               : null,
-          Icon: iconForPickId(fresh.id) ?? iconForDrinkName(fresh.name),
+          Icon: fresh === null ? null : (iconForPickId(fresh.id) ?? iconForDrinkName(fresh.name)),
         };
       }),
     [wantHistory],
@@ -651,6 +663,34 @@ export function V2Home() {
             : null,
       });
       mapApi.current?.flyTo({ lat: api.lat, lng: api.lng });
+      // UR E.2：三件套按需拉（pins 不帶，開卡才取；id 守衛防串卡）。
+      setOtherDetail(null);
+      otherDetailFor.current = api.id;
+      void fetch(`/api/v1/checkins/${encodeURIComponent(api.id)}`, {
+        credentials: "include",
+      })
+        .then(async (res) => {
+          if (!res.ok) return;
+          const j = (await res.json()) as {
+            checkin?: {
+              photo_url?: string | null;
+              note?: string | null;
+              audio_url?: string | null;
+              audio_seconds?: number | null;
+            };
+          };
+          if (otherDetailFor.current !== api.id) return;
+          const c = j.checkin;
+          if (c === undefined) return;
+          setOtherDetail({
+            photoUrl: c.photo_url ?? null,
+            note: c.note ?? null,
+            audioUrl: c.audio_url ?? null,
+            audioSeconds:
+              typeof c.audio_seconds === "number" ? c.audio_seconds : null,
+          });
+        })
+        .catch(() => {});
       return;
     }
     const m = MOCK_CHECKINS.find((c) => c.id === id);
@@ -671,6 +711,9 @@ export function V2Home() {
         gender: m.gender,
         checkedInAt: m.checkedInAt,
       });
+      // UR E.2：MOCK 無詳情端點，清殘留防串卡。
+      setOtherDetail(null);
+      otherDetailFor.current = null;
       mapApi.current?.flyTo({ lat: m.position.lat, lng: m.position.lng });
     }
   }
@@ -682,6 +725,8 @@ export function V2Home() {
     if (rec === undefined) return;
     // 自家 Sheet 開時關他人卡（互斥）。
     setCard(null);
+    setOtherDetail(null);
+    otherDetailFor.current = null;
     // 地圖釘直開不帶返回（目錄來由 openStopRecord 事後記）。
     setWantReturnTo(null);
     setSwapOpen(false);
@@ -702,14 +747,14 @@ export function V2Home() {
       return;
     }
     const rec = wantHistory.find((w) => w.at === wantSheetAt);
-    if (rec === undefined) return;
+    if (rec === undefined || rec.beer === null) return;
     setSwapBatch(pickSwapBatch(resolveFreshBeer(rec.beer), 6));
     setSwapOpen(true);
   }
   function handleSwapRefresh(): void {
     if (wantSheetAt === null || !swapOpen) return;
     const rec = wantHistory.find((w) => w.at === wantSheetAt);
-    if (rec === undefined) return;
+    if (rec === undefined || rec.beer === null) return;
     const fresh = resolveFreshBeer(rec.beer);
     const prevKey = swapBatch.map((b) => b.id).join(",");
     let next = pickSwapBatch(fresh, 6);
@@ -861,29 +906,44 @@ export function V2Home() {
     setPickOpen(true);
   }
 
-  function dropWant(beer: Beer, kind: "flash" | "post"): void {
+  /** UR E.3 verdict：ok 落版；message 行内报错；guard 守卫已弹调用方让路。 */
+  type DropWantResult =
+    | { ok: true }
+    | { ok: false; message: string }
+    | { ok: false; guard: true };
+
+  function dropWant(
+    beer: Beer | null,
+    kind: "flash" | "post",
+    shot: { photoDataUrl: string; note: string } | null,
+  ): Promise<DropWantResult> {
     if (isAuthed === false) {
       setPickStage("login");
-      return;
+      return Promise.resolve({ ok: false, message: "" });
     }
-    // UR E.1：相機三件套隨單（讀即清，單次有效；空 note／無語音不寫字段）。
-    const shot = stagedShot;
-    setStagedShot(null);
+    // UR E.3：照片＋文字随单（录音已退役；空值不送，沿旧口径）。
     const shotExtra =
       shot === null
         ? {}
         : {
             ...(shot.photoDataUrl !== "" ? { photoDataUrl: shot.photoDataUrl } : {}),
             ...(shot.note !== "" ? { note: shot.note } : {}),
-            ...(shot.audioUrl !== null
-              ? { audio: { url: shot.audioUrl, seconds: shot.audioSeconds } }
+          };
+    // UR E.2：POST 同款三件套（server 字段名；空值不送，沿上）。
+    const postExtra =
+      shot === null
+        ? {}
+        : {
+            ...(shot.photoDataUrl !== ""
+              ? { photo_url: shot.photoDataUrl }
               : {}),
+            ...(shot.note !== "" ? { note: shot.note } : {}),
           };
     // UR C.18：同 tick 連點只收一次（ref 即時，state 慢半拍擋不住）。
-    if (submittingRef.current) return;
+    if (submittingRef.current) return Promise.resolve({ ok: true });
     submittingRef.current = true;
     setCheckinSubmitting(true);
-    void (async () => {
+    return (async (): Promise<DropWantResult> => {
       const center = mapApi.current?.getCenter() ?? DEFAULT_CENTER;
       const position =
         geoStatus === "success" && geoPos !== null && isWithinHongKong(geoPos)
@@ -900,20 +960,37 @@ export function V2Home() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
+          // UR E.2 發送工作流：三件套隨單（server 即時審核，見 POST 路由）。
           body: JSON.stringify({
-            beer_id: beer.id,
+            beer_id: beer === null ? null : beer.id,
             lat: position.lat,
             lng: position.lng,
             place_name: null,
             kind,
+            ...postExtra,
           }),
         });
         if (res.status === 403) {
+          // UR E.3：rejected 行内报错（调用方决定提示面；此层不 toast，
+          // 不进离线回退——被拦内容不可落地，fail-closed）。
+          const rej = (await res.json().catch(() => null)) as {
+            error?: { code?: string; message?: string };
+          } | null;
+          if (rej?.error?.code === "rejected") {
+            done();
+            return {
+              ok: false,
+              message:
+                typeof rej.error.message === "string" && rej.error.message !== ""
+                  ? rej.error.message
+                  : t2("camPublishFailed"),
+            };
+          }
           setFriendState("unknown");
           setAddState("idle");
           setGuard({ action: "checkin", target: null });
           done();
-          return;
+          return { ok: false, guard: true };
         }
         if (!res.ok) throw new Error(`checkins ${res.status}`);
         const json = (await res.json()) as {
@@ -943,6 +1020,7 @@ export function V2Home() {
         setPickOpen(false);
         mapApi.current?.flyTo(position, 15);
         done();
+        return { ok: true };
       } catch {
         // 離線回退：本地快照（沿 v1 同配方）。
         const record: WantRecord = {
@@ -960,8 +1038,29 @@ export function V2Home() {
         setPickOpen(false);
         mapApi.current?.flyTo(position, 15);
         done();
+        return { ok: true };
       }
     })();
+  }
+
+  // UR E.3 round-2：compose 直发桥（酒已退场，一律纯照片打卡；匿名走登录；守卫已弹关相机让路）。
+  async function publishShot(args: PublishShot): Promise<PublishResult> {
+    if (isAuthed === false) {
+      setCameraOpen(false);
+      setPickStage("login");
+      setPickOpen(true);
+      return { ok: true };
+    }
+    const r = await dropWant(null, args.kind, {
+      photoDataUrl: args.photoDataUrl,
+      note: args.note,
+    });
+    if (r.ok) return { ok: true };
+    if ("guard" in r) {
+      setCameraOpen(false);
+      return { ok: true };
+    }
+    return { ok: false, message: r.message };
   }
 
   function doShake(): void {
@@ -1023,24 +1122,21 @@ export function V2Home() {
         onChat={goChat}
       />
 
-      {/* UR C.18 打卡提交冒泡罩（POST 期唯一反饋；成功／失敗／403 全 dismiss，見 dropWant）。
+      {/* UR C.18 打卡提交罩（POST 期唯一反饋；成功／失敗／403 全 dismiss，見 dropWant）。
           DEF-012 同款坑：V2Home 根 `isolate` 自建 stacking context，罩放裡面再大也壓不住
           body 級 Sheet portal——走 portal 逃出＋z1100（沿 ModePrompt DEF-008 口徑）。
-          初幀 false 故 SSR 無 document 問題（開罩只發生在客戶端交互後）。 */}
+          初幀 false 故 SSR 無 document 問題（開罩只發生在客戶端交互後）。
+          UR E.3 round-2：去 v1 啤酒泡味——中性 spinner＋文案，v2scope token。 */}
       {checkinSubmitting &&
         createPortal(
           <div
             role="status"
             aria-live="polite"
             aria-label={t2("checkinSubmitting")}
-            className="fixed inset-0 z-[1100] flex items-center justify-center bg-background/60 backdrop-blur-[2px]"
+            className={`fixed inset-0 z-[1100] flex items-center justify-center bg-background/60 backdrop-blur-[2px] ${styles.v2scope}`}
           >
-            <div className="flex flex-col items-center gap-3 rounded-3xl bg-card px-8 py-6 shadow-xl ring-1 ring-foreground/10">
-              <div className={styles.v2bubbles} aria-hidden>
-                <span className={styles.v2bubble} />
-                <span className={styles.v2bubble} />
-                <span className={styles.v2bubble} />
-              </div>
+            <div className="flex items-center gap-3 rounded-full bg-card py-3 pr-6 pl-4 shadow-xl ring-1 ring-foreground/10">
+              <LoaderCircle size={20} aria-hidden className="animate-spin text-muted-foreground" />
               <p className="text-sm font-bold">{t2("checkinSubmitting")}</p>
             </div>
           </div>,
@@ -1419,7 +1515,11 @@ export function V2Home() {
               <Button
                 variant="outline"
                 className="h-auto flex-col items-start gap-2 rounded-xl p-3"
-                onClick={() => dropWant(kindBeer, "flash")}
+                onClick={() => {
+                  void dropWant(kindBeer, "flash", null).then((r) => {
+                    if (!r.ok && "message" in r && r.message !== "") flashNote(r.message);
+                  });
+                }}
               >
                 <span className="flex items-center gap-2 font-bold">
                   <span aria-hidden className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
@@ -1432,7 +1532,11 @@ export function V2Home() {
               <Button
                 variant="outline"
                 className="h-auto flex-col items-start gap-2 rounded-xl p-3"
-                onClick={() => dropWant(kindBeer, "post")}
+                onClick={() => {
+                  void dropWant(kindBeer, "post", null).then((r) => {
+                    if (!r.ok && "message" in r && r.message !== "") flashNote(r.message);
+                  });
+                }}
               >
                 <span className="flex items-center gap-2 font-bold">
                   <span aria-hidden className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
@@ -1532,6 +1636,8 @@ export function V2Home() {
           if (v) return;
           setWantSheetAt(null);
           setCard(null);
+          setOtherDetail(null);
+          otherDetailFor.current = null;
           setSwapOpen(false);
           setConfirmDelete(false);
           // UR C.11 round-3：關詳情自動回目錄（直開時 returnTo 為 null，不回）。
@@ -1617,6 +1723,24 @@ export function V2Home() {
                       </span>
                     )}
                   </div>
+                  {/* UR E.2：他人三件套（詳情按需拉；空即無，不擋卡片本體）。 */}
+                  {otherDetail?.photoUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={otherDetail.photoUrl}
+                      alt=""
+                      loading="lazy"
+                      className="aspect-[3/4] w-full rounded-xl object-cover"
+                    />
+                  ) : null}
+                  {otherDetail?.note ? (
+                    <p className="rounded-xl bg-muted px-3 py-2 text-sm">
+                      {otherDetail.note}
+                    </p>
+                  ) : null}
+                  {otherDetail?.audioUrl ? (
+                    <audio controls src={otherDetail.audioUrl} className="h-9 w-full" />
+                  ) : null}
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       size="sm"
@@ -1652,8 +1776,8 @@ export function V2Home() {
                 ? undefined
                 : wantHistory.find((w) => w.at === wantSheetAt);
             if (rec === undefined) return null;
-            // DEF-014：渲染前對活目錄取新（DB 回退行按 beer_id 恢復正名正圖）
-            const fresh = resolveFreshBeer(rec.beer);
+            // DEF-014：渲染前對活目錄取新（DB 回退行按 beer_id 恢復正名正圖；UR E.3 无酒即 null）
+            const fresh = rec.beer === null ? null : resolveFreshBeer(rec.beer);
             const dist =
               selfPos !== null
                 ? formatDistance(haversineMeters(selfPos, rec.position))
@@ -1689,11 +1813,15 @@ export function V2Home() {
                   <SheetDescription>{formatWantTime(rec.at, locale)}</SheetDescription>
                 </SheetHeader>
                 <div className="flex items-center gap-3">
-                  <span className="w-28 shrink-0 overflow-hidden rounded-xl border bg-card p-1">
-                    <BeerImg key={fresh.id} beer={fresh} tall />
-                  </span>
+                  {fresh !== null && (
+                    <span className="w-28 shrink-0 overflow-hidden rounded-xl border bg-card p-1">
+                      <BeerImg key={fresh.id} beer={fresh} tall />
+                    </span>
+                  )}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-base font-bold">{fresh.name}</p>
+                    <p className="truncate text-base font-bold">
+                      {fresh === null ? t("you") : fresh.name}
+                    </p>
                     <p className="flex flex-wrap items-center gap-1.5 pt-1.5 text-sm text-muted-foreground">
                       <span aria-hidden className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-sm">
                         {MOCK_ME.avatarEmoji}
@@ -1742,10 +1870,12 @@ export function V2Home() {
                   <audio controls src={rec.audio.url} className="h-9 w-full" />
                 )}
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={handleSwapToggle}>
-                    <Dices size={15} aria-hidden />
-                    {t("swapBeer")}
-                  </Button>
+                  {fresh !== null && (
+                    <Button variant="outline" size="sm" onClick={handleSwapToggle}>
+                      <Dices size={15} aria-hidden />
+                      {t("swapBeer")}
+                    </Button>
+                  )}
                   {confirmDelete ? (
                     <Button
                       variant="outline"
@@ -1846,10 +1976,18 @@ export function V2Home() {
                       className="h-auto w-full justify-start gap-3 p-2"
                     >
                       <span className="w-14 shrink-0 overflow-hidden rounded-lg border bg-card p-0.5">
-                        <BeerImg beer={r.beer} />
+                        {r.beer === null ? (
+                          <span aria-hidden className="flex aspect-square w-full items-center justify-center text-2xl">
+                            📷
+                          </span>
+                        ) : (
+                          <BeerImg beer={r.beer} />
+                        )}
                       </span>
                       <span className="min-w-0 flex-1 text-left">
-                        <span className="block truncate text-sm font-bold">{r.beer.name}</span>
+                        <span className="block truncate text-sm font-bold">
+                          {r.beer === null ? (r.note && r.note !== "" ? r.note : t("you")) : r.beer.name}
+                        </span>
                         <span className="block truncate pt-0.5 text-xs font-normal text-muted-foreground">
                           {formatWantTime(r.at, locale)} ·{" "}
                           {r.placeName ?? formatWantCoords(r.position)}
@@ -1930,15 +2068,11 @@ export function V2Home() {
         </SheetContent>
       </Sheet>
 
-      {/* UR E.1 相機 Sheet（確認即暫存三件套＋關 Sheet＋開選酒，酒定後落鏈）。 */}
+      {/* UR E.3 相機一页流直发（compose 内 kind＋酒已定；匿名／守卫走导航，行内不报错）。 */}
       <V2CameraSheet
         open={cameraOpen}
         onOpenChange={setCameraOpen}
-        onConfirm={(shot) => {
-          setStagedShot(shot);
-          setCameraOpen(false);
-          openPick();
-        }}
+        onPublish={publishShot}
       />
 
     </div>

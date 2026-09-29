@@ -17,7 +17,13 @@ import styles from "@/components/v2/v2.module.css";
 type ConvoRow = {
   id: string;
   peer: { user_id: string } | null;
-  last_message: { body: string | null; created_at: number; mine: boolean } | null;
+  last_message: {
+    body: string | null;
+    kind: string;
+    created_at: number;
+    mine: boolean;
+    attachments?: { secs?: number }[];
+  } | null;
   unread: number;
   updated_at: number;
 };
@@ -100,9 +106,16 @@ export default function V2ChatListPage() {
     const hasAvatar = e.avatar_url !== null && /^https?:\/\//.test(e.avatar_url);
     const convo = convoByPeer.get(e.user_id) ?? null;
     const lm = convo?.last_message ?? null;
-    // UR D.4 fix：末句帶方向（我發的加「我：」前綴，用戶明確要一眼分清收發）。
+    // UR D.6：末句帶方向＋附件映射（圖／音無正文，顯示類型章；秒數取附件，無則回通用章）。
+    const who = lm !== null && lm.mine ? `${t("chatMe")}: ` : "";
     const snippet =
-      lm === null ? t("chatEmpty") : `${lm.mine ? `${t("chatMe")}: ` : ""}${lm.body ?? ""}`;
+      lm === null
+        ? t("chatEmpty")
+        : lm.kind === "image"
+          ? `${who}${t("chatSnippetImage")}`
+          : lm.kind === "audio"
+            ? `${who}${t("chatSnippetAudio", { n: lm.attachments?.[0]?.secs ?? 0 })}`
+            : `${who}${lm.body ?? ""}`;
     const time = lm !== null ? formatListTime(lm.created_at, nowMs) : "";
     const unread = convo?.unread ?? 0;
     return (

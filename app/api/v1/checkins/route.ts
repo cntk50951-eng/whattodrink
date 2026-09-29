@@ -1,6 +1,7 @@
 import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseCreateCheckinBody } from "@/lib/api/checkins";
+import { moderateCheckin, moderationAction } from "@/lib/moderation";
 
 /**
  * UR A.12 打卡雙類型（🔒，承 A.10）。
@@ -8,7 +9,10 @@ import { parseCreateCheckinBody } from "@/lib/api/checkins";
  * 隱身模式直接 403，前端引導切換；未傳 kind 兼容為 flash。
  */
 
-const CHECKIN_SELECT = "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at";
+const CHECKIN_SELECT = "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript";
+
+/** key 缺席只 warn 一次（開發態容許跳過；生產必須配 key，見 UR E.2）。 */
+let warnedNoModerationKey = false;
 
 export async function POST(req: Request): Promise<Response> {
   const { supabase, userId } = await getAuthedClient(req);
@@ -28,6 +32,11 @@ export async function POST(req: Request): Promise<Response> {
     return apiError("invalid_params", parsed.error, 400);
   }
   const { beer_id, lat, lng, place_name, kind } = parsed.body;
+  const photoUrl = parsed.body.photo_url ?? null;
+  const noteText = parsed.body.note ?? null;
+  const audioUrl = parsed.body.audio_url ?? null;
+  const audioSeconds = parsed.body.audio_seconds ?? null;
+  const transcriptText = parsed.body.transcript ?? null;
 
   try {
     // 防御：若 public.users 缺行（0006 触发器未执行或旧库），先补行再落库，避免 FK 23503
@@ -76,23 +85,79 @@ export async function POST(req: Request): Promise<Response> {
     if (mode === "stealth") {
       return apiError("forbidden", "隱身模式不可打卡，請切換至好友或公開模式", 403);
     }
+    // UR E.2 發送工作流：即時在線審核（圖＋文＋轉錄一次調過；語音本體兩邊
+    // 都不支援，走 transcript；鏈：OpenAI 主審 → Minimax 兜底 → 全掛放行＋warn）。
+    const modText =
+      [noteText, transcriptText]
+        .filter((s): s is string => s !== null)
+        .join("\n") || undefined;
+    const verdict = await moderateCheckin(
+      {
+        ...(modText !== undefined ? { text: modText } : {}),
+        ...(photoUrl !== null ? { imageDataUrl: photoUrl } : {}),
+      },
+      {
+        // 用戶手寫的是 OPENAI_KEY，標準名優先，兼容舊名。
+        openaiKey: process.env.OPENAI_API_KEY ?? process.env.OPENAI_KEY,
+        minimaxKey: process.env.minimaxi_api_key,
+        minimaxBaseUrl: process.env.MINIMAX_API_BASE,
+      },
+    );
+    // DEF-20260929-001：主审挂了一定大声（vendor＋status，不记内容／key；
+    // 此前空 catch 静默下沉是放行的直接帮凶）。
+    if ("primaryError" in verdict && verdict.primaryError !== undefined) {
+      console.warn(
+        `[api/v1/checkins] moderation primary failed, fallback used: vendor=${verdict.primaryError.vendor} status=${verdict.primaryError.status ?? "network"}`,
+      );
+    }
+    const action = moderationAction(verdict);
+    if (action === "reject" && verdict.flagged) {
+      const fields = [
+        ...(photoUrl !== null ? ["照片"] : []),
+        ...(modText !== undefined ? ["文字"] : []),
+      ].join("／");
+      return apiError(
+        "rejected",
+        `內容未通過審核（${fields !== "" ? fields : "內容"}），請修改後再發`,
+        403,
+      );
+    }
+    if (action === "unavailable") {
+      // 有 key 但两家全挂：fail-closed，不落地（沿 rejected 通道，message 区分是服务问题；
+      // 客户端零改动——rejected 本来就 toast＋不进离线回退）。
+      console.error(
+        `[api/v1/checkins] moderation vendors all failed: ${JSON.stringify("errors" in verdict ? verdict.errors : [])}`,
+      );
+      return apiError("rejected", "審核服務暫不可用，請稍後再試", 503);
+    }
+    if ("skipped" in verdict && verdict.skipped) {
+      if (!warnedNoModerationKey) {
+        warnedNoModerationKey = true;
+        console.warn("[api/v1/checkins] 審核鏈無 key／無輸入，放行（僅開發態容許）");
+      }
+    } else if (!verdict.flagged && verdict.via === "minimax") {
+      // 兜底命中記錄（驗證時可分清誰審的；日常乾淨請求不打日誌）。
+      console.info("[api/v1/checkins] moderation pass via minimax（主審下沉）");
+    }
     const visibility = mode === "friends" ? "friends" : "public";
     const expiresAt = kind === "flash" ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
 
-    // 先校验 beer_id 是否存在（FK 不存在会 500，提前转 400 更友好；并发竞态下仍可能落 FK，故容错两路）
-    const { data: beerExists, error: beerErr } = await supabase
-      .from("beers")
-      .select("id")
-      .eq("id", beer_id)
-      .maybeSingle();
-    if (beerErr) {
-      console.error(
-        `[api/v1/checkins] beer lookup error: code=${beerErr.code} message=${beerErr.message}`,
-      );
-      return apiError("internal", "beer 校验失败", 500);
-    }
-    if (beerExists === null) {
-      return apiError("invalid_params", `beer_id 不存在：${beer_id}`, 400);
+    // 先校验 beer_id 是否存在（無酒纯照片打卡跳过；FK 不存在会 500，提前转 400 更友好；并发竞态下仍可能落 FK，故容错两路）
+    if (beer_id !== null) {
+      const { data: beerExists, error: beerErr } = await supabase
+        .from("beers")
+        .select("id")
+        .eq("id", beer_id)
+        .maybeSingle();
+      if (beerErr) {
+        console.error(
+          `[api/v1/checkins] beer lookup error: code=${beerErr.code} message=${beerErr.message}`,
+        );
+        return apiError("internal", "beer 校验失败", 500);
+      }
+      if (beerExists === null) {
+        return apiError("invalid_params", `beer_id 不存在：${beer_id}`, 400);
+      }
     }
 
     let inserted: Record<string, unknown> | null = null;
@@ -109,6 +174,11 @@ export async function POST(req: Request): Promise<Response> {
           kind,
           visibility,
           expires_at: expiresAt,
+          photo_url: photoUrl,
+          note: noteText ?? "",
+          audio_url: audioUrl,
+          audio_seconds: audioSeconds,
+          transcript: transcriptText ?? "",
         })
         .select(CHECKIN_SELECT)
         .single();
@@ -128,8 +198,13 @@ export async function POST(req: Request): Promise<Response> {
               place_name: place_name ?? null,
               type: "want",
               visibility: "private",
+              photo_url: photoUrl,
+              note: noteText ?? "",
+              audio_url: audioUrl,
+              audio_seconds: audioSeconds,
+              transcript: transcriptText ?? "",
             })
-            .select("id,beer_id,lat,lng,place_name,created_at")
+            .select("id,beer_id,lat,lng,place_name,created_at,photo_url,note,audio_url,audio_seconds,transcript")
             .single();
           if (legacyErr || legacyData === null) {
             const isFk = legacyErr?.code === "23503";
@@ -142,7 +217,7 @@ export async function POST(req: Request): Promise<Response> {
             {
               checkin: {
                 id: r.id as string,
-                beer_id: r.beer_id as string,
+                beer_id: (r.beer_id as string | null) ?? null,
                 lat: r.lat as number,
                 lng: r.lng as number,
                 place_name: r.place_name as string | null,
@@ -150,6 +225,11 @@ export async function POST(req: Request): Promise<Response> {
                 visibility: "private" as const,
                 expires_at: expiresAt,
                 created_at: r.created_at as string,
+                photo_url: (r.photo_url as string | null) ?? null,
+                note: (r.note as string | null) ?? null,
+                audio_url: (r.audio_url as string | null) ?? null,
+                audio_seconds: (r.audio_seconds as number | null) ?? null,
+                transcript: (r.transcript as string | null) ?? null,
               },
             },
             201,
@@ -166,7 +246,7 @@ export async function POST(req: Request): Promise<Response> {
       {
         checkin: {
           id: row.id as string,
-          beer_id: row.beer_id as string,
+          beer_id: (row.beer_id as string | null) ?? null,
           lat: row.lat as number,
           lng: row.lng as number,
           place_name: row.place_name as string | null,
@@ -174,6 +254,11 @@ export async function POST(req: Request): Promise<Response> {
           visibility: row.visibility as "private" | "public" | "friends",
           expires_at: row.expires_at as string | null,
           created_at: row.created_at as string,
+          photo_url: (row.photo_url as string | null) ?? null,
+          note: (row.note as string | null) ?? null,
+          audio_url: (row.audio_url as string | null) ?? null,
+          audio_seconds: (row.audio_seconds as number | null) ?? null,
+          transcript: (row.transcript as string | null) ?? null,
         },
       },
       201,

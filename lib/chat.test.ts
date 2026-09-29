@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { appendLocalEcho, formatChatTime, formatListTime, formatSeenAgo, mergeFriendList, mockThread } from "./chat";
+import { appendLocalEcho, formatChatTime, formatListTime, formatSeenAgo, mergeFriendList, mockThread, toChatAttachments } from "./chat";
 
 const NOW = 1_757_000_000_000;
 
@@ -77,5 +77,21 @@ describe("mergeFriendList", () => {
       ]),
     );
     expect(rows.map((r) => r.user_id)).toEqual(["on-new", "on-old", "off-new", "off-none"]);
+  });
+});
+
+describe("toChatAttachments", () => {
+  it("只收合法兩桶＋雙段路徑", () => {
+    expect(
+      toChatAttachments([
+        { bucket: "chat-images", path: "u/a.png", mime: "image/png", bytes: 10 },
+        { bucket: "avatars", path: "u/a.png", mime: "image/png", bytes: 10 },
+        { bucket: "chat-voice", path: "../x", mime: "audio", bytes: 10 },
+        "nope",
+      ]),
+    ).toEqual([{ bucket: "chat-images", path: "u/a.png", mime: "image/png", bytes: 10 }]);
+  });
+  it("非數組回空", () => {
+    expect(toChatAttachments(null)).toEqual([]);
   });
 });

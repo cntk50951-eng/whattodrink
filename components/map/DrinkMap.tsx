@@ -1336,15 +1336,17 @@ export function DrinkMap({
     const layer = L.layerGroup();
     const latest = wantHistory[wantHistory.length - 1] as WantRecord;
     for (const entry of wantHistory) {
-      const icon = entry.beer.icon_url ?? null;
+      // UR E.3 v1 回归：v1 流程必有酒，守卫只为类型（无酒走 📷 通用钉，行为不变）。
+      const entryBeer = entry.beer;
+      const icon = entryBeer?.icon_url ?? null;
       const html =
         icon === null
-          ? `<div class="${styles.pinWant}">${entry.beer.emoji}</div>`
+          ? `<div class="${styles.pinWant}">${entryBeer?.emoji ?? "📷"}</div>`
           : `<div class="${styles.pinArtWant}"><img src="${icon}" alt="" loading="lazy" /></div>`;
       const isLatest = entry.at === latest.at;
       const size: [number, number] = icon === null ? [48, 48] : [56, 56];
       const pin = L.marker([entry.position.lat, entry.position.lng], {
-        title: entry.beer.name,
+        title: entryBeer?.name ?? "",
         icon: L.divIcon({
           className: "",
           html,
@@ -1686,6 +1688,11 @@ export function DrinkMap({
    * 删除：按 at 丢条；删的是正在看的→改看最新，删光→清状态关卡。 */
   function handleSwapToggle(): void {
     if (wantRecord === null) return;
+    // UR E.3 v1 回归：无酒不进换酒（v1 流程必有酒，守卫只为类型）。
+    if (wantRecord.beer === null) {
+      setSwapOpenFor(null);
+      return;
+    }
     if (swapOpenFor === wantRecord.at) {
       setSwapOpenFor(null);
       return;
@@ -1695,6 +1702,7 @@ export function DrinkMap({
   }
   function handleSwapRefresh(): void {
     if (wantRecord === null || swapOpenFor !== wantRecord.at) return;
+    if (wantRecord.beer === null) return;
     const prevKey = swapBatch.map((b) => b.id).join(",");
     let next = pickSwapBatch(wantRecord.beer, 6);
     for (
@@ -2734,7 +2742,14 @@ export function DrinkMap({
                   {(() => {
                     // UR2.7 想喝卡同构：有图上主角位，没图保持原 emoji 行。
                     // UR A.4：三級 fallback 收進 BeerIcon（key 保證換酒重掛）。
-                    return (
+                    return wantRecord.beer === null ? (
+                      <span
+                        aria-hidden
+                        className="flex h-11 w-11 items-center justify-center rounded-full border-2 text-2xl"
+                      >
+                        📷
+                      </span>
+                    ) : (
                       <BeerIcon
                         key={wantRecord.beer.id}
                         beer={wantRecord.beer}
@@ -2751,7 +2766,7 @@ export function DrinkMap({
                       </span>
                     </p>
                     <p className="text-muted-foreground truncate text-sm">
-                      {wantRecord.beer.emoji} {wantRecord.beer.name}
+                      {wantRecord.beer === null ? "" : `${wantRecord.beer.emoji} ${wantRecord.beer.name}`}
                     </p>
                   </div>
                 </div>

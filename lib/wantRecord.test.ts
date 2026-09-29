@@ -79,8 +79,20 @@ describe("parseWantRecord", () => {
       ...GOOD,
       beer: { id: "x", emoji: "🍺", name: "X" },
     });
-    expect(record?.beer.category).toBe("");
-    expect(record?.beer.tagline).toBe("");
+    expect(record?.beer?.category).toBe("");
+    expect(record?.beer?.tagline).toBe("");
+  });
+
+  it("缺 beer／beer null → 无酒记录不断（UR E.3 纯照片打卡）", () => {
+    for (const v of [undefined, null]) {
+      const r = parseWantRecord({ ...GOOD, beer: v });
+      expect(r).not.toBeNull();
+      expect(r?.beer).toBeNull();
+    }
+    const { beer: _dropped, ...noBeer } = GOOD;
+    void _dropped;
+    const r2 = parseWantRecord(noBeer);
+    expect(r2?.beer).toBeNull();
   });
 });
 

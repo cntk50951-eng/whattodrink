@@ -2,12 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Check, CheckCheck, Mic, Send } from "lucide-react";
+import { Check, CheckCheck, ImagePlus, Mic, Pause, Play, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { appendLocalEcho, formatChatTime, mockThread, type ChatMessage } from "@/lib/chat";
+import { VoiceRecorder } from "@/components/camera/voice-recorder";
+import { useSignedUrl } from "@/hooks/useSignedUrl";
+import {
+  appendLocalEcho,
+  formatChatTime,
+  mockThread,
+  type ChatAttachmentView,
+  type ChatMessage,
+} from "@/lib/chat";
 
 export type ChatPeer = {
   nickname: string;
@@ -26,7 +34,79 @@ export type ChatExternalSource = {
   onRetry?: (id: string) => void;
   /** UR D.4：對方讀水位 ms（我方行 at<=水位即✓✓；null 即沿舊 mock read 旗）。 */
   readAt?: number | null;
+  /** UR D.6：附件上傳（父層簽名→直傳→發送；mock 態不傳即藏附件鍵）。 */
+  onUpload?: (
+    kind: "image" | "audio",
+    payload: { blob: Blob; name: string; secs?: number },
+  ) => Promise<void>;
 };
+
+/**
+ * UR D.6 附件氣泡（圖片／語音共用殼；簽名短鏈經 hook 讀緩存， anonymous 零直讀）。
+ * 圖片：skeleton 佔位＋onLoad 淡入（沿 C.3 口徑）；語音：小播放鈕＋秒數。
+ */
+export function ChatAttachmentBubble({ att }: { att: ChatAttachmentView }) {
+  const t2 = useTranslations("v2");
+  const signed = useSignedUrl(att.bucket, att.path);
+  // 樂觀位本地預覽優先（秒開；成功換真行即切簽名鏈，不閃爍）。
+  const url = att.preview ?? signed;
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  if (att.bucket === "chat-voice") {
+    return (
+      <span className="flex items-center gap-2 rounded-2xl bg-muted px-3 py-2">
+        <button
+          type="button"
+          aria-label={playing ? t2("chatVoicePause") : t2("chatVoicePlay")}
+          onClick={() => {
+            const el = audioRef.current;
+            if (el === null) return;
+            if (playing) el.pause();
+            else void el.play().catch(() => {});
+          }}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background"
+        >
+          {playing ? (
+            <Pause size={14} aria-hidden className="size-3.5" />
+          ) : (
+            <Play size={14} aria-hidden className="size-3.5" />
+          )}
+        </button>
+        <span className="text-sm font-medium">
+          {att.secs !== undefined ? t2("chatVoiceSecs", { n: Math.round(att.secs) }) : ""}
+        </span>
+        {url !== null && (
+          <audio
+            ref={audioRef}
+            src={url}
+            preload="metadata"
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+            className="hidden"
+          />
+        )}
+      </span>
+    );
+  }
+  return (
+    <span className="relative block max-w-56 overflow-hidden rounded-2xl bg-muted">
+      {!imgLoaded && <span aria-hidden className="block aspect-[4/3] w-56 animate-pulse bg-muted" />}
+      {url !== null && (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={url}
+          alt=""
+          loading="lazy"
+          onLoad={() => setImgLoaded(true)}
+          className={`max-h-64 w-auto object-cover transition-opacity duration-300 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
+        />
+      )}
+    </span>
+  );
+}
 
 /**
  * UR C.15 聊天線程（v2 共用件：完整頁與舊 Sheet 同源；Sheet 已退役，現只掛完整頁）。
@@ -47,6 +127,10 @@ export function ChatThread({
 }) {
   const t2 = useTranslations("v2");
   const [draft, setDraft] = useState("");
+  // UR D.6：附件態（語音錄製中／上傳中；上傳走父層 onUpload，mock 態藏鍵）。
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const areaRef = useRef<HTMLTextAreaElement | null>(null);
   // UR D.7：輸入框自動增高（1→5 行，上限 128px；DOM 直寫，無 setState 不觸 lint）。
   const autoresize = (): void => {
@@ -117,9 +201,14 @@ export function ChatThread({
           {shown.map((m) =>
             m.role === "me" ? (
               <div key={m.id} className="flex flex-col items-end gap-0.5">
-                <div className="max-w-[80%] rounded-2xl rounded-br-md bg-foreground px-3 py-2 text-sm text-background">
-                  {m.text}
-                </div>
+                {(m.attachments ?? []).map((att, i) => (
+                  <ChatAttachmentBubble key={`${m.id}-a${i}`} att={att} />
+                ))}
+                {m.text !== "" && (
+                  <div className="max-w-[80%] rounded-2xl rounded-br-md bg-foreground px-3 py-2 text-sm text-background">
+                    {m.text}
+                  </div>
+                )}
                 <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                   {formatChatTime(m.at)}
                   {isRead(m) ? (
@@ -145,9 +234,14 @@ export function ChatThread({
                   <AvatarFallback>{peer.nickname.slice(0, 1)}</AvatarFallback>
                 </Avatar>
                 <div className="flex max-w-[80%] flex-col gap-0.5">
-                  <div className="rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm text-foreground">
-                    {m.text}
-                  </div>
+                  {(m.attachments ?? []).map((att, i) => (
+                    <ChatAttachmentBubble key={`${m.id}-a${i}`} att={att} />
+                  ))}
+                  {m.text !== "" && (
+                    <div className="rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm text-foreground">
+                      {m.text}
+                    </div>
+                  )}
                   <span className="text-[11px] text-muted-foreground">{formatChatTime(m.at)}</span>
                 </div>
               </div>
@@ -163,6 +257,28 @@ export function ChatThread({
         </Button>
       </div>
       {/* UR D.7：輸入條吸底（sticky＋安全區＋毛玻璃；鍵盤彈起不亂跑）。 */}
+      {voiceMode && external?.onUpload !== undefined ? (
+        <div className="sticky bottom-0 z-10 shrink-0 bg-background/95 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur">
+          <VoiceRecorder
+            onComplete={(_url, secs, blob) => {
+              setVoiceMode(false);
+              void (async () => {
+                setUploading(true);
+                try {
+                  await external.onUpload?.("audio", {
+                    blob,
+                    name: `voice.${blob.type.includes("mp4") ? "mp4" : "webm"}`,
+                    secs,
+                  });
+                } finally {
+                  setUploading(false);
+                }
+              })();
+            }}
+            onClear={() => setVoiceMode(false)}
+          />
+        </div>
+      ) : (
       <form
         className="sticky bottom-0 z-10 flex shrink-0 items-center gap-2 bg-background/95 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur"
         onSubmit={(e) => {
@@ -170,6 +286,42 @@ export function ChatThread({
           send(draft);
         }}
       >
+        {external?.onUpload !== undefined && (
+          <>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              aria-hidden
+              tabIndex={-1}
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                e.target.value = "";
+                if (file === null) return;
+                void (async () => {
+                  setUploading(true);
+                  try {
+                    await external.onUpload?.("image", { blob: file, name: file.name });
+                  } finally {
+                    setUploading(false);
+                  }
+                })();
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label={t2("chatAttach")}
+              disabled={uploading}
+              className="shrink-0 rounded-full"
+              onClick={() => fileRef.current?.click()}
+            >
+              <ImagePlus size={16} aria-hidden className="size-4" />
+            </Button>
+          </>
+        )}
         {/* UR D.7：多行輸入（textarea 自動增高；Enter 發送／Shift+Enter 換行；
             中文組字中 Enter 不誤發）。 */}
         <textarea
@@ -205,11 +357,21 @@ export function ChatThread({
           size="icon"
           aria-label={t2("chatVoice")}
           className="shrink-0 rounded-full"
-          onClick={onVoice}
+          onClick={() => {
+            // UR D.6：真通道走內聯錄音（mock 態沿舊 toast）；錄音中禁用防重入。
+            if (external?.onUpload !== undefined && !uploading) setVoiceMode(true);
+            else onVoice();
+          }}
         >
           <Mic size={16} aria-hidden className="size-4" />
         </Button>
+        {uploading && (
+          <span role="status" className="shrink-0 text-xs text-muted-foreground">
+            {t2("chatUploading")}
+          </span>
+        )}
       </form>
+      )}
     </>
   );
 }

@@ -10,6 +10,15 @@ export const CHAT_MAX_LIMIT = 50;
 export const CHAT_TEXT_MAX = 2000;
 export const CHAT_MINUTE_LIMIT = 30;
 export const CHAT_DAY_LIMIT = 200;
+/**
+ * UR D.6 附件上限（bucket 寬限內再收一檔，沿架構 §6 分層口徑；
+ * ext 白名單防可執行＋MIME 混淆）。
+ */
+export const CHAT_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+export const CHAT_VOICE_MAX_BYTES = 2 * 1024 * 1024;
+export const CHAT_VOICE_MAX_SECS = 60;
+export const CHAT_IMAGE_EXTS = ["jpg", "jpeg", "png", "webp", "gif"] as const;
+export const CHAT_VOICE_EXTS = ["webm", "mp4", "m4a", "ogg"] as const;
 
 /** 1v1 去重鍵：雙方 id 排序拼（同兩人永遠同一鍵；自聊由 route 擋 400）。 */
 export function directKey(a: string, b: string): string {
@@ -105,21 +114,107 @@ export function parseConversationId(raw: string): { id: string } | { error: stri
 }
 
 /**
- * `POST /:id/messages`：首期只收 text（image／audio 待 D.6，kind 先驗死）；
- * `client_msg_id` 必填（冪等唯一，弱網重發不 double）。
+ * `POST /:id/messages`：text 必 body；image／audio 必 attachments[0]
+ * （D.6 開閘；`client_msg_id` 必填（冪等唯一，弱網重發不 double）。
  */
+export type ChatAttachment = {
+  path: string;
+  mime: string;
+  bytes: number;
+  secs?: number;
+};
+
 export function parseCreateMessageBody(
   raw: unknown,
-): { kind: "text"; body: string; client_msg_id: string } | { error: string } {
+):
+  | { kind: "text"; body: string; client_msg_id: string }
+  | { kind: "image" | "audio"; attachments: ChatAttachment[]; client_msg_id: string }
+  | { error: string } {
   if (!isRecord(raw)) return { error: "body 需为对象" };
-  if (raw.kind !== "text") return { error: "kind 非法（首期只收 text）" };
-  const body = asNonEmptyString(raw.body);
-  if (body === null || body.length > CHAT_TEXT_MAX) {
-    return { error: `body 必填（1–${CHAT_TEXT_MAX} 字）` };
-  }
   const client_msg_id = asNonEmptyString(raw.client_msg_id);
   if (client_msg_id === null) return { error: "client_msg_id 必填（冪等鍵）" };
-  return { kind: "text", body, client_msg_id };
+  if (raw.kind === "text") {
+    const body = asNonEmptyString(raw.body);
+    if (body === null || body.length > CHAT_TEXT_MAX) {
+      return { error: `body 必填（1–${CHAT_TEXT_MAX} 字）` };
+    }
+    return { kind: "text", body, client_msg_id };
+  }
+  if (raw.kind === "image" || raw.kind === "audio") {
+    const atts = parseAttachments(raw.attachments, raw.kind);
+    if ("error" in atts) return atts;
+    return { kind: raw.kind, attachments: atts.attachments, client_msg_id };
+  }
+  return { error: "kind 非法（只要 text|image|audio）" };
+}
+
+function parseAttachments(
+  raw: unknown,
+  kind: "image" | "audio",
+): { attachments: ChatAttachment[] } | { error: string } {
+  if (!Array.isArray(raw) || raw.length !== 1) {
+    return { error: "attachments 只要 1 個（首期單附件）" };
+  }
+  const r = raw[0] as Record<string, unknown>;
+  if (typeof r !== "object" || r === null) return { error: "attachment 需为对象" };
+  const path = asNonEmptyString(r.path);
+  // 路徑約定 `<uid>/<uuid>.<ext>`（首段歸屬 route 層驗，這裡只驗形狀防遍歷）
+  if (path === null || path.includes("..") || path.split("/").length !== 2) {
+    return { error: "path 非法" };
+  }
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  const bytes = typeof r.bytes === "number" && Number.isFinite(r.bytes) ? r.bytes : -1;
+  if (kind === "image") {
+    if (!(CHAT_IMAGE_EXTS as readonly string[]).includes(ext)) {
+      return { error: `圖片只要 ${CHAT_IMAGE_EXTS.join("/")}` };
+    }
+    if (bytes < 0 || bytes > CHAT_IMAGE_MAX_BYTES) return { error: "圖片超 10MB" };
+    if (typeof r.mime !== "string" || !r.mime.startsWith("image/")) {
+      return { error: "mime 非圖片" };
+    }
+    return { attachments: [{ path, mime: r.mime, bytes }] };
+  }
+  if (!(CHAT_VOICE_EXTS as readonly string[]).includes(ext)) {
+    return { error: `語音只要 ${CHAT_VOICE_EXTS.join("/")}` };
+  }
+  if (bytes < 0 || bytes > CHAT_VOICE_MAX_BYTES) return { error: "語音超 2MB" };
+  const secs = typeof r.secs === "number" && Number.isFinite(r.secs) ? r.secs : -1;
+  if (secs <= 0 || secs > CHAT_VOICE_MAX_SECS) return { error: "語音超 60s" };
+  return { attachments: [{ path, mime: "audio", bytes, secs }] };
+}
+
+/** `POST /uploads/sign {purpose, ext, bytes}`（D.6 直傳簽名）。 */
+export function parseSignBody(
+  raw: unknown,
+): { purpose: "image" | "voice"; ext: string; bytes: number } | { error: string } {
+  if (!isRecord(raw)) return { error: "body 需为对象" };
+  const purpose = raw.purpose;
+  if (purpose !== "image" && purpose !== "voice") {
+    return { error: "purpose 只要 image|voice" };
+  }
+  const ext = typeof raw.ext === "string" ? raw.ext.toLowerCase() : "";
+  const allow = purpose === "image" ? CHAT_IMAGE_EXTS : CHAT_VOICE_EXTS;
+  if (!(allow as readonly string[]).includes(ext)) {
+    return { error: `ext 非法（${allow.join("/")}）` };
+  }
+  const bytes = typeof raw.bytes === "number" && Number.isFinite(raw.bytes) ? raw.bytes : -1;
+  const cap = purpose === "image" ? CHAT_IMAGE_MAX_BYTES : CHAT_VOICE_MAX_BYTES;
+  if (bytes <= 0 || bytes > cap) return { error: "bytes 非法" };
+  return { purpose, ext, bytes };
+}
+
+/** `POST /uploads/view {bucket, path}`（D.6 播時簽名；歸屬 route 層驗）。 */
+export function parseViewBody(raw: unknown): { bucket: string; path: string } | { error: string } {
+  if (!isRecord(raw)) return { error: "body 需为对象" };
+  const bucket = raw.bucket;
+  if (bucket !== "chat-images" && bucket !== "chat-voice") {
+    return { error: "bucket 只要 chat-images|chat-voice" };
+  }
+  const path = asNonEmptyString(raw.path);
+  if (path === null || path.includes("..") || path.split("/").length !== 2) {
+    return { error: "path 非法" };
+  }
+  return { bucket, path };
 }
 
 /* ---- 行映射 ---- */
@@ -135,6 +230,8 @@ export type ChatMessageJson = {
   sender_id: string;
   kind: string;
   body: string | null;
+  /** D.6 附件直傳（server 寫入時已驗歸屬＋大小；讀端只渲染不信任執行）。 */
+  attachments: unknown[];
   /** Epoch ms（DB 是 ISO，mapper 轉；轉不過＝壞行）。 */
   created_at: number;
   mine: boolean;
@@ -164,7 +261,8 @@ export function toChatMessage(raw: unknown, me: string): ChatMessageJson | null 
   if (createdRaw === null) return null;
   const created_at = Date.parse(createdRaw);
   if (!Number.isFinite(created_at)) return null;
-  return { id, sender_id, kind: raw.kind, body: body ?? null, created_at, mine: sender_id === me };
+  const attachments = Array.isArray(raw.attachments) ? raw.attachments : [];
+  return { id, sender_id, kind: raw.kind, body: body ?? null, attachments, created_at, mine: sender_id === me };
 }
 
 /** 對方簡檔映射：只吐公開三列（精確坐標／email 永不回，沿架構隱私線）。 */

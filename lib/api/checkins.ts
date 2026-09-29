@@ -12,17 +12,30 @@ export const CHECKINS_MINE_LIMIT = 30;
 export const CHECKINS_MINE_MAX_LIMIT = 50;
 
 export type CreateCheckinBody = {
-  beer_id: string;
+  /** UR E.3：酒可选——null 即纯照片打卡（DB 列本就 nullable，pins 早已 null-safe）。 */
+  beer_id: string | null;
   lat: number;
   lng: number;
   place_name?: string | null;
   kind: "flash" | "post";
+  /** UR E.2 三件套（dataURL 直存口徑；後端再驗上限＋審核，見 POST 路由）。 */
+  photo_url?: string | null;
+  note?: string | null;
+  audio_url?: string | null;
+  audio_seconds?: number | null;
+  transcript?: string | null;
 };
+
+/** E.2 上限（body 肥大即 400；抓幀 ≤1024 jpeg 約 200–400k，60s 語音約 1M 內）。 */
+export const CHECKIN_PHOTO_MAX_CHARS = 1_000_000;
+export const CHECKIN_AUDIO_MAX_CHARS = 2_000_000;
+export const CHECKIN_NOTE_MAX = 500;
+export const CHECKIN_TRANSCRIPT_MAX = 2000;
 
 export type CreateCheckinJson = {
   checkin: {
     id: string;
-    beer_id: string;
+    beer_id: string | null;
     lat: number;
     lng: number;
     place_name: string | null;
@@ -43,6 +56,12 @@ export type MineRowJson = {
   visibility: "private" | "public" | "friends";
   expires_at: string | null;
   created_at: string;
+  /** UR E.2 三件套（mine 回顯帶回，前端 WantRecord 直用；缺列回 null）。 */
+  photo_url: string | null;
+  note: string | null;
+  audio_url: string | null;
+  audio_seconds: number | null;
+  transcript: string | null;
   beers: {
     id: string;
     name: string;
@@ -71,8 +90,14 @@ export function parseCreateCheckinBody(
   }
   const r = raw as Record<string, unknown>;
   const beerId = r.beer_id;
-  if (typeof beerId !== "string" || beerId.trim() === "") {
-    return { error: "beer_id 必填且为非空字符串" };
+  // UR E.3：酒可选——缺／null／空串一律按 null 收（旧客户端照常送 id，行为不变）。
+  let beer_id: string | null = null;
+  if (beerId !== undefined && beerId !== null) {
+    if (typeof beerId !== "string") {
+      return { error: "beer_id 需为字符串或 null" };
+    }
+    const t = beerId.trim();
+    beer_id = t === "" ? null : t;
   }
   const lat = r.lat;
   const lng = r.lng;
@@ -102,13 +127,83 @@ export function parseCreateCheckinBody(
   } else {
     return { error: "kind 非法：只要 flash|post" };
   }
+  // UR E.2 三件套（白名單＋上限；壞值即 400，不靜默丟——發送工作流要即時拒絕）。
+  const photoRaw = r.photo_url;
+  let photoUrl: string | null = null;
+  if (photoRaw !== undefined && photoRaw !== null) {
+    if (
+      typeof photoRaw !== "string" ||
+      !photoRaw.startsWith("data:image/") ||
+      photoRaw.length > CHECKIN_PHOTO_MAX_CHARS
+    ) {
+      return { error: "photo_url 非法：要 data:image 且 ≤1M 字符" };
+    }
+    photoUrl = photoRaw;
+  }
+  const noteRaw = r.note;
+  let note: string | null = null;
+  if (noteRaw !== undefined && noteRaw !== null) {
+    if (typeof noteRaw !== "string") return { error: "note 需为字符串或 null" };
+    const t = noteRaw.trim();
+    if (t !== "") {
+      if (t.length > CHECKIN_NOTE_MAX) {
+        return { error: "note 非法：≤500 字" };
+      }
+      note = t;
+    }
+  }
+  const audioRaw = r.audio_url;
+  let audioUrl: string | null = null;
+  if (audioRaw !== undefined && audioRaw !== null) {
+    if (
+      typeof audioRaw !== "string" ||
+      !audioRaw.startsWith("data:audio/") ||
+      audioRaw.length > CHECKIN_AUDIO_MAX_CHARS
+    ) {
+      return { error: "audio_url 非法：要 data:audio 且 ≤2M 字符" };
+    }
+    audioUrl = audioRaw;
+  }
+  const secsRaw = r.audio_seconds;
+  let audioSeconds: number | null = null;
+  if (secsRaw !== undefined && secsRaw !== null) {
+    if (
+      typeof secsRaw !== "number" ||
+      !Number.isFinite(secsRaw) ||
+      secsRaw < 0 ||
+      secsRaw > 60
+    ) {
+      return { error: "audio_seconds 非法：要 0–60" };
+    }
+    audioSeconds = secsRaw;
+  }
+  if (audioUrl === null) audioSeconds = null;
+  const transcriptRaw = r.transcript;
+  let transcript: string | null = null;
+  if (transcriptRaw !== undefined && transcriptRaw !== null) {
+    if (typeof transcriptRaw !== "string") {
+      return { error: "transcript 需为字符串或 null" };
+    }
+    const t = transcriptRaw.trim();
+    if (t !== "") {
+      if (t.length > CHECKIN_TRANSCRIPT_MAX) {
+        return { error: "transcript 非法：≤2000 字" };
+      }
+      transcript = t;
+    }
+  }
   return {
     body: {
-      beer_id: beerId.trim(),
+      beer_id,
       lat,
       lng,
       ...(placeName === null ? { place_name: null } : { place_name: placeName }),
       kind,
+      ...(photoUrl !== null ? { photo_url: photoUrl } : {}),
+      ...(note !== null ? { note } : {}),
+      ...(audioUrl !== null ? { audio_url: audioUrl } : {}),
+      ...(audioSeconds !== null ? { audio_seconds: audioSeconds } : {}),
+      ...(transcript !== null ? { transcript } : {}),
     },
   };
 }
@@ -162,6 +257,46 @@ export function toMineRow(raw: unknown): MineRowJson | null {
   }
   if (!Number.isFinite(Date.parse(createdAt))) return null;
   if (expiresAt !== null && !Number.isFinite(Date.parse(expiresAt))) return null;
+  // UR E.2 三件套（列缺席回 null，不炸整行；沿既有容错口徑）。
+  const photoUrl =
+    typeof raw.photo_url === "string"
+      ? raw.photo_url
+      : raw.photo_url === null || raw.photo_url === undefined
+        ? null
+        : null;
+  const note =
+    typeof raw.note === "string"
+      ? raw.note
+      : raw.note === null || raw.note === undefined
+        ? null
+        : null;
+  const audioUrl =
+    typeof raw.audio_url === "string"
+      ? raw.audio_url
+      : raw.audio_url === null || raw.audio_url === undefined
+        ? null
+        : null;
+  const audioSeconds =
+    typeof raw.audio_seconds === "number" && Number.isFinite(raw.audio_seconds)
+      ? raw.audio_seconds
+      : raw.audio_seconds === null || raw.audio_seconds === undefined
+        ? null
+        : null;
+  const transcript =
+    typeof raw.transcript === "string"
+      ? raw.transcript
+      : raw.transcript === null || raw.transcript === undefined
+        ? null
+        : null;
+  if (
+    photoUrl === undefined ||
+    note === undefined ||
+    audioUrl === undefined ||
+    audioSeconds === undefined ||
+    transcript === undefined
+  ) {
+    return null;
+  }
   return {
     id,
     beer_id: beerId as string | null,
@@ -172,6 +307,11 @@ export function toMineRow(raw: unknown): MineRowJson | null {
     visibility,
     expires_at: expiresAt,
     created_at: createdAt,
+    photo_url: photoUrl,
+    note,
+    audio_url: audioUrl,
+    audio_seconds: audioSeconds,
+    transcript,
     beers,
   };
 }
@@ -196,9 +336,8 @@ export function mineRowToWantRecord(row: MineRowJson): WantRecord | null {
   } else if (typeof row.beer_id === "string" && row.beer_id.length > 0) {
     // 无 join 时用最小 beer（至少让钉可渲染，图标走 emoji 回退）
     beer = { id: row.beer_id, name: row.beer_id, emoji: "🍺", category: "", tagline: "" };
-  } else {
-    return null;
   }
+  // UR E.3：双双缺即无酒打卡（beer null，钉／卡走照片＋note 主视觉，不丢行）。
   const position: LatLng = { lat: row.lat, lng: row.lng };
   const expiresAt = row.expires_at !== null ? Date.parse(row.expires_at) : null;
   const out: WantRecord = {
@@ -213,5 +352,42 @@ export function mineRowToWantRecord(row: MineRowJson): WantRecord | null {
   if (typeof row.place_name === "string" && row.place_name.length > 0) {
     out.placeName = row.place_name;
   }
+  // UR E.2：回顯三件套進 WantRecord（本地 E.1 字段同形，mine 回來即有圖文音）。
+  if (typeof row.photo_url === "string" && row.photo_url.startsWith("data:image/")) {
+    out.photoDataUrl = row.photo_url;
+  }
+  if (typeof row.note === "string" && row.note !== "") {
+    out.note = row.note;
+  }
+  if (
+    typeof row.audio_url === "string" &&
+    row.audio_url !== "" &&
+    typeof row.audio_seconds === "number" &&
+    Number.isFinite(row.audio_seconds)
+  ) {
+    out.audio = { url: row.audio_url, seconds: row.audio_seconds };
+  }
   return out;
+}
+
+/**
+ * UR E.2 詳情可見門（純函數可單測）：本人全見；public 全見；
+ * friends 僅互好友見；其餘（含陌生＋private 他人）不見。
+ */
+export function canViewCheckin(
+  viewerId: string,
+  ownerId: string | null,
+  visibility: unknown,
+  friendIds: readonly string[],
+): boolean {
+  if (ownerId !== null && viewerId === ownerId) return true;
+  if (visibility === "public") return true;
+  if (
+    visibility === "friends" &&
+    ownerId !== null &&
+    friendIds.includes(ownerId)
+  ) {
+    return true;
+  }
+  return false;
 }

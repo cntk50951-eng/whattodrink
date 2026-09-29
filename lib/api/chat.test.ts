@@ -10,6 +10,8 @@ import {
   parseCreateConversationBody,
   parseCreateMessageBody,
   parseReadBody,
+  parseSignBody,
+  parseViewBody,
   toChatMessage,
   toChatPeer,
 } from "./chat";
@@ -75,10 +77,68 @@ describe("parseCreateMessageBody", () => {
     expect(parseCreateMessageBody(good)).toEqual(good);
   });
   it("非 text／空體／超長／缺冪等鍵拒", () => {
-    expect(parseCreateMessageBody({ ...good, kind: "image" })).toHaveProperty("error");
+    expect(parseCreateMessageBody({ ...good, kind: "video" })).toHaveProperty("error");
     expect(parseCreateMessageBody({ ...good, body: "  " })).toHaveProperty("error");
     expect(parseCreateMessageBody({ ...good, body: "x".repeat(2001) })).toHaveProperty("error");
     expect(parseCreateMessageBody({ kind: "text", body: "hi" })).toHaveProperty("error");
+  });
+  it("D.6：image／audio 附件校验", () => {
+    const img = {
+      kind: "image",
+      client_msg_id: "c-2",
+      attachments: [{ path: "u1/a.jpg", mime: "image/jpeg", bytes: 100 }],
+    };
+    expect(parseCreateMessageBody(img)).toEqual({
+      kind: "image",
+      attachments: [{ path: "u1/a.jpg", mime: "image/jpeg", bytes: 100 }],
+      client_msg_id: "c-2",
+    });
+    expect(parseCreateMessageBody({ ...img, kind: "image", attachments: [] })).toHaveProperty("error");
+    expect(
+      parseCreateMessageBody({
+        kind: "audio",
+        client_msg_id: "c-3",
+        attachments: [{ path: "u1/a.exe", mime: "audio", bytes: 10, secs: 5 }],
+      }),
+    ).toHaveProperty("error");
+    expect(
+      parseCreateMessageBody({
+        kind: "audio",
+        client_msg_id: "c-3",
+        attachments: [{ path: "u1/a.webm", mime: "audio", bytes: 10, secs: 61 }],
+      }),
+    ).toHaveProperty("error");
+    expect(
+      parseCreateMessageBody({
+        kind: "audio",
+        client_msg_id: "c-3",
+        attachments: [{ path: "u1/a.webm", mime: "audio", bytes: 10, secs: 5 }],
+      }),
+    ).toEqual({
+      kind: "audio",
+      attachments: [{ path: "u1/a.webm", mime: "audio", bytes: 10, secs: 5 }],
+      client_msg_id: "c-3",
+    });
+  });
+});
+
+describe("parseSignBody／parseViewBody", () => {
+  it("sign 收三件套＋拒超限", () => {
+    expect(parseSignBody({ purpose: "image", ext: "png", bytes: 10 })).toEqual({
+      purpose: "image",
+      ext: "png",
+      bytes: 10,
+    });
+    expect(parseSignBody({ purpose: "image", ext: "exe", bytes: 10 })).toHaveProperty("error");
+    expect(parseSignBody({ purpose: "voice", ext: "webm", bytes: 3 * 1024 * 1024 })).toHaveProperty("error");
+  });
+  it("view 收合法 bucket＋path", () => {
+    expect(parseViewBody({ bucket: "chat-images", path: "u1/a.png" })).toEqual({
+      bucket: "chat-images",
+      path: "u1/a.png",
+    });
+    expect(parseViewBody({ bucket: "avatars", path: "u1/a.png" })).toHaveProperty("error");
+    expect(parseViewBody({ bucket: "chat-images", path: "../x" })).toHaveProperty("error");
   });
 });
 
