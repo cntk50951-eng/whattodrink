@@ -17,7 +17,47 @@ export type ChatMessage = {
   read: boolean;
   /** UR D.4：發送失敗位（留行＋重試鍵；成功／重發即清） */
   failed?: boolean;
+  /** UR D.6：附件視圖（server 已驗歸屬＋大小；讀端只渲染） */
+  attachments?: ChatAttachmentView[];
 };
+
+/** D.6 附件視圖（body 為空時 bubbles 走此渲染；snippet 走 kind）。 */
+export type ChatAttachmentView = {
+  bucket: "chat-images" | "chat-voice";
+  path: string;
+  mime: string;
+  bytes: number;
+  secs?: number;
+  /** 本地預覽（樂觀位專用，會話態，不持久化不發送）。 */
+  preview?: string;
+};
+
+/** 附件行映射：壞條丟棄（單條壞不炸整串；未知桶／非法 path 即壞）。 */
+export function toChatAttachments(raw: unknown): ChatAttachmentView[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ChatAttachmentView[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) continue;
+    const r = item as Record<string, unknown>;
+    if (r.bucket !== "chat-images" && r.bucket !== "chat-voice") continue;
+    if (typeof r.path !== "string" || r.path.includes("..") || r.path.split("/").length !== 2) {
+      continue;
+    }
+    if (typeof r.mime !== "string") continue;
+    if (typeof r.bytes !== "number" || !Number.isFinite(r.bytes) || r.bytes < 0) continue;
+    const att: ChatAttachmentView = {
+      bucket: r.bucket,
+      path: r.path,
+      mime: r.mime,
+      bytes: r.bytes,
+    };
+    if (typeof r.secs === "number" && Number.isFinite(r.secs) && r.secs > 0) {
+      att.secs = r.secs;
+    }
+    out.push(att);
+  }
+  return out;
+}
 
 const MINUTE_MS = 60_000;
 

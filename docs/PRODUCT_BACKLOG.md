@@ -1820,7 +1820,7 @@ UR A.20　酒圖本地優先（local-first，web／ios／aos 同源）[✓]
 
 ---
 
-UR A.21　我的位置＋在線態＋好友實時追踪 [WIP]
+UR A.21　我的位置＋在線態＋好友實時追踪 [✓]
 
 首次進地圖以我為中心；左上狀態燈（在線／隱身）；自釘呼吸燈按模式變色（綠／灰）；公開／好友態看在線好友呼吸燈（實時跟隨移動）；隱身看不到任何人、也發不出任何位置。
 
@@ -1843,6 +1843,7 @@ UR A.21　我的位置＋在線態＋好友實時追踪 [WIP]
 - 2026-09-27：建檔置 []（用戶指令六件事；深度思考已輸出；版本指向＋頻率＋釘互動待問答）
 - 2026-09-27：問答定案（v2／30s＋50m／打招呼 Sheet＋通道另開）置 [WIP]
 - 2026-09-27：實作完待驗（DB 0011 待執行＋雙端點＋hooks＋自釘變色＋好友滑行層＋聊天 Sheet＋chat*×3＋openapi；單測 20；三閘綠；單機可驗中心／燈／色／心跳／Sheet，雙人實時待聯驗）
+- 2026-09-27：置 [✓]（用户指令 mark done；PR #28 已合入；2026-09-28 備註：此行曾被同樹並寫蓋掉，本輪重建；雙人聯驗＋0012 後通道另開 D 線已立）
 - 2026-09-27：實作完（DB 0011＋雙端點＋hooks＋自釘變色＋好友層＋聊天 Sheet；單測 20；lint 0 error）——驗收被擋：隊友 C.11 足跡重構進行中（`trailRef` 更名殘留致 build 紅），非我方代碼；待協調
 
 ---
@@ -2540,7 +2541,7 @@ UR D.5　推送（a 前台含於 D.3／b 後台推播另期）[]
 - D.5a：含於 D.3（前台訂閱＋降級），本條不單獨驗收
 - D.5b（另期）：`devices(platform, push_token)`（A.4-15 未建）＋寫入後 server 扇出（Web Push 先行，APNs／FCM 隨原生；pg_net 或 QStash 削峰重試，量級到了才上）；payload 只帶誰＋哪會話不帶正文（鎖屏隱私＋PDPO）；`muted`／隱身／陌生人三刀
 
-UR D.6　圖片＋語音附件 []
+UR D.6　圖片＋語音附件 [WIP]
 
 作為用戶，我要發圖＋發語音條，姿勢和牆一致。
 
@@ -2552,6 +2553,14 @@ UR D.6　圖片＋語音附件 []
 
 ### 非目標
 - 端到端加密（V2 議題，見設計第 7 節取捨③）、閱後即焚（另議）
+
+### AC
+- AC1：選圖→上傳→對方房內見圖（點開展望另議，先縮圖）；錄音→60s 內→對方播得出
+- AC2：列表末句圖／音有類型章；陌生人拿 path 簽不出（404）；超限／非法 ext 400
+- AC3：慢網發送中可見上傳態；三閘綠；雙號聯驗；`git status` 無 v1
+
+*改動記錄*
+- 2026-09-27：開工置 [WIP]；實作完待驗（0013 RLS＋0014 RPC＋sign/view 雙端點＋發送附件校验＋列表單 RPC＋composer 圖／音＋氣泡＋snippet 章＋7 組 key；`VoicePlayer` 牆耦合另起小件；轉寫另議；tsc 我方淨（同伴 V2Home/moderation 施工中紅＋刪頁 artifact，不碰）／lint 0 error（同伴 gathering 1 error 不碰）／單測綠；待用戶 Dashboard 三動作＋雙號聯驗＋合入）
 
 ---
 
@@ -2650,7 +2659,7 @@ UR E.1　v2 相機 Sheet（權限門＋後置＋拍攝＋濾鏡）[✓]
 
 ---
 
-UR E.2　打卡三件套後端＋他人可見（POST＋pins＋他人卡）[]
+UR E.2　打卡三件套後端＋他人可見（POST＋pins＋他人卡）[WIP]
 
 E.1 前端閉環後，照片／文字／語音只活在本地。DB 列全有（0001 即有 `photo_url/audio_url/audio_seconds/note/transcript`，免遷移），缺三段接線。
 
@@ -2669,6 +2678,35 @@ E.1 前端閉環後，照片／文字／語音只活在本地。DB 列全有（0
 
 *改動記錄*
 - 2026-09-27：建檔置 []（E.1 分期問答產物；待 E.1 驗收後開工，照片存法＋他人卡協調先問答）
+- 2026-09-28：問答定案（OpenAI omni-moderation 免費已官方實證＋key 位／發送→審核→發布 fail-closed／dataURL 直存）置 [WIP]；E.2 實作完待驗（`lib/moderation` 主＋Minimax 兜底編排＋12 單測、`parseCreateCheckinBody` 三件套＋上限、`POST` 審核門＋落庫＋回顯、`GET [id]` 詳情＋`canViewCheckin`、`mine` 回顯、`dropWant` 送三件套＋rejected 直顯不落地、他人卡按需拉＋渲染；lint 淨／386 綠／build 56 頁綠；待用戶雙 key 親驗，未提交）
+- 2026-09-28：連通＋功能實測全綠（OPENAI_KEY 真 key：乾淨文→放行／暴力文→拒＋harassment/violence 類／圖文一次→放行；主審 key 錯→Minimax 3s 頂上放行；key 名兼容 `OPENAI_API_KEY` 優先＋`OPENAI_KEY` 回退；live 測試文件跑完即刪未留倉）
+- 2026-09-28：問答定案（OpenAI omni-moderation 免費已官方實證＋key 位／發送→審核→發布 fail-closed／dataURL 直存）置 [WIP]；實作完待驗（`lib/moderation`＋4 單測、`parseCreateCheckinBody` 三件套＋上限、`POST` 審核門＋落庫＋回顯、`GET [id]` 詳情＋`canViewCheckin`、`mine` 回顯、`dropWant` 送三件套＋rejected 直顯不落地、他人卡按需拉＋渲染；lint 淨／378 綠；全樹 build 被隊友 `ChatRoomLive` 未提交語法錯擋住（非我方）；待用戶雙號＋審核親驗，未提交）
+- 2026-09-29：DEF-20260929-001 修復中（暴力文本静默发布：OpenAI 地域封锁＋Minimax 平台信号瞎，双实测实锤；修法＝vendor 错误分级日志＋分级失败＋Minimax 模型裁决 OR 化；图片审核代码本就在链上，本轮验证 plumbing＋补 body 断言；单测 19 绿＋Minimax 真 key live 双绿跑完即删；tsc 净／eslint 净；待用户原路径复测＋合入指令，未提交）
+
+---
+
+UR E.3　拍照一页流＋酒可选＋rejected 行内报错 [✓]
+
+用户指令（2026-09-29，DEF-20260929-002）：rejected 只回 JSON 无感知＋内容丢失；拍照发布拆两页；输入框被遮挡；录音不可审直接砍；类型每次必选＋选择器要现代滑动感；酒可选。
+
+### 范围（v2-only；共用层只做加法＋放宽，v1 回归修绿）
+1. `V2CameraSheet` 一页流：ask→kind（每次必选无默认，点选即进＋左右滑切换＋选中动画）→live（顶栏回改类型）→compose（类型滑动滑块可改＋缩略配文 IG 式＋酒横滑可选＋sticky 发布条；rejected 行内 `role=alert` banner 留现场重发；发布中禁用态）。录音全删（mic state／refs／UI／`StagedShot.audio`）。
+2. 酒可选端到端：`beer_id` nullable（parse／route 跳检／insert／回显）、`WantRecord.beer` nullable（parse／mine／pins 本已 null-safe／自家卡＋目录＋换酒守卫／v1 `DrinkMap`＋`trailStops` 回归守卫，行为不变）。
+3. `dropWant(beer|null, kind, shot)` 回 verdict（ok／message／guard）；kinds 旧链 toast 化；相机 `publishShot` 桥（匿名走登录／守卫让路／其余行内）。
+4. 文案 `camKindTitle／camKindHint／camPublish／camPublishing／camDrinkTitle／camNoDrink／camRejectedKept／camPublishFailed`×3（同序 parity；mic 旧 key 留置零风险）。
+
+### 非目标
+- 真磨皮／贴纸（另议）、server `audio_url` 移除（v1 兼容保留）、选酒旧链删除（pills／CTA 照走）。
+
+### AC
+- AC1：rejected 行内红 banner＋原文保留，重发可达；通过关 sheet 落钉。
+- AC2：不选酒可发布（DB `beer_id` null，钉 📷，卡无酒行）；选酒链旧入口行为不变。
+- AC3：小屏＋键盘下输入框可见、发布条吸底；三闸绿；用户浏览器亲验；`git status` 无 v1（共用层双回归已绿）。
+
+*改動記錄*
+- 2026-09-29：建档即开工置 [WIP]（用户指令＋问答定 v2-only／kind 每次必选；IG 单 composer＋Snap 一键心智；单测 98 绿涉 5 套件／tsc 净／lint 净；待用户浏览器亲验，未提交）
+- 2026-09-29 round-2：酒退场（打卡未必要选酒，compose 删酒区，一律纯照片打卡；后端 nullable 保留给旧链）＋发布罩去 v1 味（啤酒泡→中性 spinner＋v2scope）；tsc 净／lint 净／全量 396 绿；待用户复验，未提交
+- 2026-09-29：置 [✓]（用户亲验通过，指令联合提交；与队友 D/F 线同车合入）
 
 ---
 

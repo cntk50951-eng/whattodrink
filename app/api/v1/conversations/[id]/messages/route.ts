@@ -44,7 +44,7 @@ export async function GET(
   }
   let query = supabase
     .from("messages")
-    .select("id,sender_id,kind,body,created_at")
+    .select("id,sender_id,kind,body,attachments,created_at")
     .eq("conversation_id", parsedId.id)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false });
@@ -130,6 +130,18 @@ export async function POST(
   ) {
     return apiError("forbidden", "隱身模式不可收發消息", 403);
   }
+  // D.6 附件歸屬：path 首段必須是自己（storage RLS 同口徑，雙保險；
+  // 陌生人拿別人的 path 發即 400，會話成員校验在下）。
+  let attachments: { path: string; mime: string; bytes: number; secs?: number }[] = [];
+  if (parsed.kind !== "text") {
+    for (const a of parsed.attachments) {
+      if (!a.path.startsWith(`${userId}/`)) {
+        return apiError("invalid_params", "附件不屬於你", 400);
+      }
+    }
+    const bucket = parsed.kind === "image" ? "chat-images" : "chat-voice";
+    attachments = parsed.attachments.map((a) => ({ ...a, bucket }));
+  }
   // 限流（兩檔計數；POC 直查，上量後換計數列，見 UR）
   const nowMs = Date.now();
   const { count: minCount } = await supabase
@@ -151,7 +163,7 @@ export async function POST(
   // 冪等：同會話同鍵直接回既有行（弱網重發不 double，沿架構 §5）
   const { data: dup } = await supabase
     .from("messages")
-    .select("id,sender_id,kind,body,created_at")
+    .select("id,sender_id,kind,body,attachments,created_at")
     .eq("conversation_id", parsedId.id)
     .eq("client_msg_id", parsed.client_msg_id)
     .maybeSingle();
@@ -165,18 +177,18 @@ export async function POST(
       conversation_id: parsedId.id,
       sender_id: userId,
       kind: parsed.kind,
-      body: parsed.body,
-      attachments: [],
+      body: parsed.kind === "text" ? parsed.body : null,
+      attachments,
       client_msg_id: parsed.client_msg_id,
     })
-    .select("id,sender_id,kind,body,created_at")
+    .select("id,sender_id,kind,body,attachments,created_at")
     .single();
   if (iErr !== null || inserted === null) {
     // 23505 併發撞鍵：回讀既有行（與上同，競態收斂）
     if (iErr?.code === "23505") {
       const { data: raced } = await supabase
         .from("messages")
-        .select("id,sender_id,kind,body,created_at")
+        .select("id,sender_id,kind,body,attachments,created_at")
         .eq("conversation_id", parsedId.id)
         .eq("client_msg_id", parsed.client_msg_id)
         .maybeSingle();

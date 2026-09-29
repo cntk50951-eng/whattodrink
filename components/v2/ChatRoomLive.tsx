@@ -5,13 +5,14 @@ import { useTranslations } from "next-intl";
 
 import { createClient } from "@/lib/supabase/client";
 import { ChatThread, type ChatPeer } from "@/components/v2/ChatThread";
-import type { ChatMessage } from "@/lib/chat";
+import { toChatAttachments, type ChatMessage } from "@/lib/chat";
 
 type ServerMessage = {
   id: string;
   sender_id: string;
   kind: string;
   body: string | null;
+  attachments?: unknown;
   created_at: number;
 };
 
@@ -38,7 +39,18 @@ export function ChatRoomLive({
   // UR D.4：對方讀水位（頁內已讀✓✓翻態源；開房＋收信＋10s 輪詢三路刷新）。
   const [peerReadAt, setPeerReadAt] = useState<number | null>(null);
   const seqRef = useRef(0);
-  const pendingRef = useRef(new Map<string, { clientMsgId: string; text: string }>());
+  const pendingRef = useRef(
+    new Map<
+      string,
+      {
+        clientMsgId: string;
+        kind: "text" | "image" | "audio";
+        text: string;
+        attachments: { path: string; mime: string; bytes: number; secs?: number }[];
+        previewUrl?: string;
+      }
+    >(),
+  );
 
   const toChat = useCallback(
     (m: ServerMessage, me: string | null): ChatMessage => ({
@@ -47,6 +59,7 @@ export function ChatRoomLive({
       text: m.body ?? "",
       at: m.created_at,
       read: m.sender_id !== me,
+      attachments: toChatAttachments(m.attachments),
     }),
     [],
   );
@@ -204,20 +217,30 @@ export function ChatRoomLive({
   }, [convId, fetchReadStatus]);
 
   /** POST 一次（成功換真行；失敗留行掛 failed＋重試鍵，D.4 收 D.3 缺口）。 */
-  async function postOne(tempId: string, clientMsgId: string, body: string): Promise<void> {
+  async function postOne(tempId: string): Promise<void> {
     const cid = convId;
-    if (cid === null) return;
+    const pend = pendingRef.current.get(tempId);
+    if (cid === null || pend === undefined) return;
     try {
       const res = await fetch(`/api/v1/conversations/${encodeURIComponent(cid)}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ kind: "text", body, client_msg_id: clientMsgId }),
+        body: JSON.stringify(
+          pend.kind === "text"
+            ? { kind: "text", body: pend.text, client_msg_id: pend.clientMsgId }
+            : {
+                kind: pend.kind,
+                client_msg_id: pend.clientMsgId,
+                attachments: pend.attachments,
+              },
+        ),
       });
       if (!res.ok) throw new Error(`send ${res.status}`);
       const json = (await res.json()) as { message?: ServerMessage };
       if (json.message === undefined) throw new Error("bad send json");
       pendingRef.current.delete(tempId);
+      if (pend.previewUrl !== undefined) URL.revokeObjectURL(pend.previewUrl);
       const myId = await myUserId();
       const mapped = toChat(json.message, myId);
       setMessages((prev) => {
@@ -239,20 +262,98 @@ export function ChatRoomLive({
     seqRef.current += 1;
     const tempId = `local-${seqRef.current}`;
     const clientMsgId = `c-${Date.now()}-${seqRef.current}`;
-    pendingRef.current.set(tempId, { clientMsgId, text: body });
+    pendingRef.current.set(tempId, { clientMsgId, kind: "text", text: body, attachments: [] });
     setMessages((prev) => [
       ...prev,
       { id: tempId, role: "me", text: body, at: Date.now(), read: false },
     ]);
-    await postOne(tempId, clientMsgId, body);
+    await postOne(tempId);
   }
 
   /** 重試用同一 client_msg_id（冪等不 double）。 */
   async function retrySend(tempId: string): Promise<void> {
-    const pend = pendingRef.current.get(tempId);
-    if (pend === undefined || convId === null) return;
+    if (convId === null || pendingRef.current.get(tempId) === undefined) return;
     setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, failed: false } : m)));
-    await postOne(tempId, pend.clientMsgId, pend.text);
+    await postOne(tempId);
+  }
+
+  /**
+   * UR D.6 附件上傳＋發送（簽名→直傳 Storage→帶附件發送；樂觀位帶本地預覽，
+   * 成功即換真行，失敗掛 failed 走重試鍵；發送中拋錯一律收斂到行狀態，不拋出）。
+   */
+  async function uploadAndSend(
+    kind: "image" | "audio",
+    payload: { blob: Blob; name: string; secs?: number },
+  ): Promise<void> {
+    if (convId === null) return;
+    const ext = extOf(payload.blob.type, payload.name);
+    if (ext === null) return;
+    seqRef.current += 1;
+    const tempId = `local-${seqRef.current}`;
+    const clientMsgId = `c-${Date.now()}-${seqRef.current}`;
+    try {
+      const signRes = await fetch("/api/v1/uploads/sign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          purpose: kind === "image" ? "image" : "voice",
+          ext,
+          bytes: payload.blob.size,
+        }),
+      });
+      if (!signRes.ok) throw new Error(`sign ${signRes.status}`);
+      const signJson = (await signRes.json()) as {
+        bucket?: unknown;
+        path?: unknown;
+        uploadUrl?: unknown;
+      };
+      if (
+        typeof signJson.bucket !== "string" ||
+        typeof signJson.path !== "string" ||
+        typeof signJson.uploadUrl !== "string"
+      ) {
+        throw new Error("bad sign json");
+      }
+      const putRes = await fetch(signJson.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": payload.blob.type || "application/octet-stream" },
+        body: payload.blob,
+      });
+      if (!putRes.ok) throw new Error(`upload ${putRes.status}`);
+      const previewUrl = URL.createObjectURL(payload.blob);
+      const bucket: "chat-images" | "chat-voice" =
+        kind === "image" ? "chat-images" : "chat-voice";
+      const att = {
+        bucket,
+        path: signJson.path,
+        mime: payload.blob.type || "application/octet-stream",
+        bytes: payload.blob.size,
+        ...(payload.secs !== undefined ? { secs: payload.secs } : {}),
+      };
+      pendingRef.current.set(tempId, {
+        clientMsgId,
+        kind,
+        text: "",
+        attachments: [att],
+        previewUrl,
+      });
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: tempId,
+          role: "me",
+          text: "",
+          at: Date.now(),
+          read: false,
+          attachments: [{ ...att, preview: previewUrl }],
+        },
+      ]);
+      await postOne(tempId);
+    } catch {
+      pendingRef.current.delete(tempId);
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+    }
   }
 
   if (failed) {
@@ -272,6 +373,7 @@ export function ChatRoomLive({
         onSend: (t) => void sendText(t),
         onRetry: (id) => void retrySend(id),
         readAt: peerReadAt,
+        onUpload: (kind, payload) => uploadAndSend(kind, payload),
       }}
     />
   );
@@ -286,4 +388,30 @@ async function myUserId(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * UR D.6 blob→簽名 ext（白名單內才回；未知回 null 即前端拒傳，後端 parse 兜底）。
+ * 錄音 mime 按平台漂（webm／mp4），圖片按四類收。
+ */
+export function extOf(mime: string, name: string): string | null {
+  const m = mime.toLowerCase();
+  if (m.startsWith("image/")) {
+    const fromName = name.split(".").pop()?.toLowerCase() ?? "";
+    if (fromName === "jpg" || fromName === "jpeg") return "jpg";
+    if (fromName === "png") return "png";
+    if (fromName === "webp") return "webp";
+    if (fromName === "gif") return "gif";
+    if (m === "image/png") return "png";
+    if (m === "image/webp") return "webp";
+    if (m === "image/gif") return "gif";
+    return "jpg";
+  }
+  if (m.startsWith("audio/") || m === "video/mp4") {
+    if (m.includes("mp4")) return "mp4";
+    if (m.includes("m4a")) return "m4a";
+    if (m.includes("ogg") || m.includes("opus")) return "ogg";
+    return "webm";
+  }
+  return null;
 }

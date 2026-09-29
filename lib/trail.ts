@@ -50,8 +50,9 @@ export function writeTrailFlag(key: string, on: boolean): void {
 export function trailStops(records: readonly WantRecord[]): TrailStop[] {
   return parseWantHistory([...records]).map((record) => ({
     id: `want-${record.at}`,
-    beerId: record.beer.id,
-    beerName: record.beer.name,
+    // UR E.3：无酒足迹站用空串占位（下游只做展示／分组键，不寻目录）。
+    beerId: record.beer?.id ?? "",
+    beerName: record.beer?.name ?? "",
     at: record.at,
     position: record.position,
     placeName: record.placeName ?? "",

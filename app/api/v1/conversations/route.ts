@@ -146,71 +146,60 @@ export async function GET(req: Request): Promise<Response> {
   const { limit, cursor } = parsed.params;
   const nowMs = Date.now();
 
-  const { data: myRows, error: mErr } = await supabase
-    .from("conversation_members")
-    .select("conversation_id,last_read_at,muted,hidden_at,conversations!inner(id,expires_at)")
-    .eq("user_id", userId)
-    .is("hidden_at", null);
-  if (mErr !== null) {
-    console.error(`[api/v1/conversations] list error: code=${mErr.code} message=${mErr.message}`);
+  // UR D.6 提速：列表 N+1（3N+1 roundtrips）收斂到單 RPC（見 0014；
+  // 函數內硬校驗 auth.uid()=p_uid，會話可見性＋水位＋末條＋未讀一次回）。
+  const { data: rpcRows, error: rpcErr } = await supabase.rpc("get_conversations", {
+    p_uid: userId,
+    p_limit: 100,
+  });
+  if (rpcErr !== null) {
+    console.error(`[api/v1/conversations] rpc error: code=${rpcErr.code} message=${rpcErr.message}`);
     return apiError("internal", "读取会话失败", 500);
   }
-  type MyRow = {
-    conversation_id: string;
-    last_read_at: string;
+  type RpcRow = {
+    conv_id: string;
+    peer_id: string | null;
+    nickname: string | null;
+    avatar_url: string | null;
+    last_id: string | null;
+    last_sender: string | null;
+    last_kind: string | null;
+    last_body: string | null;
+    last_ca: string | null;
+    last_secs: number | null;
+    unread: number | string;
     muted: boolean;
-    conversations: { id: string; expires_at: string };
+    updated_at: string;
   };
   const items: ConversationJson[] = [];
-  // DEF-011 續：對方成員行走 service（RLS 只許讀自己行，authed 查不到對方；
-  // 到此已用 authed 自行驗過我是成員，fail-closed 不動，見上）。
-  const svc = await createServiceClient();
-  for (const r of ((myRows ?? []) as unknown[]) as MyRow[]) {
-    if (isConversationExpired(r.conversations.expires_at, nowMs)) continue;
-    const convId = r.conversation_id;
-    const lastReadMs = Date.parse(r.last_read_at);
-    // 對方成員 id（1v1 取非我；group 預留取首個非我，peer 置該人）
-    const { data: members } = await svc
-      .from("conversation_members")
-      .select("user_id")
-      .eq("conversation_id", convId);
-    const peerId = (
-      ((members ?? []) as unknown[]) as { user_id: string }[]
-    ).map((m) => m.user_id).find((id) => id !== userId) ?? null;
-    let peer = null;
-    if (peerId !== null) {
-      const { data: prow } = await svc
-        .from("users")
-        .select("id,nickname,avatar_url")
-        .eq("id", peerId)
-        .maybeSingle();
-      peer = toChatPeer(prow);
-    }
-    const { data: lastRows } = await supabase
-      .from("messages")
-      .select("id,sender_id,kind,body,created_at")
-      .eq("conversation_id", convId)
-      .order("created_at", { ascending: false })
-      .limit(1);
-    const lastRaw = ((lastRows ?? []) as unknown[])[0] ?? null;
+  for (const r of ((rpcRows ?? []) as unknown[]) as RpcRow[]) {
     const last_message: ChatMessageJson | null =
-      lastRaw === null ? null : toChatMessage(lastRaw, userId);
-    let unread = 0;
-    if (Number.isFinite(lastReadMs)) {
-      const { count } = await supabase
-        .from("messages")
-        .select("id", { count: "exact", head: true })
-        .eq("conversation_id", convId)
-        .neq("sender_id", userId)
-        .gt("created_at", new Date(lastReadMs).toISOString());
-      unread = count ?? 0;
-    }
-    const updated_at = last_message?.created_at ?? Date.parse(r.last_read_at);
+      r.last_id === null
+        ? null
+        : toChatMessage(
+            {
+              id: r.last_id,
+              sender_id: r.last_sender,
+              kind: r.last_kind,
+              body: r.last_body,
+              created_at: r.last_ca,
+              // D.6 列表語音章秒數（完整附件只在記錄端點回，列表只帶 secs 夠用）
+              attachments:
+                typeof r.last_secs === "number"
+                  ? [{ bucket: "chat-voice", path: "", mime: "audio", bytes: 0, secs: r.last_secs }]
+                  : [],
+            },
+            userId,
+          );
+    const updated_at = Date.parse(r.updated_at);
     items.push({
-      id: convId,
-      peer,
+      id: r.conv_id,
+      peer:
+        r.peer_id === null
+          ? null
+          : toChatPeer({ id: r.peer_id, nickname: r.nickname, avatar_url: r.avatar_url }),
       last_message,
-      unread,
+      unread: typeof r.unread === "number" ? r.unread : Number(r.unread) || 0,
       muted: r.muted,
       updated_at: Number.isFinite(updated_at) ? updated_at : nowMs,
     });

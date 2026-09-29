@@ -5,6 +5,8 @@
 ## [Unreleased]
 
 ### Added
+- **UR D.6 圖片＋語音附件 [WIP]**
+  - `0013_chat_storage.sql`（私有桶 RLS：首段歸屬寫删，讀全走簽名）＋`0014_conversations_rpc.sql`（列表 N+1→單 RPC＋語音 secs）；`POST /uploads/sign`＋`/uploads/view`（bucket 白名單＋歸屬校验）；發送附件開閘（歸屬＋ caps）；composer 圖／音＋氣泡＋snippet 章；`useSignedUrl` 緩存；7 組 key；單測綠；待用戶 Dashboard 三動作＋聯驗＋合入
 - **EPIC D 好友聊天真通道＋UR D.1 三表 [WIP]**
   - UR D.1 mark done（用戶 Dashboard 執行 0012 回填 green）
 - **UR D.2 會話 API 四端點 [WIP]**（待真數據聯驗，D.3 聯驗時一併驗）
@@ -351,6 +353,13 @@
   - redesign（taste skill）：筆記改橫線紙＋膠帶＋手寫計數；錄音改圓形錄音鍵＋計時＋60 秒真實進度軌＋自訂播放（去 emoji，換 lucide）；送出改全幅藥丸＋硬陰影＋按壓動效；EN 文案去 em-dash
 
 - harness：新增 `workflow.md` Step 3.5——UI 設計相關改動（新頁面／redesign／tokens／動畫／layout primitives）寫 code 前先調設計 skill（`stitch-design`／`design-taste-frontend`／`taste`），品牌層（doodle）不可動；同步 `.harness/README.md`、`harness-workflow` skill（`.agents/`＋`.opencode/`）、`AGENTS.md` 工具對應表
+
+### Fixed
+- **DEF-20260929-002 拍照一页流＋酒可选＋rejected 行内报错（UR E.3，修復中，未提交）**
+  - `V2CameraSheet` 一页流（kind 必选点选即进＋滑动切换／compose 缩略配文＋sticky 发布／rejected `role=alert` 留现场；录音全删；round-2 酒退场＋发布罩去啤酒泡味）；`dropWant` 回 verdict（ok／message／guard）；`beer_id`＋`WantRecord.beer` nullable 端到端（pins 本已 null-safe；v1 `DrinkMap`＋`trailStops` 回归守卫）；文案 8 key×3 同序；单测 98 绿／tsc 净／lint 净
+  - 數據文檔無需更新（零新增前端数据类型，酒 null 属既有字段放宽；照片／note 沿 E.2 已同步）
+  - `ModerationVendorError`（vendor＋status 分级，message 沿旧格式）＋Minimax 模型裁决 OR 化（平台信号独立，注水只会更严）＋`moderationAction` 纯函数（pass／reject／unavailable）＋有 key 全挂 503 fail-closed（沿 rejected 通道，客户端零改动）；图片 body 双 vendor 断言；单测 19 绿；Minimax 真 key live 双绿跑完即删；tsc／eslint 净
+  - 數據文檔無需更新（零新增前端数据，server 日志不属展示数据）
 
 ### Planned
 - 等用戶從 20 張風格圖選定方向，把更多 theme preset 填進 `lib/themes/presets/`

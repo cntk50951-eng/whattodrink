@@ -138,10 +138,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [beer_id, lat, lng]
+              required: [lat, lng]
               properties:
                 beer_id:
                   type: string
+                  nullable: true
+                  description: UR E.3 酒可选——null 即纯照片打卡
                 lat:
                   type: number
                   minimum: -90
@@ -159,9 +161,33 @@ paths:
                   enum: [flash, post]
                   default: flash
                   description: 快貼 24h / 帖子永久，未傳按 flash 回兼容
+                photo_url:
+                  type: string
+                  nullable: true
+                  description: UR E.2 三件套——jpeg dataURL（≤1M 字符，抓幀已壓 ≤1024）
+                note:
+                  type: string
+                  nullable: true
+                  maxLength: 500
+                  description: UR E.2 三件套——文字备注
+                audio_url:
+                  type: string
+                  nullable: true
+                  description: UR E.2 三件套——data:audio（≤2M 字符）
+                audio_seconds:
+                  type: number
+                  nullable: true
+                  minimum: 0
+                  maximum: 60
+                  description: UR E.2 三件套——語音秒數
+                transcript:
+                  type: string
+                  nullable: true
+                  maxLength: 2000
+                  description: UR E.2 三件套——語音轉錄文本（同審）
       responses:
         "201":
-          description: 落库成功
+          description: 落库成功（含三件套回顯，E.2）
           content:
             application/json:
               schema:
@@ -171,13 +197,69 @@ paths:
                   checkin:
                     $ref: "#/components/schemas/Checkin"
         "403":
-          description: 隱身模式不可打卡（A.12 模式權限）
+          description: 隱身模式不可打卡（A.12 模式權限）／內容未通過審核（E.2 rejected，發送工作流 fail-closed）
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
         "400":
           $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/checkins/{id}:
+    get:
+      operationId: getCheckinDetail
+      summary: 打卡詳情三件套（需登录；本人／public／互好友可見，UR E.2）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 照片＋文字＋語音（pins 列表不帶，開卡按需拉）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [checkin]
+                properties:
+                  checkin:
+                    type: object
+                    required: [id]
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      photo_url:
+                        type: string
+                        nullable: true
+                      note:
+                        type: string
+                        nullable: true
+                      audio_url:
+                        type: string
+                        nullable: true
+                      audio_seconds:
+                        type: number
+                        nullable: true
+                      transcript:
+                        type: string
+                        nullable: true
+        "403":
+          description: 無權查看（陌生／private 他人，fail-closed）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
@@ -1031,6 +1113,26 @@ components:
         created_at:
           type: string
           format: date-time
+        photo_url:
+          type: string
+          nullable: true
+          description: UR E.2 三件套回顯
+        note:
+          type: string
+          nullable: true
+          description: UR E.2 三件套回顯
+        audio_url:
+          type: string
+          nullable: true
+          description: UR E.2 三件套回顯
+        audio_seconds:
+          type: number
+          nullable: true
+          description: UR E.2 三件套回顯
+        transcript:
+          type: string
+          nullable: true
+          description: UR E.2 三件套回顯
     MineRow:
       type: object
       required: [id, beer_id, lat, lng, place_name, kind, visibility, expires_at, created_at, beers]

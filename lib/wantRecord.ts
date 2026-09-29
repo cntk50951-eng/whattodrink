@@ -13,7 +13,8 @@ import { haversineMeters } from "./geo";
 
 /** Frozen the moment a 想喝 pin drops — never follows you afterwards. */
 export type WantRecord = {
-  beer: Beer;
+  /** UR E.3：酒可选——null 即纯照片打卡（DB／pins 早已 null-safe）。 */
+  beer: Beer | null;
   /** Epoch ms at drop time. */
   at: number;
   position: LatLng;
@@ -67,20 +68,22 @@ export function parseWantRecord(raw: unknown): WantRecord | null {
   }
   if (!isLatLng(outer.position)) return null;
   const beer = outer.beer;
-  if (typeof beer !== "object" || beer === null) return null;
-  const candidate = beer as Record<string, unknown>;
-  if (
-    typeof candidate.id !== "string" ||
-    typeof candidate.emoji !== "string" ||
-    typeof candidate.name !== "string"
-  ) {
-    return null;
-  }
-  // UR A.4：icon_url 必須帶上——白名單漏新鍵＝刷新掉圖（已踩一次）。
-  const iconUrl =
-    typeof candidate.icon_url === "string" ? candidate.icon_url : null;
-  const record: WantRecord = {
-    beer: {
+  // UR E.3：酒可选——缺／null 即无酒（旧档必有酒，行为不变）。
+  let parsedBeer: Beer | null = null;
+  if (beer !== undefined && beer !== null) {
+    if (typeof beer !== "object") return null;
+    const candidate = beer as Record<string, unknown>;
+    if (
+      typeof candidate.id !== "string" ||
+      typeof candidate.emoji !== "string" ||
+      typeof candidate.name !== "string"
+    ) {
+      return null;
+    }
+    // UR A.4：icon_url 必須帶上——白名單漏新鍵＝刷新掉圖（已踩一次）。
+    const iconUrl =
+      typeof candidate.icon_url === "string" ? candidate.icon_url : null;
+    parsedBeer = {
       id: candidate.id,
       emoji: candidate.emoji,
       name: candidate.name,
@@ -88,7 +91,10 @@ export function parseWantRecord(raw: unknown): WantRecord | null {
         typeof candidate.category === "string" ? candidate.category : "",
       tagline: typeof candidate.tagline === "string" ? candidate.tagline : "",
       ...(iconUrl !== null ? { icon_url: iconUrl } : {}),
-    },
+    };
+  }
+  const record: WantRecord = {
+    beer: parsedBeer,
     at: outer.at,
     position: outer.position,
   };
