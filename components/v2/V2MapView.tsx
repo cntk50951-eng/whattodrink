@@ -24,7 +24,9 @@ import {
   shouldFallbackToOsm,
   tileSpecFor,
 } from "@/lib/maps/provider";
+import type { TileSpec } from "@/lib/maps/provider";
 import { avoidLive, planSpread } from "@/lib/mapSpread";
+import { HEAT_WINDOW_MS } from "@/lib/heatmap";
 import {
   ANCHOR_ZOOM_MAX,
   groupByAnchor,
@@ -96,6 +98,11 @@ type V2MapViewProps = {
   onFriendClick: (id: string) => void;
   /** UR C.14 round-2：+N 堆疊徽點擊（成員 id 含代表，父層開列表 Sheet）。 */
   onStackClick?: (ids: string[]) => void;
+  /** UR E.6 round-4 热点巡游（藏钉＋热独显；底图不换，原样保留彩色）。
+   * 自／友 live 钉保留定向。 */
+  heatMode: boolean;
+  /** UR E.6 round-4 巡游焦点格成员 id（只渲该格热斑，单格聚焦；null＝全量）。 */
+  heatFocusIds: string[] | null;
 };
 
 /** HTML 转义（divIcon  innerHTML 拼昵称首字用，用户内容不可信）。 */
@@ -152,7 +159,7 @@ function unmountRootsAsync(roots: Root[]): void {
  * 操作經 ref 暴露（父層按鈕調）。 reduced-motion 讀掛載時一次。
  */
 export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView(
-  { others, wants, trail, self, onPinClick, onWantClick, onReady, onMapTap, presence, friends, onFriendClick, onStackClick },
+  { others, wants, trail, self, onPinClick, onWantClick, onReady, onMapTap, presence, friends, onFriendClick, onStackClick, heatMode, heatFocusIds },
   ref,
 ) {
   const holderRef = useRef<HTMLDivElement | null>(null);
@@ -181,6 +188,16 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
   // CSS 位移過渡即平滑跟隨，不拆層不閃爍）。
   const friendLayerRef = useRef<Leaflet.LayerGroup | null>(null);
   const friendMarksRef = useRef(new Map<string, Leaflet.Marker>());
+  // UR E.6 热点模式底图运行时换层（ref 双保险：初始回退闭包与换层 effect 共用）。
+  const baseLayerRef = useRef<Leaflet.TileLayer | null>(null);
+  // DEF-20260929-008 round-3：换层幂等键（无变化不换——挂载即换会掀掉回退计数与瓦片进度）。
+  const baseSpecRef = useRef<"env" | "carto" | null>(null);
+  const baseSwapRef = useRef<((spec: TileSpec) => void) | null>(null);
+  // UR E.6 round-2 巡游：点爆改父层按钮顺序跳格，透明圆退役（沿用热 canvas 本体）。
+  // UR E.5 热力常驻层（leaflet.heat canvas；主 layer 重建不碰它）。
+  const heatLayerRef = useRef<Leaflet.Layer | null>(null);
+  // 图例只在真有热时出现（没热点不挂羊头）。
+  const [heatOn, setHeatOn] = useState(false);
   // UR C.13 足跡腳印常駐層（獨立於主 layer，關 Sheet 不重建，仿 friendLayer）
   const footLayerRef = useRef<Leaflet.LayerGroup | null>(null);
   const footMarksRef = useRef(new Map<string, Leaflet.Marker>());
@@ -195,6 +212,8 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       friendLayerRef.current = null;
       // eslint-disable-next-line react-hooks/exhaustive-deps
       friendMarksRef.current.clear();
+      heatLayerRef.current?.remove();
+      heatLayerRef.current = null;
       footLayerRef.current?.remove();
       footLayerRef.current = null;
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -346,13 +365,59 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
         fellBack = true;
         created.removeLayer(baseLayer);
         const osm = tileSpecFor("osm");
-        L.tileLayer(osm.url, {
+        const osmLayer = L.tileLayer(osm.url, {
           attribution: osm.attribution,
           maxZoom: ZOOM_MAX,
           maxNativeZoom: osm.maxNativeZoom,
-        }).addTo(created);
+        });
+        osmLayer.addTo(created);
+        // UR E.6：回退也同步 ref，换层 effect 不会叠出双底图。
+        baseLayerRef.current = osmLayer;
       });
       baseLayer.addTo(map);
+      baseLayerRef.current = baseLayer;
+      baseSpecRef.current = "env";
+      // UR E.6：运行时换底图（热点无字源↔环境源；换层不碰回退计数，沿旧口径）。
+      // DEF-20260929-008：换上的层也要接失败回退（CARTO 挂则回 OSM，有字总比全白好）。
+      baseSwapRef.current = (spec: TileSpec) => {
+        const cur = mapRef.current;
+        if (cur === null) return;
+        if (baseLayerRef.current !== null) {
+          cur.removeLayer(baseLayerRef.current);
+          baseLayerRef.current = null;
+        }
+        const nl = L.tileLayer(spec.url, {
+          attribution: spec.attribution,
+          maxZoom: ZOOM_MAX,
+          maxNativeZoom: spec.maxNativeZoom,
+          ...(spec.subdomains !== undefined
+            ? { subdomains: spec.subdomains }
+            : {}),
+        });
+        let swapErrors = 0;
+        nl.on("tileload", () => {
+          swapErrors = 0;
+        });
+        nl.on("tileerror", () => {
+          swapErrors += 1;
+          if (!shouldFallbackToOsm(swapErrors)) return;
+          // 已被更新换掉就不管（防与手动切换打架）。
+          if (baseLayerRef.current !== nl) return;
+          console.warn(`[v2map] base tiles failing over to OSM (errors=${swapErrors})`);
+          cur.removeLayer(nl);
+          const osm = tileSpecFor("osm");
+          const ol = L.tileLayer(osm.url, {
+            attribution: osm.attribution,
+            maxZoom: ZOOM_MAX,
+            maxNativeZoom: osm.maxNativeZoom,
+          });
+          ol.addTo(cur);
+          baseLayerRef.current = ol;
+        });
+        nl.addTo(cur);
+        baseLayerRef.current = nl;
+        console.info(`[v2map] base tiles swapped (fallback-armed)`);
+      };
       map.setView([DEFAULT_CENTER.lat, DEFAULT_CENTER.lng], ZOOM_DEFAULT);
       // UR C.13 足迹置顶：创建高 zIndex pane，保证脚印在最上层
       try {
@@ -390,6 +455,9 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       layerRef.current?.remove();
       map?.remove();
       mapRef.current = null;
+      baseLayerRef.current = null;
+      baseSpecRef.current = null;
+      baseSwapRef.current = null;
       delete holder.dataset.ready;
       setMapReady(false);
     };
@@ -505,8 +573,10 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       });
     };
     const zoom = map.getZoom();
-    // UR C.13 足迹模式下只显示自己的打卡和足迹，他人暂时隐藏
-    const showOthers = trail === null;
+    // UR C.13 足迹模式下只显示自己的打卡和足迹，他人暂时隐藏。
+    // UR E.6 热点模式藏他人钉徽（纯热斑＋自／友定向）。
+    // round-8：图上钻取退役（查看打卡回 Sheet 列连通片全员），本层只藏钉。
+    const showOthers = trail === null && !heatMode;
     if (showOthers) {
       if (zoom <= ANCHOR_ZOOM_MAX) {
         for (const g of groupByAnchor(rest)) {
@@ -606,7 +676,9 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
     }
 
     // 我的想喝釘（UR A.20 本地 SVG 注入優先；無圖沿舊 img／emoji 鏈）
-    for (const w of wants) {
+    // UR E.6 热点模式藏自家钉（纯热斑）。
+    if (!heatMode) {
+      for (const w of wants) {
       if (w.Icon !== null) {
         const Icon = w.Icon;
         // UR C.14 round-2：想喝釘也避 live（自家想喝常與自釘同點）。
@@ -639,6 +711,7 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       });
       marker.on("click", () => cbRef.current.onWantClick(w.id));
       marker.addTo(layer);
+    }
     }
 
     // 足跡：三级分层（国家>城市>区），仅显示自己，层级决定徽与缩放
@@ -780,7 +853,100 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       root.render(<Icon className="size-full" />);
       artRoots.current.push(root);
     }
-  }, [mapReady, others, wants, trail, self, presence, friends, spreadIds, zoomTick]);
+  }, [mapReady, others, wants, trail, self, presence, friends, spreadIds, zoomTick, heatMode]);
+
+  // UR E.5 round-4：heat 挂载改自包含式——UMD 插件是后挂到 module.exports 上的，
+  // 而 `import("leaflet")` 拿到的命名空间是冻结快照，新属性永远看不见
+  // （console 实锤 `[v2map] L.heatLayer 缺失`）。改走 `.default`（即 module.exports
+  // 本体，变更可见），一次到位；挂不上就 warn，不炸版。
+  useEffect(() => {
+    const map = mapRef.current;
+    const L = leafletRef.current;
+    if (!mapReady || map === null || L === null) return;
+    let cancelled = false;
+    void (async () => {
+      // DEF-20260929-008 round-5：隔离开关（?noheat=1 即跳过热力，判证地图本身是否清白）。
+      try {
+        if (new URLSearchParams(window.location.search).get("noheat") === "1") {
+          console.info("[v2map] heat skipped (?noheat=1)");
+          setHeatOn(false);
+          return;
+        }
+      } catch {
+        //  ignore，老浏览器直接走正常链
+      }
+      try {
+        await import("leaflet.heat");
+      } catch {
+        if (!cancelled) {
+          console.warn("[v2map] leaflet.heat 加载失败，热力缺席");
+          setHeatOn(false);
+        }
+        return;
+      }
+      if (cancelled) return;
+      const mutable = (L as unknown as { default?: unknown }).default ?? L;
+      const heatFactory = (
+        mutable as unknown as {
+          heatLayer?: (
+            latlngs: [number, number, number][],
+            options: Record<string, unknown>,
+          ) => Leaflet.Layer;
+        }
+      ).heatLayer;
+      if (typeof heatFactory !== "function") {
+        console.warn("[v2map] heatLayer 仍不可见，热力缺席");
+        setHeatOn(false);
+        return;
+      }
+      heatLayerRef.current?.remove();
+      heatLayerRef.current = null;
+      if (trail !== null) {
+        setHeatOn(false);
+        return;
+      }
+      const nowMs = Date.now();
+      const pts: [number, number, number][] = [];
+      // UR E.6 round-4 巡游单格聚焦：有焦点只渲该格（一次只见一个热点）。
+      const focus = heatFocusIds === null ? null : new Set(heatFocusIds);
+      for (const m of others) {
+        if (focus !== null && !focus.has(m.id)) continue;
+        if (m.at === null || m.at <= 0 || m.at > nowMs || nowMs - m.at > HEAT_WINDOW_MS) continue;
+        pts.push([m.lat, m.lng, 1]);
+      }
+      if (pts.length === 0) {
+        setHeatOn(false);
+        return;
+      }
+      // DEF-20260929-008 round-4：诊断行（数据条数，判证“无数据”还是“渲染挂”）。
+      console.info(`[v2map] heat build: points=${pts.length}`);
+      const heatLayer = heatFactory(pts, {
+        minOpacity: 0.7,
+        maxZoom: 18,
+        // round-6 再加深：底更实＋更快饱和＋更聚（blur 收）。
+        max: 0.4,
+        radius: 48,
+        blur: 24,
+        gradient: {
+          0.12: "#2563eb",
+          0.35: "#16a34a",
+          0.55: "#ca8a04",
+          0.75: "#ea580c",
+          1.0: "#b91c1c",
+        },
+      });
+      if (cancelled) return;
+      heatLayer.addTo(map);
+      heatLayerRef.current = heatLayer;
+      setHeatOn(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mapReady, others, trail, heatFocusIds]);
+
+  // UR E.6 round-4：热点巡游不再换底图（Esri 灰 Canvas 被投诉黑白＋无字需求
+  // 已被巡游代替；原底图保留，热斑照常叠加。换层 infra 留给回退用）。
 
   // UR A.21 好友常駐層對帳：增量增刪改（marker 複用；setLatLng 配 CSS
   // 位移過渡即跟隨滑行）。主 layer 重建不碰此層；卸載／init 清場由下負責。
@@ -870,5 +1036,9 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       ?.classList.add(styles.v2trailMarch);
   }, [mapReady, trail]);
 
-  return <div ref={holderRef} className={styles.v2map} />;
+  return (
+    <div className={`${styles.v2map} ${heatOn ? styles.v2heatBreathe : ""}`}>
+      <div ref={holderRef} className={styles.v2holder} />
+    </div>
+  );
 });

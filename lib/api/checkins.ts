@@ -219,6 +219,21 @@ export function parseMineParams(
   return { limit };
 }
 
+// ---- 详情 id 校验（DEF-20260929-003：DELETE/GET 共用，纯函数可单测） ----
+
+/** UUID 宽松校验（防路径注入拼进查询；非空＋字符集即过，存在性由 DB 判）。 */
+export function parseCheckinIdParam(
+  raw: unknown,
+): { id: string } | { error: string } {
+  if (typeof raw !== "string" || raw === "") {
+    return { error: "id 非法：需为非空字符串" };
+  }
+  if (raw.length > 64 || !/^[A-Za-z0-9-]+$/.test(raw)) {
+    return { error: "id 非法：字符集越界" };
+  }
+  return { id: raw };
+}
+
 // ---- 行映射：DB 行 -> WantRecord 兼容形状（前端直接用） ----
 
 function isRecord(v: unknown): v is Record<string, unknown> {

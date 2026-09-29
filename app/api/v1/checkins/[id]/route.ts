@@ -1,7 +1,7 @@
 import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { areFriends, type FriendshipRow } from "@/lib/friends";
-import { canViewCheckin } from "@/lib/api/checkins";
+import { canViewCheckin, parseCheckinIdParam } from "@/lib/api/checkins";
 
 /**
  * UR E.2 打卡詳情（🔒）。
@@ -88,4 +88,48 @@ export async function GET(
       transcript: (row.transcript as string | null) ?? null,
     },
   });
+}
+
+/**
+ * UR E.3 删除打卡（DEF-20260929-003：此前只删本地，刷新即被 mine 复活）。
+ * `DELETE /api/v1/checkins/:id`（🔒）：只删自己的（`eq user_id`＋RLS owner delete
+ * 双保险；非本人／不存在一律 404，不泄露归属）。
+ */
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<Response> {
+  const { supabase, userId } = await getAuthedClient();
+  if (userId === null) {
+    return apiError("unauthorized", "未登录", 401);
+  }
+  const { id } = await params;
+  const parsed = parseCheckinIdParam(id);
+  if ("error" in parsed) {
+    return apiError("invalid_params", parsed.error, 400);
+  }
+  try {
+    const { data, error } = await supabase
+      .from("checkins")
+      .delete()
+      .eq("id", parsed.id)
+      .eq("user_id", userId)
+      .select("id");
+    if (error) {
+      console.error(
+        `[api/v1/checkins/[id]] delete error: code=${error.code} message=${error.message}`,
+      );
+      return apiError("internal", "打卡删除失败", 500);
+    }
+    if (!Array.isArray(data) || data.length === 0) {
+      return apiError("not_found", "打卡不存在", 404);
+    }
+  } catch (err) {
+    return apiError(
+      "internal",
+      err instanceof Error ? err.message : "unknown",
+      500,
+    );
+  }
+  return apiOk({ deleted: true });
 }

@@ -17,6 +17,8 @@ export type V2Marker = {
   /** UR C.6 round-7：釘面改酒圖標——展示名（本地 SVG 解析用）與 emoji（回退）。 */
   drink: string | null;
   drinkEmoji: string | null;
+  /** UR E.5：打卡时间 epoch ms（热力 24h 窗用；MOCK 无时间即 null 不进热）。 */
+  at: number | null;
 };
 
 export function apiPinsToMarkers(pins: readonly PinJson[]): V2Marker[] {
@@ -28,6 +30,7 @@ export function apiPinsToMarkers(pins: readonly PinJson[]): V2Marker[] {
     online: p.isOnline,
     drink: p.drinkName,
     drinkEmoji: p.drinkEmoji,
+    at: p.checkedInAt,
   }));
 }
 
@@ -40,5 +43,6 @@ export function mockToMarkers(checkins: readonly Checkin[] = MOCK_CHECKINS): V2M
     online: false,
     drink: c.drinkName,
     drinkEmoji: c.drinkEmoji,
+    at: c.checkedInAt,
   }));
 }

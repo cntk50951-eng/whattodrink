@@ -19,7 +19,7 @@ describe("apiPinsToMarkers (UR C.1)", () => {
         isOnline: true,
       },
     ]);
-    expect(out).toEqual([{ id: "u1", lat: 22.28, lng: 114.15, label: "阿", online: true, drink: "Heineken", drinkEmoji: "🍺" }]);
+    expect(out).toEqual([{ id: "u1", lat: 22.28, lng: 114.15, label: "阿", online: true, drink: "Heineken", drinkEmoji: "🍺", at: 1 }]);
   });
   it("酒字段透傳（釘面圖標用，無則 null）", () => {
     const out = apiPinsToMarkers([
@@ -81,6 +81,6 @@ describe("mockToMarkers (UR C.1)", () => {
         mock: true,
       },
     ]);
-    expect(out).toEqual([{ id: "m1", lat: 22.28, lng: 114.15, label: "測", online: false, drink: "測試酒", drinkEmoji: "🍺" }]);
+    expect(out).toEqual([{ id: "m1", lat: 22.28, lng: 114.15, label: "測", online: false, drink: "測試酒", drinkEmoji: "🍺", at: 1 }]);
   });
 });

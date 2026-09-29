@@ -2710,7 +2710,94 @@ UR E.3　拍照一页流＋酒可选＋rejected 行内报错 [✓]
 
 ---
 
-EPIC F　组局（Group Gathering，生产线 F）
+UR E.4　打卡管理＋卡片 IG 化（删除落库＋双卡重排）[WIP]
+
+用户指令（2026-09-29，DEF-20260929-003／005）：删后刷新复活；照片卡预览错位。DEF-20260929-004 同收（码证正确，判证中）。
+
+### 范围（v2-only；共用层加法，v1 行为不变）
+1. `DELETE /api/v1/checkins/:id`（🔒，本人＋404 不泄归属；RLS owner delete 现成，免迁移）＋`parseCheckinIdParam` 纯函数＋单测＋openapi
+2. 客户端先库后本（失败 toast 留本地；`deleteFailed`×3）＋调用点 `void` 包裹
+3. 双卡 IG 化：作者行→单视觉槽（实拍赢＋限高 `46svh`，酒 hero 只在无图垫底）→地点→文字→操作；换卡 key-remount 回顶（detail 到达不重置）
+
+### 非目标
+- 离线同步 worker（DEF-004 若定罪本地货，另开 UR）、语音（已退役）、v1 行为改动
+
+### AC
+- AC1：删→刷新无复活；删他人 404；失败 toast 留本地
+- AC2：开卡即顶部，照片不撑爆，单视觉＋文字紧贴；无图卡行为不变
+- AC3：三闸绿；用户浏览器亲验；`git status` 无 v1（共用层双回归已绿）
+
+*改動記錄*
+- 2026-09-29：建档即开工置 [WIP]；修码完待验（单测＋3／tsc 净／lint 净；待用户亲验删→刷新＋长图卡片，未提交）
+- 2026-09-29 round-2：DEF-006（key-remount 搞乱 Dialog→去 key 改 id＋effect 回顶）＋DEF-007（双卡 overlay＋单视觉槽）；顺手记：TDZ 类型错会连带误报 purity lint（修完自消，勿加 disable）；edit 中文注释锚又失败两次（ASCII／python 行号手术）；tsc 0／lint 净／398 绿；待亲验，未提交
+- 2026-09-29 round-3：DEF-007 返工（overlay 难读→主流帖子式：纯图＋操作行＋用户名加粗正文同行＋地点；他人卡操作行上移＋酒名并入 caption）；tsc 0／lint 净／398 绿；待亲验，未提交
+- 2026-09-29 round-4：DEF-007 再返工（文案压图回来了，但作者视角去名字：header 已有作者，overlay 只留正文＋加重渐变可读性）；tsc 0／lint 净；待亲验，未提交
+- 2026-09-29 round-5：DEF-007 文案搬照片上缘（第一眼即得；双卡同改）；类名级改动，tsc／lint 过；待亲验，未提交
+- 2026-09-29 round-6：DEF-007 定死彻底分开（overlay 全删；独立 caption 纯正文无名字；他人卡操作行已在图下）；tsc 0／lint 净；待亲验，未提交
+- 2026-09-29 round-7：DEF-007 文案搬照片上缘独立行（双卡同改）；tsc 0／lint 净；待亲验，未提交
+
+---
+
+UR E.5　地图 24h 地理热力（3km 格＋红黄绿＋脉冲）[done]
+
+用户指令（2026-09-29）：3km 内 24h 打卡多即显热力，红黄绿三档，阈值我定。
+
+### 范围（v2-only：`lib/heatmap.ts` 新＋`components/v2/v2Pins.ts` 加 `at`＋`V2MapView` 热力常驻层＋`v2.module.css`；v1 零文件）
+1. 数据：`apiPins` 前端滤 24h（`checkedInAt` 经 `V2Marker.at` 透传；fuzz 坐标对 3km 格够用）
+2. 聚合：3km 地理格计数（纯函数可单测＋快照；阈值红≥8／黄4-7／绿2-3，单钉不成热；格子 cap 12 防刷屏）
+3. 渲染：`L.circle` 半径 1500m（真 3km 直径）＋CSS 脉冲（动态感零 rAF）＋`reduced-motion` 静止；足迹模式藏他人即藏热
+
+### 非目标
+- 后端聚合端点、heat 插件新依赖、精确到楼／街
+
+### AC
+- AC1：24h 内同 3km 格达档即显对应色脉冲圆；过期自动退
+- AC2：`reduced-motion` 下静止；三闸绿；用户浏览器亲验
+
+*改動記錄*
+- 2026-09-29：建档置 []（待问答定版本＋视觉后置 [WIP]）
+- 2026-09-29：问答定案（v2-only＋脉冲圆）置 [WIP]；实作完待验（`lib/heatmap`＋7 单测＋1 快照、`V2Marker.at` 透传、热力常驻层＋`v2heat` 三色脉冲；405 绿／tsc 净／lint 净；待用户浏览器亲验，未提交）
+- 2026-09-29 round-2：用户否决脉冲圆→真渐变热力（`leaflet.heat` 新依赖＋`@types`；聚合档废除改密度自成色＋图例；`heatmap.ts` 退役删档；`V2Marker.at` 保留）；398 绿／tsc 净／lint 净；待用户亲眼验渐变＋图例＋插件挂载，未提交
+- 2026-09-29 round-3：热不显示排查（fire-and-forget 竞态＋静默守卫是元凶，改建图前 await 挂载＋双 warn＋图例只在真有热点出现；`max` 1.0→0.6 稀疏也烧红）；398 绿／tsc 净／lint 净；待亲验，未提交
+- 2026-09-29 round-4：console 实锤 UMD 双实例（`L.heatLayer 缺失`）→挂载改自包含式（走 `.default` 本体＋取消守卫＋双 warn 留口）；tsc 净／lint 净；待亲验，未提交
+- 2026-09-29 round-5：热力活着但太淡→加深（`minOpacity` 0.6／`max` 0.5／`radius` 46／红心 `#dc2626`，图例同步）；高德 HeatMap 已评估否决（要 JS Key＋`AMap.Map` 实例两套栈混用，视觉同族无优势）；`leaflet.heat` 重装回仓；tsc 净／lint 净／398 绿；待亲验，未提交
+- 2026-09-29 round-6：再加深（底 0.7／`max` 0.4／`radius` 48／`blur` 24／深色序）＋canvas 呼吸（CSS opacity，零 rAF）＋图例删除（key 同删，parity 保）；tsc 净／lint 净／398 绿；待亲验，未提交
+- 2026-09-29 round-7：用户拿来 CARTO Key→`cartoNoLabelsSpec(apiKey?)` 带 key 走配额（匿名超限白块即元凶嫌疑；key 进 gitignored `.env`＋`.env.example` 占位；真 key curl 200 验过）；tsc 净／lint 净／单测过；待重启 dev 亲验，未提交
+- 2026-09-29：用户亲验通过（热斑红心＋呼吸正常，截图链全活）→ [done]，随 E.6 同车提交（main 直推）
+
+---
+
+UR E.6　热点模式（一键全览＋无字底图＋斑点点爆）[done]
+
+用户指令：左上 pills 行加"热点"钮；点后缩到装下所有数据点，热力斑点显示所有区域，不显示地区名称；钉不留，但点斑点爆开定位到对应区后可点钉。问答定 v2-only。
+
+### 范围（v2-only：`V2Home` 钮＋开关＋`V2MapView heatMode`＋`lib/maps/provider` 加无字 spec＋`lib/heatmap` 分组回归）
+1. 按钮＋开关：pills 行 `hotspot` 钮（toggle）；开即 `fitPoints` 全量点（他人＋自家＋足迹＋朋友＋自己）
+2. 热点模式：藏他人钉徽（锚／簇／+N／散开）、底图切 CARTO 无字瓦片（运行时换层，退出复原）、热力独显（自＋友 live 钉保留定向）
+3. 斑点点爆：3km 格透明可点圆 → `onHeatCellClick(ids)` → 退模式＋fit 该格＋钉可点
+4. CARTO 无字 spec（免 key raster，沿 OSM 口径；attribution 双署名）＋单测
+
+### 非目标
+- 后端改动、v1 改动、新依赖（沿用 `leaflet.heat`）、tile 失败回退重构（沿旧口径只保初始层）
+
+### AC
+- AC1：一键全纳＋无字＋纯热斑；点斑爆开定位＋钉可点；再点退出复原（镜头不动）
+- AC2：三闸绿；用户浏览器亲验；`git status` 无 v1
+
+*改動記錄*
+- 2026-09-29：建档＋问答（v2-only／钉不留＋点爆）置 [WIP]；待实作
+- 2026-09-29：实作完待验（pills 热点钮＋开关／`heatMode` 藏钉徽＋无字底图运行时换层＋斑点点爆退模式定位／`hotspot`×3／`cartoNoLabelsSpec`＋单测／`groupHeatCells`＋3 单测；402 绿／tsc 净／lint 净；待用户浏览器亲验＋dev 重启，未提交）
+- 2026-09-29 round-2：DEF-20260929-008（换层补失败回退：CARTO 挂回 OSM；此前非目标自埋坑）；tsc 净／lint 净／402 绿；待亲验，未提交
+- 2026-09-29 round-3：巡游重做（点爆退役：按离我排序逐格跳＋悬浮下一格钮带序号＋绕回，退出回定位；空热 toast；`hotspotNext／hotspotEmpty`×3）；tsc 净／lint 净／402 绿；待亲验，未提交
+- 2026-09-29 round-4：巡游按新指令返工（①黑白退役：热点不再换 Esri 灰底，原彩色底图保留，Esri 死码清树；②单格聚焦：热力只渲当前格＋格 3km→1km 一格一斑，起点离我最近、之后贪心最近邻链 `orderHeatCellsTour`＋2 单测，末格／单格按钮变“回到我的位置”点即回定位，绕回删除；`hotspotBack`×3）；tsc 净／lint 净／403 绿；我方浏览器全链实证 1/3→2/3→3/3→返回退出；待用户亲验，未提交
+- 2026-09-29 round-5：每站信息卡（地点众数 `summarizeHeatCell`＋2 单测＋计数＋距你距离，`hotspotInfo／hotspotView／hotspotUnknown`×3）；tsc 净／lint 净／405 绿；待亲验，未提交
+- 2026-09-29 round-6：Sheet 退役改钻取（查看打卡＝fit 本格自动适应＋图上散真钉可点开卡，巡游面板保留，钻后变收起；多推的一级 zoom 特删，纯 fit）；tsc 净／lint 净／405 绿；我方浏览器实证钻取＋点钉开卡；待用户亲验，未提交
+- 2026-09-29 round-7：钻取连通片（`connectedCellIds`＋2 单测：目标格＋八邻接连通全并入；实测本区 3 格 6 条全并入，markers 0→6）＋fit 后推一级；tsc 净／lint 净／407 绿；但 fit＋zoom 裁边（3 钉出画）未达预期，未提交
+- 2026-09-29 round-8：图上钻取退役回 Sheet（查看打卡＝连通片全部打卡列表，卡与 Sheet 摘要同口径；行点开卡沿 openPin）；钻取死码清树（`heatDrillIds`／zoomIn）；tsc 净／lint 净／407 绿；我方浏览器实证 6 行＋点行开卡；待用户亲验，未提交
+- 2026-09-29：用户亲验通过（巡游 1/3→返回＋信息卡＋Sheet 6 行＋开卡全链）→ [done]；终态：彩色底图保留＋单格热聚焦＋贪心巡游＋末格返回＋连通片 Sheet；随 E.5 同车提交（main 直推）
+- 2026-09-29 round-3：DEF-20260929-008 真凶（本站 amap 源＋挂载即换掀计数进度→换层幂等，无变化不换；另清脏 `.next` 毒 validator＋build 重建类型）；build 绿／tsc 净／lint 净／402 绿；待亲验，未提交
+- 2026-09-29 round-4：DEF-20260929-008 推翻重定×2（①动态 className 抹类→内外分家，我方截图全活；②CARTO 回 200 水印砖→用户 key 未授权 basemaps→换 Esri 浅灰免 key，我方点热点截图全貌通过）；tsc 净／lint 净；待用户亲眼复验，未提交
+- 2026-09-29 round-4：DEF-20260929-008 推翻重定（agent-browser 实证：砖 valid 但渲染宽 0＋容器丢类；元凶＝动态 className 绑在 Leaflet 节点上被重写抹类→内外分家修完，我方截图砖热钉全活）；tsc 净／lint 净；待用户亲眼复验，未提交
 
 > 生产线 F 新开，主力承载“组局”功能。总体定位：以“每人带一支酒的品酒会”为原型，扩展为主题化小聚引擎（B 主题开放 + C 熟人基座），初期纯信息撮合 + 免责声明 + 公开场所引导（用户自选公开场所，平台建议清单，不指定），后期叠加认证合作场地。MVP 闭环：发布 → 发现（地图+列表）→ 申请 → 审批 → 行前提醒 → 签到 → 互评。法务待复核，PDPO/年龄/免责按 §3 风险矩阵落地。详见 `docs/EPIC_F_GROUP_GATHERING.md` v0.1 与 `docs/F_BACKLOG_DRAFT.md` 草案。
 

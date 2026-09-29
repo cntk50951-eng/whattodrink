@@ -279,7 +279,8 @@
     "friendsOnly": "Friends only",
     "friendsAll": "Everyone",
     "loginRequiredBody": "Check-ins need an account — your pins follow your account across devices",
-    "loginCta": "Sign in"
+    "loginCta": "Sign in",
+    "deleteFailed": "Delete failed, try again"
   },
   "mode": {
     "guardTitle": "Stealth mode is read-only",
@@ -379,7 +380,15 @@
     "camDrinkTitle": "Tag a drink? (optional)",
     "camNoDrink": "No drink",
     "camRejectedKept": "Kept — edit and resend",
-    "camPublishFailed": "Share failed, try again"
+    "camPublishFailed": "Share failed, try again",
+    "hotspot": "Hotspots",
+    "hotspotNext": "Next hotspot",
+    "hotspotEmpty": "No hotspots in the last 24h nearby",
+    "hotspotBack": "Back to my location",
+    "hotspotView": "View check-ins",
+    "hotspotInfo": "{n} check-ins · {d} away",
+    "hotspotUnknown": "Nearby",
+    "hotspotCollapse": "Hide pins"
   },
   "gatherings": {
     "newTitle": "Create Gathering",

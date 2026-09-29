@@ -21,6 +21,7 @@ import {
   LogOut,
   Map as MapIcon,
   MapPin,
+  Radar,
   RefreshCw,
   Sparkles,
   Trash2,
@@ -62,6 +63,8 @@ import {
 } from "@/lib/geo";
 import type { LatLng } from "@/lib/geo";
 import { resolveCityCode } from "@/lib/city";
+import { groupHeatCells, orderHeatCellsTour, summarizeHeatCell, connectedCellIds } from "@/lib/heatmap";
+import type { HeatCell } from "@/lib/heatmap";
 import { areaOf } from "@/lib/geoAreas";
 import {
   BEER_CATEGORIES,
@@ -262,6 +265,8 @@ export function V2Home() {
   } | null>(null);
   const otherDetailFor = useRef<string | null>(null);
   const [trailOn, setTrailOn] = useState(false);
+  // UR E.6 热点模式开关（开即全纳＋无字＋纯热斑；再点退出复原，镜头不动）。
+  const [heatMode, setHeatMode] = useState(false);
   // UR C.11：一鍵足跡——登入浮層開關／地圖 ready tick／?trail=1 續跑 intent／目錄 Sheet。
   const [trailLoginOpen, setTrailLoginOpen] = useState(false);
   const [stopsOpen, setStopsOpen] = useState(false);
@@ -283,6 +288,18 @@ export function V2Home() {
 
   // UR C.4 自打卡底部 Sheet：按記錄 at 認正在看的條；換酒批／刪除確認隨層開關
   const [wantSheetAt, setWantSheetAt] = useState<number | null>(null);
+  // DEF-20260929-006：换卡回顶（开卡／换卡即滚顶；detail 到达不触发，不打断阅读；
+  // 放 state 声明后，沿 tsc 先声明后使用）。
+  useEffect(() => {
+    const key = card !== null && card.kind === "other" ? card.id : wantSheetAt;
+    if (key === null) return;
+    const raf = requestAnimationFrame(() => {
+      document
+        .getElementById("wtd-checkin-sheet")
+        ?.scrollTo({ top: 0 });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [card, wantSheetAt]);
   // UR C.14 round-2：+N 堆疊列表 Sheet（同點超 cap 組的成員 id，含代表）。
   const [stackIds, setStackIds] = useState<string[] | null>(null);
   // UR E.3：相機一页流直发（shot 随参，无 staged 中转；酒可空）。
@@ -777,10 +794,27 @@ export function V2Home() {
     if (rec !== undefined && rec.id === undefined) saveWantHistory(next);
     setSwapOpen(false);
   }
-  function handleDeleteWant(): void {
+  // DEF-20260929-003：有 DB id 先删库（失败留本地＋toast），再清本地；无 id 纯本地。
+  // 此前只清本地，刷新即被 mine 复活，且根本没有 DELETE 端点。
+  async function handleDeleteWant(): Promise<void> {
     if (wantSheetAt === null) return;
     const at = wantSheetAt;
     const doomed = wantHistory.find((w) => w.at === at);
+    if (doomed?.id !== undefined) {
+      try {
+        const res = await fetch(`/api/v1/checkins/${encodeURIComponent(doomed.id)}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        if (!res.ok) {
+          flashNote(t("deleteFailed"));
+          return;
+        }
+      } catch {
+        flashNote(t("deleteFailed"));
+        return;
+      }
+    }
     const next = removeWantAt(wantHistory, at);
     setWantHistory(next);
     if (doomed !== undefined && doomed.id === undefined) saveWantHistory(next);
@@ -1063,6 +1097,109 @@ export function V2Home() {
     return { ok: false, message: r.message };
   }
 
+  // UR E.6 round-4 热点巡游：起点离我最近，之后基于当前格跳最近未访格；
+  // 末格按钮变返回（回我位置），单格直接返回。
+  // round-5：每站信息卡（地点众数＋计数＋距离，点即开成员 Sheet）。
+  // round-8：图上钻取退役——查看打卡回 Sheet，列连通片全部打卡（行点开卡）。
+  const [heatCells, setHeatCells] = useState<HeatCell[]>([]);
+  const [heatIdx, setHeatIdx] = useState(0);
+  const [heatOrigin, setHeatOrigin] = useState<LatLng | null>(null);
+  const [heatSheetOpen, setHeatSheetOpen] = useState(false);
+
+  function exitHeatTour(): void {
+    // 退出回当前定位（沿回位口径）。
+    setHeatMode(false);
+    setHeatCells([]);
+    setHeatIdx(0);
+    setHeatOrigin(null);
+    setHeatSheetOpen(false);
+    mapApi.current?.recenter();
+  }
+
+  function flyHeatCell(cells: HeatCell[], i: number): void {
+    const c = cells[i];
+    if (c === undefined) return;
+    const pts = c.ids.flatMap((id) => {
+      const m = others.find((o) => o.id === id);
+      return m === undefined ? [] : [{ lat: m.lat, lng: m.lng }];
+    });
+    if (pts.length > 0) mapApi.current?.fitPoints(pts);
+    setHeatIdx(i);
+  }
+
+  function toggleHeatMode(): void {
+    if (heatMode) {
+      exitHeatTour();
+      return;
+    }
+    const origin = selfPos ?? mapApi.current?.getCenter() ?? null;
+    const cells = groupHeatCells(
+      others.map((m) => ({ id: m.id, lat: m.lat, lng: m.lng, at: m.at })),
+    );
+    if (cells.length === 0) {
+      flashNote(t2("hotspotEmpty"));
+      return;
+    }
+    const ordered = orderHeatCellsTour(cells, origin);
+    setHeatCells(ordered);
+    setHeatOrigin(origin);
+    setHeatSheetOpen(false);
+    setHeatMode(true);
+    flyHeatCell(ordered, 0);
+  }
+
+  // 巡游下一格（末格即返回我的位置，不再绕回；跳格即关 Sheet）。
+  function nextHeatCell(): void {
+    if (heatCells.length === 0) return;
+    if (heatIdx >= heatCells.length - 1) {
+      exitHeatTour();
+      return;
+    }
+    setHeatSheetOpen(false);
+    flyHeatCell(heatCells, heatIdx + 1);
+  }
+
+  // UR E.6 round-8 当前站派生（信息卡＋成员 Sheet 共用；成员＝连通片全员，
+  // 沿 openPin 双源口径；摘要口径同成员，卡与 Sheet 一致）。
+  const heatCell = heatMode ? (heatCells[heatIdx] ?? null) : null;
+  const heatSheetIds =
+    heatCell === null ? [] : connectedCellIds(heatCell, heatCells);
+  const heatMembers = heatSheetIds.flatMap((id) => {
+          const api = apiPins.find((p) => p.id === id);
+          if (api !== undefined) {
+            return [
+              {
+                id,
+                area: api.area,
+                title: api.nickname ?? api.drinkName ?? "酒友",
+                emoji: api.drinkEmoji ?? "🍺",
+                drink: api.drinkName ?? "",
+                lat: api.lat,
+                lng: api.lng,
+              },
+            ];
+          }
+          const m = MOCK_CHECKINS.find((c) => c.id === id);
+          if (m !== undefined) {
+            return [
+              {
+                id,
+                area: m.area,
+                title: m.nickname,
+                emoji: m.drinkEmoji,
+                drink: m.drinkName,
+                lat: m.position.lat,
+                lng: m.position.lng,
+              },
+            ];
+          }
+          return [];
+        });
+  const heatSummary =
+    heatCell === null
+      ? null
+      : summarizeHeatCell({ ...heatCell, ids: heatSheetIds }, heatMembers, heatOrigin);
+
   function doShake(): void {
     const now = Date.now();
     const from = selfPos ?? mapApi.current?.getCenter() ?? DEFAULT_CENTER;
@@ -1113,6 +1250,8 @@ export function V2Home() {
         friends={friendMarkers}
         onFriendClick={openChat}
         onStackClick={(ids) => setStackIds(ids)}
+        heatMode={heatMode}
+        heatFocusIds={heatMode ? (heatCells[heatIdx]?.ids ?? null) : null}
       />
 
       {/* UR C.17 好友信息卡（點釘先看人，卡內聊天鍵進完整頁；對方離線即自動收卡 fail-closed） */}
@@ -1271,6 +1410,15 @@ export function V2Home() {
           <Users aria-hidden />
           {t2("chatFriendsOnly")}
         </Button>
+        <Button
+          size="sm"
+          variant={heatMode ? "secondary" : "outline"}
+          className={`shrink-0 rounded-full shadow-md ring-1 ring-foreground/10 ${heatMode ? "" : "bg-card"}`}
+          onClick={toggleHeatMode}
+        >
+          <Radar aria-hidden />
+          {t2("hotspot")}
+        </Button>
       </div>
       {/* 足跡浮條（頂部容器內流式排布，永不與 pills 重疊） */}
       {trailOn && (
@@ -1333,6 +1481,69 @@ export function V2Home() {
         <p role="status" className="absolute bottom-40 left-1/2 z-[1000] w-max max-w-[92%] -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background shadow-md">
           {note}
         </p>
+      )}
+
+      {/* UR E.6 round-8 巡游信息卡：地点＋计数＋距离，点即开成员 Sheet
+          （连通片全部打卡）；下方查看键＋巡游键（非末＝下一格＋进度，
+          末／单＝返回）。 */}
+      {heatMode && heatCell !== null && heatSummary !== null && (
+        <div className="pointer-events-none absolute inset-x-3 bottom-36 z-[1000] flex justify-center">
+          <div className="pointer-events-auto w-full max-w-sm rounded-2xl bg-card p-3 shadow-lg ring-1 ring-foreground/10">
+            <button
+              type="button"
+              onClick={() => setHeatSheetOpen(true)}
+              className="flex w-full items-center gap-2.5 text-left"
+              aria-label={t2("hotspotView")}
+            >
+              <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
+                <MapPin size={17} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-bold">
+                  {heatSummary.area ?? t2("hotspotUnknown")}
+                </span>
+                <span className="block truncate pt-0.5 text-xs text-muted-foreground">
+                  {t2("hotspotInfo", {
+                    n: heatSummary.count,
+                    d:
+                      heatSummary.distanceM === null
+                        ? "—"
+                        : formatDistance(heatSummary.distanceM),
+                  })}
+                </span>
+              </span>
+              <ChevronRight size={16} aria-hidden className="shrink-0 text-muted-foreground" />
+            </button>
+            <div className="mt-2 flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 rounded-full"
+                onClick={() => setHeatSheetOpen(true)}
+              >
+                {t2("hotspotView")}
+              </Button>
+              {heatIdx >= heatCells.length - 1 ? (
+                <Button
+                  size="sm"
+                  className="flex-1 rounded-full"
+                  onClick={nextHeatCell}
+                >
+                  {t2("hotspotBack")} · {heatCells.length}/{heatCells.length}
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="flex-1 rounded-full"
+                  onClick={nextHeatCell}
+                >
+                  {t2("hotspotNext")} · {heatIdx + 1}/{heatCells.length}
+                  <ChevronRight size={15} aria-hidden />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 底部 CTA 列（UR C.20：只留選酒大鈕——主要賣點；相機走 TabBar 大圓，
@@ -1647,7 +1858,13 @@ export function V2Home() {
           }
         }}
       >
-        <SheetContent side="bottom" className={`${styles.v2scope} max-h-[85svh] gap-4 overflow-y-auto rounded-t-2xl p-4 sm:mx-auto sm:w-full sm:max-w-md`}>
+        {/* DEF-20260929-006：此前 key 随卡变 remount Popup，开着换卡直接搞乱
+            base-ui Dialog 开关机（残留吞点击）——改 id＋effect 回顶，身份稳定。 */}
+        <SheetContent
+          id="wtd-checkin-sheet"
+          side="bottom"
+          className={`${styles.v2scope} max-h-[85svh] gap-4 overflow-y-auto rounded-t-2xl p-4 sm:mx-auto sm:w-full sm:max-w-md`}
+        >
           {(() => {
             // UR C.10 返工：他人卡進同一 Sheet（grabber／Header／X 共用，
             // 與自家同容器，錯位按構造消失；浮動卡退役）。
@@ -1668,23 +1885,7 @@ export function V2Home() {
                     </SheetDescription>
                   </SheetHeader>
                   <div className="flex items-center gap-3">
-                    <span className="w-28 shrink-0 overflow-hidden rounded-xl border bg-card p-1">
-                      {(() => {
-                        const hero =
-                          card.drink !== "" ? beerByName(card.drink) : null;
-                        return hero !== null ? (
-                          <BeerImg key={hero.id} beer={hero} tall />
-                        ) : (
-                          <span aria-hidden className="flex aspect-[3/4] w-full items-center justify-center text-4xl">
-                            {card.emoji}
-                          </span>
-                        );
-                      })()}
-                    </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-base font-bold">
-                        {card.drink !== "" ? card.drink : card.title}
-                      </p>
                       <p className="flex flex-wrap items-center gap-1.5 pt-1.5 text-sm text-muted-foreground">
                         {card.avatarUrl !== null &&
                         /^https?:\/\//.test(card.avatarUrl) ? (
@@ -1704,43 +1905,33 @@ export function V2Home() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1.5 text-sm">
-                    {card.sub !== "" && (
-                      <span className="flex items-center gap-1.5">
-                        <MapPin size={15} aria-hidden />
-                        <span className="min-w-0 truncate">{card.sub}</span>
-                      </span>
-                    )}
-                    {selfPos !== null && (
-                      <span className="flex items-center gap-1.5">
-                        <Footprints size={15} aria-hidden />
-                        {formatDistance(
-                          haversineMeters(selfPos, {
-                            lat: card.lat,
-                            lng: card.lng,
-                          }),
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  {/* UR E.2：他人三件套（詳情按需拉；空即無，不擋卡片本體）。 */}
+                  {/* UR E.3 round-3 IG 式单视觉槽：有实拍即主视觉（限高），酒 hero 只在无图时垫底，不再双图三明治。 */}
+                  {otherDetail?.note && (
+                    <p className="pt-1 text-sm">{otherDetail.note}</p>
+                  )}
                   {otherDetail?.photoUrl ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img
                       src={otherDetail.photoUrl}
                       alt=""
                       loading="lazy"
-                      className="aspect-[3/4] w-full rounded-xl object-cover"
+                      className="max-h-[46svh] w-full rounded-xl object-cover"
                     />
-                  ) : null}
-                  {otherDetail?.note ? (
-                    <p className="rounded-xl bg-muted px-3 py-2 text-sm">
-                      {otherDetail.note}
-                    </p>
-                  ) : null}
-                  {otherDetail?.audioUrl ? (
-                    <audio controls src={otherDetail.audioUrl} className="h-9 w-full" />
-                  ) : null}
+                  ) : (
+                    <span className="w-full shrink-0 overflow-hidden rounded-xl border bg-card p-1">
+                      {(() => {
+                        const hero =
+                          card.drink !== "" ? beerByName(card.drink) : null;
+                        return hero !== null ? (
+                          <BeerImg key={hero.id} beer={hero} tall />
+                        ) : (
+                          <span aria-hidden className="flex aspect-[3/4] w-full items-center justify-center text-4xl">
+                            {card.emoji}
+                          </span>
+                        );
+                      })()}
+                    </span>
+                  )}
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       size="sm"
@@ -1768,6 +1959,32 @@ export function V2Home() {
                       ? t("cheersLeft", { n: cheersRemaining(sentIds) })
                       : t("cheersLimitReached")}
                   </span>
+                  {card.drink !== "" && (
+                    <p className="text-sm text-muted-foreground">🍺 {card.drink}</p>
+                  )}
+                  <div className="flex flex-col gap-1.5 text-sm">
+                    {card.sub !== "" && (
+                      <span className="flex items-center gap-1.5">
+                        <MapPin size={15} aria-hidden />
+                        <span className="min-w-0 truncate">{card.sub}</span>
+                      </span>
+                    )}
+                    {selfPos !== null && (
+                      <span className="flex items-center gap-1.5">
+                        <Footprints size={15} aria-hidden />
+                        {formatDistance(
+                          haversineMeters(selfPos, {
+                            lat: card.lat,
+                            lng: card.lng,
+                          }),
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  {/* UR E.2：他人三件套（詳情按需拉；照片已上移主视觉，此处只剩文字——IG 式 caption 紧贴照片下）。 */}
+                  {otherDetail?.audioUrl ? (
+                    <audio controls src={otherDetail.audioUrl} className="h-9 w-full" />
+                  ) : null}
                 </>
               );
             }
@@ -1813,11 +2030,6 @@ export function V2Home() {
                   <SheetDescription>{formatWantTime(rec.at, locale)}</SheetDescription>
                 </SheetHeader>
                 <div className="flex items-center gap-3">
-                  {fresh !== null && (
-                    <span className="w-28 shrink-0 overflow-hidden rounded-xl border bg-card p-1">
-                      <BeerImg key={fresh.id} beer={fresh} tall />
-                    </span>
-                  )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-base font-bold">
                       {fresh === null ? t("you") : fresh.name}
@@ -1835,6 +2047,23 @@ export function V2Home() {
                     </p>
                   </div>
                 </div>
+                {/* DEF-20260929-007 round-4：文案压图（作者视角不加名字，header 已有作者）。 */}
+                {rec.note && (
+                  <p className="pt-1 text-sm">{rec.note}</p>
+                )}
+                {rec.photoDataUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={rec.photoDataUrl}
+                    alt=""
+                    className="max-h-[46svh] w-full rounded-xl object-cover"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                    <Camera size={16} aria-hidden />
+                    {t2("wantPhotoSoon")}
+                  </div>
+                )}
                 <div className="flex flex-col gap-1.5 text-sm">
                   <span className="flex items-center gap-1.5">
                     <MapPin size={15} aria-hidden />
@@ -1848,24 +2077,6 @@ export function V2Home() {
                   )}
                   <span className="text-xs text-muted-foreground">{t("wantFrozenNote")}</span>
                 </div>
-                {/* UR E.1：有實拍即顯真圖＋文字＋語音（本地三件套；E.2 才同步後端）。
-                    無圖沿舊佔位。 */}
-                {rec.photoDataUrl ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={rec.photoDataUrl}
-                    alt=""
-                    className="aspect-[3/4] w-full rounded-xl object-cover"
-                  />
-                ) : (
-                  <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
-                    <Camera size={16} aria-hidden />
-                    {t2("wantPhotoSoon")}
-                  </div>
-                )}
-                {rec.note && (
-                  <p className="rounded-xl bg-muted px-3 py-2 text-sm">{rec.note}</p>
-                )}
                 {rec.audio && (
                   <audio controls src={rec.audio.url} className="h-9 w-full" />
                 )}
@@ -1881,7 +2092,9 @@ export function V2Home() {
                       variant="outline"
                       size="sm"
                       className="border-destructive text-destructive"
-                      onClick={handleDeleteWant}
+                      onClick={() => {
+                        void handleDeleteWant();
+                      }}
                     >
                       <Trash2 size={15} aria-hidden />
                       {t("confirmDelete")}
@@ -2062,6 +2275,76 @@ export function V2Home() {
                 >
                   {t("stackSpread")}
                 </Button>
+              </>
+            );
+          })()}
+        </SheetContent>
+      </Sheet>
+
+      {/* UR E.6 round-8：热点成员 Sheet（查看打卡：连通片全部打卡列表，行点开卡沿 openPin 全量详情） */}
+      <Sheet
+        open={heatSheetOpen && heatCell !== null}
+        onOpenChange={(v) => {
+          if (!v) setHeatSheetOpen(false);
+        }}
+      >
+        <SheetContent side="bottom" className={`${styles.v2scope} max-h-[70svh] gap-4 overflow-y-auto rounded-t-2xl p-4 sm:mx-auto sm:w-full sm:max-w-md`}>
+          {(() => {
+            if (heatCell === null || heatSummary === null) return null;
+            return (
+              <>
+                <div aria-hidden className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
+                <SheetHeader className="text-left">
+                  <SheetTitle>{heatSummary.area ?? t2("hotspotUnknown")}</SheetTitle>
+                  <SheetDescription>
+                    {t2("hotspotInfo", {
+                      n: heatSummary.count,
+                      d:
+                        heatSummary.distanceM === null
+                          ? "—"
+                          : formatDistance(heatSummary.distanceM),
+                    })}
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="flex flex-col gap-2">
+                  {heatMembers.map((m) => {
+                    const parts = [
+                      m.drink !== "" ? m.drink : null,
+                      m.area,
+                      heatOrigin !== null
+                        ? formatDistance(
+                            haversineMeters(heatOrigin, { lat: m.lat, lng: m.lng }),
+                          )
+                        : null,
+                    ].filter((x): x is string => x !== null && x !== "");
+                    return (
+                      <Button
+                        key={m.id}
+                        variant="outline"
+                        onClick={() => {
+                          setHeatSheetOpen(false);
+                          openPin(m.id);
+                        }}
+                        className="h-auto w-full justify-start gap-3 p-2"
+                      >
+                        <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-xl">
+                          {m.emoji}
+                        </span>
+                        <span className="min-w-0 flex-1 text-left">
+                          <span className="block truncate text-sm font-bold">
+                            {m.title}
+                          </span>
+                          {parts.length > 0 && (
+                            <span className="block truncate pt-0.5 text-xs font-normal text-muted-foreground">
+                              {parts.join(" · ")}
+                            </span>
+                          )}
+                        </span>
+                        <ChevronRight size={16} aria-hidden className="shrink-0 text-muted-foreground" />
+                      </Button>
+                    );
+                  })}
+                </div>
               </>
             );
           })()}

@@ -355,11 +355,23 @@
 - harness：新增 `workflow.md` Step 3.5——UI 設計相關改動（新頁面／redesign／tokens／動畫／layout primitives）寫 code 前先調設計 skill（`stitch-design`／`design-taste-frontend`／`taste`），品牌層（doodle）不可動；同步 `.harness/README.md`、`harness-workflow` skill（`.agents/`＋`.opencode/`）、`AGENTS.md` 工具對應表
 
 ### Fixed
-- **DEF-20260929-002 拍照一页流＋酒可选＋rejected 行内报错（UR E.3，修復中，未提交）**
-  - `V2CameraSheet` 一页流（kind 必选点选即进＋滑动切换／compose 缩略配文＋sticky 发布／rejected `role=alert` 留现场；录音全删；round-2 酒退场＋发布罩去啤酒泡味）；`dropWant` 回 verdict（ok／message／guard）；`beer_id`＋`WantRecord.beer` nullable 端到端（pins 本已 null-safe；v1 `DrinkMap`＋`trailStops` 回归守卫）；文案 8 key×3 同序；单测 98 绿／tsc 净／lint 净
+- **DEF-20260929-002 拍照一页流＋酒可选＋rejected 行内报错（UR E.3，[merged #41]）**
+  - `V2CameraSheet` 一页流（kind 必选点选即进＋滑动切换／compose 缩略配文＋sticky 发布／rejected `role=alert` 留现场；录音全删；round-2 酒退场＋发布罩去啤酒泡味）
+- **DEF-20260929-003／005（UR E.4，修復中，已提交；DEF-004 待用户两步判证）**
+  - `DELETE /:id`（本人＋404 不泄）＋`parseCheckinIdParam`＋单测＋openapi；客户端先库后本＋`deleteFailed`×3；双卡 IG 化（作者行→单视觉槽限高→地点→文字→操作）＋换卡回顶；单测＋3／tsc 净／lint 净
+  - round-2：DEF-006（去 key-remount，改 id＋effect 回顶）＋DEF-007（双卡 overlay 压字）；tsc 0／lint 净／398 绿
+  - round-3：DEF-007 返工（overlay 难读→主流帖子式 caption；他人卡操作行上移）；tsc 0／lint 净／398 绿
+  - DEF-20260929-004 码证回显正确（登录即全量 `mine`），留用户两步判证法，未动码
+  - 數據文檔無需更新（零新增前端数据类型）；`dropWant` 回 verdict（ok／message／guard）；`beer_id`＋`WantRecord.beer` nullable 端到端（pins 本已 null-safe；v1 `DrinkMap`＋`trailStops` 回归守卫）；文案 8 key×3 同序；单测 98 绿／tsc 净／lint 净
   - 數據文檔無需更新（零新增前端数据类型，酒 null 属既有字段放宽；照片／note 沿 E.2 已同步）
   - `ModerationVendorError`（vendor＋status 分级，message 沿旧格式）＋Minimax 模型裁决 OR 化（平台信号独立，注水只会更严）＋`moderationAction` 纯函数（pass／reject／unavailable）＋有 key 全挂 503 fail-closed（沿 rejected 通道，客户端零改动）；图片 body 双 vendor 断言；单测 19 绿；Minimax 真 key live 双绿跑完即删；tsc／eslint 净
   - 數據文檔無需更新（零新增前端数据，server 日志不属展示数据）
+- **UR E.5 地图 24h 地理热力 [✓，用户親驗，main 直推]**
+  - `leaflet.heat` 真渐变热力（蓝→绿→黄→红密度自成色＋canvas 呼吸，图例删除；`max` 0.4／`radius` 48／`blur` 24／`minOpacity` 0.7）；UMD 双实例坑（命名空间冻结快照→走 `.default` 本体）；`V2Marker.at` 透传＋24h 窗；`leaflet.heat` 新依赖；用户親驗截图链全活
+- **UR E.6 热点巡游 [✓，用户親驗，main 直推]**
+  - 终态：彩色底图保留（CARTO 水印砖→Esri→不换底图，换层代码整段删除）＋单格热聚焦（`heatFocusIds`，格 3km→1km 一格一斑）＋贪心最近邻巡游（`orderHeatCellsTour`，末格变返回回定位）＋每站信息卡（地点众数 `summarizeHeatCell`＋计数＋距你距离）＋查看打卡 Sheet（连通片 `connectedCellIds` 全员列表，行点开卡沿 openPin）；文案 `hotspot/hotspotNext/hotspotBack/hotspotEmpty/hotspotView/hotspotInfo/hotspotUnknown/hotspotCollapse`×3 同序；单测 407 绿／tsc 净／lint 净；用户親驗全链（1/3→返回＋6 行＋开卡）
+- **DEF-20260929-008 热点模式底图变白 [Closed，用户親驗关闭]**
+  - 确诊链：①动态 className 抹 `leaflet-container` 类→内外分家（外层 React 动态类，内层 holder 静态）；②换层掀回退计数→幂等→随不换底图整段删除；③CARTO 回 200 水印砖（用户 key 未授权 basemaps，已清出树）→Esri→不换底图；铁律：第三方拥有的 DOM 只挂静态类＋白屏先看计算样式＋两轮不中换取证手段
 
 ### Planned
 - 等用戶從 20 張風格圖選定方向，把更多 theme preset 填進 `lib/themes/presets/`

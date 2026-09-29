@@ -279,7 +279,8 @@
     "friendsOnly": "只看好友",
     "friendsAll": "全部动态",
     "loginRequiredBody": "打卡需要登录，登录后记录会跟随你的账号，换设备也不丢",
-    "loginCta": "去登录"
+    "loginCta": "去登录",
+    "deleteFailed": "删除失败，请再试一次"
   },
   "mode": {
     "guardTitle": "隐身模式仅可浏览",
@@ -379,7 +380,15 @@
     "camDrinkTitle": "加支酒？（可选）",
     "camNoDrink": "不选酒",
     "camRejectedKept": "内容已保留，改完可直接重发",
-    "camPublishFailed": "发布失败，请再试一次"
+    "camPublishFailed": "发布失败，请再试一次",
+    "hotspot": "热点",
+    "hotspotNext": "下一个热点",
+    "hotspotEmpty": "附近 24 小时暂无热点",
+    "hotspotBack": "回到我的位置",
+    "hotspotView": "查看打卡",
+    "hotspotInfo": "{n} 条打卡 · 距你 {d}",
+    "hotspotUnknown": "附近",
+    "hotspotCollapse": "收起打卡点"
   },
   "gatherings": {
     "newTitle": "发起组局",

@@ -43,6 +43,14 @@
   inset: 0;
 }
 
+/* DEF-20260929-008 血训：动态 className 绝不绑在 Leaflet 拥有的节点上——
+ * React 重写 className 会抹掉 Leaflet 加的 `leaflet-container`，瓦片 CSS 全灭白屏。
+ * 呼吸开关挂外层 .v2map（React 拥有），内层 holder 终身无动态 class。 */
+.v2holder {
+  position: absolute;
+  inset: 0;
+}
+
 /* Leaflet 容器觸控：UR C.12 改回 none（Leaflet 全接管捏合／雙擊／拖）。
  * C.1 的 pan-y pinch-zoom 在 v2 全屏下退役——它明示瀏覽器可接 pinch，
  * 圖上捏合變 race；v1 那份原樣不動。 */
@@ -353,6 +361,28 @@
   }
   .v2friend {
     transition: none;
+  }
+}
+
+/* UR E.5 round-6：热力呼吸（只动 canvas 整体 opacity，零 rAF；
+ * heat 重绘时会重置动画时钟，呼吸相位跟随数据刷新，属预期行为）。 */
+.v2heatBreathe :global(.leaflet-heatmap-layer) {
+  animation: v2heatbreathe 3.2s ease-in-out infinite;
+}
+
+@keyframes v2heatbreathe {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2heatBreathe :global(.leaflet-heatmap-layer) {
+    animation: none;
   }
 }
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canViewCheckin,
   mineRowToWantRecord,
+  parseCheckinIdParam,
   parseCreateCheckinBody,
   parseMineParams,
   toMineRow,
@@ -218,5 +219,19 @@ describe("toMineRow 三件套回顯 (UR E.2)", () => {
     });
     expect(row?.photo_url).toBe("data:image/jpeg;base64,/9j/");
     expect(row?.note).toBe("好飲");
+  });
+});
+
+describe("parseCheckinIdParam (DEF-20260929-003)", () => {
+  it("合法 id 过", () => {
+    expect(parseCheckinIdParam("cf279968-30bd-4ffa-bf2b-4992928909c3")).toEqual({
+      id: "cf279968-30bd-4ffa-bf2b-4992928909c3",
+    });
+  });
+  it("空／非串／越界字符拒", () => {
+    expect("error" in parseCheckinIdParam("")).toBe(true);
+    expect("error" in parseCheckinIdParam(null)).toBe(true);
+    expect("error" in parseCheckinIdParam("../x")).toBe(true);
+    expect("error" in parseCheckinIdParam("a".repeat(65))).toBe(true);
   });
 });
