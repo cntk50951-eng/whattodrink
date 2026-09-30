@@ -3193,7 +3193,7 @@ UR F.10　反刷与行为风控（AI 辅助）[]
 
 > 用戶拍板（2026-09-30）：「今晚喝咩？」變扭蛋遊戲＋品牌圖鑑；免登錄；落位 v2；殼選 Capacitor（分兩步，G1 數據達標再套殼）。
 
-UR G1.1　規則純函數（`lib/game/gacha.ts`＋`dex.ts`＋單測）[]
+UR G1.1　規則純函數（`lib/game/gacha.ts`＋`dex.ts`＋單測）[✓]
 UR G1.2　扭蛋機＋抽卡 UI（Motion＋CSS 3D，v2）[]
 UR G1.3　圖鑑冊＋分享頁（`/dex/:code`＋noindex／OG）[]
 
