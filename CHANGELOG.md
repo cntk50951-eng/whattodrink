@@ -5,12 +5,6 @@
 ## [Unreleased]
 
 ### Added
-- **UR G1.0 扭蛋＋圖鑑數據與契約 [✓，用戶 Dashboard 貼跑驗過]**
-- **UR G1.1 規則純函數 [✓，單測＋全套綠，用戶確認提交]**（`lib/game/gacha.ts`：`rollLane`／`drawBrand` 保底＋集滿順延／`isNewDay`；`dex.ts`：`registerDraw` 去重累數／`mergeDex` 認領合併；9 單測；storage IO 留 G1.2）
-  - `supabase/migrations/0015_dex_tables.sql`（`dex_identities`／`user_cards`／`dex_likes`，RLS 全拒，Dashboard 貼跑；`card_id` 無 FK，白名單 G1.4 handler 校驗）
-  - `docs/api-openapi.yaml` 加 `POST /dex/collect`／`POST /dex/likes`（429＋冪等 `duplicate`＋merge 語義）＋`DexCollectBody`／`DexCollectResult`
-  - EPIC G 建檔（G1.1–G1.3 [] 路線圖）；future-schema `game_*` 暫緩改 G1 例外
-  - 數據文檔無需更新（零新增前端數據；表屬未來映射，已回 future-schema）
 - **UR D.6 圖片＋語音附件 [WIP]**
   - `0013_chat_storage.sql`（私有桶 RLS：首段歸屬寫删，讀全走簽名）＋`0014_conversations_rpc.sql`（列表 N+1→單 RPC＋語音 secs）；`POST /uploads/sign`＋`/uploads/view`（bucket 白名單＋歸屬校验）；發送附件開閘（歸屬＋ caps）；composer 圖／音＋氣泡＋snippet 章；`useSignedUrl` 緩存；7 組 key；單測綠；待用戶 Dashboard 三動作＋聯驗＋合入
 - **EPIC D 好友聊天真通道＋UR D.1 三表 [WIP]**
