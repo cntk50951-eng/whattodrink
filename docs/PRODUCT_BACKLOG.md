@@ -3186,3 +3186,35 @@ UR F.10　反刷与行为风控（AI 辅助）[]
 *改動記錄*
 |- 2026-09-27：建檔置 []（行为风控 P2，可与 F.5 并行，待问答定相似度算法与阈值后置 [WIP]）
 
+
+---
+
+### EPIC G　扭蛋＋圖鑑（留存主線，EPIC 4.0 提前；規格見 `docs/G1_GACHA_DEX_PLAN.md`）
+
+> 用戶拍板（2026-09-30）：「今晚喝咩？」變扭蛋遊戲＋品牌圖鑑；免登錄；落位 v2；殼選 Capacitor（分兩步，G1 數據達標再套殼）。
+
+UR G1.1　規則純函數（`lib/game/gacha.ts`＋`dex.ts`＋單測）[]
+UR G1.2　扭蛋機＋抽卡 UI（Motion＋CSS 3D，v2）[]
+UR G1.3　圖鑑冊＋分享頁（`/dex/:code`＋noindex／OG）[]
+
+UR G1.0　數據與契約（表＋RLS＋openapi，Dashboard 執行）[✓]
+
+G1 留存主線第一刀：`dex_identities`／`user_cards`／`dex_likes`（0015）＋RLS 全拒（讀寫走 Route Handler service role，G1.4）＋openapi（`POST /dex/collect`／`POST /dex/likes`＋429＋冪等 `duplicate`）＋future-schema 回寫。無 UI（落位 v2 已定，G1.2 生效）。
+
+### 範圍
+1. SQL：`supabase/migrations/0015_dex_tables.sql`（IF NOT EXISTS 可重放；`dex_code` 10 hex＋UNIQUE；`card_id` 無 FK，目錄代碼驅動，白名單 G1.4 handler 校驗）
+2. 契約：yaml 加 2 端點＋`DexCollectBody`／`DexCollectResult`（merge 語義寫進 description）
+3. 文檔：future-schema `game_*` 暫緩行改 G1 例外；本 UR；CHANGELOG
+4. 用戶動作：Dashboard 貼跑 SQL＋驗表；本地 `.env` 補 `SUPABASE_SERVICE_ROLE_KEY`（占位已在 `.env.example:36`，值從 Dashboard 拷）
+
+### 非目標
+- Route Handler 實現（G1.4）、任何 UI、`motion` 依賴（G1.2）、v1 文件
+
+### AC
+- AC1：SQL 貼跑綠＋三表＋索引＋RLS 全拒可驗（anon key 直讀寫 403／空）
+- AC2：yaml 結構與既有塊同構（operationId 唯一、$ref 可解；全文件 512 行重複 key 係 HEAD 既有問題，未動）
+- AC3：`git status` 無 v1、無代碼文件（純 SQL＋yaml＋md）
+
+*改動記錄*
+- 2026-09-30：建檔置 [WIP]（Step 1＋2＋AskUserQuestion：G1.0 先行＋v2 落位已確認；記憶回顧已報備）
+- 2026-09-30：用戶 Dashboard 貼跑成功（三表＋索引＋RLS 全拒已驗）→ [✓]，隨本車提交（main 直推）

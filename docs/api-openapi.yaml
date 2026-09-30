@@ -854,6 +854,82 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/dex/collect:
+    post:
+      operationId: collectDexCard
+      summary: 圖鑑收錄（UR G1.0：免登錄，anon_id 聲稱＋card_id 白名單＋限流；重複收錄只累 dup_count）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DexCollectBody"
+      responses:
+        "201":
+          description: 收錄成功（duplicate=true 即冪等命中只累計數；首收附 dex_code）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DexCollectResult"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "429":
+          description: 限流（匿名 60/day；白名單外 card_id 歸 400）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/dex/likes:
+    post:
+      operationId: likeDexBook
+      summary: 圖鑑點讚（UR G1.0：免登錄，dex_code＋anon_id 去重＋限流）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dex_code, anon_id]
+              properties:
+                dex_code:
+                  type: string
+                  description: 被讚圖鑑的公開代號
+                anon_id:
+                  type: string
+                  format: uuid
+                  description: 訪客匿名身份（去重用，可偽造，風險已接受：無榜無獎勵）
+      responses:
+        "201":
+          description: 點讚成功（duplicate=true 即已讚過，只回計數）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [likes]
+                properties:
+                  likes:
+                    type: integer
+                    description: 該圖鑑當前讚數（實時 count，不存列）
+                  duplicate:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "404":
+          description: dex_code 不存在（fail-closed，不枚舉）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 限流（匿名 60/day）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
 components:
   schemas:
     WallAuthor:
@@ -1051,6 +1127,38 @@ components:
         status:
           type: string
           enum: [pending, accepted]
+    DexCollectBody:
+      type: object
+      required: [anon_id, card_id]
+      description: 圖鑑收錄體（UR G1.0：免登錄；登錄認領時附帶 JWT＋anon_id，服務端把 a: 行改寫 u:）
+      properties:
+        anon_id:
+          type: string
+          format: uuid
+          description: 客戶端 localStorage 自造匿名身份（可偽造，風險已接受）
+        card_id:
+          type: string
+          description: 品牌卡鍵（白名單：lib/beers.ts 目錄＋icon 文件，非名單 400）
+        dup_count:
+          type: integer
+          minimum: 1
+          default: 1
+          description: 本地累計重複數（節流批量同步用；服務端累加，不覆寫）
+    DexCollectResult:
+      type: object
+      required: [duplicate, dup_count]
+      description: 收錄回執（首收附 dex_code，公開鏈用）
+      properties:
+        duplicate:
+          type: boolean
+          description: true＝已收過，本次只累計數
+        dup_count:
+          type: integer
+          description: 該卡當前累計擁有數
+        dex_code:
+          type: string
+          nullable: true
+          description: 首收時發公開代號（已建 identities 行則不重發，回 null）
     LiveFriend:
       type: object
       required: [user_id, nickname, avatar_url, lat, lng, updated_at]

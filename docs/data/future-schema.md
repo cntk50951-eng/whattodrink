@@ -57,7 +57,8 @@ UI 全确定后按此开工 EPIC 3.0 真表设计。
 - `conversations(id, type, direct_key, created_at, expires_at)` —— **EPIC D 聊天（0012 已建，UI 殼先行 mock）**：首期 direct，`direct_key`（min|max）1v1 去重唯一；`expires_at`＝末條＋90d，讀時懶刪；group 預留 type 不動行
 - `conversation_members(conversation_id, user_id, last_read_at, muted, hidden_at)` —— **EPIC D（0012）**：未讀現算（水位之後對方條數，不存計數）；`muted` 免打擾；`hidden_at` 只藏自己；RLS 只讀寫自己行
 - `messages(id, conversation_id, sender_id, kind, body, attachments, client_msg_id, created_at)` —— **EPIC D（0012）**：`kind` 枚舉一次凍結（text／image／audio）；`attachments` jsonb 給以後；`(conversation_id, client_msg_id)` 冪等唯一；`(conversation_id, created_at DESC)` 索引；RLS 成員可讀＋本人可發；UPDATE／DELETE 不開
-- （暂缓）`bars`、`game_*` —— EPIC 4.0 前不设计（`friendships` 已由 0007 建表、A.15 轉正，不在此列）
+- （暂缓）`bars` —— EPIC 4.0 前不设计（`friendships` 已由 0007 建表、A.15 轉正，不在此列）
+- `dex_identities(anon_id, dex_code, created_at)`／`user_cards(ident, card_id, obtained_at, dup_count)`／`dex_likes(dex_code, anon_id, created_at)` —— **UR G1.0 已建（0015，EPIC 4.0 提前：扭蛋圖鑑是留存主線，不等 4.0）**：ident＝`u:<uuid>`／`a:<uuid>`，主鍵天然去重；RLS 全拒，讀寫走 Route Handler（service role，G1.4）
 
 ## 三、MOCK→真替换清单（EPIC 3.0 开工即执行）
 
