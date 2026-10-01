@@ -2625,6 +2625,27 @@ UR C.20　v2 按鈕清道（頂／右／底去重去廢）[✓]
 - 2026-09-27：問答定案（右列刪足跡搖一搖／CTA留選酒大鈕刪相機和toast／pills刪三留三）置 [WIP]；實作完待驗（`V2Home` 刪 7 枚重複鈕：右列足跡搖一搖、CTA相機和加好友toast、pills拍照足跡酒牆；失用 key 保留（nav 共用＋E線 reuse）；build 綠／lint 淨／340 綠；待用戶瀏覽器親驗，未提交）
 - 2026-09-27：置 [✓]（用戶指令 mark done；刪 7 枚在倉實證（PR #36 聯合提交已合入），失用 key 保留口徑不變）
 
+UR C.21　v2 選酒大鈕換霓虹動畫 [WIP]
+
+用戶指令（2026-10-01）：`neon_icon_animated_transparent.webm` 取代中央「今晚飲咩？」CTA。問答定案：只改 v2（v1 MapFab 不動）＋整顆按鈕換成影片。
+
+### 範圍（v2-only：`public/neon-pick.webm`＋`V2Home.tsx` 底部 CTA 一處；零新 key／零新依賴）
+1. 素材：webm 入 `public/`＋首幀 poster；`openPick` 行為不變
+2. 按鈕：外層仍是 `<button onClick={openPick} aria-label={pickTitle}>`，內容換 `autoplay/loop/muted/playsInline` 影片；reduced-motion 停播顯 poster
+
+### 非目標
+- v1 任何文件、新文案 key、選酒 Sheet 流程改動、新依賴
+
+### AC
+- AC1：`/v2` 底部 CTA 為霓虹循環動畫，點即開選酒 Sheet（沿舊鏈）
+- AC2：reduced-motion 下靜止＋三閘綠＋用戶瀏覽器親驗＋`git status` 無 v1
+
+*改動記錄*
+- 2026-10-01：建檔置 [WIP]（問答定案只改 v2＋整顆換影片；直接開工）
+- 2026-10-01：實作完待驗（`public/neon-pick.webm` 入庫＋`V2Home` 底部 CTA 整顆換影片鈕：語義／openPick／aria-label 沿舊，reduced-motion 暫停顯首幀；零新 key／零 v1；build 綠／V2Home lint 淨；test 未跑純 UI；待用戶瀏覽器親驗，未提交）
+- 2026-10-01 round-2：實作完待驗（與 TabBar 中央對調：霓虹進中央大圓`openPick`圓形 object-cover，相機上浮底部 CTA 列成 pill（`setCameraOpen`＋`tabShoot`）；Mood 不動（用戶親答 no issue）；僅 `V2Home.tsx`；build 綠／lint 淨；待親驗，未提交）
+- 2026-10-01 round-3：相機 pill 去文字改純圖圓鈕（`size=icon`＋`aria-label=tabShoot`；三語 key 保留共用）；霓虹中央大圓去白底（`bg-card`＋陰影刪，留 hairline ring；透明像素直接透地圖）；build 綠／lint 淨；待親驗，未提交）
+
 ---
 
 EPIC E　拍照打卡（v2 內聯相機＋濾鏡＋美顏，拒絕跳頁）

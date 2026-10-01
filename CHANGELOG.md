@@ -5,6 +5,9 @@
 ## [Unreleased]
 
 ### Added
+- **UR C.21 v2 選酒大鈕換霓虹動畫 [WIP]**
+  - `public/neon-pick.webm`（2.2MB 透明動畫入庫）＋`V2Home` 底部 CTA 整顆換影片鈕（button 語義／`openPick`／`aria-label=pickTitle` 沿舊；影片 aria-hidden＋playsInline/muted；reduced-motion 掛載暫停顯首幀，無 poster 檔）；零新 key／零新依賴／零 v1 文件；build 綠／V2Home lint 淨（全倉 1 error 係既有 `V2GatheringForm.tsx` 未碰）；數據文檔無需更新（零數據改動）；待用戶瀏覽器親驗
+  - round-2（CTA 對調）：霓虹進 TabBar 中央大圓（圓形 object-cover＋原 `-mt-5` 大圓語言），相機上浮底部 CTA 列成 pill（`setCameraOpen`＋`tabShoot` 可見文案）；僅 `V2Home.tsx`；build 綠／lint 淨；待親驗
 - **UR D.6 圖片＋語音附件 [WIP]**
   - `0013_chat_storage.sql`（私有桶 RLS：首段歸屬寫删，讀全走簽名）＋`0014_conversations_rpc.sql`（列表 N+1→單 RPC＋語音 secs）；`POST /uploads/sign`＋`/uploads/view`（bucket 白名單＋歸屬校验）；發送附件開閘（歸屬＋ caps）；composer 圖／音＋氣泡＋snippet 章；`useSignedUrl` 緩存；7 組 key；單測綠；待用戶 Dashboard 三動作＋聯驗＋合入
 - **EPIC D 好友聊天真通道＋UR D.1 三表 [WIP]**

@@ -1547,12 +1547,20 @@ export function V2Home() {
       )}
 
       {/* 底部 CTA 列（UR C.20：只留選酒大鈕——主要賣點；相機走 TabBar 大圓，
-          加好友 toast（死鈕）退役，EPIC B/E 線再上） */}
+          加好友 toast（死鈕）退役，EPIC B/E 線再上）
+          UR C.21：整顆換霓虹 webm（透明底透出地圖）；button 語義／openPick／aria-label 沿舊，
+          影片純裝飾 aria-hidden；reduced-motion 掛載即暫停顯首幀（無 poster 檔，paused video 即首幀）。
+          UR C.21 round-2：與 TabBar 中央對調——霓虹進中央大圓，此列改相機 pill（`setCameraOpen` 沿 E.1 口徑）。 */}
       {card === null && (
-        <div className="absolute inset-x-3 bottom-20 z-[1000] flex touch-manipulation items-end gap-2">
-          <Button variant="outline" className="h-12 flex-1 rounded-full bg-card text-base font-bold shadow-md ring-1 ring-foreground/10" onClick={openPick}>
-            <Dices aria-hidden />
-            {t("pickTitle")}
+        <div className="absolute inset-x-3 bottom-20 z-[1000] flex touch-manipulation items-end justify-center">
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label={t2("tabShoot")}
+            className="h-12 w-12 rounded-full bg-card shadow-md ring-1 ring-foreground/10"
+            onClick={() => setCameraOpen(true)}
+          >
+            <Camera aria-hidden />
           </Button>
         </div>
       )}
@@ -1569,15 +1577,31 @@ export function V2Home() {
             {t2("tabHot")}
             {wallDot && <Badge className="absolute top-0.5 right-1/3 h-2 min-w-2 p-0" />}
           </Link>
-          {/* UR E.1：TabBar 拍照改開相機 Sheet（不跳頁；舊 /camera 路由保留直接訪問）。 */}
+          {/* UR E.1：TabBar 拍照改開相機 Sheet（不跳頁；舊 /camera 路由保留直接訪問）。
+              UR C.21 round-2：中央大圓改霓虹選酒（`openPick`；圓形 object-cover，透明像素透出圓底；
+              reduced-motion 掛載暫停顯首幀）；相機上浮至底部 CTA 列。 */}
           <Button
             variant="ghost"
-            aria-label={t2("tabShoot")}
-            onClick={() => setCameraOpen(true)}
-            className="flex justify-center"
+            aria-label={t("pickTitle")}
+            onClick={openPick}
+            className="flex touch-manipulation justify-center"
           >
-            <span className="-mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-card shadow-md ring-1 ring-foreground/10">
-              <Camera size={22} aria-hidden />
+            <span className="-mt-5 flex h-[4.24rem] w-[4.24rem] items-center justify-center overflow-hidden rounded-full">
+              <video
+                className="h-full w-full object-cover"
+                src="/neon-pick.webm"
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="auto"
+                aria-hidden
+                tabIndex={-1}
+                disablePictureInPicture
+                ref={(el) => {
+                  if (el !== null && window.matchMedia("(prefers-reduced-motion: reduce)").matches) el.pause();
+                }}
+              />
             </span>
           </Button>
           {/* UR C.11：足跡與心情換位（地圖／熱門／拍照／足跡／心情） */}
