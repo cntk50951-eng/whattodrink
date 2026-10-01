@@ -2646,6 +2646,28 @@ UR C.21　v2 選酒大鈕換霓虹動畫 [✓]
 - 2026-10-01 round-2：實作完待驗（與 TabBar 中央對調：霓虹進中央大圓`openPick`圓形 object-cover，相機上浮底部 CTA 列成 pill（`setCameraOpen`＋`tabShoot`）；Mood 不動（用戶親答 no issue）；僅 `V2Home.tsx`；build 綠／lint 淨；待親驗，未提交）
 - 2026-10-01 round-3：相機 pill 去文字改純圖圓鈕（`size=icon`＋`aria-label=tabShoot`；三語 key 保留共用）；霓虹中央大圓去白底（`bg-card`＋陰影刪，留 hairline ring；透明像素直接透地圖）；build 綠／lint 淨；待親驗，未提交）
 
+UR C.22　v2 霓虹點開黑底隨機照片 overlay [WIP]
+
+用戶指令（2026-10-01）：點霓虹 CTA 開深色 overlay 隨機 show 酒／啤酒照片（現只有 1 張 GIF，驗證後再加）。問答定案：取代 Sheet（照片即結果頁，舊 cats/batch 鏈保留給 pills 退路）＋關閉三路（背景／X／主鈕）＋照片放 `components/drinks/`（co-located import）。
+
+### 範圍（v2-only：新 `components/drinks/gallery.ts`＋`components/v2/V2RevealOverlay.tsx`＋`lib/reveal.ts` 純函數＋單測＋`V2Home` 接線；4 新 key×3 語）
+1. `gallery.ts`：`[{src, altKey}]` 現 1 筆（`sapporo_commercial_9x16_no_loop.gif` 9x16）；日後加照片只 append 陣列
+2. Overlay：`fixed inset-0 z-[1100] bg-black/95`＋`role=dialog aria-modal`＋Esc；GIF 用 `next/image unoptimized` 保動畫＋`object-contain`（豎幅保全圖）；主鈕「再來一張」（1 張時同圖屬預期）＋右上 X＋背景點關
+3. `V2Home`：中央霓虹鈕改道 `openReveal`（開時抽 index 存 state，render 內不抽）；pills／2189 沿舊 `openPick`
+4. `pickRandomIndex(count, rand)` 純函數＋單測（空陣列回 -1；`rand=0→0`／`0.999→末`）
+
+### 非目標
+- 真抽籤結果模型（照片多了之後另開 UR）、v1 任何文件、新依賴
+
+### AC
+- AC1：點霓虹→黑底 overlay＋照片置中；三路關閉；再抽換圖（多張時）
+- AC2：build／lint／單測綠＋用戶瀏覽器親驗＋`git status` 無 v1
+
+*改動記錄*
+- 2026-10-01：建檔置 [WIP]（問答定案取代 Sheet＋三路關閉＋components/drinks 交接；直接開工）
+- 2026-10-01：實作完待驗（`gallery.ts` 1 筆 GIF＋`V2RevealOverlay` 黑底 dialog＋`openReveal` 改道（pills／2189 沿舊）；`pickRandomIndex`＋5 單測；`revealTitle/Again/Close/PhotoAlt1`×3；build／lint／5 測綠；待親驗，未提交）
+- 2026-10-01：照片 3 張到齊（＋Budweiser／青島 GIF＋`revealPhotoAlt2/3`×3；池架構零改碼）；build／lint／5 測綠；待隨機親驗，未提交）
+
 ---
 
 EPIC E　拍照打卡（v2 內聯相機＋濾鏡＋美顏，拒絕跳頁）

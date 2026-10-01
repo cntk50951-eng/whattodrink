@@ -50,6 +50,9 @@ import { useFriendRelation } from "@/hooks/useFriendRelation";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useLiveFriends } from "@/hooks/useLiveFriends";
 import { V2FriendCard } from "./V2FriendCard";
+import { V2RevealOverlay } from "./V2RevealOverlay";
+import { revealPhotoAt, revealPhotoCount } from "@/components/drinks/gallery";
+import { pickRandomIndex } from "@/lib/reveal";
 import { LOGOUT_CLEAR_EVENT, clearUserLocalCaches } from "@/lib/auth/clear";
 import { displayName } from "@/lib/auth/profile";
 import { setActivePeer } from "@/lib/chatPeer";
@@ -276,6 +279,9 @@ export function V2Home() {
 
   // 選酒 sheet 三段：cats → batch → kinds → login（匿名）
   const [pickOpen, setPickOpen] = useState(false);
+  // UR C.22 揭曉 overlay（取代 Sheet：霓虹點即此頁；舊鏈保留給 pills 退路）
+  const [revealOpen, setRevealOpen] = useState(false);
+  const [revealIdx, setRevealIdx] = useState(0);
   const [pickStage, setPickStage] = useState<"cats" | "batch" | "kinds" | "login">("cats");
   const [laneId, setLaneId] = useState<string | null>(null);
   const [batch, setBatch] = useState<Beer[]>([]);
@@ -940,6 +946,12 @@ export function V2Home() {
     setPickOpen(true);
   }
 
+  /** UR C.22：霓虹點開揭曉 overlay——開時抽一次 index 存 state（render 內不抽，防閃爍）。 */
+  function openReveal(): void {
+    setRevealIdx(pickRandomIndex(revealPhotoCount()));
+    setRevealOpen(true);
+  }
+
   /** UR E.3 verdict：ok 落版；message 行内报错；guard 守卫已弹调用方让路。 */
   type DropWantResult =
     | { ok: true }
@@ -1565,6 +1577,15 @@ export function V2Home() {
         </div>
       )}
 
+      {/* UR C.22 揭曉 overlay（fixed 全屏，與 DOM 位置無關；放 TabBar 前可讀性最高） */}
+      {revealOpen && (
+        <V2RevealOverlay
+          photo={revealPhotoAt(revealIdx)}
+          onReshuffle={() => setRevealIdx(pickRandomIndex(revealPhotoCount()))}
+          onClose={() => setRevealOpen(false)}
+        />
+      )}
+
       {/* 底部 TabBar */}
       <nav aria-label={tn("menu")} className="absolute inset-x-0 bottom-0 z-[1000] touch-manipulation border-t bg-card pb-[env(safe-area-inset-bottom)]">
         <div className="grid grid-cols-5 px-2 pt-1">
@@ -1583,7 +1604,7 @@ export function V2Home() {
           <Button
             variant="ghost"
             aria-label={t("pickTitle")}
-            onClick={openPick}
+            onClick={openReveal}
             className="flex touch-manipulation justify-center"
           >
             <span className="-mt-5 flex h-[4.24rem] w-[4.24rem] items-center justify-center overflow-hidden rounded-full">
