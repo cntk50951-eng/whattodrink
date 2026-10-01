@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { Martini } from "lucide-react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
@@ -54,6 +55,18 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
     }
   });
   const [chatOpen, setChatOpen] = useState(false);
+  // 进场三幕：霓虹招牌（加载中）→ 门开（模型就绪）→ 卸幕进场。
+  const [doorsOpen, setDoorsOpen] = useState(false);
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    if (loading) return;
+    const t1 = setTimeout(() => setDoorsOpen(true), 300);
+    const t2 = setTimeout(() => setEntered(true), 1600);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [loading]);
   const [msgs, setMsgs] = useState<ChatMsg[]>([]);
   const [invite, setInvite] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -812,9 +825,48 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
       >
         {mode === "walk" ? "⭮ 環繞" : "🚶 走路"}
       </button>
-      {loading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/70 text-sm text-amber-100">
-          酒吧載入中…（4.8MB＋酒保 1.5MB）
+      {/* 进场幕（推门进酒吧）：霓虹招牌闪 → 招牌熄、门缝暖光胀开 → 双门滑开卸幕。 */}
+      {!entered && (
+        <div className="absolute inset-0 z-40 overflow-hidden bg-black" aria-hidden>
+          {/* 门后暖光（门开时胀开）。 */}
+          <div
+            className={`absolute inset-0 transition-opacity delay-300 duration-1000 ${doorsOpen ? "opacity-100" : "opacity-0"}`}
+            style={{
+              background:
+                "radial-gradient(ellipse at center, rgba(251,191,36,.55), rgba(120,53,15,.25) 45%, transparent 70%)",
+            }}
+          />
+          {/* 左门。 */}
+          <div
+            className={`absolute inset-y-0 left-0 w-1/2 transition-transform duration-[1100ms] ease-in-out ${doorsOpen ? "-translate-x-full" : ""}`}
+            style={{
+              background: "linear-gradient(105deg, #1c0f08, #3b1f0e 60%, #120906)",
+              borderRight: "2px solid rgba(251,191,36,.5)",
+              boxShadow: "8px 0 30px rgba(251,191,36,.25)",
+            }}
+          />
+          {/* 右门。 */}
+          <div
+            className={`absolute inset-y-0 right-0 w-1/2 transition-transform duration-[1100ms] ease-in-out ${doorsOpen ? "translate-x-full" : ""}`}
+            style={{
+              background: "linear-gradient(255deg, #1c0f08, #3b1f0e 60%, #120906)",
+              borderLeft: "2px solid rgba(251,191,36,.5)",
+              boxShadow: "-8px 0 30px rgba(251,191,36,.25)",
+            }}
+          />
+          {/* 霓虹招牌（加载时；门开即熄）。 */}
+          <div
+            className={`absolute inset-0 flex flex-col items-center justify-center gap-5 transition-opacity duration-500 ${doorsOpen ? "opacity-0" : "opacity-100"}`}
+          >
+            <span className="bar-neon">
+              <Martini
+                size={64}
+                strokeWidth={1.5}
+                className="text-amber-200 drop-shadow-[0_0_12px_rgba(251,191,36,.8)]"
+              />
+            </span>
+            <span className="bar-neon text-4xl font-bold tracking-[.35em]">IVY BAR</span>
+          </div>
         </div>
       )}
       {/* 18＋ 閘（酒保對話前置；session 內記住）。 */}

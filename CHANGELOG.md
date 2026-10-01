@@ -8,6 +8,8 @@
 - **UR C.22 揭曉照片換版**：`sapporo_commercial_9x16_no_loop.gif` 換新版（同檔名；Budweiser／青島與庫內一致）
 
 ### Added
+- **UR F.1 进场三幕＋loader 去文字**
+  - 加载文字删干净，换进场仪式：霓虹 IVY BAR 招牌闪（加载时）→ 招牌熄、门缝暖光胀开 → 双木门滑开卸幕；`bar-neon-flicker` 进 globals.css（reduced-motion 停）；待亲验
 - **UR C.22 v2 霓虹點開黑底隨機照片 overlay [WIP]**
   - `components/drinks/gallery.ts`（照片池，現 1 筆 9x16 GIF；加照片只 append）＋`V2RevealOverlay`（`bg-black/95` dialog＋Esc／背景／X 三路關＋主鈕再抽；GIF `unoptimized` 保動畫＋`object-contain`）＋霓虹鈕改道 `openReveal`（pills／2189 沿舊 Sheet 鏈）；`pickRandomIndex` 純函數＋5 單測；`revealTitle/Again/Close/PhotoAlt1`×3；build／lint／單測綠；數據文檔無需更新（零持久化）；待親驗
 - **UR C.21 v2 選酒大鈕換霓虹動畫 [WIP]**
