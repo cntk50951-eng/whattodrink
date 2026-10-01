@@ -50,3 +50,6 @@ next-env.d.ts
 
 # icon export build cache (regenerable)
 scripts/.cache/
+
+# Hunyuan 源文件（89MB＋78MB）：只留本地，线上用 public/bar-room 压好的
+UI style/*.glb

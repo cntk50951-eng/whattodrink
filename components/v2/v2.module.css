@@ -507,6 +507,61 @@
     opacity: 0;
   }
 }
+/* POC 酒吧入口（選酒鈕右側藥丸）：入場彈跳＋琥珀呼吸光＋掃光，靜態也認得出是酒吧。 */
+@keyframes v2-bar-pop {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes v2-bar-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 18px 4px rgba(251, 191, 36, 0.35);
+  }
+}
+@keyframes v2-bar-shine {
+  0% {
+    transform: translateX(-130%) skewX(-18deg);
+  }
+  55%,
+  100% {
+    transform: translateX(260%) skewX(-18deg);
+  }
+}
+.v2barEntry {
+  position: relative;
+  overflow: hidden;
+  animation:
+    v2-bar-pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both,
+    v2-bar-glow 2.6s ease-in-out 0.5s infinite;
+}
+.v2barEntry::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: v2-bar-shine 3.2s ease-in-out 0.8s infinite;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .v2barEntry,
+  .v2barEntry::after {
+    animation: none;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .v2bubble {
     animation: none;

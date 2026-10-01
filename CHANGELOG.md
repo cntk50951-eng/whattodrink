@@ -13,6 +13,12 @@
 - **UR C.21 v2 選酒大鈕換霓虹動畫 [WIP]**
   - `public/neon-pick.webm`（2.2MB 透明動畫入庫）＋`V2Home` 底部 CTA 整顆換影片鈕（button 語義／`openPick`／`aria-label=pickTitle` 沿舊；影片 aria-hidden＋playsInline/muted；reduced-motion 掛載暫停顯首幀，無 poster 檔）；零新 key／零新依賴／零 v1 文件；build 綠／V2Home lint 淨（全倉 1 error 係既有 `V2GatheringForm.tsx` 未碰）；數據文檔無需更新（零數據改動）；待用戶瀏覽器親驗
   - round-2（CTA 對調）：霓虹進 TabBar 中央大圓（圓形 object-cover＋原 `-mt-5` 大圓語言），相機上浮底部 CTA 列成 pill（`setCameraOpen`＋`tabShoot` 可見文案）；僅 `V2Home.tsx`；build 綠／lint 淨；待親驗
+- **POC 酒吧 Ivy（`/bar-room`＋v2 首页入口）**
+  - Hunyuan 房间（89MB→4.84MB）＋女酒保静态扫描（78MB→1.52MB，15.7 万面，无骨骼；身高归一 3.3m，头顶同行走眼 3.8 平头）；第一人称（WASD＋拖拽＋手机左走右看）＋环绕扇形（客人侧 ±60°）；射线挡墙＋径向挡人＋探针落地（地板面 0.54）＋镜头锁吊柜下
+  - 触摸：单击开聊／双击转圈 Cheers／长按摸头鞠躬（程序化＋震动＋按住放大低头＋贴近前倾）；走近 2.2m 招呼；18＋ 闸
+  - 对话＋语音全走 MiniMax（M3＋speech-2.6-turbo 少女音）：`lib/minimax.ts`＋14 单测；`POST /api/v1/bar/chat`（message／event＋10 句历史）＋`POST /api/v1/bar/voice`（回 MP3）；人设只留指令零 hardcode 台词；失败灰字系统提示；语音开关
+  - v2 首页“今晚喝什么”右侧琥珀药丸入口（`nav.barRoom`×3 语；入场弹跳＋呼吸光＋扫光，reduced-motion 全停）
+  - 三闸：build 绿／lint 0／单测绿；待用户真机手感验收＋合入
 - **UR D.6 圖片＋語音附件 [WIP]**
   - `0013_chat_storage.sql`（私有桶 RLS：首段歸屬寫删，讀全走簽名）＋`0014_conversations_rpc.sql`（列表 N+1→單 RPC＋語音 secs）；`POST /uploads/sign`＋`/uploads/view`（bucket 白名單＋歸屬校验）；發送附件開閘（歸屬＋ caps）；composer 圖／音＋氣泡＋snippet 章；`useSignedUrl` 緩存；7 組 key；單測綠；待用戶 Dashboard 三動作＋聯驗＋合入
 - **EPIC D 好友聊天真通道＋UR D.1 三表 [WIP]**

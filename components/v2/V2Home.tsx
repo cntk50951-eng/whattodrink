@@ -21,6 +21,7 @@ import {
   LogOut,
   Map as MapIcon,
   MapPin,
+  Martini,
   Radar,
   RefreshCw,
   Sparkles,
@@ -1564,7 +1565,7 @@ export function V2Home() {
           影片純裝飾 aria-hidden；reduced-motion 掛載即暫停顯首幀（無 poster 檔，paused video 即首幀）。
           UR C.21 round-2：與 TabBar 中央對調——霓虹進中央大圓，此列改相機 pill（`setCameraOpen` 沿 E.1 口徑）。 */}
       {card === null && (
-        <div className="absolute inset-x-3 bottom-20 z-[1000] flex touch-manipulation items-end justify-center">
+        <div className="absolute inset-x-3 bottom-20 z-[1000] flex touch-manipulation items-end justify-center gap-2">
           <Button
             variant="outline"
             size="icon"
@@ -1574,6 +1575,16 @@ export function V2Home() {
           >
             <Camera aria-hidden />
           </Button>
+          {/* POC 酒吧入口（Ivy）：琥珀药丸（图标＋字），贴着相机 pill，
+              正下方就是选酒霓虹大圆；呼吸光＋扫光自己会发光。 */}
+          <Link
+            href="/bar-room"
+            aria-label={tn("barRoom")}
+            className={`${styles.v2barEntry} flex h-12 shrink-0 items-center gap-1.5 rounded-full border border-amber-300 bg-amber-300 px-4 text-sm font-bold whitespace-nowrap text-amber-950 shadow-md transition-transform active:translate-x-0.5 active:translate-y-0.5 active:shadow-none`}
+          >
+            <Martini size={18} aria-hidden strokeWidth={2.5} />
+            {tn("barRoom")}
+          </Link>
         </div>
       )}
 

@@ -86,6 +86,9 @@
 
 > 用戶偏好（成本考量）：瀏覽器測試**預設由作者本人**啟動本地 server 並親眼操作驗證。
 > AI 不主動起 dev server、不主動用 Playwright 截圖「代替」作者看。
+> 2026-10-01 補充（bar-room 教訓）：AI 用 agent-browser 自行截圖驗收 3D 視覺又慢又盲
+> （每輪 build＋prod＋截圖十幾分鐘，角度還成日錯），**預設禁止**；做完直接通知作者去
+> `:3000` 驗，作者反饋先係驗收。agent-browser 只留返 debug 特定 bug 用。
 
 - 涉及**具體 UI 功能**（互動、表單、動畫、狀態變化）時，**作者本人**啟動 `npm run dev` 在瀏覽器實際點
 - 純 layout / 靜態頁面可以靠 `npm run build` 通過就算

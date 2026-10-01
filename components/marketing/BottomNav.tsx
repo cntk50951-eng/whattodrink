@@ -32,6 +32,9 @@ type BottomNavProps = {
  * hover/active 沿 MapToolbar 配方（同衛星圓鈕家族）。
  *
  * 牆紅點沿用 UR4.1 v3（icon 右上角 dot）。
+ *
+ * 注意：底部 row 已塞滿（MapFab＋2 藥丸＋4 鈕），再加鈕會被擠出屏；
+ * 新入口走 header（見 layout），唔好加到呢度。
  */
 export function BottomNav({ onRandomPick, hidden }: BottomNavProps) {
   const t = useTranslations("nav");

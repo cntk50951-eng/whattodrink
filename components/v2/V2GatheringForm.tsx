@@ -84,7 +84,10 @@ export function V2GatheringForm() {
   const isFlyingRef = useRef(false);
   const flyTimerRef = useRef<number | null>(null);
   const placeRef = useRef<Place | null>(null);
-  placeRef.current = place;
+  // render 期不写 ref（lint react-hooks/refs）：place 同步走 effect。
+  useEffect(() => {
+    placeRef.current = place;
+  }, [place]);
 
   const doSearch = useCallback(async (termRaw: string) => {
     const term = termRaw.trim();
