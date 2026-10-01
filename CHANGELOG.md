@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### Changed
+- **UR C.22 揭曉照片換版**：`sapporo_commercial_9x16_no_loop.gif` 換新版（同檔名；Budweiser／青島與庫內一致）
+
 ### Added
 - **UR C.22 v2 霓虹點開黑底隨機照片 overlay [WIP]**
   - `components/drinks/gallery.ts`（照片池，現 1 筆 9x16 GIF；加照片只 append）＋`V2RevealOverlay`（`bg-black/95` dialog＋Esc／背景／X 三路關＋主鈕再抽；GIF `unoptimized` 保動畫＋`object-contain`）＋霓虹鈕改道 `openReveal`（pills／2189 沿舊 Sheet 鏈）；`pickRandomIndex` 純函數＋5 單測；`revealTitle/Again/Close/PhotoAlt1`×3；build／lint／單測綠；數據文檔無需更新（零持久化）；待親驗
