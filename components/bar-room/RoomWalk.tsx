@@ -14,6 +14,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 
 import { BARTENDER_NAME } from "@/lib/bartender";
+import { buildRecordingBlob, recordingToWavBase64 } from "@/lib/audio";
 
 const EYE = 3.8;
 const SPEED = 1.7;
@@ -91,6 +92,10 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
     msgsRef.current = msgsRef.current.map((x) => (x.id === id ? { ...m, id } : x));
     setMsgs(msgsRef.current);
   };
+  const removeMsg = (id: number): void => {
+    msgsRef.current = msgsRef.current.filter((x) => x.id !== id);
+    setMsgs(msgsRef.current);
+  };
   /** 问 Ivy（文字＋事件统一口；history 自动带最近 10 句；失败回 null）。 */
   const askIvy = async (input: { message?: string; event?: string }): Promise<string | null> => {
     try {
@@ -157,10 +162,16 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
     const text = draft.trim();
     if (text.length === 0 || sending) return;
     setDraft("");
-    pushMsg({ from: "me", text });
+    await sendText(text);
+  };
+  /** 发文字（打字＋语音转写统一口；history 由 askIvy 自动带）。 */
+  const sendText = async (text: string): Promise<void> => {
+    const t = text.trim().slice(0, 500);
+    if (t.length === 0 || sending) return;
+    pushMsg({ from: "me", text: t });
     setSending(true);
     const pid = pushMsg({ from: "her", text: "…" });
-    const line = await askIvy({ message: text });
+    const line = await askIvy({ message: t });
     setSending(false);
     if (line === null) {
       replaceMsg(pid, { from: "sys", text: "Ivy 暂时没听清，稍后再试。" });
@@ -168,6 +179,94 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
     }
     replaceMsg(pid, { from: "her", text: line });
     void playVoice(line);
+  };
+  // 按住对讲（粤／普／英走讯飞 fallback；30s 自动断；松手即转写发送）。
+  const [recording, setRecording] = useState(false);
+  const [recSecs, setRecSecs] = useState(0);
+  const [inputFocused, setInputFocused] = useState(false);
+  const recRef = useRef<{
+    stream: MediaStream;
+    mr: MediaRecorder;
+    chunks: Blob[];
+    timer: ReturnType<typeof setInterval>;
+  } | null>(null);
+  const stopRecord = async (send: boolean): Promise<void> => {
+    const r = recRef.current;
+    recRef.current = null;
+    setRecording(false);
+    if (r === null) return;
+    clearInterval(r.timer);
+    const blob: Blob | null = await new Promise((resolve) => {
+      r.mr.onstop = () => {
+        try {
+          resolve(buildRecordingBlob(r.chunks, r.mr.mimeType));
+        } catch {
+          resolve(null);
+        }
+      };
+      try {
+        r.mr.stop();
+      } catch {
+        resolve(null);
+      }
+    });
+    r.stream.getTracks().forEach((t) => t.stop());
+    if (!send || blob === null) return;
+    const tip = pushMsg({ from: "sys", text: "正在听写…" });
+    // 分段报错（别再用一句“网络问题”糊弄）：转格式／HTTP 状态／真断网分开说。
+    let wav: string;
+    try {
+      wav = await recordingToWavBase64(blob);
+    } catch (e) {
+      console.error("[bar-voice-in] wav convert failed:", e);
+      replaceMsg(tip, { from: "sys", text: "录音转格式失败，换个浏览器再试一次。" });
+      return;
+    }
+    try {
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ audioBase64: wav }),
+      });
+      const data = (await res.json()) as { text?: string; code?: string };
+      if (!res.ok) {
+        console.error("[bar-voice-in] transcribe status:", res.status, data);
+        replaceMsg(tip, { from: "sys", text: `转写服务忙（${res.status}），再试一次。` });
+        return;
+      }
+      if (typeof data.text !== "string" || data.text.trim().length === 0) {
+        replaceMsg(tip, { from: "sys", text: "没听清，再按住说一次。" });
+        return;
+      }
+      removeMsg(tip);
+      await sendText(data.text);
+    } catch (e) {
+      console.error("[bar-voice-in] transcribe fetch failed:", e);
+      replaceMsg(tip, { from: "sys", text: "网络问题，转写失败。" });
+    }
+  };
+  const startRecord = async (): Promise<void> => {
+    if (recording || sending || recRef.current !== null) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      const started = Date.now();
+      const timer = setInterval(() => {
+        const s = Math.floor((Date.now() - started) / 1000);
+        setRecSecs(s);
+        if (s >= 30) void stopRecord(true);
+      }, 250);
+      recRef.current = { stream, mr, chunks, timer };
+      setRecSecs(0);
+      setRecording(true);
+      mr.start();
+    } catch {
+      pushMsg({ from: "sys", text: "麦克风没打开，去系统设置里允许后重试。" });
+    }
   };
 
   useEffect(() => {
@@ -792,6 +891,17 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
       if (pendingChat !== null) clearTimeout(pendingChat);
       if (inviteTimer !== null) clearTimeout(inviteTimer);
       if (audioRef.current !== null) audioRef.current.pause();
+      // 录音中卸载：停表停流停机（同步能做的全做）。
+      if (recRef.current !== null) {
+        clearInterval(recRef.current.timer);
+        try {
+          recRef.current.mr.stop();
+        } catch {
+          /* 已停即过 */
+        }
+        recRef.current.stream.getTracks().forEach((t) => t.stop());
+        recRef.current = null;
+      }
       el.removeEventListener("pointerdown", onDown);
       el.removeEventListener("wheel", onWheel);
       window.removeEventListener("pointermove", onMove);
@@ -927,7 +1037,7 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
               </button>
             </div>
           </div>
-          <div className="flex max-h-56 flex-col gap-2 overflow-y-auto">
+          <div className={`flex flex-col gap-2 overflow-y-auto ${inputFocused ? "max-h-20" : "max-h-56"}`}>
             {msgs.map((m) => (
               <div
                 key={m.id}
@@ -944,9 +1054,29 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
             ))}
           </div>
           <div className="mt-3 flex gap-2">
+            {/* 按住对讲（粤／普／英）：按住说话，松手发送；录音中变红＋计时。 */}
+            <button
+              type="button"
+              aria-label={recording ? `录音中 ${recSecs} 秒，松手发送` : "按住说话"}
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                void startRecord();
+              }}
+              onPointerUp={() => void stopRecord(true)}
+              onPointerCancel={() => void stopRecord(false)}
+              className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold disabled:opacity-50 ${
+                recording
+                  ? "animate-pulse bg-red-500 text-white"
+                  : "bg-amber-400 text-black"
+              }`}
+            >
+              {recording ? `${recSecs}s` : "🎤"}
+            </button>
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") void sendChat();
               }}

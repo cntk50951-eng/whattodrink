@@ -58,11 +58,15 @@ export async function POST(req: Request) {
 
   const creds = { appId, apiKey, apiSecret };
   const order: IflytekAccent[] = ["cantonese", "mandarin", "english"];
+  const t0 = Date.now();
   for (const accent of order) {
+    const ta = Date.now();
     try {
       const text = (await transcribePcm16k(creds, pcm, accent)).trim();
+      console.error(`[transcribe] accent=${accent} ms=${Date.now() - ta} hit=${text.length > 0}`);
       if (text) return NextResponse.json({ text, accent });
     } catch (err) {
+      console.error(`[transcribe] accent=${accent} ms=${Date.now() - ta} err=${err instanceof Error ? err.message : err}`);
       // Auth/billing errors fail fast; recognition empties fall through.
       const msg = err instanceof Error ? err.message : "";
       if (/ASR error \[(101|102|103|104|105|106|107|108|109|110)\]/.test(msg)) {
@@ -73,5 +77,6 @@ export async function POST(req: Request) {
       }
     }
   }
+  console.error(`[transcribe] all-empty ms=${Date.now() - t0}`);
   return NextResponse.json({ text: "", accent: null });
 }

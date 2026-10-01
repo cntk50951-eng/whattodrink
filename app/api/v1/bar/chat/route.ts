@@ -41,8 +41,10 @@ export async function POST(req: Request): Promise<Response> {
     return apiError("invalid_params", "message 或 event 二选一。", 400);
   }
 
-  const apiKey = process.env.minimaxi_api_key ?? "";
+  // 大小写都认（Vercel 里容易顺手写成大写）。
+  const apiKey = process.env.minimaxi_api_key ?? process.env.MINIMAXI_API_KEY ?? "";
   if (apiKey.length === 0) {
+    console.error("[bar-chat] minimaxi_api_key missing in environment");
     return apiError("internal", "语音服务未配置。", 500);
   }
 
@@ -51,6 +53,7 @@ export async function POST(req: Request): Promise<Response> {
     return apiOk({ text });
   } catch (e) {
     const status = e instanceof MinimaxError ? e.status : 500;
+    console.error(`[bar-chat] minimax failed: ${e instanceof Error ? e.message : e}`);
     return apiError("internal", "Ivy 暂时没听清，请稍后再试。", status === 429 ? 429 : 502);
   }
 }
