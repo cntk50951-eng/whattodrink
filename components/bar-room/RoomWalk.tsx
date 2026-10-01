@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Martini } from "lucide-react";
+import { Martini, Mic } from "lucide-react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
@@ -1137,41 +1137,26 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
               </button>
             </div>
           </div>
-          <div className={`flex flex-col gap-2 overflow-y-auto ${inputFocused ? "max-h-20" : "max-h-56"}`}>
-            {msgs.map((m) => (
-              <div
-                key={m.id}
-                className={
-                  m.from === "her"
-                    ? "self-start rounded-2xl rounded-tl-sm bg-white/10 px-3 py-2 text-xs leading-relaxed text-white"
-                    : m.from === "me"
-                      ? "self-end rounded-2xl rounded-tr-sm bg-amber-400 px-3 py-2 text-xs leading-relaxed text-black"
-                      : "self-center rounded-full bg-white/5 px-3 py-1 text-[11px] text-white/50"
-                }
-              >
-                {m.text}
-              </div>
-            ))}
-          </div>
+          {/* 打字时只留输入行（消息＋大按钮全收，键盘再顶也盖不住 Ivy）。 */}
+          {!inputFocused && (
+            <div className="flex max-h-56 flex-col gap-2 overflow-y-auto">
+              {msgs.map((m) => (
+                <div
+                  key={m.id}
+                  className={
+                    m.from === "her"
+                      ? "self-start rounded-2xl rounded-tl-sm bg-white/10 px-3 py-2 text-xs leading-relaxed text-white"
+                      : m.from === "me"
+                        ? "self-end rounded-2xl rounded-tr-sm bg-amber-400 px-3 py-2 text-xs leading-relaxed text-black"
+                        : "self-center rounded-full bg-white/5 px-3 py-1 text-[11px] text-white/50"
+                  }
+                >
+                  {m.text}
+                </div>
+              ))}
+            </div>
+          )}
           <div className="mt-3 flex gap-2">
-            {/* 按住对讲（粤／普／英）：按住说话，松手发送；录音中变红＋计时。 */}
-            <button
-              type="button"
-              aria-label={recording ? `录音中 ${recSecs} 秒，松手发送` : "按住说话"}
-              onPointerDown={(e) => {
-                e.currentTarget.setPointerCapture(e.pointerId);
-                void startRecord();
-              }}
-              onPointerUp={() => void stopRecord(true)}
-              onPointerCancel={() => void stopRecord(false)}
-              className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold disabled:opacity-50 ${
-                recording
-                  ? "animate-pulse bg-red-500 text-white"
-                  : "bg-amber-400 text-black"
-              }`}
-            >
-              {recording ? `${recSecs}s` : "🎤"}
-            </button>
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -1180,7 +1165,7 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
               onKeyDown={(e) => {
                 if (e.key === "Enter") void sendChat();
               }}
-              placeholder={`和 ${BARTENDER_NAME} 说话…（她会回文字＋语音）`}
+              placeholder={`和 ${BARTENDER_NAME} 说话…（她用英文回你）`}
               className="min-w-0 flex-1 rounded-full bg-white/10 px-4 py-2 text-xs text-white outline-none placeholder:text-white/40 focus:ring-1 focus:ring-amber-200/50"
             />
             <button
@@ -1192,6 +1177,42 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
               {sending ? "…" : "送出"}
             </button>
           </div>
+          {/* 圆圈对讲（粤／普／英）：拇指按住，呼吸光圈待命，录音扩散波＋秒数。 */}
+          {!inputFocused && (
+            <div className="mt-2 flex flex-col items-center gap-1">
+              <button
+                type="button"
+                aria-label={recording ? `录音中 ${recSecs} 秒，松手发送` : "按住说话"}
+                onPointerDown={(e) => {
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  void startRecord();
+                }}
+                onPointerUp={() => void stopRecord(true)}
+                onPointerCancel={() => void stopRecord(false)}
+                className={`relative flex h-[76px] w-[76px] shrink-0 touch-none items-center justify-center rounded-full transition-all select-none ${
+                  recording
+                    ? "scale-105 bg-red-500 text-white shadow-[0_0_28px_rgba(239,68,68,.6)]"
+                    : "bg-gradient-to-br from-amber-300 to-amber-500 text-amber-950 shadow-[0_0_18px_rgba(251,191,36,.45)] active:scale-95"
+                }`}
+              >
+                {recording ? (
+                  <>
+                    <span className="absolute inset-0 animate-ping rounded-full bg-red-400/50" />
+                    <span
+                      className="absolute inset-0 animate-ping rounded-full bg-red-400/30"
+                      style={{ animationDelay: ".5s" }}
+                    />
+                  </>
+                ) : (
+                  <span className="absolute inset-0 animate-ping rounded-full bg-amber-300/30 [animation-duration:2.4s]" />
+                )}
+                <Mic size={30} aria-hidden strokeWidth={2.2} className="relative" />
+              </button>
+              <span className={`text-[11px] font-bold ${recording ? "text-red-300" : "text-white/60"}`}>
+                {recording ? `● ${recSecs}s 松手发送` : "按住说话 · Hold to Talk"}
+              </span>
+            </div>
+          )}
         </div>
       )}
     </>

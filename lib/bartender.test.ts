@@ -8,11 +8,11 @@ import {
 } from "./bartender";
 
 describe("ivy persona", () => {
-  it("人设有名字和底线（暧昧拉满但不露骨、不灌酒、叫停就收）", () => {
+  it("人设有名字和底线（英文默认、大胆调情但不露骨、叫停就收）", () => {
     expect(IVY_SYSTEM_PROMPT).toContain(BARTENDER_NAME);
-    expect(IVY_SYSTEM_PROMPT).toContain("大胆调情");
-    expect(IVY_SYSTEM_PROMPT).toContain("只调情、不露骨");
-    expect(IVY_SYSTEM_PROMPT).toContain("绝不纠缠");
+    expect(IVY_SYSTEM_PROMPT).toContain("Always reply in English");
+    expect(IVY_SYSTEM_PROMPT).toContain("never explicit");
+    expect(IVY_SYSTEM_PROMPT).toContain("never clingy");
   });
 
   it("三个事件都有指令（非台词）", () => {

@@ -216,6 +216,10 @@ UI 全確定前不建表，但數據文檔（`docs/data/`）必須與前端同�
   - test / build / lint 結果
 - 用 `AskUserQuestion` 問「Commit + push 嗎？」拿最終確認
 - 等用戶明確答「要」才執行 `git commit` + `git push`
+- **什麼不算确认**（2026-10-01 血泪：AI 以“方便线上测试”为由擅自 push 被叫停）：
+  「修好了」「可以测了」「线上验证下」「推上去看看」「方便」「你看着办」都不算；
+  只有「提交」「部署」「合并」「commit」「push」「合入」这类明确指令，或 10d 问完答“要”，才算。
+  Vercel 接 main 自动部署＝push 即上线，更要守住。
 - commit message 遵循 `git.md` 格式
 - 推送用 token inline URL，不寫進 git config
 

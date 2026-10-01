@@ -8,6 +8,11 @@
 - **UR C.22 揭曉照片換版**：`sapporo_commercial_9x16_no_loop.gif` 換新版（同檔名；Budweiser／青島與庫內一致）
 
 ### Added
+- **UR F.1 英文默认＋语音对讲＋圆钮＋键盘收起**
+  - Ivy 默认英文（他语跟随切），TTS 按 CJK 自动切 Chinese／English boost
+  - 按住对讲：浏览器免费识别（粤→普→英）打头，失败回落服务端讯飞；Float32 包装 bug 修
+  - 对讲钮改圆圈（呼吸光圈＋录音扩散波＋秒数）；打字时消息＋按钮全收，键盘盖不住 Ivy
+  - 转写报错分段＋服务端计时日志；三闸绿；用户验收通过
 - **UR F.1 进场三幕＋loader 去文字**
   - 加载文字删干净，换进场仪式：霓虹 IVY BAR 招牌闪（加载时）→ 招牌熄、门缝暖光胀开 → 双木门滑开卸幕；`bar-neon-flicker` 进 globals.css（reduced-motion 停）；待亲验
 - **UR C.22 v2 霓虹點開黑底隨機照片 overlay [WIP]**

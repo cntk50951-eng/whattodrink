@@ -60,6 +60,21 @@ describe("minimaxTts", () => {
     expect(buf.subarray(0, 3).toString()).toBe("ID3");
   });
 
+  it("英文台词走 English boost，中文走 Chinese", async () => {
+    const seen: string[] = [];
+    const fn = vi.fn(async (_url: unknown, init?: { body?: unknown }) => {
+      seen.push(String(init?.body ?? ""));
+      return new Response(
+        JSON.stringify({ base_resp: { status_code: 0 }, data: { audio: "494433040000", status: 2 } }),
+        { status: 200 },
+      );
+    }) as unknown as typeof fetch;
+    await minimaxTts("Hey there, handsome", { apiKey: "k", fetchFn: fn });
+    await minimaxTts("晚上好呀", { apiKey: "k", fetchFn: fn });
+    const boosts = seen.map((b) => (JSON.parse(b) as { language_boost?: string }).language_boost);
+    expect(boosts).toEqual(["English", "Chinese"]);
+  });
+
   it("平台错码抛", async () => {
     const fn = stubFetch({ base_resp: { status_code: 2013, status_msg: "bad" } });
     await expect(minimaxTts("你好", { apiKey: "k", fetchFn: fn })).rejects.toThrow("bad");
