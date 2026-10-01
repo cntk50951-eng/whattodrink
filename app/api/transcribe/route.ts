@@ -8,7 +8,18 @@ import {
  * UR2.3 transcription endpoint. Accepts a 16k mono WAV (base64, converted
  * client-side by lib/audio.ts), tries Cantonese → Mandarin → English and
  * returns the first non-empty transcript. Secrets never leave the server.
+ *
+ * GET → `{ configured: boolean }` (no secrets): lets clients disable voice
+ * input with a clear message instead of failing after recording.
  */
+export async function GET(): Promise<Response> {
+  const configured =
+    (process.env.IFLYTEK_APP_ID ?? "").length > 0 &&
+    (process.env.IFLYTEK_API_KEY ?? "").length > 0 &&
+    (process.env.IFLYTEK_API_SECRET ?? "").length > 0;
+  return NextResponse.json({ configured });
+}
+
 export async function POST(req: Request) {
   const { appId, apiKey, apiSecret } = {
     appId: process.env.IFLYTEK_APP_ID ?? "",

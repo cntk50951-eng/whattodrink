@@ -7,14 +7,14 @@
  * 無骨骼無動畫，靠程序化點頭／面向玩家／呼吸浮動撐場面）。
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import Link from "next/link";
 import { Martini, Mic } from "lucide-react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 
 import { BARTENDER_NAME } from "@/lib/bartender";
-import { buildRecordingBlob, recordingToWavBase64 } from "@/lib/audio";
 
 const EYE = 3.8;
 const SPEED = 1.7;
@@ -30,7 +30,8 @@ const BLOCK_RADIUS = 0.9;
 type WalkMode = "walk" | "orbit";
 
 // sys＝系统提示（网络失败等，非台词，灰色居中，与 Ivy 气泡区分）。
-type ChatMsg = { id: number; from: "her" | "me" | "sys"; text: string };
+// pending＝等模型／等语音时的打字点动画位。
+type ChatMsg = { id: number; from: "her" | "me" | "sys"; text: string; pending?: boolean };
 
 export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => void }): React.JSX.Element {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -47,15 +48,27 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
   }, [onReady]);
 
   // 酒保对话态（three 循环经 stable setter 写入；台词全部来自模型）。
-  // 18＋ 闸 session 内记住（lazy init，不经 effect 避 cascading render）。
-  const [adult, setAdult] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem("bar-adult") === "1";
-    } catch {
-      return false;
-    }
-  });
+  // 18＋ 闸 session 内记住。首渲染必须与服务端一致（false），否则 hydration 错位；
+  // session 的值走 useSyncExternalStore 在挂载后同步（React 官方推荐做法）。
+  const [adultOk, setAdultOk] = useState(false);
+  const storedAdult = useSyncExternalStore(
+    () => () => {},
+    () => {
+      try {
+        return sessionStorage.getItem("bar-adult") === "1";
+      } catch {
+        return false;
+      }
+    },
+    () => false,
+  );
+  const adult = adultOk || storedAdult;
   const [chatOpen, setChatOpen] = useState(false);
+  // 面板开合进循环（点空地收面板用；赋值走 effect）。
+  const chatOpenRef = useRef(false);
+  useEffect(() => {
+    chatOpenRef.current = chatOpen;
+  }, [chatOpen]);
   // 进场三幕：霓虹招牌（加载中）→ 门开（模型就绪）→ 卸幕进场。
   const [doorsOpen, setDoorsOpen] = useState(false);
   const [entered, setEntered] = useState(false);
@@ -73,6 +86,12 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
+  const [speaking, setSpeaking] = useState(false);
+  const sendingRef = useRef(false);
+  useEffect(() => {
+    sendingRef.current = sending;
+  }, [sending]);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const msgsRef = useRef<ChatMsg[]>([]);
   const idRef = useRef(1);
   const voiceOnRef = useRef(true);
@@ -96,7 +115,8 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
     msgsRef.current = msgsRef.current.filter((x) => x.id !== id);
     setMsgs(msgsRef.current);
   };
-  /** 问 Ivy（文字＋事件统一口；history 自动带最近 10 句；失败回 null）。 */
+  /** 问 Ivy（文字＋事件统一口；history 自动带最近 10 句；失败回 null）。
+   * 45s 超时兜底：不断流，不卡死后面所有发送。 */
   const askIvy = async (input: { message?: string; event?: string }): Promise<string | null> => {
     try {
       const history = msgsRef.current
@@ -107,6 +127,7 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...input, history }),
+        signal: AbortSignal.timeout(45000),
       });
       if (!res.ok) return null;
       const data = (await res.json()) as { text?: string };
@@ -115,16 +136,21 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
       return null;
     }
   };
-  /** 播台词语音（静默失败：有字无声，不挡聊天）。 */
+  /** 播台词语音（静默失败：有字无声，不挡聊天；播时顶栏显示播放中）。 */
   const playVoice = async (text: string): Promise<void> => {
     if (!voiceOnRef.current) return;
+    setSpeaking(true);
     try {
       const res = await fetch("/api/v1/bar/voice", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ text }),
+        signal: AbortSignal.timeout(30000),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        setSpeaking(false);
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       if (audioRef.current !== null) {
@@ -133,16 +159,19 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
       }
       const a = new Audio(url);
       audioRef.current = a;
-      await a.play().catch(() => {});
+      a.onended = () => setSpeaking(false);
+      a.onerror = () => setSpeaking(false);
+      await a.play().catch(() => setSpeaking(false));
     } catch {
       /* 有字无声 */
+      setSpeaking(false);
     }
   };
   const openChat = (): void => {
     setInvite(null);
     setChatOpen(true);
     if (msgsRef.current.length > 0) return;
-    const pid = pushMsg({ from: "her", text: "…" });
+    const pid = pushMsg({ from: "her", text: "…", pending: true });
     void (async () => {
       const line = await askIvy({ event: "greet" });
       if (line === null) {
@@ -164,28 +193,104 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
     setDraft("");
     await sendText(text);
   };
-  /** 发文字（打字＋语音转写统一口；history 由 askIvy 自动带）。 */
-  const sendText = async (text: string): Promise<void> => {
+  /** 发文字（打字＋语音转写统一口；history 由 askIvy 自动带）。
+   * keepOpen：语音来的全程展开（等待点跳看得见），打字来的发完秒收。 */
+  const sendText = async (text: string, keepOpen = false): Promise<void> => {
     const t = text.trim().slice(0, 500);
-    if (t.length === 0 || sending) return;
+    if (t.length === 0) return;
+    // 上一句还没回：不静默吞，冒个快闪泡说一声（2.5s 自散）。
+    if (sending) {
+      setInvite("Ivy 还在回上一句，说完就来…");
+      setTimeout(() => {
+        setInvite((cur) => (cur === "Ivy 还在回上一句，说完就来…" ? null : cur));
+      }, 2500);
+      return;
+    }
     pushMsg({ from: "me", text: t });
     setSending(true);
-    const pid = pushMsg({ from: "her", text: "…" });
+    const pid = pushMsg({ from: "her", text: "…", pending: true });
+    if (keepOpen) setChatOpen(true);
     const line = await askIvy({ message: t });
     setSending(false);
     if (line === null) {
       replaceMsg(pid, { from: "sys", text: "Ivy 暂时没听清，稍后再试。" });
+    } else {
+      replaceMsg(pid, { from: "her", text: line });
+      void playVoice(line);
+    }
+    // 打字来的发完秒收（面板只在阅读时展开，平时不挡 Ivy）。
+    if (!keepOpen) setChatOpen(false);
+  };
+  // 识别语种：自动（上次说通的先试，localStorage 记顺序）或手动锁一种。
+  const SR_LANGS = ["yue-HK", "cmn-Hans-CN", "en-US"];
+  const SR_LANG_LABEL: Record<string, string> = {
+    auto: "自动",
+    "yue-HK": "粤",
+    "cmn-Hans-CN": "普",
+    "en-US": "英",
+  };
+  const [srMode, setSrMode] = useState("auto");
+  const srModeRef = useRef<string | null>(null);
+  const srOrderRef = useRef<string[] | null>(null);
+  const ensureSrPrefs = (): void => {
+    if (srModeRef.current !== null) return;
+    let mode = "auto";
+    try {
+      mode = localStorage.getItem("bar-sr-mode") ?? "auto";
+    } catch {
+      /* 无痕 */
+    }
+    if (mode !== "auto" && !SR_LANGS.includes(mode)) mode = "auto";
+    srModeRef.current = mode;
+    setSrMode(mode);
+    if (mode !== "auto") {
+      srOrderRef.current = [mode];
       return;
     }
-    replaceMsg(pid, { from: "her", text: line });
-    void playVoice(line);
+    try {
+      const o = JSON.parse(localStorage.getItem("bar-sr-order") ?? "null") as unknown;
+      if (Array.isArray(o) && o.length > 0) {
+        const clean = o.filter(
+          (s): s is string => typeof s === "string" && SR_LANGS.includes(s),
+        );
+        if (clean.length > 0) srOrderRef.current = clean;
+      }
+    } catch {
+      /* 用默认顺序 */
+    }
   };
-  // 按住对讲（先浏览器免费识别：粤→普→英连试；认不出再走服务端讯飞）。
+  const setSrModeAll = (mode: string): void => {
+    srModeRef.current = mode;
+    setSrMode(mode);
+    try {
+      localStorage.setItem("bar-sr-mode", mode);
+    } catch {
+      /* 无痕 */
+    }
+    // 切回自动：重读已存顺序；锁单语：只试一种（又快又准）。
+    srOrderRef.current = null;
+    if (mode !== "auto") {
+      srOrderRef.current = [mode];
+      return;
+    }
+    try {
+      const o = JSON.parse(localStorage.getItem("bar-sr-order") ?? "null") as unknown;
+      if (Array.isArray(o) && o.length > 0) {
+        const clean = o.filter(
+          (s): s is string => typeof s === "string" && SR_LANGS.includes(s),
+        );
+        if (clean.length > 0) srOrderRef.current = clean;
+      }
+    } catch {
+      /* 用默认顺序 */
+    }
+  };
   const [recording, setRecording] = useState(false);
   const [recSecs, setRecSecs] = useState(0);
   const [inputFocused, setInputFocused] = useState(false);
   type SRBox = {
     cancelled: boolean;
+    err: string | null;
     rec: {
       stop(): void;
     } | null;
@@ -195,7 +300,7 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
     interimResults: boolean;
     maxAlternatives: number;
     onresult: ((e: { results?: ArrayLike<ArrayLike<{ transcript?: string }>> }) => void) | null;
-    onerror: (() => void) | null;
+    onerror: ((e: { error?: string }) => void) | null;
     onend: (() => void) | null;
     start(): void;
     stop(): void;
@@ -237,7 +342,10 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
         const t = e.results?.[0]?.[0]?.transcript?.trim() ?? "";
         finish(t.length > 0 ? t : null);
       };
-      rec.onerror = () => finish(null);
+      rec.onerror = (e) => {
+        if (typeof e.error === "string" && e.error.length > 0) box.err = e.error;
+        finish(null);
+      };
       rec.onend = () => finish(null);
       try {
         rec.start();
@@ -246,12 +354,10 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
       }
     });
   const recRef = useRef<{
-    stream: MediaStream;
-    mr: MediaRecorder;
-    chunks: Blob[];
     timer: ReturnType<typeof setInterval>;
     srBox: SRBox;
-    srDone: Promise<string | null>;
+    srDone: Promise<{ text: string; lang: string } | null>;
+    startedAt: number;
   } | null>(null);
   const stopRecord = async (send: boolean): Promise<void> => {
     const r = recRef.current;
@@ -259,108 +365,71 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
     setRecording(false);
     if (r === null) return;
     clearInterval(r.timer);
-    // 停掉浏览器识别（松手即停，onend 会把 srDone 结算成 null）。
+    // 太短当误触（半秒不到认不出东西，直接吞＋提示）。
+    if (Date.now() - r.startedAt < 600) {
+      if (send) pushMsg({ from: "sys", text: "按住久一点（半秒以上）再松手。" });
+      return;
+    }
+    // 停掉浏览器识别（松手即停，onend 会把 srDone 结算）。
     r.srBox.cancelled = true;
     try {
       r.srBox.rec?.stop();
     } catch {
       /* 已停 */
     }
-    const blob: Blob | null = await new Promise((resolve) => {
-      r.mr.onstop = () => {
-        try {
-          resolve(buildRecordingBlob(r.chunks, r.mr.mimeType));
-        } catch {
-          resolve(null);
-        }
-      };
-      try {
-        r.mr.stop();
-      } catch {
-        resolve(null);
-      }
-    });
-    r.stream.getTracks().forEach((t) => t.stop());
-    if (!send || blob === null) return;
-    // 浏览器识别优先（免费）：有字直接用，录音丢掉；没有才走服务端。
+    if (!send) return;
+    // 纯浏览器识别（不要讯飞）：等链路结算（最多 2s），有字就发。
     const tip = pushMsg({ from: "sys", text: "正在听写…" });
-    try {
-      const srText = await Promise.race([
-        r.srDone,
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500)),
-      ]);
-      if (typeof srText === "string" && srText.length > 0) {
-        removeMsg(tip);
-        await sendText(srText);
-        return;
-      }
-    } catch {
-      /* 掉回服务端 */
-    }
-    // 分段报错（别再用一句“网络问题”糊弄）：转格式／HTTP 状态／真断网分开说。
-    let wav: string;
-    try {
-      wav = await recordingToWavBase64(blob);
-    } catch (e) {
-      console.error("[bar-voice-in] wav convert failed:", e);
-      replaceMsg(tip, { from: "sys", text: "录音转格式失败，换个浏览器再试一次。" });
-      return;
-    }
-    try {
-      const res = await fetch("/api/transcribe", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ audioBase64: wav }),
-      });
-      const data = (await res.json()) as { text?: string; code?: string };
-      if (!res.ok) {
-        console.error("[bar-voice-in] transcribe status:", res.status, data);
-        replaceMsg(tip, { from: "sys", text: `转写服务忙（${res.status}），再试一次。` });
-        return;
-      }
-      if (typeof data.text !== "string" || data.text.trim().length === 0) {
-        replaceMsg(tip, { from: "sys", text: "没听清，再按住说一次。" });
-        return;
+    const srText = await Promise.race([
+      r.srDone,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+    ]);
+    if (srText !== null) {
+      // 自动模式记住说通的语种，下次先试它（普通话不再被粤语截胡）。
+      if (srModeRef.current === "auto") {
+        const order = [srText.lang, ...SR_LANGS.filter((l) => l !== srText.lang)];
+        srOrderRef.current = order;
+        try {
+          localStorage.setItem("bar-sr-order", JSON.stringify(order));
+        } catch {
+          /* 无痕 */
+        }
       }
       removeMsg(tip);
-      await sendText(data.text);
-    } catch (e) {
-      console.error("[bar-voice-in] transcribe fetch failed:", e);
-      replaceMsg(tip, { from: "sys", text: "网络问题，转写失败。" });
+      // keepOpen：等待点跳全程可见（之前面板关着等，用户啥也看不到）。
+      await sendText(srText.text, true);
+      return;
+    }
+    // 没字：麦克风问题直说，否则就是没听清。
+    const err = r.srBox.err ?? "";
+    if (err === "not-allowed" || err === "audio-capture" || err === "service-not-allowed") {
+      replaceMsg(tip, { from: "sys", text: "麦克风没打开，去系统设置里允许后重试。" });
+    } else {
+      replaceMsg(tip, { from: "sys", text: "没听清，再按住说一次。" });
     }
   };
-  const startRecord = async (): Promise<void> => {
+  const startRecord = (): void => {
     if (recording || sending || recRef.current !== null) return;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
-      const chunks: Blob[] = [];
-      mr.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
-      const started = Date.now();
-      const timer = setInterval(() => {
-        const s = Math.floor((Date.now() - started) / 1000);
-        setRecSecs(s);
-        if (s >= 30) void stopRecord(true);
-      }, 250);
-      // 浏览器免费识别与录音并行（按住期间粤→普→英连试；松手即停）。
-      const srBox: SRBox = { cancelled: false, rec: null };
-      const srDone: Promise<string | null> = (async () => {
-        for (const lang of ["yue-HK", "cmn-Hans-CN", "en-US"]) {
-          if (srBox.cancelled) return null;
-          const t = await webSpeechOnce(lang, srBox, 5000);
-          if (t !== null) return t;
-        }
-        return null;
-      })();
-      recRef.current = { stream, mr, chunks, timer, srBox, srDone };
-      setRecSecs(0);
-      setRecording(true);
-      mr.start();
-    } catch {
-      pushMsg({ from: "sys", text: "麦克风没打开，去系统设置里允许后重试。" });
-    }
+    // 纯浏览器识别（不走服务端）；语种按偏好顺序试；计时＋30s 自动断。
+    ensureSrPrefs();
+    const started = Date.now();
+    const timer = setInterval(() => {
+      const s = Math.floor((Date.now() - started) / 1000);
+      setRecSecs(s);
+      if (s >= 30) void stopRecord(true);
+    }, 250);
+    const srBox: SRBox = { cancelled: false, err: null, rec: null };
+    const srDone: Promise<{ text: string; lang: string } | null> = (async () => {
+      for (const lang of srOrderRef.current ?? SR_LANGS) {
+        if (srBox.cancelled) return null;
+        const t = await webSpeechOnce(lang, srBox, 5000);
+        if (t !== null) return { text: t, lang };
+      }
+      return null;
+    })();
+    recRef.current = { timer, srBox, srDone, startedAt: started };
+    setRecSecs(0);
+    setRecording(true);
   };
 
   useEffect(() => {
@@ -772,8 +841,12 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
       })();
     };
     // 單擊延遲開（等 280ms 睇下有無第二擊變雙擊；撳即震一下先）。
+    // 點空地（沒點中她）：面板開著就收起，方便再選語音／文字。
     const tapOrDouble = (cx: number, cy: number): void => {
-      if (!tapIva(cx, cy)) return;
+      if (!tapIva(cx, cy)) {
+        if (chatOpenRef.current) setChatOpen(false);
+        return;
+      }
       buzz(15);
       const nowMs = performance.now();
       if (nowMs - lastTap < 300) {
@@ -855,7 +928,7 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
             const p = 1 - (bowUntil - nowMs) / 900;
             ivaWrap.rotation.x = Math.sin(p * Math.PI) * 0.28;
           } else {
-            ivaWrap.rotation.x = pressDip;
+            ivaWrap.rotation.x = pressDip + (sendingRef.current ? 0.08 : 0);
           }
           let hop = 0;
           if (nowMs < spinUntil) {
@@ -927,8 +1000,8 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
         const dx = pos.x - ivaWrap.position.x;
         const dz = pos.z - ivaWrap.position.z;
         const dist = Math.hypot(dx, dz);
-        // 貼近前傾（1.5m 內 +0.06，活人感；鞠躬／按住時唔搶）。
-        const lean = dist < 1.5 ? 0.06 : 0;
+        // 貼近前傾（1.5m 內 +0.06，活人感）＋想事情前傾（等模型回＋0.08，被晾著也看得出她在動腦）。
+        const lean = (dist < 1.5 ? 0.06 : 0) + (sendingRef.current ? 0.08 : 0);
         // 長按鞠躬（0.9s 前俯後回；轉圈時唔搶）。
         if (nowMs < bowUntil) {
           const p = 1 - (bowUntil - nowMs) / 900;
@@ -985,7 +1058,7 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
       if (pendingChat !== null) clearTimeout(pendingChat);
       if (inviteTimer !== null) clearTimeout(inviteTimer);
       if (audioRef.current !== null) audioRef.current.pause();
-      // 录音中卸载：停表停机停识别（同步能做的全做）。
+      // 识别中卸载：停表＋取消链路（同步能做的全做）。
       if (recRef.current !== null) {
         clearInterval(recRef.current.timer);
         recRef.current.srBox.cancelled = true;
@@ -994,12 +1067,6 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
         } catch {
           /* 已停 */
         }
-        try {
-          recRef.current.mr.stop();
-        } catch {
-          /* 已停即过 */
-        }
-        recRef.current.stream.getTracks().forEach((t) => t.stop());
         recRef.current = null;
       }
       el.removeEventListener("pointerdown", onDown);
@@ -1027,14 +1094,23 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
   return (
     <>
       <div ref={mountRef} className="absolute inset-0" aria-hidden />
-      {/* 環繞／走路切換（酒保到了以後：環繞看他，走路走過去） */}
-      <button
-        type="button"
-        onClick={() => setMode((m) => (m === "walk" ? "orbit" : "walk"))}
-        className="absolute right-3 top-3 z-20 rounded-full bg-black/55 px-4 py-2 text-xs font-bold text-amber-100 ring-1 ring-white/20 backdrop-blur"
-      >
-        {mode === "walk" ? "⭮ 環繞" : "🚶 走路"}
-      </button>
+      {/* 右上：返回主页＋環繞／走路切換。 */}
+      <div className="absolute right-3 top-3 z-20 flex gap-2">
+        <Link
+          href="/"
+          aria-label="返回主页"
+          className="rounded-full bg-black/55 px-3 py-2 text-xs font-bold text-white/80 ring-1 ring-white/20 backdrop-blur"
+        >
+          ← 主页
+        </Link>
+        <button
+          type="button"
+          onClick={() => setMode((m) => (m === "walk" ? "orbit" : "walk"))}
+          className="rounded-full bg-black/55 px-4 py-2 text-xs font-bold text-amber-100 ring-1 ring-white/20 backdrop-blur"
+        >
+          {mode === "walk" ? "⭮ 環繞" : "🚶 走路"}
+        </button>
+      </div>
       {/* 进场幕（推门进酒吧）：霓虹招牌闪 → 招牌熄、门缝暖光胀开 → 双门滑开卸幕。 */}
       {!entered && (
         <div className="absolute inset-0 z-40 overflow-hidden bg-black" aria-hidden>
@@ -1090,8 +1166,12 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
             <button
               type="button"
               onClick={() => {
-                sessionStorage.setItem("bar-adult", "1");
-                setAdult(true);
+                try {
+                  sessionStorage.setItem("bar-adult", "1");
+                } catch {
+                  /* 无痕模式照样进 */
+                }
+                setAdultOk(true);
               }}
               className="mt-4 w-full rounded-full bg-amber-400 py-2.5 text-sm font-bold text-black"
             >
@@ -1100,12 +1180,12 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
           </div>
         </div>
       )}
-      {/* 走近招呼（撳即開聊）。 */}
+      {/* 走近招呼（点即开聊；悬在底部输入组上方）。 */}
       {invite !== null && !chatOpen && adult && (
         <button
           type="button"
           onClick={openChat}
-          className="absolute bottom-16 left-1/2 z-20 w-max max-w-[92%] -translate-x-1/2 rounded-2xl bg-black/70 px-4 py-2.5 text-left text-xs leading-relaxed text-amber-100 ring-1 ring-amber-200/30 backdrop-blur"
+          className="absolute bottom-56 left-1/2 z-20 w-max max-w-[92%] -translate-x-1/2 rounded-2xl bg-black/70 px-4 py-2.5 text-left text-xs leading-relaxed text-amber-100 ring-1 ring-amber-200/30 backdrop-blur"
         >
           <span className="font-bold">Ivy：</span>
           {invite}
@@ -1123,7 +1203,7 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
                 onClick={() => setVoiceOn((v) => !v)}
                 className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/70"
               >
-                {voiceOn ? "🔊 语音开" : "🔇 语音关"}
+                {speaking ? "🔊 播放中…" : voiceOn ? "🔊 语音开" : "🔇 语音关"}
               </button>
               <button
                 type="button"
@@ -1151,13 +1231,42 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
                         : "self-center rounded-full bg-white/5 px-3 py-1 text-[11px] text-white/50"
                   }
                 >
-                  {m.text}
+                  {m.pending === true ? (
+                    <span className="flex items-center gap-1 py-0.5" aria-label="Ivy 正在输入">
+                      {[0, 1, 2].map((i) => (
+                        <span
+                          key={i}
+                          className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/70"
+                          style={{ animationDelay: `${i * 0.15}s` }}
+                        />
+                      ))}
+                    </span>
+                  ) : (
+                    m.text
+                  )}
                 </div>
               ))}
             </div>
           )}
           <div className="mt-3 flex gap-2">
+            {/* 面板内的语音键（和底部圆钮同一套录音逻辑，随按随用）。 */}
+            <button
+              type="button"
+              aria-label={recording ? `录音中 ${recSecs} 秒，松手发送` : "按住说话"}
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                void startRecord();
+              }}
+              onPointerUp={() => void stopRecord(true)}
+              onPointerCancel={() => void stopRecord(false)}
+              className={`flex h-9 w-9 shrink-0 touch-none items-center justify-center rounded-full transition-all select-none ${
+                recording ? "animate-pulse bg-red-500 text-white" : "bg-white/10 text-amber-100"
+              }`}
+            >
+              <Mic size={16} aria-hidden strokeWidth={2.4} />
+            </button>
             <input
+              ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onFocus={() => setInputFocused(true)}
@@ -1177,42 +1286,72 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
               {sending ? "…" : "送出"}
             </button>
           </div>
-          {/* 圆圈对讲（粤／普／英）：拇指按住，呼吸光圈待命，录音扩散波＋秒数。 */}
-          {!inputFocused && (
-            <div className="mt-2 flex flex-col items-center gap-1">
+        </div>
+      )}
+      {/* 底部输入组（面板收起时）：输入 pill（点开打字）＋语种锁＋独立圆圈对讲。 */}
+      {adult && !chatOpen && (
+        <div className="absolute inset-x-0 bottom-0 z-30 mx-auto flex w-full max-w-md flex-col items-center gap-2 p-4 pb-6">
+          <button
+            type="button"
+            onClick={() => {
+              setChatOpen(true);
+              setTimeout(() => inputRef.current?.focus(), 60);
+            }}
+            className="w-full rounded-full bg-zinc-950/80 px-4 py-2.5 text-left text-xs text-white/60 ring-1 ring-white/15 backdrop-blur"
+          >
+            和 {BARTENDER_NAME} 说话…（点开打字）
+          </button>
+          {/* 识别语种：自动（上次说通的先试）或手动锁一种，又快又准。 */}
+          <div
+            className="flex gap-1 rounded-full bg-black/40 p-1 ring-1 ring-white/10"
+            role="group"
+            aria-label="语音识别语言"
+          >
+            {["auto", ...SR_LANGS].map((k) => (
               <button
+                key={k}
                 type="button"
-                aria-label={recording ? `录音中 ${recSecs} 秒，松手发送` : "按住说话"}
-                onPointerDown={(e) => {
-                  e.currentTarget.setPointerCapture(e.pointerId);
-                  void startRecord();
-                }}
-                onPointerUp={() => void stopRecord(true)}
-                onPointerCancel={() => void stopRecord(false)}
-                className={`relative flex h-[76px] w-[76px] shrink-0 touch-none items-center justify-center rounded-full transition-all select-none ${
-                  recording
-                    ? "scale-105 bg-red-500 text-white shadow-[0_0_28px_rgba(239,68,68,.6)]"
-                    : "bg-gradient-to-br from-amber-300 to-amber-500 text-amber-950 shadow-[0_0_18px_rgba(251,191,36,.45)] active:scale-95"
+                onClick={() => setSrModeAll(k)}
+                aria-pressed={srMode === k}
+                className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                  srMode === k ? "bg-amber-300 text-amber-950" : "text-white/60"
                 }`}
               >
-                {recording ? (
-                  <>
-                    <span className="absolute inset-0 animate-ping rounded-full bg-red-400/50" />
-                    <span
-                      className="absolute inset-0 animate-ping rounded-full bg-red-400/30"
-                      style={{ animationDelay: ".5s" }}
-                    />
-                  </>
-                ) : (
-                  <span className="absolute inset-0 animate-ping rounded-full bg-amber-300/30 [animation-duration:2.4s]" />
-                )}
-                <Mic size={30} aria-hidden strokeWidth={2.2} className="relative" />
+                {SR_LANG_LABEL[k]}
               </button>
-              <span className={`text-[11px] font-bold ${recording ? "text-red-300" : "text-white/60"}`}>
-                {recording ? `● ${recSecs}s 松手发送` : "按住说话 · Hold to Talk"}
-              </span>
-            </div>
-          )}
+            ))}
+          </div>
+          <button
+            type="button"
+            aria-label={recording ? `录音中 ${recSecs} 秒，松手发送` : "按住说话"}
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              void startRecord();
+            }}
+            onPointerUp={() => void stopRecord(true)}
+            onPointerCancel={() => void stopRecord(false)}
+            className={`relative flex h-[76px] w-[76px] shrink-0 touch-none items-center justify-center rounded-full transition-all select-none ${
+              recording
+                ? "scale-105 bg-red-500 text-white shadow-[0_0_28px_rgba(239,68,68,.6)]"
+                : "bg-gradient-to-br from-amber-300 to-amber-500 text-amber-950 shadow-[0_0_18px_rgba(251,191,36,.45)] active:scale-95"
+            }`}
+          >
+            {recording ? (
+              <>
+                <span className="absolute inset-0 animate-ping rounded-full bg-red-400/50" />
+                <span
+                  className="absolute inset-0 animate-ping rounded-full bg-red-400/30"
+                  style={{ animationDelay: ".5s" }}
+                />
+              </>
+            ) : (
+              <span className="absolute inset-0 animate-ping rounded-full bg-amber-300/30 [animation-duration:2.4s]" />
+            )}
+            <Mic size={30} aria-hidden strokeWidth={2.2} className="relative" />
+          </button>
+          <span className={`text-[11px] font-bold ${recording ? "text-red-300" : "text-white/60"}`}>
+            {recording ? `● ${recSecs}s 松手发送` : "按住说话 · Hold to Talk"}
+          </span>
         </div>
       )}
     </>
