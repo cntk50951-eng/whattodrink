@@ -10,7 +10,7 @@ export async function toMono16k(blob: Blob): Promise<Float32Array> {
     window.OfflineAudioContext ??
     (window as unknown as { webkitOfflineAudioContext: typeof OfflineAudioContext })
       .webkitOfflineAudioContext;
-  const raw = new Float32Array(await blob.arrayBuffer());
+  const buf = await blob.arrayBuffer();
   // Decode via a temp context at the file's native rate.
   const TmpCtx =
     window.AudioContext ??
@@ -18,7 +18,7 @@ export async function toMono16k(blob: Blob): Promise<Float32Array> {
       .webkitAudioContext;
   const tmp = new TmpCtx();
   try {
-    const decoded = await tmp.decodeAudioData(raw.buffer as ArrayBuffer);
+    const decoded = await tmp.decodeAudioData(buf);
     const length = Math.ceil((decoded.length / decoded.sampleRate) * 16000);
     const offline = new Ctx(1, length, 16000);
     const src = offline.createBufferSource();

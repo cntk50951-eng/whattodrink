@@ -180,15 +180,78 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
     replaceMsg(pid, { from: "her", text: line });
     void playVoice(line);
   };
-  // 按住对讲（粤／普／英走讯飞 fallback；30s 自动断；松手即转写发送）。
+  // 按住对讲（先浏览器免费识别：粤→普→英连试；认不出再走服务端讯飞）。
   const [recording, setRecording] = useState(false);
   const [recSecs, setRecSecs] = useState(0);
   const [inputFocused, setInputFocused] = useState(false);
+  type SRBox = {
+    cancelled: boolean;
+    rec: {
+      stop(): void;
+    } | null;
+  };
+  type SRInstance = {
+    lang: string;
+    interimResults: boolean;
+    maxAlternatives: number;
+    onresult: ((e: { results?: ArrayLike<ArrayLike<{ transcript?: string }>> }) => void) | null;
+    onerror: (() => void) | null;
+    onend: (() => void) | null;
+    start(): void;
+    stop(): void;
+  };
+  /** 单次浏览器识别（不支持／超时／取消即回 null，不抛）。 */
+  const webSpeechOnce = (lang: string, box: SRBox, timeoutMs: number): Promise<string | null> =>
+    new Promise((resolve) => {
+      const SR = (window as unknown as { SpeechRecognition?: new () => SRInstance }).SpeechRecognition
+        ?? (window as unknown as { webkitSpeechRecognition?: new () => SRInstance }).webkitSpeechRecognition;
+      if (SR === undefined || box.cancelled) {
+        resolve(null);
+        return;
+      }
+      let rec: SRInstance;
+      try {
+        rec = new SR();
+      } catch {
+        resolve(null);
+        return;
+      }
+      box.rec = rec;
+      let settled = false;
+      const finish = (v: string | null): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        try {
+          rec.stop();
+        } catch {
+          /* 已停 */
+        }
+        resolve(v);
+      };
+      const timer = setTimeout(() => finish(null), timeoutMs);
+      rec.lang = lang;
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      rec.onresult = (e) => {
+        const t = e.results?.[0]?.[0]?.transcript?.trim() ?? "";
+        finish(t.length > 0 ? t : null);
+      };
+      rec.onerror = () => finish(null);
+      rec.onend = () => finish(null);
+      try {
+        rec.start();
+      } catch {
+        finish(null);
+      }
+    });
   const recRef = useRef<{
     stream: MediaStream;
     mr: MediaRecorder;
     chunks: Blob[];
     timer: ReturnType<typeof setInterval>;
+    srBox: SRBox;
+    srDone: Promise<string | null>;
   } | null>(null);
   const stopRecord = async (send: boolean): Promise<void> => {
     const r = recRef.current;
@@ -196,6 +259,13 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
     setRecording(false);
     if (r === null) return;
     clearInterval(r.timer);
+    // 停掉浏览器识别（松手即停，onend 会把 srDone 结算成 null）。
+    r.srBox.cancelled = true;
+    try {
+      r.srBox.rec?.stop();
+    } catch {
+      /* 已停 */
+    }
     const blob: Blob | null = await new Promise((resolve) => {
       r.mr.onstop = () => {
         try {
@@ -212,7 +282,21 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
     });
     r.stream.getTracks().forEach((t) => t.stop());
     if (!send || blob === null) return;
+    // 浏览器识别优先（免费）：有字直接用，录音丢掉；没有才走服务端。
     const tip = pushMsg({ from: "sys", text: "正在听写…" });
+    try {
+      const srText = await Promise.race([
+        r.srDone,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500)),
+      ]);
+      if (typeof srText === "string" && srText.length > 0) {
+        removeMsg(tip);
+        await sendText(srText);
+        return;
+      }
+    } catch {
+      /* 掉回服务端 */
+    }
     // 分段报错（别再用一句“网络问题”糊弄）：转格式／HTTP 状态／真断网分开说。
     let wav: string;
     try {
@@ -260,7 +344,17 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
         setRecSecs(s);
         if (s >= 30) void stopRecord(true);
       }, 250);
-      recRef.current = { stream, mr, chunks, timer };
+      // 浏览器免费识别与录音并行（按住期间粤→普→英连试；松手即停）。
+      const srBox: SRBox = { cancelled: false, rec: null };
+      const srDone: Promise<string | null> = (async () => {
+        for (const lang of ["yue-HK", "cmn-Hans-CN", "en-US"]) {
+          if (srBox.cancelled) return null;
+          const t = await webSpeechOnce(lang, srBox, 5000);
+          if (t !== null) return t;
+        }
+        return null;
+      })();
+      recRef.current = { stream, mr, chunks, timer, srBox, srDone };
       setRecSecs(0);
       setRecording(true);
       mr.start();
@@ -891,9 +985,15 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
       if (pendingChat !== null) clearTimeout(pendingChat);
       if (inviteTimer !== null) clearTimeout(inviteTimer);
       if (audioRef.current !== null) audioRef.current.pause();
-      // 录音中卸载：停表停流停机（同步能做的全做）。
+      // 录音中卸载：停表停机停识别（同步能做的全做）。
       if (recRef.current !== null) {
         clearInterval(recRef.current.timer);
+        recRef.current.srBox.cancelled = true;
+        try {
+          recRef.current.srBox.rec?.stop();
+        } catch {
+          /* 已停 */
+        }
         try {
           recRef.current.mr.stop();
         } catch {
