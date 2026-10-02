@@ -287,6 +287,15 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
   };
   const [recording, setRecording] = useState(false);
   const [recSecs, setRecSecs] = useState(0);
+  // 當前瀏覽器有無語音識別（iPhone 全系無 SpeechRecognition：DEF-20261002-001）。
+  // 有即全功能；無即對講鈕置灰＋語種鎖隱藏，不讓用戶空按。
+  const [srSupported] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      ((window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition ??
+        (window as unknown as { webkitSpeechRecognition?: unknown })
+          .webkitSpeechRecognition) !== undefined,
+  );
   const [inputFocused, setInputFocused] = useState(false);
   type SRBox = {
     cancelled: boolean;
@@ -410,6 +419,14 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
   };
   const startRecord = (): void => {
     if (recording || sending || recRef.current !== null) return;
+    // 無識別能力的瀏覽器（iPhone 全系）：直說原因，不進錄音態（DEF-20261002-001）。
+    if (!srSupported) {
+      pushMsg({
+        from: "sys",
+        text: "当前浏览器不支持语音识别，请直接打字（或换安卓／电脑版 Chrome 再试语音）。",
+      });
+      return;
+    }
     // 纯浏览器识别（不走服务端）；语种按偏好顺序试；计时＋30s 自动断。
     ensureSrPrefs();
     const started = Date.now();
@@ -1252,7 +1269,14 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
             {/* 面板内的语音键（和底部圆钮同一套录音逻辑，随按随用）。 */}
             <button
               type="button"
-              aria-label={recording ? `录音中 ${recSecs} 秒，松手发送` : "按住说话"}
+              aria-label={
+                !srSupported
+                  ? "当前浏览器不支持语音，请打字"
+                  : recording
+                    ? `录音中 ${recSecs} 秒，松手发送`
+                    : "按住说话"
+              }
+              disabled={!srSupported}
               onPointerDown={(e) => {
                 e.currentTarget.setPointerCapture(e.pointerId);
                 void startRecord();
@@ -1261,7 +1285,7 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
               onPointerCancel={() => void stopRecord(false)}
               className={`flex h-9 w-9 shrink-0 touch-none items-center justify-center rounded-full transition-all select-none ${
                 recording ? "animate-pulse bg-red-500 text-white" : "bg-white/10 text-amber-100"
-              }`}
+              } ${!srSupported ? "opacity-40" : ""}`}
             >
               <Mic size={16} aria-hidden strokeWidth={2.4} />
             </button>
@@ -1301,7 +1325,8 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
           >
             和 {BARTENDER_NAME} 说话…（点开打字）
           </button>
-          {/* 识别语种：自动（上次说通的先试）或手动锁一种，又快又准。 */}
+          {/* 识别语种：自动（上次说通的先试）或手动锁一种，又快又准。无识别能力时整组隐藏。 */}
+          {srSupported && (
           <div
             className="flex gap-1 rounded-full bg-black/40 p-1 ring-1 ring-white/10"
             role="group"
@@ -1321,9 +1346,17 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
               </button>
             ))}
           </div>
+          )}
           <button
             type="button"
-            aria-label={recording ? `录音中 ${recSecs} 秒，松手发送` : "按住说话"}
+            aria-label={
+              !srSupported
+                ? "当前浏览器不支持语音，请打字"
+                : recording
+                  ? `录音中 ${recSecs} 秒，松手发送`
+                  : "按住说话"
+            }
+            disabled={!srSupported}
             onPointerDown={(e) => {
               e.currentTarget.setPointerCapture(e.pointerId);
               void startRecord();
@@ -1334,7 +1367,7 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
               recording
                 ? "scale-105 bg-red-500 text-white shadow-[0_0_28px_rgba(239,68,68,.6)]"
                 : "bg-gradient-to-br from-amber-300 to-amber-500 text-amber-950 shadow-[0_0_18px_rgba(251,191,36,.45)] active:scale-95"
-            }`}
+            } ${!srSupported ? "opacity-40 saturate-50" : ""}`}
           >
             {recording ? (
               <>

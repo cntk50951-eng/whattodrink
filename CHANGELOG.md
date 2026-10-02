@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+- **DEF-20261002-001 Ivy Bar iPhone 对讲录不上**：iPhone 全系无 `SpeechRecognition`，旧链空转报“没听清”。修为能力检测＋诚实降级（无能力时麦克风钮置灰 disabled、语种锁隐藏、按压直说原因请打字；安卓/电脑 Chrome 行为不变）
+- **DEF-20261002-002 Ivy Bar 手机键盘顶飞 Ivy**：iOS 键盘只缩 visualViewport 不发 `window.resize`，画布不重排、系统整页 pan。修为页根容器跟 `visualViewport.height` 走＋补 dispatch 让画布重排；桌面端 no-op
+
 ### Changed
 - **UR C.22 揭曉照片換版**：`sapporo_commercial_9x16_no_loop.gif` 換新版（同檔名；Budweiser／青島與庫內一致）
 
