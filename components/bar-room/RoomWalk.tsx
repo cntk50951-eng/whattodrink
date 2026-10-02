@@ -287,15 +287,25 @@ export function RoomWalk({ onReady }: { onReady: (ok: boolean, note: string) => 
   };
   const [recording, setRecording] = useState(false);
   const [recSecs, setRecSecs] = useState(0);
-  // 當前瀏覽器有無語音識別（iPhone 全系無 SpeechRecognition：DEF-20261002-001）。
+  // 當前瀏覽器有無語音識別（DEF-20261002-001）。
+  // 兩道門：①接口存在性；②iOS 非 Safari 擺設接口特判（WebKit 239816：
+  // iPhone Chrome 等 WKWebView 套殼瀏覽器暴露 webkitSpeechRecognition 但服務不工作，
+  // 存在性檢測會被騙過，用戶實證按鈕保持黃色可用）。
   // 有即全功能；無即對講鈕置灰＋語種鎖隱藏，不讓用戶空按。
-  const [srSupported] = useState(
-    () =>
-      typeof window !== "undefined" &&
+  const [srSupported] = useState(() => {
+    if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+    const ua = navigator.userAgent;
+    const isIosDevice =
+      /iPhone|iPad|iPod/.test(ua) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|Chrome/.test(ua);
+    if (isIosDevice && !isSafari) return false;
+    return (
       ((window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition ??
         (window as unknown as { webkitSpeechRecognition?: unknown })
-          .webkitSpeechRecognition) !== undefined,
-  );
+          .webkitSpeechRecognition) !== undefined
+    );
+  });
   const [inputFocused, setInputFocused] = useState(false);
   type SRBox = {
     cancelled: boolean;

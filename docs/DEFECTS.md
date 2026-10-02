@@ -692,6 +692,8 @@
 - **实际**：一直提示失败，语音发不出去（打字正常）
 - **初判根因**：同确诊（见下）
 - **确诊根因**：iPhone 上任何浏览器（含 Chrome，iOS 全走 WKWebView）都没有 `SpeechRecognition`——`webSpeechOnce`（`RoomWalk.tsx:311-316`）`SR === undefined` 即静默回 null，三语种轮空，`srDone` 永 null，落到 :408 “没听清”分支。错不在麦克风权限（否则会是 :406 “麦克风没打开”），也不在转写服务（纯浏览器链，F.1 已拿掉讯飞 fallback，无服务端环节）。附带 UX 缺口：不支持的浏览器连点 3 次都是同一句误导文案，按钮也不置灰，用户无法知道“这个浏览器永远不行”
+- **确诊根因补充（2026-10-02，用户新报：点按钮反复弹麦克风权限＋仍“没听清”）**：WebKit Bugzilla 239816——iOS 非 Safari 浏览器里 `webkitSpeechRecognition` 照样暴露（`srSupported` 检测会通过），但识别服务根本不工作。若用户测的是已部署的新代码，说明 a96daad 的存在性检测不够，需加 UA 门（iPhone／iPad 非 Safari 一律判不支持）或连续失败计数；若测的是部署前的旧代码，则属预期内旧行为。待用户回填两问（测的线上还是本地／按钮灰了吗）再定分支
+- **确诊根因定分支（2026-10-02，用户回填：测的是已部署最新代码，按钮黄色可用、语种行在）**：a96daad 存在性检测被摆設接口骗过，定罪为“接口暴露但服务不工作”。修法 round-2：`srSupported` 加 UA 门——iOS 设备（iPhone／iPad／iPod＋iPadOS 桌面 UA 回退）且非 Safari（排除 CriOS／FxiOS／EdgiOS／Chrome）一律 false；Safari／iOS 外维持存在性检测
 - **关联 UR**：UR F.1（3D 酒吧 Ivy；Fix 走完整 10 步）
 - **修复验证**：待定（手机真机按住→松手→出字→Ivy 回语音；桌面回归同路径）
 - **回归范围**：对讲按钮（底部大圆＋面板小麦克风）、语种锁（自动／粤／普／英）、打字发送、`sendText` 等待态

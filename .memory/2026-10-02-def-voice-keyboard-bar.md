@@ -19,3 +19,9 @@
 1. `srSupported`（lazy state，SSR 安全）：`startRecord` 無能力即直說原因不進錄音態；兩顆麥克風鈕 `disabled`＋置灰；語種鎖整組隱藏。
 2. `bar-room/page.tsx` 根容器跟 `visualViewport.height` 走（`vv.resize` 訂閱＋卸載清），每次 fit 後手動 `dispatchEvent(resize)` 讓 RoomWalk 既有 `onResize` 重排畫布。桌面端 vv 不變，天然 no-op。
 3. 教訓：移動端鍵盤相關一律走 `visualViewport`，`window.resize` 在 iOS 上靠不住。
+
+## round-2（2026-10-02，UA 門）
+
+- 用戶實證（已部署新代碼＋按鈕仍黃色可用）：存在性檢測被騙過——iOS 非 Safari 暴露擺設接口（WebKit Bugzilla 239816）。
+- 修正：`srSupported` 加 UA 門（iOS 設備且非 Safari 一律 false；iPadOS 桌面 UA 用 `MacIntel＋maxTouchPoints` 回退認）。
+- 教訓：feature-detect 敵不過平台擺設接口時，UA 特判是誠實做法（記下判據出處 bug 號，免後人當髒代碼刪掉）。
