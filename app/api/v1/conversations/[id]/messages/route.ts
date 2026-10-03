@@ -1,5 +1,7 @@
 import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { canViewCheckin } from "@/lib/api/checkins";
+import { friendIdsOf } from "@/lib/friends";
 import {
   CHAT_DAY_LIMIT,
   CHAT_MINUTE_LIMIT,
@@ -132,8 +134,57 @@ export async function POST(
   }
   // D.6 附件歸屬：path 首段必須是自己（storage RLS 同口徑，雙保險；
   // 陌生人拿別人的 path 發即 400，會話成員校验在下）。
-  let attachments: { path: string; mime: string; bytes: number; secs?: number }[] = [];
-  if (parsed.kind !== "text") {
+  // UR E.13 站内分享（非文件附件，无 path）：仅自家帖可分享＋对方须可见；
+  // 跳过归属校验，原样存 [{checkin_id}]。
+  let attachments: { path: string; mime: string; bytes: number; secs?: number }[] | { checkin_id: string; place?: string }[] = [];
+  if (parsed.kind === "text" && parsed.share !== undefined) {
+    const { data: postRaw } = await supabase
+      .from("checkins")
+      .select("id,user_id,visibility")
+      .eq("id", parsed.share.checkin_id)
+      .maybeSingle();
+    const post = postRaw as { id: string; user_id: string | null; visibility: unknown } | null;
+    if (post === null) {
+      return apiError("not_found", "打卡不存在", 404);
+    }
+    // 仅自家可分享（UR 范围；他人帖分享另议）。
+    if (post.user_id === null || post.user_id !== userId) {
+      return apiError("forbidden", "只能分享自己的打卡", 403);
+    }
+    // 对方须可见（direct 1v1：除自己的另一成员；不可见 403 明拒）。
+    const peerIds = memberIds.map((m) => m.user_id).filter((mid) => mid !== userId);
+    let blocked = false;
+    for (const peerId of peerIds) {
+      let fids: string[] = [];
+      if (post.visibility === "friends") {
+        const { data: fsRows } = await supabase
+          .from("friendships")
+          .select("user_id,friend_id,status")
+          .or(`user_id.eq.${peerId},friend_id.eq.${peerId}`)
+          .limit(200);
+        fids = friendIdsOf(
+          peerId,
+          ((fsRows ?? []) as unknown[]) as {
+            user_id: unknown;
+            friend_id: unknown;
+            status: unknown;
+          }[],
+        );
+      }
+      if (!canViewCheckin(peerId, post.user_id, post.visibility, fids)) {
+        blocked = true;
+        break;
+      }
+    }
+    if (blocked) {
+      return apiError("forbidden", "對方無權查看這條打卡", 403);
+    }
+    attachments = [
+      parsed.share.place === undefined
+        ? { checkin_id: parsed.share.checkin_id }
+        : { checkin_id: parsed.share.checkin_id, place: parsed.share.place },
+    ];
+  } else if (parsed.kind !== "text") {
     for (const a of parsed.attachments) {
       if (!a.path.startsWith(`${userId}/`)) {
         return apiError("invalid_params", "附件不屬於你", 400);

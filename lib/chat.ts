@@ -22,7 +22,7 @@ export type ChatMessage = {
 };
 
 /** D.6 附件視圖（body 為空時 bubbles 走此渲染；snippet 走 kind）。 */
-export type ChatAttachmentView = {
+export type ChatFileView = {
   bucket: "chat-images" | "chat-voice";
   path: string;
   mime: string;
@@ -32,6 +32,14 @@ export type ChatAttachmentView = {
   preview?: string;
 };
 
+/** UR E.13 站内打卡分享视图（非文件附件；渲染走卡片分支，不走签名链）。 */
+export type ChatShareView = {
+  checkin_id: string;
+  place?: string;
+};
+
+export type ChatAttachmentView = ChatFileView | ChatShareView;
+
 /** 附件行映射：壞條丟棄（單條壞不炸整串；未知桶／非法 path 即壞）。 */
 export function toChatAttachments(raw: unknown): ChatAttachmentView[] {
   if (!Array.isArray(raw)) return [];
@@ -39,6 +47,15 @@ export function toChatAttachments(raw: unknown): ChatAttachmentView[] {
   for (const item of raw) {
     if (typeof item !== "object" || item === null) continue;
     const r = item as Record<string, unknown>;
+    // UR E.13：分享附件直通（uuid 形 checkin_id；可見性发送时已验，读端只渲染）。
+    if (typeof r.checkin_id === "string" && /^[A-Za-z0-9-]{1,64}$/.test(r.checkin_id)) {
+      const share: ChatShareView = { checkin_id: r.checkin_id };
+      if (typeof r.place === "string" && r.place.trim() !== "") {
+        share.place = r.place.trim().slice(0, 120);
+      }
+      out.push(share);
+      continue;
+    }
     if (r.bucket !== "chat-images" && r.bucket !== "chat-voice") continue;
     if (typeof r.path !== "string" || r.path.includes("..") || r.path.split("/").length !== 2) {
       continue;
@@ -52,7 +69,7 @@ export function toChatAttachments(raw: unknown): ChatAttachmentView[] {
       bytes: r.bytes,
     };
     if (typeof r.secs === "number" && Number.isFinite(r.secs) && r.secs > 0) {
-      att.secs = r.secs;
+      (att as ChatFileView).secs = r.secs;
     }
     out.push(att);
   }

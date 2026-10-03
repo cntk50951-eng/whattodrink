@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, LocateFixed, MessageCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, LocateFixed, MapPin, MessageCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ type ConvoRow = {
     kind: string;
     created_at: number;
     mine: boolean;
-    attachments?: { secs?: number }[];
+    attachments?: { secs?: number; checkin_id?: string; place?: string }[];
   } | null;
   unread: number;
   updated_at: number;
@@ -175,14 +175,32 @@ export default function V2ChatListPage() {
     const lm = convo?.last_message ?? null;
     // UR D.6：末句帶方向＋附件映射（圖／音無正文，顯示類型章；秒數取附件，無則回通用章）。
     const who = lm !== null && lm.mine ? `${t("chatMe")}: ` : "";
+    // UR E.13：分享卡片行（末附件 checkin_id 即卡式：📍釘＋店名 snippet；旧库无列即落旧口径）。
+    const shareId =
+      lm?.attachments?.[0]?.checkin_id !== undefined && lm.attachments[0].checkin_id !== ""
+        ? (lm.attachments[0].checkin_id as string)
+        : null;
+    // UR E.13 卡片地点行（附件 place；无即回 body，不拿坐标）。
+    const sharePlace =
+      shareId !== null &&
+      typeof lm?.attachments?.[0]?.place === "string" &&
+      (lm?.attachments?.[0]?.place as string) !== ""
+        ? (lm.attachments[0].place as string)
+        : null;
     const snippet =
       lm === null
         ? t("chatEmpty")
-        : lm.kind === "image"
-          ? `${who}${t("chatSnippetImage")}`
-          : lm.kind === "audio"
-            ? `${who}${t("chatSnippetAudio", { n: lm.attachments?.[0]?.secs ?? 0 })}`
-            : `${who}${lm.body ?? ""}`;
+        : shareId !== null
+          ? `${who}${lm.body ?? ""}`
+          : lm.kind === "image"
+            ? `${who}${t("chatSnippetImage")}`
+            : lm.kind === "audio"
+              ? `${who}${t("chatSnippetAudio", { n: lm.attachments?.[0]?.secs ?? 0 })}`
+              : `${who}${lm.body ?? ""}`;
+    const shareLine =
+      sharePlace !== null && (lm?.body ?? "") !== "" && (lm?.body ?? "") !== sharePlace
+        ? `${who}${sharePlace} · ${lm?.body ?? ""}`
+        : (sharePlace !== null ? `${who}${sharePlace}` : snippet);
     const time = lm !== null ? formatListTime(lm.created_at, nowMs) : "";
     const unread = convo?.unread ?? 0;
     return (
@@ -208,7 +226,14 @@ export default function V2ChatListPage() {
               )}
             </span>
             <span className="flex items-center justify-between gap-2">
-              <span className="truncate text-xs font-normal text-muted-foreground">{snippet}</span>
+              {shareId !== null ? (
+                <span className="flex min-w-0 items-center gap-1.5 rounded-lg border bg-card px-2 py-1">
+                  <MapPin size={13} aria-hidden className="shrink-0 text-primary" />
+                  <span className="truncate text-xs font-bold">{shareLine}</span>
+                </span>
+              ) : (
+                <span className="truncate text-xs font-normal text-muted-foreground">{snippet}</span>
+              )}
               {unread > 0 && (
                 <Badge variant="default" className="shrink-0 rounded-full">
                   {unread > 99 ? "99+" : unread}

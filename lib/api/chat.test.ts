@@ -82,6 +82,57 @@ describe("parseCreateMessageBody", () => {
     expect(parseCreateMessageBody({ ...good, body: "x".repeat(2001) })).toHaveProperty("error");
     expect(parseCreateMessageBody({ kind: "text", body: "hi" })).toHaveProperty("error");
   });
+  it("E.13：text 可带一枚分享附件（checkin_id），多枚／非法拒", () => {
+    const share = {
+      kind: "text",
+      body: "中環 Soho",
+      client_msg_id: "c-9",
+      attachments: [{ checkin_id: "11111111-2222-3333-4444-555555555555" }],
+    };
+    expect(parseCreateMessageBody(share)).toEqual({
+      kind: "text",
+      body: "中環 Soho",
+      share: { checkin_id: "11111111-2222-3333-4444-555555555555" },
+      client_msg_id: "c-9",
+    });
+    expect(
+      parseCreateMessageBody({ ...share, attachments: [{ checkin_id: "a" }, { checkin_id: "b" }] }),
+    ).toHaveProperty("error");
+    expect(
+      parseCreateMessageBody({ ...share, attachments: [{ checkin_id: "../x" }] }),
+    ).toHaveProperty("error");
+    expect(
+      parseCreateMessageBody({ ...share, attachments: [{ path: "u1/a.jpg" }] }),
+    ).toHaveProperty("error");
+  });
+  it("E.13：分享附件可带地点 place（展示文本，非坐标；超长截断）", () => {
+    expect(
+      parseCreateMessageBody({
+        kind: "text",
+        body: "呢杯正",
+        client_msg_id: "c-10",
+        attachments: [{ checkin_id: "abc-123", place: "中環 Soho" }],
+      }),
+    ).toEqual({
+      kind: "text",
+      body: "呢杯正",
+      share: { checkin_id: "abc-123", place: "中環 Soho" },
+      client_msg_id: "c-10",
+    });
+    expect(
+      parseCreateMessageBody({
+        kind: "text",
+        body: "hi",
+        client_msg_id: "c-11",
+        attachments: [{ checkin_id: "abc-123", place: "  " }],
+      }),
+    ).toEqual({
+      kind: "text",
+      body: "hi",
+      share: { checkin_id: "abc-123" },
+      client_msg_id: "c-11",
+    });
+  });
   it("D.6：image／audio 附件校验", () => {
     const img = {
       kind: "image",

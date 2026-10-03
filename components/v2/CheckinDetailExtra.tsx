@@ -4,12 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Beer, Check, Heart, MapPin, MessageCircle, Share2, Star } from "lucide-react";
 
-import { formatRating } from "@/lib/api/rating";
+import { formatAvgRating } from "@/lib/api/rating";
 import { useCheckinDetail } from "@/hooks/useCheckinDetail";
 
 /**
- * UR E.10 打卡面板共享段（v2-only；自家 Sheet＋他人卡同构，数据源只有 checkinId）。
- * 酒 pills（品牌／评分／地点）＋互动栏（赞／评数／想喝／分享）＋作者评分器。
+ * UR E.12 打卡面板共享段（v2-only；自家 Sheet＋他人卡同构，数据源只有 checkinId）。
+ * 酒 pills（品牌／平均分／地点）＋互动栏（赞／评数／想喝／分享）＋评分（他人可投，作者只读）。
  * 地点名：detail.place_name → 反查 → 面板 fallback → 藏（沿 UR1.8 诚实口径，不编地名）。
  * 图标一律 lucide（原型 Tabler 不引入，见 E.10 约束）。
  */
@@ -19,7 +19,6 @@ export function CheckinDetailExtra({
   fallbackPlace,
   lat,
   lng,
-  canRate,
   commentsAnchorId,
 }: {
   /** DB id（无即整块不挂，沿 V2Comments 口径） */
@@ -28,13 +27,11 @@ export function CheckinDetailExtra({
   fallbackPlace?: string | null;
   lat?: number | null;
   lng?: number | null;
-  /** 作者本人才设评分（他人只读） */
-  canRate: boolean;
   /** 评论区容器 id（评数按钮点即滚过去；V2Comments 同传此 id） */
   commentsAnchorId: string;
 }) {
   const t = useTranslations("v2");
-  const { detail, busy, toggleLike, toggleWant, rate } = useCheckinDetail(checkinId);
+  const { detail, busy, failed, toggleLike, toggleWant, rate } = useCheckinDetail(checkinId);
   const [reverseName, setReverseName] = useState<string | null>(null);
   const reverseKey = useRef<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -75,10 +72,37 @@ export function CheckinDetailExtra({
     };
   }, [checkinId, detail?.place_name, detail?.lat, detail?.lng, lat, lng]);
 
-  if (detail === null) return null;
+  if (detail === null) {
+    // UR E.11：失败沿旧口径藏行；加载中出骨架（行列与实块同构防位移，
+    // 尺寸取实块 py／text 级近似，沿 V2Comments 留言骨架口径）。
+    if (failed) return null;
+    return (
+      <div className="flex flex-col gap-2" aria-hidden>
+        <div className="flex flex-wrap gap-1.5">
+          <div className="h-6 w-24 animate-pulse rounded-full bg-muted" />
+          <div className="h-6 w-16 animate-pulse rounded-full bg-muted" />
+          <div className="h-6 w-20 animate-pulse rounded-full bg-muted" />
+        </div>
+        {/* 骨架不知作者身份，一律按可投形佔位（作者落定換只讀行，僅一行之差）。 */}
+        <div className="flex items-center gap-1">
+          <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+          {[1, 2, 3, 4, 5].map((n) => (
+            <div key={n} className="h-5 w-5 animate-pulse rounded bg-muted" />
+          ))}
+        </div>
+        <div className="flex items-center gap-2 border-y py-2">
+          <div className="h-9 w-16 animate-pulse rounded-xl bg-muted" />
+          <div className="h-9 w-16 animate-pulse rounded-xl bg-muted" />
+          <div className="h-9 w-24 animate-pulse rounded-xl bg-muted" />
+          <span className="flex-1" />
+          <div className="h-[34px] w-[34px] animate-pulse rounded-full bg-muted" />
+        </div>
+      </div>
+    );
+  }
   const beerName = detail.beer_name ?? fallbackBeerName ?? null;
   const placeName = detail.place_name ?? reverseName ?? fallbackPlace ?? null;
-  const ratingText = formatRating(detail.rating);
+  const ratingText = formatAvgRating(detail.rating_avg);
 
   const share = (): void => {
     const url = window.location.href;
@@ -128,14 +152,35 @@ export function CheckinDetailExtra({
           )}
         </div>
       )}
-      {canRate && (
+      {/* UR E.12：作者身份服务端判（detail.is_author；分支不可信，自家帖从钉点开会落他人分支）。
+          作者只读平均＋人数；非作者可投（已投态＋点同星撤分＋清除钮）。 */}
+      {detail.is_author ? (
+        // UR E.12 空態：同槽佔位（星＋暫無評分，有分即原位替換，沿 YouTube 同槽口徑）。
+        <div className="flex items-center gap-1.5">
+          <Star
+            size={14}
+            aria-hidden
+            className={detail.rating_avg !== null ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}
+          />
+          {detail.rating_avg !== null ? (
+            <>
+              <span className="text-xs font-bold">{ratingText}</span>
+              <span className="text-xs text-muted-foreground">
+                {t("checkinRatingCount", { n: detail.rating_count })}
+              </span>
+            </>
+          ) : (
+            <span className="text-xs text-muted-foreground">{t("checkinNoRating")}</span>
+          )}
+        </div>
+      ) : (
         <div className="flex items-center gap-1">
           <span className="text-xs text-muted-foreground">{t("checkinRateTitle")}</span>
           {[1, 2, 3, 4, 5].map((n) => (
             <button
               key={n}
               type="button"
-              onClick={() => rate(detail.rating === n ? null : n)}
+              onClick={() => rate(detail.my_rating === n ? null : n)}
               disabled={busy}
               aria-label={`${t("checkinRateTitle")} ${n}`}
               className="rounded p-0.5 disabled:opacity-50"
@@ -143,11 +188,11 @@ export function CheckinDetailExtra({
               <Star
                 size={16}
                 aria-hidden
-                className={detail.rating !== null && n <= detail.rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}
+                className={detail.my_rating !== null && n <= detail.my_rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}
               />
             </button>
           ))}
-          {detail.rating !== null && (
+          {detail.rated_by_me && (
             <button
               type="button"
               onClick={() => rate(null)}
@@ -156,6 +201,13 @@ export function CheckinDetailExtra({
             >
               {t("checkinRateClear")}
             </button>
+          )}
+          {detail.rating_avg !== null ? (
+            <span className="pl-1 text-xs text-muted-foreground">
+              {ratingText} · {t("checkinRatingCount", { n: detail.rating_count })}
+            </span>
+          ) : (
+            <span className="pl-1 text-xs text-muted-foreground">{t("checkinNoRating")}</span>
           )}
         </div>
       )}

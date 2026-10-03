@@ -25,6 +25,7 @@ import {
   MoreHorizontal,
   Radar,
   RefreshCw,
+  Share2,
   Sparkles,
   Trash2,
   Users,
@@ -47,6 +48,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { V2Comments } from "@/components/v2/V2Comments";
+import { FriendPicker } from "@/components/v2/FriendPicker";
 import { CheckinDetailExtra } from "@/components/v2/CheckinDetailExtra";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMyMode } from "@/hooks/useMyMode";
@@ -271,8 +273,12 @@ export function V2Home() {
     note: string | null;
     audioUrl: string | null;
     audioSeconds: number | null;
+    /** 服务端作者身份（管理菜单按此出，不按分支，见 UR E.13）。 */
+    isAuthor: boolean;
   } | null>(null);
   const otherDetailFor = useRef<string | null>(null);
+  // UR E.11：三件套在飛旗（開拉置真、落定／失敗／切卡置假；id 守衛防串卡，失敗不清旗即無限骨架）。
+  const [otherDetailLoading, setOtherDetailLoading] = useState(false);
   const [trailOn, setTrailOn] = useState(false);
   // UR E.6 热点模式开关（开即全纳＋无字＋纯热斑；再点退出复原，镜头不动）。
   const [heatMode, setHeatMode] = useState(false);
@@ -321,6 +327,15 @@ export function V2Home() {
   const [swapOpen, setSwapOpen] = useState(false);
   const [swapBatch, setSwapBatch] = useState<Beer[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // UR E.13：他人分支自家卡管理（身份走 GET is_author；删除两段＋站内分享）。
+  const [otherConfirmDelete, setOtherConfirmDelete] = useState(false);
+  const [shareTarget, setShareTarget] = useState<{
+    checkinId: string;
+    snippet: string;
+    place: string;
+    lat: number | null;
+    lng: number | null;
+  } | null>(null);
 
   // 輕提示（添加好友佔位／搖一搖空結果），定時自散，卸載清場
   const [note, setNote] = useState<string | null>(null);
@@ -411,6 +426,7 @@ export function V2Home() {
       setWantHistory([]);
       setCard(null);
       setOtherDetail(null);
+      setOtherDetailLoading(false);
       otherDetailFor.current = null;
       setSentIds([]);
       setInvites({});
@@ -452,6 +468,19 @@ export function V2Home() {
       })
       .catch(() => {});
   }, [isAuthed]);
+
+  // UR E.13：聊天房「查看完整」深鏈（`/v2?checkin={id}`；pins 到即自開＋清參防重開）。
+  // 读 window.location（effect 内，免 useSearchParams 的預渲染 Suspense 門）。
+  const jumpDoneRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!apiPinsLoaded || typeof window === "undefined") return;
+    const cid = new URLSearchParams(window.location.search).get("checkin");
+    if (cid === null || cid === "" || jumpDoneRef.current === cid) return;
+    if (!apiPins.some((p) => p.id === cid)) return;
+    jumpDoneRef.current = cid;
+    openPin(cid);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [apiPinsLoaded, apiPins]);
 
   // 他人 pins：真數據優先，非空替 MOCK（沿 A.13 配方；C.1 固定 7d＋all）
   useEffect(() => {
@@ -730,32 +759,45 @@ export function V2Home() {
       mapApi.current?.flyTo({ lat: api.lat, lng: api.lng });
       // UR E.2：三件套按需拉（pins 不帶，開卡才取；id 守衛防串卡）。
       setOtherDetail(null);
+      setOtherDetailLoading(true);
       otherDetailFor.current = api.id;
       void fetch(`/api/v1/checkins/${encodeURIComponent(api.id)}`, {
         credentials: "include",
       })
         .then(async (res) => {
-          if (!res.ok) return;
+          if (otherDetailFor.current !== api.id) return;
+          if (!res.ok) {
+            setOtherDetailLoading(false);
+            return;
+          }
           const j = (await res.json()) as {
             checkin?: {
               photo_url?: string | null;
               note?: string | null;
               audio_url?: string | null;
               audio_seconds?: number | null;
+              is_author?: boolean;
             };
           };
           if (otherDetailFor.current !== api.id) return;
           const c = j.checkin;
-          if (c === undefined) return;
+          if (c === undefined) {
+            setOtherDetailLoading(false);
+            return;
+          }
           setOtherDetail({
             photoUrl: c.photo_url ?? null,
             note: c.note ?? null,
             audioUrl: c.audio_url ?? null,
             audioSeconds:
               typeof c.audio_seconds === "number" ? c.audio_seconds : null,
+            isAuthor: c.is_author === true,
           });
+          setOtherDetailLoading(false);
         })
-        .catch(() => {});
+        .catch(() => {
+          if (otherDetailFor.current === api.id) setOtherDetailLoading(false);
+        });
       return;
     }
     const m = MOCK_CHECKINS.find((c) => c.id === id);
@@ -778,6 +820,7 @@ export function V2Home() {
       });
       // UR E.2：MOCK 無詳情端點，清殘留防串卡。
       setOtherDetail(null);
+      setOtherDetailLoading(false);
       otherDetailFor.current = null;
       mapApi.current?.flyTo({ lat: m.position.lat, lng: m.position.lng });
     }
@@ -791,12 +834,14 @@ export function V2Home() {
     // 自家 Sheet 開時關他人卡（互斥）。
     setCard(null);
     setOtherDetail(null);
+    setOtherDetailLoading(false);
     otherDetailFor.current = null;
     // 地圖釘直開不帶返回（目錄來由 openStopRecord 事後記）。
     setWantReturnTo(null);
     setSwapOpen(false);
     setSwapBatch([]);
     setConfirmDelete(false);
+    setOtherConfirmDelete(false);
     setWantSheetAt(at);
     mapApi.current?.flyTo(rec.position);
   }
@@ -869,6 +914,28 @@ export function V2Home() {
     setConfirmDelete(false);
     setSwapOpen(false);
     setWantSheetAt(null);
+  }
+
+  // UR E.13：他人分支自家卡删除（沿 handleDeleteWant 两段确认；api 钉本地摘除免重拉）。
+  async function handleDeleteOther(id: string): Promise<void> {
+    try {
+      const res = await fetch(`/api/v1/checkins/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        flashNote(t("deleteFailed"));
+        return;
+      }
+    } catch {
+      flashNote(t("deleteFailed"));
+      return;
+    }
+    setApiPins((prev) => prev.filter((p) => p.id !== id));
+    setOtherConfirmDelete(false);
+    setOtherDetail(null);
+    otherDetailFor.current = null;
+    setCard(null);
   }
 
   function handleCheers(id: string): void {
@@ -1961,9 +2028,11 @@ export function V2Home() {
           setWantSheetAt(null);
           setCard(null);
           setOtherDetail(null);
+          setOtherDetailLoading(false);
           otherDetailFor.current = null;
           setSwapOpen(false);
           setConfirmDelete(false);
+          setOtherConfirmDelete(false);
           // UR C.11 round-3：關詳情自動回目錄（直開時 returnTo 為 null，不回）。
           if (wantReturnTo === "stops") {
             setWantReturnTo(null);
@@ -2036,33 +2105,97 @@ export function V2Home() {
                         {card.title}
                       </p>
                     </div>
+                    {/* UR E.13：他人分支自家卡管理（身份走 GET is_author；删除两段＋站内分享）。 */}
+                    {otherDetail?.isAuthor === true && (
+                      <span className="shrink-0">
+                        {otherConfirmDelete ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-destructive text-destructive"
+                            onClick={() => {
+                              void handleDeleteOther(card.id);
+                            }}
+                          >
+                            <Trash2 size={15} aria-hidden />
+                            {t("confirmDelete")}
+                          </Button>
+                        ) : (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              aria-label={t2("checkinMore")}
+                              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+                            >
+                              <MoreHorizontal size={16} aria-hidden />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className={styles.v2scope}>
+                              <DropdownMenuGroup>
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onClick={() => setOtherConfirmDelete(true)}
+                                >
+                                  <Trash2 size={15} aria-hidden />
+                                  {t("deleteEntry")}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    setShareTarget({
+                                      checkinId: card.id,
+                                      snippet:
+                                        card.sub !== "" ? card.sub : card.drink !== "" ? card.drink : card.title,
+                                      place: card.sub,
+                                      lat: card.lat,
+                                      lng: card.lng,
+                                    })
+                                  }
+                                >
+                                  <Share2 size={15} aria-hidden />
+                                  {t2("checkinShareToFriend")}
+                                </DropdownMenuItem>
+                              </DropdownMenuGroup>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </span>
+                    )}
                   </div>
                   {/* UR E.3 round-3 IG 式单视觉槽：有实拍即主视觉（限高），酒 hero 只在无图时垫底，不再双图三明治。 */}
-                  {otherDetail?.note && (
-                    <p className="pt-1 text-sm">{otherDetail.note}</p>
-                  )}
-                  {otherDetail?.photoUrl ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={otherDetail.photoUrl}
-                      alt=""
-                      loading="lazy"
-                      className="max-h-[25svh] w-full rounded-xl object-cover"
-                    />
+                  {/* UR E.11：三件套在飛即骨架佔位（照片＋文字；語音稀有段到才掛，不佔位）；
+                      落定／失敗走舊口徑（真圖／hero／藏行），不無限骨架。 */}
+                  {otherDetailLoading ? (
+                    <div className="flex flex-col gap-2" aria-hidden>
+                      <div className="h-3.5 w-2/3 animate-pulse rounded bg-muted" />
+                      <div className="h-44 max-h-[25svh] w-full animate-pulse rounded-xl bg-muted" />
+                    </div>
                   ) : (
-                    <span className="w-full shrink-0 overflow-hidden rounded-xl border bg-card p-1">
-                      {(() => {
-                        const hero =
-                          card.drink !== "" ? beerByName(card.drink) : null;
-                        return hero !== null ? (
-                          <BeerImg key={hero.id} beer={hero} tall />
-                        ) : (
-                          <span aria-hidden className="flex aspect-[3/4] w-full items-center justify-center text-4xl">
-                            {card.emoji}
-                          </span>
-                        );
-                      })()}
-                    </span>
+                    <>
+                      {otherDetail?.note && (
+                        <p className="pt-1 text-sm">{otherDetail.note}</p>
+                      )}
+                      {otherDetail?.photoUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={otherDetail.photoUrl}
+                          alt=""
+                          loading="lazy"
+                          className="max-h-[25svh] w-full rounded-xl object-cover"
+                        />
+                      ) : (
+                        <span className="w-full shrink-0 overflow-hidden rounded-xl border bg-card p-1">
+                          {(() => {
+                            const hero =
+                              card.drink !== "" ? beerByName(card.drink) : null;
+                            return hero !== null ? (
+                              <BeerImg key={hero.id} beer={hero} tall />
+                            ) : (
+                              <span aria-hidden className="flex aspect-[3/4] w-full items-center justify-center text-4xl">
+                                {card.emoji}
+                              </span>
+                            );
+                          })()}
+                        </span>
+                      )}
+                    </>
                   )}
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
@@ -2118,7 +2251,6 @@ export function V2Home() {
                       fallbackPlace={card.sub === "" ? null : card.sub}
                       lat={card.lat}
                       lng={card.lng}
-                      canRate={false}
                       commentsAnchorId="v2c-other"
                     />
                   ) : null}
@@ -2158,6 +2290,7 @@ export function V2Home() {
                         setWantSheetAt(null);
                         setSwapOpen(false);
                         setConfirmDelete(false);
+                        setOtherConfirmDelete(false);
                         setStopsOpen(true);
                       }}
                     >
@@ -2230,7 +2363,6 @@ export function V2Home() {
                     fallbackPlace={rec.placeName ?? null}
                     lat={rec.position.lat}
                     lng={rec.position.lng}
-                    canRate
                     commentsAnchorId="v2c-self"
                   />
                 ) : null}
@@ -2257,7 +2389,8 @@ export function V2Home() {
                       {t("confirmDelete")}
                     </Button>
                   ) : (
-                    /* UR E.10：删除收进 ⋯ 菜单（原型 §1；两段确认沿用，确认行不变）。 */
+                    /* UR E.10：删除收进 ⋯ 菜单（原型 §1；两段确认沿用，确认行不变）。
+                       UR E.13：加站内分享项（仅 DB 真行；本地单机记录无 id 不挂）。 */
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         aria-label={t2("checkinMore")}
@@ -2274,6 +2407,22 @@ export function V2Home() {
                             <Trash2 size={15} aria-hidden />
                             {t("deleteEntry")}
                           </DropdownMenuItem>
+                          {rec.id !== undefined && rec.id !== "" && (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setShareTarget({
+                                  checkinId: rec.id as string,
+                                  snippet: rec.placeName ?? fresh?.name ?? t("you"),
+                                  place: rec.placeName ?? "",
+                                  lat: rec.position.lat,
+                                  lng: rec.position.lng,
+                                })
+                              }
+                            >
+                              <Share2 size={15} aria-hidden />
+                              {t2("checkinShareToFriend")}
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuGroup>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -2310,6 +2459,20 @@ export function V2Home() {
           })()}
         </SheetContent>
       </Sheet>
+
+      {/* UR E.13：站内分享好友选择器（自家两入口共用；发完 toast 人数）。 */}
+      {shareTarget !== null && (
+        <FriendPicker
+          open
+          checkinId={shareTarget.checkinId}
+          snippet={shareTarget.snippet}
+          place={shareTarget.place}
+          lat={shareTarget.lat}
+          lng={shareTarget.lng}
+          onClose={() => setShareTarget(null)}
+          onSent={(n) => flashNote(t2("friendPickerSent", { n }))}
+        />
+      )}
 
       {/* UR C.11 返工 R-A：記錄目錄 Sheet（目錄；行點即飛＋開 want Sheet 詳情管理） */}
       <Sheet

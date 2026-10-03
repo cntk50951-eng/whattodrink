@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.4.0
+  version: 1.6.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -267,11 +267,25 @@ paths:
                       beer_name:
                         type: string
                         nullable: true
-                      rating:
+                      rating_avg:
+                        type: number
+                        minimum: 1
+                        maximum: 5
+                        nullable: true
+                        description: 他人制平均（未舍入；展示取 1 位小数，UR E.12）
+                      rating_count:
+                        type: integer
+                        minimum: 0
+                      rated_by_me:
+                        type: boolean
+                      my_rating:
                         type: integer
                         minimum: 1
                         maximum: 5
                         nullable: true
+                      is_author:
+                        type: boolean
+                        description: 服务端判的作者身份（分支不可信，UR E.12）
                       like_count:
                         type: integer
                         minimum: 0
@@ -295,57 +309,6 @@ paths:
           $ref: "#/components/responses/NotFound"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/Internal"
-    patch:
-      operationId: rateCheckin
-      summary: 打卡评分设置（需登录；仅作者，1–5 整数或 null 清除，UR E.10）
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [rating]
-              properties:
-                rating:
-                  type: integer
-                  minimum: 1
-                  maximum: 5
-                  nullable: true
-      responses:
-        "200":
-          description: 保存成功（回写后值）
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [rating]
-                properties:
-                  rating:
-                    type: integer
-                    minimum: 1
-                    maximum: 5
-                    nullable: true
-        "400":
-          $ref: "#/components/responses/InvalidParams"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          description: 非本人或帖子不存在（不泄归属）
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
     delete:
@@ -595,6 +558,78 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "403":
           description: 隱身禁表态（沿 E.7 评论口径）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 帖子不存在或無可見權限（不泄归属）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/checkins/{id}/ratings:
+    post:
+      operationId: rateCheckinByOthers
+      summary: 他人制打分（需登录；仅非作者，1–5 整数或 null 撤分，upsert 覆盖，UR E.12）
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  nullable: true
+      responses:
+        "200":
+          description: 打分成功（回本人行＋实时聚合；只吐聚合不吐谁投）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rated, my_rating, rating_avg, rating_count]
+                properties:
+                  rated:
+                    type: boolean
+                  my_rating:
+                    type: integer
+                    minimum: 1
+                    maximum: 5
+                    nullable: true
+                  rating_avg:
+                    type: number
+                    minimum: 1
+                    maximum: 5
+                    nullable: true
+                  rating_count:
+                    type: integer
+                    minimum: 0
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          description: 未登录（匿名请先登录）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: 作者禁投／隱身禁表态（沿 like 口径）
           content:
             application/json:
               schema:
@@ -1111,7 +1146,7 @@ paths:
           $ref: "#/components/responses/Internal"
     post:
       operationId: sendMessage
-      summary: 發送（首期只收 text，需登录，D.3：隱身任一端 403＋限流＋冪等）
+      summary: 發送（首期只收 text，需登录，D.3：隱身任一端 403＋限流＋冪等；E.13 text 可帶分享附件一枚）
       security:
         - bearerAuth: []
       parameters:
@@ -1137,6 +1172,20 @@ paths:
                 client_msg_id:
                   type: string
                   description: 冪等鍵（同會話同鍵重發回既有行，不 double）
+                attachments:
+                  type: array
+                  maxItems: 1
+                  description: E.13 站内分享（僅 [{checkin_id}]；僅自家帖＋對方須可見，作者／隱身 403；place 為可選地點展示文本，非坐標）
+                  items:
+                    type: object
+                    required: [checkin_id]
+                    properties:
+                      checkin_id:
+                        type: string
+                        format: uuid
+                      place:
+                        type: string
+                        maxLength: 120
       responses:
         "201":
           description: 發送成功（duplicate=true 即冪等命中回既有行）

@@ -3,15 +3,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * UR E.10 打卡面板数据钩（v2-only；读口 Batch4 GET 扩展，写口 like／want／rating）。
+ * UR E.12 打卡面板数据钩（v2-only；读口 GET 扩展，写口 like／want／ratings）。
  * - detail 为空即加载中／失败（调用方骨架或藏行，不另起文案）。
- * - toggle 乐观 ±1，失败回滚＋重拉对账；全程 credentials 同源。
+ * - toggle 乐观 ±1，失败回滚＋重拉对账；评分走 POST ratings（他人制），作者端只读。
+ * - 全程 credentials 同源。
  */
 
 export type CheckinDetail = {
   id: string;
   beer_name: string | null;
-  rating: number | null;
+  /** 他人制平均（未舍入；展示层 formatAvgRating 取 1 位小数），无人评即 null。 */
+  rating_avg: number | null;
+  rating_count: number;
+  rated_by_me: boolean;
+  my_rating: number | null;
+  /** 服务端判的作者身份（分支 prop 不可信，见 GET is_author）。 */
+  is_author: boolean;
   place_name: string | null;
   lat: number | null;
   lng: number | null;
@@ -29,11 +36,17 @@ function toDetail(row: DetailRow, id: string): CheckinDetail {
     typeof v === "number" && Number.isFinite(v) ? v : null;
   const count = (v: unknown): number =>
     typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
-  const rating = num(row.rating);
+  const avg = num(row.rating_avg);
+  const my = num(row.my_rating);
   return {
     id,
     beer_name: typeof row.beer_name === "string" ? row.beer_name : null,
-    rating: rating !== null && Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : null,
+    rating_avg: avg !== null && avg >= 1 && avg <= 5 ? avg : null,
+    rating_count: count(row.rating_count),
+    rated_by_me: row.rated_by_me === true,
+    my_rating:
+      my !== null && Number.isInteger(my) && my >= 1 && my <= 5 ? my : null,
+    is_author: row.is_author === true,
     place_name: typeof row.place_name === "string" ? row.place_name : null,
     lat: num(row.lat),
     lng: num(row.lng),
@@ -48,17 +61,21 @@ function toDetail(row: DetailRow, id: string): CheckinDetail {
 export function useCheckinDetail(checkinId: string | null): {
   detail: CheckinDetail | null;
   busy: boolean;
+  /** 首拉失败（!ok／抛错）即 true；切帖重置。调用方据此骨架→藏行，不无限骨架。 */
+  failed: boolean;
   toggleLike: () => void;
   toggleWant: () => void;
   rate: (rating: number | null) => void;
 } {
   const [detail, setDetail] = useState<CheckinDetail | null>(null);
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
   const seq = useRef(0);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- checkinId 切换清旧帖属 props-sync（沿 ChatRoomLive 开房重置豁免口径）
     setDetail(null);
+    setFailed(false);
     if (checkinId === null) return;
     const my = ++seq.current;
     let cancelled = false;
@@ -67,11 +84,20 @@ export function useCheckinDetail(checkinId: string | null): {
         const res = await fetch(`/api/v1/checkins/${encodeURIComponent(checkinId)}`, {
           credentials: "include",
         });
-        if (!res.ok || cancelled) return;
+        if (!res.ok || cancelled) {
+          if (!cancelled && seq.current === my) setFailed(!res.ok);
+          return;
+        }
         const j = (await res.json()) as { checkin?: DetailRow };
-        if (seq.current !== my || cancelled || typeof j.checkin !== "object" || j.checkin === null) return;
+        if (seq.current !== my || cancelled) return;
+        // 畸形包当失败（免无限骨架，沿 failed 藏行口径）。
+        if (typeof j.checkin !== "object" || j.checkin === null) {
+          setFailed(true);
+          return;
+        }
         setDetail(toDetail(j.checkin, checkinId));
       } catch {
+        if (!cancelled && seq.current === my) setFailed(true);
         // 失败留空（调用方藏行，面板主体不炸；计数按钮稍后重挂即回）
       }
     })();
@@ -187,24 +213,71 @@ export function useCheckinDetail(checkinId: string | null): {
     (rating: number | null) => {
       if (checkinId === null) return;
       setBusy(true);
+      // 乐观：星星先跟本人值（失败重拉对账回滚，沿 toggle 口径）。
+      const prevMine = { current: null as number | null };
+      setDetail((prev) => {
+        if (prev === null) return prev;
+        prevMine.current = prev.my_rating;
+        return {
+          ...prev,
+          my_rating: rating,
+          rated_by_me: rating !== null,
+        };
+      });
       void (async () => {
         try {
-          const res = await fetch(`/api/v1/checkins/${encodeURIComponent(checkinId)}`, {
-            method: "PATCH",
+          const res = await fetch(`/api/v1/checkins/${encodeURIComponent(checkinId)}/ratings`, {
+            method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
             body: JSON.stringify({ rating }),
           });
-          const j = (await res.json().catch(() => null)) as { rating?: unknown } | null;
+          const j = (await res.json().catch(() => null)) as {
+            rated?: unknown;
+            my_rating?: unknown;
+            rating_avg?: unknown;
+            rating_count?: unknown;
+          } | null;
           if (!res.ok) throw new Error("bad");
-          const v = j?.rating;
+          const num = (v: unknown): number | null =>
+            typeof v === "number" && Number.isFinite(v) ? v : null;
+          const avg = num(j?.rating_avg);
+          const my = num(j?.my_rating);
           setDetail((prev) =>
             prev === null
               ? prev
-              : { ...prev, rating: typeof v === "number" ? v : null },
+              : {
+                  ...prev,
+                  rated_by_me: j?.rated === true,
+                  my_rating:
+                    my !== null && Number.isInteger(my) && my >= 1 && my <= 5 ? my : null,
+                  rating_avg: avg !== null && avg >= 1 && avg <= 5 ? avg : null,
+                  rating_count:
+                    typeof j?.rating_count === "number" && j.rating_count > 0
+                      ? Math.floor(j.rating_count)
+                      : 0,
+                },
           );
         } catch {
-          // 失败不翻 state（星星保持旧值，用户可再点）
+          // 回滚＋重拉对账（作者 403 等硬拒亦走此路，星星回到旧值）。
+          setDetail((prev) =>
+            prev === null
+              ? prev
+              : {
+                  ...prev,
+                  my_rating: prevMine.current,
+                  rated_by_me: prevMine.current !== null,
+                },
+          );
+          try {
+            const res = await fetch(`/api/v1/checkins/${encodeURIComponent(checkinId)}`, {
+              credentials: "include",
+            });
+            const j = (await res.json()) as { checkin?: DetailRow };
+            if (typeof j.checkin === "object" && j.checkin !== null) {
+              setDetail(toDetail(j.checkin, checkinId));
+            }
+          } catch {}
         } finally {
           setBusy(false);
         }
@@ -213,5 +286,5 @@ export function useCheckinDetail(checkinId: string | null): {
     [checkinId],
   );
 
-  return { detail, busy, toggleLike, toggleWant, rate };
+  return { detail, busy, failed, toggleLike, toggleWant, rate };
 }

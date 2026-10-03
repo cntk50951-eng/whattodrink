@@ -152,6 +152,7 @@ export function ChatRoomLive({
                 body: string | null;
                 created_at: string;
                 client_msg_id?: string;
+                attachments?: unknown;
               };
               const at = Date.parse(row.created_at);
               if (!Number.isFinite(at)) return;
@@ -170,6 +171,8 @@ export function ChatRoomLive({
                   text: row.body ?? "",
                   at,
                   read: row.sender_id !== myId,
+                  // UR E.13：实时行补附件透传（历史有、实时无，D.6 已知缺口；分享卡靠此）。
+                  attachments: toChatAttachments(row.attachments),
                 };
                 if (pendIdx !== -1) {
                   const next = [...prev];

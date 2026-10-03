@@ -5,7 +5,7 @@
 ## [Unreleased]
 
 ### Fixed
-- **DEF-20261003-004 打卡面板佔滿屏＋關閉鈕不可見（v2-only，重做中；關聯 UR E.10）**
+- **DEF-20261003-004 打卡面板佔滿屏＋關閉鈕不可見（v2-only，重做已合入，用戶手機親驗通過）**
   - 回滚前 batch7 固定高＋丢 `max-h` 上限致面板超視口（已隨 bfc08f7 回滚下線）；重做取 dd73920 形（batch6）＋三樣帶修：`max-h-[85svh]` 上限保留、in-flow 常駐關閉行（默認角落 X 關掉防疊字）、`initialFocus={false}` 保開即頂部；固定頭／半屏展開不再引入
   - 端點＋migration 文件（0017／0018，DB 已跑過，僅回倉對齊）＋三語 key 全數撿回；用戶手機親驗通過，隨本車合入
 - **DEF-20261003-002 Bell 门禁＋列表即时（v2-only，已合入 main，用户亲验通过）**
@@ -21,6 +21,20 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR E.13 站内分享打卡给好友（v2-only，[WIP]，待 0019/0020＋雙人親驗）**
+  - 管理菜单按服务端身份两分支都出（自家 Sheet＋钉卡自家行；删除两段确认，钉卡删本地摘钉免重拉）＋「分享给好友」项（仅 DB 真行）
+  - 新 `FriendPicker`（搜索＋多选＋发送确认栏；逐人 `POST /conversations`＋发分享消息，不建群）
+  - 后端：`parseCreateMessageBody` text 放行一枚 `checkin_id` 附件＋单测；messages 路由仅自家可分享＋对方须可见（403 明拒）＋跳 path 归属校验；Realtime 回调补附件透传（D.6 缺口顺手修）
+  - 接收：列表卡片行（📍＋店名，0020 RPC 加法透 `checkin_id`）；房内 `CheckinCardBubble`＋摘要 Dialog（图文分數時地＋查看完整→`/v2?checkin=` 自开）；openapi 1.6.0
+  - 新 key：`checkinShareToFriend/friendPickerTitle-Search-Empty-Send-Sent/checkinViewFull`×3 parity；旧端看分享消息即一行店名（body 兜底）
+- **UR E.12 打卡評分改他人制＋平均分（v2-only，[WIP]，待 0019＋親驗）**
+  - 方向反轉（E.10 作者自評作廢）：`POST .../ratings` 他人寫（作者 403／隱身 403／upsert 覆蓋／null 撤分）；GET 詳情吐 `rating_avg/count/rated_by_me/my_rating`（service 聚合，只吐聚合＋本人行）；舊 PATCH 作者端點刪除；0019 新表（待用戶 Dashboard 貼跑）；0020 另起 drop 舊 `checkins.rating` 列
+  - UI：他人卡星級器可投可改＋平均回顯；自家面板只讀平均＋人數；`checkinRateTitle` 改字＋新 `checkinRatingCount`×3 parity；openapi 1.5.0；數據文檔 future-schema 同步
+- **UR E.11 打卡面板骨架 loading（v2-only，[WIP]，待親驗）**
+  - `useCheckinDetail` 加 `failed` 旗（加法返回；首拉 !ok／拋錯／畸形包即真，切帖重置，免無限骨架）
+  - `CheckinDetailExtra`：`detail===null && !failed` 出三段式骨架（pills 行＋評分行（僅作者）＋互動欄，`animate-pulse`＋`aria-hidden`，行列與實塊同構）；`failed` 沿舊口徑藏行
+  - 他人卡：`otherDetailLoading` 旗（開拉置真、落定／失敗／切卡／MOCK 置假，id 守衛防串卡），在飛即照片＋文字兩段骨架；語音稀有段到才掛不佔位
+  - 零新 key／零端點／零 migration；留言骨架、自家本地照片不動；數據文檔無需更新（零新增持久化）
 - **UR D.5 推送 P1 顶部 Bell＋全局 Realtime（v2-only，[WIP]，待亲验）**
   - `hooks/useChatBell.ts` 新（在线才拉取＋订阅：`GET /conversations` 求和＋`messages` INSERT 全局订阅沿 B.2 RLS 口径，到对方行即重算＋toast；匿名／隐身门内挡，hidden 不拉，卸载拆频道）
   - `V2Home` 顶栏 Bell（总未读>0 才显＋99+ 封顶，点进 `/v2/chat`；`chatBellLabel/chatBellNew`×3 三语同位）

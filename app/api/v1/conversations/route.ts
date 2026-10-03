@@ -167,6 +167,8 @@ export async function GET(req: Request): Promise<Response> {
     last_body: string | null;
     last_ca: string | null;
     last_secs: number | null;
+    last_checkin_id: string | null;
+    last_place: string | null;
     unread: number | string;
     muted: boolean;
     updated_at: string;
@@ -184,10 +186,17 @@ export async function GET(req: Request): Promise<Response> {
               body: r.last_body,
               created_at: r.last_ca,
               // D.6 列表語音章秒數（完整附件只在記錄端點回，列表只帶 secs 夠用）
+              // UR E.13 分享卡片行（末附件 checkin_id＋place 透出；旧库无列即 undefined，走旧口径）
               attachments:
-                typeof r.last_secs === "number"
-                  ? [{ bucket: "chat-voice", path: "", mime: "audio", bytes: 0, secs: r.last_secs }]
-                  : [],
+                typeof r.last_checkin_id === "string" && r.last_checkin_id !== ""
+                  ? [
+                      typeof r.last_place === "string" && r.last_place !== ""
+                        ? { checkin_id: r.last_checkin_id, place: r.last_place }
+                        : { checkin_id: r.last_checkin_id },
+                    ]
+                  : typeof r.last_secs === "number"
+                    ? [{ bucket: "chat-voice", path: "", mime: "audio", bytes: 0, secs: r.last_secs }]
+                    : [],
             },
             userId,
           );

@@ -94,6 +94,23 @@ describe("toChatAttachments", () => {
   it("非數組回空", () => {
     expect(toChatAttachments(null)).toEqual([]);
   });
+  it("E.13：分享附件直通（checkin_id），非法形狀丟棄", () => {
+    expect(
+      toChatAttachments([
+        { checkin_id: "abc-123" },
+        { checkin_id: "../x" },
+        { checkin_id: 5 },
+      ]),
+    ).toEqual([{ checkin_id: "abc-123" }]);
+  });
+  it("E.13：分享地点 place 透传（空即丢，不拿坐标）", () => {
+    expect(toChatAttachments([{ checkin_id: "abc-123", place: "中環 Soho" }])).toEqual([
+      { checkin_id: "abc-123", place: "中環 Soho" },
+    ]);
+    expect(toChatAttachments([{ checkin_id: "abc-123", place: "  " }])).toEqual([
+      { checkin_id: "abc-123" },
+    ]);
+  });
 });
 
 describe("sumUnread", () => {

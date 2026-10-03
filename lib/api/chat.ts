@@ -114,7 +114,8 @@ export function parseConversationId(raw: string): { id: string } | { error: stri
 }
 
 /**
- * `POST /:id/messages`：text 必 body；image／audio 必 attachments[0]
+ * `POST /:id/messages`：text 必 body；image／audio 必 attachments[0]；
+ * text 可带分享附件 `attachments:[{checkin_id}]`（UR E.13 站内分享打卡，零新 kind）。
  * （D.6 開閘；`client_msg_id` 必填（冪等唯一，弱網重發不 double）。
  */
 export type ChatAttachment = {
@@ -124,10 +125,17 @@ export type ChatAttachment = {
   secs?: number;
 };
 
+/** 站内打卡分享附件（非文件，无 path／bucket；可见性由路由验）。 */
+export type CheckinShareAttachment = {
+  checkin_id: string;
+  /** 地点展示（店名／区名，绝不放坐标；卡片地点行用）。 */
+  place?: string;
+};
+
 export function parseCreateMessageBody(
   raw: unknown,
 ):
-  | { kind: "text"; body: string; client_msg_id: string }
+  | { kind: "text"; body: string; share?: CheckinShareAttachment; client_msg_id: string }
   | { kind: "image" | "audio"; attachments: ChatAttachment[]; client_msg_id: string }
   | { error: string } {
   if (!isRecord(raw)) return { error: "body 需为对象" };
@@ -138,7 +146,28 @@ export function parseCreateMessageBody(
     if (body === null || body.length > CHAT_TEXT_MAX) {
       return { error: `body 必填（1–${CHAT_TEXT_MAX} 字）` };
     }
-    return { kind: "text", body, client_msg_id };
+    if (raw.attachments === undefined) return { kind: "text", body, client_msg_id };
+    // UR E.13：text 仅允许分享附件一枚（checkin_id uuid 形；存在＋可见由路由判）。
+    if (!Array.isArray(raw.attachments) || raw.attachments.length !== 1) {
+      return { error: "分享附件只要 1 個" };
+    }
+    const first = raw.attachments[0] as Record<string, unknown> | null;
+    const checkinId = typeof first === "object" && first !== null ? first.checkin_id : null;
+    if (typeof checkinId !== "string" || checkinId === "" || checkinId.length > 64 || !/^[A-Za-z0-9-]+$/.test(checkinId)) {
+      return { error: "checkin_id 非法" };
+    }
+    // place 可选（展示用纯文本，非坐标；超长截断，非法即丢不挡发送）。
+    const placeRaw = typeof first === "object" && first !== null ? first.place : null;
+    const place =
+      typeof placeRaw === "string" && placeRaw.trim() !== ""
+        ? placeRaw.trim().slice(0, 120)
+        : undefined;
+    return {
+      kind: "text",
+      body,
+      share: place === undefined ? { checkin_id: checkinId } : { checkin_id: checkinId, place },
+      client_msg_id,
+    };
   }
   if (raw.kind === "image" || raw.kind === "audio") {
     const atts = parseAttachments(raw.attachments, raw.kind);

@@ -8,12 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { VoiceRecorder } from "@/components/camera/voice-recorder";
+import { CheckinCardBubble } from "@/components/v2/CheckinCardBubble";
 import { useSignedUrl } from "@/hooks/useSignedUrl";
 import {
   appendLocalEcho,
   formatChatTime,
   mockThread,
-  type ChatAttachmentView,
+  type ChatFileView,
   type ChatMessage,
 } from "@/lib/chat";
 
@@ -45,7 +46,7 @@ export type ChatExternalSource = {
  * UR D.6 附件氣泡（圖片／語音共用殼；簽名短鏈經 hook 讀緩存， anonymous 零直讀）。
  * 圖片：skeleton 佔位＋onLoad 淡入（沿 C.3 口徑）；語音：小播放鈕＋秒數。
  */
-export function ChatAttachmentBubble({ att }: { att: ChatAttachmentView }) {
+export function ChatAttachmentBubble({ att }: { att: ChatFileView }) {
   const t2 = useTranslations("v2");
   const signed = useSignedUrl(att.bucket, att.path);
   // 樂觀位本地預覽優先（秒開；成功換真行即切簽名鏈，不閃爍）。
@@ -201,9 +202,14 @@ export function ChatThread({
           {shown.map((m) =>
             m.role === "me" ? (
               <div key={m.id} className="flex flex-col items-end gap-0.5">
-                {(m.attachments ?? []).map((att, i) => (
-                  <ChatAttachmentBubble key={`${m.id}-a${i}`} att={att} />
-                ))}
+                {(m.attachments ?? []).map((att, i) =>
+                  // UR E.13：分享附件走卡片分支（标题即正文，地点另行透传）。
+                  "checkin_id" in att ? (
+                    <CheckinCardBubble key={`${m.id}-a${i}`} checkinId={att.checkin_id} title={m.text} place={att.place ?? ""} />
+                  ) : (
+                    <ChatAttachmentBubble key={`${m.id}-a${i}`} att={att} />
+                  ),
+                )}
                 {m.text !== "" && (
                   <div className="max-w-[80%] rounded-2xl rounded-br-md bg-foreground px-3 py-2 text-sm text-background">
                     {m.text}
@@ -234,9 +240,14 @@ export function ChatThread({
                   <AvatarFallback>{peer.nickname.slice(0, 1)}</AvatarFallback>
                 </Avatar>
                 <div className="flex max-w-[80%] flex-col gap-0.5">
-                  {(m.attachments ?? []).map((att, i) => (
-                    <ChatAttachmentBubble key={`${m.id}-a${i}`} att={att} />
-                  ))}
+                  {(m.attachments ?? []).map((att, i) =>
+                    // UR E.13：分享附件走卡片分支（标题即正文，地点另行透传）。
+                    "checkin_id" in att ? (
+                      <CheckinCardBubble key={`${m.id}-a${i}`} checkinId={att.checkin_id} title={m.text} place={att.place ?? ""} />
+                    ) : (
+                      <ChatAttachmentBubble key={`${m.id}-a${i}`} att={att} />
+                    ),
+                  )}
                   {m.text !== "" && (
                     <div className="rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm text-foreground">
                       {m.text}
