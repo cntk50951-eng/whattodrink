@@ -426,7 +426,7 @@
     "checkinRepliesMore": "Show {n} replies",
     "checkinExpand": "Expand fullscreen",
     "checkinCollapse": "Collapse to half",
-    "loginHint": "Log in to see your trail",
+    "loginHint": "Log in to see your trail"
   },
   "gatherings": {
     "newTitle": "Create Gathering",
