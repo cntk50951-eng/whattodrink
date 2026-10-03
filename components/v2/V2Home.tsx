@@ -46,8 +46,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { CheckinDetailExtra, CheckinSheetHead } from "@/components/v2/CheckinDetailExtra";
 import { V2Comments } from "@/components/v2/V2Comments";
-import { CheckinDetailExtra } from "@/components/v2/CheckinDetailExtra";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMyMode } from "@/hooks/useMyMode";
 import { useFriendRelation } from "@/hooks/useFriendRelation";
@@ -319,6 +319,8 @@ export function V2Home() {
   // UR C.11 round-3：詳情返回目錄（目錄來才記 "stops"；地圖釘直開為 null 不帶返回鈕）。
   const [wantReturnTo, setWantReturnTo] = useState<"stops" | null>(null);
   const [swapOpen, setSwapOpen] = useState(false);
+  // UR E.10 batch7：半屏展开态（默认 75svh，展开 92svh；只在事件里改，不进 effect，沿 lint 豁免外口径）。
+  const [sheetFull, setSheetFull] = useState(false);
   const [swapBatch, setSwapBatch] = useState<Beer[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -1363,6 +1365,7 @@ export function V2Home() {
                     )}
                   </AvatarFallback>
                 </Avatar>
+                </span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className={styles.v2scope}>
                 {/* DEF-009：Label 必須在 Group 內（base-ui GroupLabel 硬性要求，游離即炸） */}
@@ -1964,6 +1967,7 @@ export function V2Home() {
           otherDetailFor.current = null;
           setSwapOpen(false);
           setConfirmDelete(false);
+          setSheetFull(false);
           // UR C.11 round-3：關詳情自動回目錄（直開時 returnTo 為 null，不回）。
           if (wantReturnTo === "stops") {
             setWantReturnTo(null);
@@ -1973,10 +1977,13 @@ export function V2Home() {
       >
         {/* DEF-20260929-006：此前 key 随卡变 remount Popup，开着换卡直接搞乱
             base-ui Dialog 开关机（残留吞点击）——改 id＋effect 回顶，身份稳定。 */}
+        {/* DEF-20261003-007：关自动抢焦（默认抢底部输入框，浏览器滚到底盖过回顶 effect）；
+            焦点 trap 不动，Tab 照进，手机键盘不弹。 */}
         <SheetContent
           id="wtd-checkin-sheet"
           side="bottom"
-          className={`${styles.v2scope} max-h-[85svh] gap-4 overflow-y-auto rounded-t-2xl p-4 sm:mx-auto sm:w-full sm:max-w-md`}
+          initialFocus={false}
+          className={`${styles.v2scope} gap-4 overflow-hidden rounded-t-2xl p-4 sm:mx-auto sm:w-full sm:max-w-md ${sheetFull ? "h-[92svh]" : "h-[75svh]"}`}
         >
           {(() => {
             // UR C.10 返工：他人卡進同一 Sheet（grabber／Header／X 共用，
@@ -1984,7 +1991,23 @@ export function V2Home() {
             if (card !== null && card.kind === "other") {
               return (
                 <>
-                  <div aria-hidden className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
+                  <div aria-hidden className="mx-auto h-1 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
+                  {/* UR E.10 batch7：半屏固定头（缩略图＋酒款＋展开钮；滚动区外）。 */}
+                  <CheckinSheetHead
+                    photoUrl={otherDetail?.photoUrl ?? null}
+                    title={card.drink === "" ? card.title : card.drink}
+                    sub={
+                      card.checkedInAt !== null
+                        ? formatSeenAgo(card.checkedInAt, nowMs, locale)
+                        : ""
+                    }
+                    expanded={sheetFull}
+                    onToggleExpand={() => setSheetFull((v) => !v)}
+                  />
+                  <div
+                    id="v2c-scroll-other"
+                    className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto"
+                  >
                   <SheetHeader className="text-left">
                     <SheetTitle className="flex min-w-0 flex-wrap items-center gap-1.5">
                       <span className="truncate">{card.title}</span>
@@ -2101,6 +2124,7 @@ export function V2Home() {
                       lng={card.lng}
                       canRate={false}
                       commentsAnchorId="v2c-other"
+                      scrollContainerId="v2c-scroll-other"
                     />
                   ) : null}
                   {/* UR E.7：留言（真釘才有 DB id；MOCK 無行不掛）。 */}
@@ -2111,6 +2135,7 @@ export function V2Home() {
                   {otherDetail?.audioUrl ? (
                     <audio controls src={otherDetail.audioUrl} className="h-9 w-full" />
                   ) : null}
+                  </div>
                 </>
               );
             }
@@ -2127,7 +2152,19 @@ export function V2Home() {
                 : null;
             return (
               <>
-                <div aria-hidden className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
+                <div aria-hidden className="mx-auto h-1 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
+                {/* UR E.10 batch7：半屏固定头（缩略图＋酒款＋展开钮；滚动区外）。 */}
+                <CheckinSheetHead
+                  photoUrl={rec.photoDataUrl ?? null}
+                  title={fresh?.name ?? t("you")}
+                  sub={formatSeenAgo(rec.at, nowMs, locale)}
+                  expanded={sheetFull}
+                  onToggleExpand={() => setSheetFull((v) => !v)}
+                />
+                <div
+                  id="v2c-scroll-self"
+                  className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto"
+                >
                 {/* UR C.11 round-3：目錄來才有返回（沿 C.5 返回鍵口徑，文案复用 trailBack） */}
                 {wantReturnTo === "stops" && (
                   <div className="flex items-center">
@@ -2213,6 +2250,7 @@ export function V2Home() {
                     lng={rec.position.lng}
                     canRate
                     commentsAnchorId="v2c-self"
+                    scrollContainerId="v2c-scroll-self"
                   />
                 ) : null}
                 {rec.audio && (
@@ -2286,6 +2324,7 @@ export function V2Home() {
                     </Button>
                   </div>
                 )}
+                </div>
               </>
             );
           })()}

@@ -2987,8 +2987,11 @@ UR E.10　打卡面板互动升级（6 项，主流 App 体验对齐）[WIP]
 - 2026-10-03 batch6 评论区原型对齐＋DEF-20261003-006（`checkinMore` 命名空间 `t`→`t2` 单行；同文件其余混用 grep 全验；`parseReplyTarget` 纯函数＋2 单测；行重排：大头像／名时同行／嵌套缩进／@高亮／大输入＋实心发送钮；478 绿；待亲验，未提交）
 - 2026-10-03 batch6 round-2 输入区返工（`text-accent` 浅色近白隐形：@名／想喝字全看不见，改 `text-primary`；输入 h-14＋text-base 防 iOS 缩放；发送钮 h-14 实心蓝；Button default 即 bg-primary 未被去色，验过 `button.tsx:11`；待亲验，未提交）
 - 2026-10-03 batch6 round-3 shadcn 底样式打架（DOM 实证：`px-2.5` 挤＋`md:text-sm` 盖 16px＋`size-8` 顶 `h-14`；输入补 `px-5`＋`md:text-base` 逐断点压死；发送钮改原生 button 全显式类，提交走 form onSubmit；待亲验，未提交）
+- 2026-10-03 batch7 半屏重构（问答定案：75% 半屏＋固定照片头＋评论独立滚动＋吸底输入；启发式折叠；无新表；赞评论／长按菜单仍排除；待实现，未提交）
+- 2026-10-03 batch7 落地＋DEF-20261003-007（`initialFocus={false}` 关抢焦＋回顶 effect 重掌定位；固定头／75svh／展开 92svh／启发式折叠＋展开 N 条／评数往返跳；`checkinRepliesMore/Expand/Collapse`×3 parity 120；三闸 478 绿；待亲验，未提交）
 
 ---
+
 > 生产线 F 新开，主力承载“组局”功能。总体定位：以“每人带一支酒的品酒会”为原型，扩展为主题化小聚引擎（B 主题开放 + C 熟人基座），初期纯信息撮合 + 免责声明 + 公开场所引导（用户自选公开场所，平台建议清单，不指定），后期叠加认证合作场地。MVP 闭环：发布 → 发现（地图+列表）→ 申请 → 审批 → 行前提醒 → 签到 → 互评。法务待复核，PDPO/年龄/免责按 §3 风险矩阵落地。详见 `docs/EPIC_F_GROUP_GATHERING.md` v0.1 与 `docs/F_BACKLOG_DRAFT.md` 草案。
 
 UR F.1　组局发布（最小可用）[WIP]

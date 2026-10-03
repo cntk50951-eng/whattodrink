@@ -186,6 +186,130 @@ export function V2Comments({ checkinId, anchorId }: { checkinId: string; anchorI
     setDraft(`@${nameOf(c)} `);
     inputRef.current?.focus();
   };
+  // UR E.10 batch7 回复折叠（启发式一层：@名挂最近上文同名；默认折“展开 N 条”，点开展示）：
+  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set());
+  const toggleExpanded = (id: string): void => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  type Thread = { top: CommentJson; kids: CommentJson[] };
+  const threads: Thread[] = [];
+  {
+    const topIndexById = new Map<string, number>();
+    comments.forEach((c) => {
+      if (c.id.startsWith("pending-")) {
+        topIndexById.set(c.id, threads.length);
+        threads.push({ top: c, kids: [] });
+        return;
+      }
+      const target = parseReplyTarget(c.body);
+      let parent = -1;
+      if (target !== null) {
+        for (let j = threads.length - 1; j >= 0; j--) {
+          const t = threads[j].top;
+          if (!t.id.startsWith("pending-") && nameOf(t) === target) {
+            parent = j;
+            break;
+          }
+        }
+      }
+      if (parent === -1) {
+        topIndexById.set(c.id, threads.length);
+        threads.push({ top: c, kids: [] });
+      } else {
+        threads[parent].kids.push(c);
+      }
+    });
+  }
+
+  // 行渲染（nested 即缩进小字＋@高亮；抽出供折叠复用，pending 永不嵌套）。
+  const renderRow = (c: CommentJson, nested: boolean): React.JSX.Element => {
+    const pending = c.id.startsWith("pending-");
+    const target = parseReplyTarget(c.body);
+    const rest = nested && target !== null ? c.body.slice(target.length + 2) : c.body;
+    return (
+      <div
+        key={c.id}
+        className={`flex items-start gap-2.5 rounded-xl px-1 py-1 ${
+          nested ? "ml-12" : ""
+        } ${
+          // 本人的行淡底（token 透明度，不新增色值）；pending 行呼吸占位。
+          c.is_mine ? "bg-primary/[0.05]" : ""
+        } ${pending ? "motion-safe:animate-pulse" : ""}`}
+      >
+        <span
+          aria-hidden
+          className={`flex shrink-0 items-center justify-center rounded-full font-bold ${
+            nested ? "h-7 w-7 text-[11px]" : "h-11 w-11 text-sm"
+          } ${
+            c.is_author
+              ? "bg-secondary text-secondary-foreground"
+              : "bg-muted text-muted-foreground"
+          }`}
+        >
+          {avatarOf(c)}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p
+            className={`flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 ${
+              nested ? "text-[13px]" : "text-[15px]"
+            }`}
+          >
+            <span className="truncate font-bold">{nameOf(c)}</span>
+            {/* DEF-20261003-001：作者章（all 人可见，小红书／IG 同款）＋本人「我」標。 */}
+            {c.is_author && (
+              <Badge variant="secondary" className="h-4 shrink-0 px-1 text-[10px] leading-none">
+                {t("commentAuthor")}
+              </Badge>
+            )}
+            {c.is_mine && !c.is_author && (
+              <span className="shrink-0 font-normal text-muted-foreground">
+                {t("commentMe")}
+              </span>
+            )}
+            {!pending && timeOf(c) !== "" && (
+              <span className="shrink-0 font-normal text-muted-foreground">
+                {timeOf(c)}
+              </span>
+            )}
+          </p>
+          <p
+            className={`break-words pt-0.5 leading-relaxed ${
+              nested ? "text-sm" : "text-[15px]"
+            }`}
+          >
+            {nested && target !== null && (
+              <span className="text-primary">@{target} </span>
+            )}
+            {rest}
+          </p>
+          {!pending && (
+            <button
+              type="button"
+              onClick={() => replyTo(c)}
+              className="mt-0.5 w-fit shrink-0 rounded px-1 py-0.5 text-xs text-muted-foreground opacity-70 transition-opacity hover:text-foreground hover:opacity-100 focus-visible:opacity-100"
+            >
+              {t("checkinReply")}
+            </button>
+          )}
+        </div>
+        {!pending && (
+          <button
+            type="button"
+            onClick={() => void remove(c.id)}
+            aria-label={t("commentDelete")}
+            className="shrink-0 rounded px-1.5 py-0.5 text-xs text-muted-foreground opacity-40 transition-opacity hover:text-destructive hover:opacity-100 focus-visible:opacity-100"
+          >
+            {arming === c.id ? t("commentDeleteConfirm") : "×"}
+          </button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div id={anchorId} className="flex scroll-mt-2 flex-col gap-2.5 border-t pt-3">
@@ -210,96 +334,20 @@ export function V2Comments({ checkinId, anchorId }: { checkinId: string; anchorI
       ) : comments.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("commentEmptyGuide")}</p>
       ) : (
-        <div className="flex max-h-72 flex-col gap-3 overflow-y-auto">
-          {comments.map((c, i) => {
-            const pending = c.id.startsWith("pending-");
-            // 一层回复归属：@名 取最近上文同名（零 migration 的对话感，见 E.10）。
-            const target = pending ? null : parseReplyTarget(c.body);
-            let nested = false;
-            if (target !== null) {
-              for (let j = i - 1; j >= 0; j--) {
-                const pj = comments[j];
-                if (!pj.id.startsWith("pending-") && nameOf(pj) === target) {
-                  nested = true;
-                  break;
-                }
-              }
-            }
-            const rest = nested && target !== null ? c.body.slice(target.length + 2) : c.body;
+        <div className="flex flex-col gap-3">
+          {threads.map(({ top, kids }) => {
+            const open = expandedIds.has(top.id);
             return (
-              <div
-                key={c.id}
-                className={`flex items-start gap-2.5 rounded-xl px-1 py-1 ${
-                  nested ? "ml-12" : ""
-                } ${
-                  // 本人的行淡底（token 透明度，不新增色值）；pending 行呼吸占位。
-                  c.is_mine ? "bg-primary/[0.05]" : ""
-                } ${pending ? "motion-safe:animate-pulse" : ""}`}
-              >
-                <span
-                  aria-hidden
-                  className={`flex shrink-0 items-center justify-center rounded-full font-bold ${
-                    nested ? "h-7 w-7 text-[11px]" : "h-11 w-11 text-sm"
-                  } ${
-                    c.is_author
-                      ? "bg-secondary text-secondary-foreground"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {avatarOf(c)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 ${
-                      nested ? "text-[13px]" : "text-[15px]"
-                    }`}
-                  >
-                    <span className="truncate font-bold">{nameOf(c)}</span>
-                    {/* DEF-20261003-001：作者章（all 人可见，小红书／IG 同款）＋本人「我」標。 */}
-                    {c.is_author && (
-                      <Badge variant="secondary" className="h-4 shrink-0 px-1 text-[10px] leading-none">
-                        {t("commentAuthor")}
-                      </Badge>
-                    )}
-                    {c.is_mine && !c.is_author && (
-                      <span className="shrink-0 font-normal text-muted-foreground">
-                        {t("commentMe")}
-                      </span>
-                    )}
-                    {!pending && timeOf(c) !== "" && (
-                      <span className="shrink-0 font-normal text-muted-foreground">
-                        {timeOf(c)}
-                      </span>
-                    )}
-                  </p>
-                  <p
-                    className={`break-words pt-0.5 leading-relaxed ${
-                      nested ? "text-sm" : "text-[15px]"
-                    }`}
-                  >
-                    {nested && target !== null && (
-                      <span className="text-primary">@{target} </span>
-                    )}
-                    {rest}
-                  </p>
-                  {!pending && (
-                    <button
-                      type="button"
-                      onClick={() => replyTo(c)}
-                      className="mt-0.5 w-fit shrink-0 rounded px-1 py-0.5 text-xs text-muted-foreground opacity-70 transition-opacity hover:text-foreground hover:opacity-100 focus-visible:opacity-100"
-                    >
-                      {t("checkinReply")}
-                    </button>
-                  )}
-                </div>
-                {!pending && (
+              <div key={top.id} className="flex flex-col gap-1">
+                {renderRow(top, false)}
+                {open && kids.map((k) => renderRow(k, true))}
+                {kids.length > 0 && !open && (
                   <button
                     type="button"
-                    onClick={() => void remove(c.id)}
-                    aria-label={t("commentDelete")}
-                    className="shrink-0 rounded px-1.5 py-0.5 text-xs text-muted-foreground opacity-40 transition-opacity hover:text-destructive hover:opacity-100 focus-visible:opacity-100"
+                    onClick={() => toggleExpanded(top.id)}
+                    className="ml-12 w-fit rounded px-1 py-0.5 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                   >
-                    {arming === c.id ? t("commentDeleteConfirm") : "×"}
+                    {t("checkinRepliesMore", { n: kids.length })}
                   </button>
                 )}
               </div>

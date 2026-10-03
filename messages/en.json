@@ -423,6 +423,9 @@
     "checkinMore": "More",
     "checkinLikeCount": "{n} likes",
     "checkinCommentCount": "{n} comments",
+    "checkinRepliesMore": "Show {n} replies",
+    "checkinExpand": "Expand fullscreen",
+    "checkinCollapse": "Collapse to half",
     "loginHint": "Log in to see your trail",
   },
   "gatherings": {

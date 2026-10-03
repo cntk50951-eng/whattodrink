@@ -38,3 +38,6 @@
 
 ## round-8（2026-10-03，accent token 隐形字）
 - `accent` 是底色 token（浅色近白），绝不能当文字色（`text-accent` 白底隐形）。要鲜艳前景一律 `text-primary`（v2scope 即 shadcn Blue，验过 `v2.module.css:25`）。Button default 即 `bg-primary`，去色运动没动它（验过 `button.tsx:11`）。
+
+## round-9（2026-10-03，DEF-20261003-007 跟踪到底）
+- Sheet 开即到底首先怀疑 Dialog 抢焦（base-ui 默认抢首个可 tab 元素），而不是滚动逻辑——本次回顶 effect 早就在，照样被 autofocus 盖过。修法只关抢焦不动 trap。

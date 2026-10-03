@@ -2,10 +2,56 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Beer, Check, Heart, MapPin, MessageCircle, Share2, Star } from "lucide-react";
+import { Beer, Check, Heart, Image as ImageIcon, MapPin, Maximize2, MessageCircle, Minimize2, Share2, Star } from "lucide-react";
 
 import { formatRating } from "@/lib/api/rating";
 import { useCheckinDetail } from "@/hooks/useCheckinDetail";
+
+/**
+ * UR E.10 batch7 半屏固定头（照片缩略图＋酒款＋展开钮；滚动区之上不跟滚，
+ * 沿小红书 70% 面板“标题固定、列表独立滚”口径；展开收起只换高度，无手势系统）。
+ */
+export function CheckinSheetHead({
+  photoUrl,
+  title,
+  sub,
+  expanded,
+  onToggleExpand,
+}: {
+  photoUrl: string | null;
+  title: string;
+  sub: string;
+  expanded: boolean;
+  onToggleExpand: () => void;
+}) {
+  const t = useTranslations("v2");
+  return (
+    <div className="flex shrink-0 items-center gap-2.5">
+      {photoUrl !== null ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img src={photoUrl} alt="" loading="lazy" className="h-11 w-11 shrink-0 rounded-xl object-cover" />
+      ) : (
+        <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+          <ImageIcon size={18} />
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold">{title}</span>
+        {sub !== "" && (
+          <span className="block truncate text-xs text-muted-foreground">{sub}</span>
+        )}
+      </span>
+      <button
+        type="button"
+        onClick={onToggleExpand}
+        aria-label={expanded ? t("checkinCollapse") : t("checkinExpand")}
+        className="shrink-0 rounded-full p-2 text-muted-foreground hover:text-foreground"
+      >
+        {expanded ? <Minimize2 size={18} aria-hidden /> : <Maximize2 size={18} aria-hidden />}
+      </button>
+    </div>
+  );
+}
 
 /**
  * UR E.10 打卡面板共享段（v2-only；自家 Sheet＋他人卡同构，数据源只有 checkinId）。
@@ -21,6 +67,7 @@ export function CheckinDetailExtra({
   lng,
   canRate,
   commentsAnchorId,
+  scrollContainerId,
 }: {
   /** DB id（无即整块不挂，沿 V2Comments 口径） */
   checkinId: string;
@@ -32,8 +79,15 @@ export function CheckinDetailExtra({
   canRate: boolean;
   /** 评论区容器 id（评数按钮点即滚过去；V2Comments 同传此 id） */
   commentsAnchorId: string;
+  /** 面板滚动区容器 id（已在评论区即回顶，否则跳评论区，小红书同款往返） */
+  scrollContainerId: string;
 }) {
   const t = useTranslations("v2");
+  const [reducedMotion] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
   const { detail, busy, toggleLike, toggleWant, rate } = useCheckinDetail(checkinId);
   const [reverseName, setReverseName] = useState<string | null>(null);
   const reverseKey = useRef<string | null>(null);
@@ -101,7 +155,13 @@ export function CheckinDetailExtra({
   };
 
   const scrollToComments = (): void => {
-    document.getElementById(commentsAnchorId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const sc = document.getElementById(scrollContainerId);
+    const anchor = document.getElementById(commentsAnchorId);
+    if (sc === null || anchor === null) return;
+    const scRect = sc.getBoundingClientRect();
+    const target = anchor.getBoundingClientRect().top - scRect.top + sc.scrollTop;
+    // 已在评论区（偏 80px 内）即回顶，否则跳评论区。
+    sc.scrollTo({ top: target - sc.scrollTop > 80 ? target : 0, behavior: reducedMotion ? "auto" : "smooth" });
   };
 
   return (
