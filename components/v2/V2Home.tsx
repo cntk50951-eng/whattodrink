@@ -45,7 +45,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { V2Comments } from "@/components/v2/V2Comments";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMyMode } from "@/hooks/useMyMode";
 import { useFriendRelation } from "@/hooks/useFriendRelation";

@@ -757,3 +757,4 @@
 - **关联 UR**：UR D.6（RPC 引入方；`0016` 已写好，待用户 Dashboard 贴跑，见改动记录）
 - **修复验证**：用户 Dashboard 跑完 0016，`GET /conversations` 回 200（终端无 rpc error 行）＋列表末条未读正确；002 Bell＋红点待同源复验（见 002 F 支）
 - **回归范围**：会话列表、Bell 汇总；room 历史／read-status 独立端点不受影响
+- **远端阻塞确诊（2026-10-03）**：d6063f6 把 teammate 未提交的 `V2Comments` import 顺带合入（半截提交，DEF-20260926-016 同款），`V2Comments.tsx` 不在仓 → Vercel `TS2307` 连红两单，远端跑旧包；修法＝hotfix 删 dangling import（main 内零引用，E.7 文件随其 UR 另行合入）；待 Vercel 转绿后远端复验转 Verified

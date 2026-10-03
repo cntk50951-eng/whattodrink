@@ -568,3 +568,4 @@
 ### Notes
 - Node 版本要求 22+（`nvm use 22`）
 - `UI style/` 目錄保留 20 張風格探索圖（MiniMax image-01 生成），作為 design system 選型參考
+  - 远端 Vercel 连红两单修复（hotfix）：d6063f6 半截提交把未进仓的 `V2Comments` import 带入 main → `TS2307`；删 dangling import（main 内零引用），随 hotfix 合入；待转绿后远端复验
