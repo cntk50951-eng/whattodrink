@@ -2851,6 +2851,73 @@ UR E.6　热点模式（一键全览＋无字底图＋斑点点爆）[done]
 - 2026-09-29 round-4：DEF-20260929-008 推翻重定×2（①动态 className 抹类→内外分家，我方截图全活；②CARTO 回 200 水印砖→用户 key 未授权 basemaps→换 Esri 浅灰免 key，我方点热点截图全貌通过）；tsc 净／lint 净；待用户亲眼复验，未提交
 - 2026-09-29 round-4：DEF-20260929-008 推翻重定（agent-browser 实证：砖 valid 但渲染宽 0＋容器丢类；元凶＝动态 className 绑在 Leaflet 节点上被重写抹类→内外分家修完，我方截图砖热钉全活）；tsc 净／lint 净；待用户亲眼复验，未提交
 
+---
+
+UR E.7　打卡帖子留言（匿名可留＋限流＋审核）[WIP]
+
+作為路過打卡帖子的人，我想直接留言（登入或匿名都行），作者能回我；作為作者，我想看到每條留言是誰留的（登入名或匿名標）並逐條回。
+
+### 背景（2026-10-02 問答定案，只做 v2）
+- IG／小紅書的評論都要登入，沒有匿名評論可抄；“匿名可留＋作者回前限 1 條”是自創規則，按業界匿名限流最佳實踐落地（cookie 身份＋IP 墊底，見下），不假裝防得住蓄意刷號，只擋順手濫用
+- UR 4.1 明確排除過留言（“留言是完全不同量級”），E.1–E.6 無評論設計，故新開 E.7，不塞 E.4（E.4 已 7 輪返工）
+- 通知拆獨立 UR E.8，本 UR 只管留／看／刪
+
+### 範圍（v2-only；共用層加法，v1 行為不變）
+1. **表**（`supabase/migrations/00xx_checkin_comments.sql`，用戶 Dashboard 執行）：`checkin_comments(id, checkin_id→checkins ON DELETE CASCADE, user_id→users NULL, anon_id text NULL, anon_ip_hash text NULL, body text ≤500, status visible|hidden DEFAULT visible, created_at)`＋`CHECK(user_id NOT NULL OR anon_id NOT NULL)`＋索引 `(checkin_id, created_at)`；RLS：讀沿帖子可見性（能看帖即能看評，`canViewCheckin` 同口徑），本人＋帖作者可刪（帖作者可刪任何人，防騷擾）
+2. **匿名身份**：首次評服務端 mint `anon_id`（uuid）→ httpOnly cookie `wtd-anon`（1 年）；同時記 `anon_ip_hash`（SHA256＋salt，不存原文，PDPO）；展示一律 `匿名·短號`（anon_id 哈希前 4 碼，作者分得清不同人即可，不暴露身份）
+3. **限流**（核心規則，服務端計數，localStorage 不算數）：
+   - 未登入：每帖每匿名身份最多 **1 條 outstanding**（作者回覆該身份前再發即 422＋提示“作者回复前只能留 1 条”）；作者回後計數清零可再留 1 條（往復）
+   - 已登入：每帖每 10 分鐘 ≤3 條（防刷，不限 1 條）
+   - IP 墊底：同 `anon_ip_hash` 同帖 24h 內匿名評 ≤5 條（防清 cookie 重刷；NAT 誤傷可接受，文案誠實提示）
+4. **審核**（白話：發評前先過一遍髒話／廣告／攻擊檢測，沿 E.2 現成管線——OpenAI 主審＋Minimax 兜底，命中即 422 直拒＋行內提示＋原文保留可改；管線全掛則 503 拒收不落地，fail-closed）
+5. **端點**（走 api-workflow，一次一個）：`GET /checkins/:id/comments`（🌐，cursor 分頁，只回 visible；帖不可見即 404）→ `POST /checkins/:id/comments`（🌐：登入走 session，匿名走 cookie＋mint；隱身 403；頻控／限流 422 包絡）→ `DELETE /comments/:id`（🔒本人或帖作者；他人 404 不洩歸屬）
+6. **UI**（v2-only：自家 Sheet C.4＋他人卡 C.10 底部留言區）：列表（頭像／名或匿名標＋時間＋正文＋回覆態）＋輸入框＋發送；匿名態提示“以匿名身份留言”＋剩餘規則一句話；`rejected` 行內紅 banner 沿 E.3 口徑；檢舉／刪除兩段確認沿牆帖口徑
+7. 三語 `comment*` 新 key（×3 同序 parity）；`docs/data` 同步 comments 行；`docs/api-openapi.yaml` 逐端點補
+
+### 非目標
+- 通知（E.8）、私信、讚評論、@、圖片評論、評論再回覆（只做一層，作者回即正文）、v1 任何文件
+
+### AC
+- AC1：匿名留 1 條可見（`匿名·短號`）；未等作者回再留第 2 條→422＋提示；作者回後可再留
+- AC2：登入 10 分鐘內第 4 條→422；清 cookie 換身份同 IP 連刷→第 6 條 422
+- AC3：隱身點發送→403 引導浮層（沿 A.16 `ModePrompt`）；陌生人看 friends 帖→404
+- AC4：髒話／廣告文本→422 行內提示＋原文保留；三閘綠；用戶瀏覽器親驗；`git status` 無 v1
+
+*改動記錄*
+- 2026-10-02：建檔置 []（用戶指令 IG 風留言＋匿名可留＋回前限 1；問答定案 v2-only／匿名短號標／cookie＋IP 雙信號限流／隱身禁評／通知拆 E.8；待開工指令）
+- 2026-10-02：開工置 [WIP]；`0015_checkin_comments.sql`（表＋三索引＋四 policy，含公開帖匿名可讀）＋`lib/api/comments.ts`（parse／cursor／短號／映射／限流判定，20 單測綠）＋`GET /checkins/:id/comments`（🌐，public 直讀＋非公開 canViewCheckin＋keyset 翻頁）；tsc 淨／lint 淨；待用戶：Dashboard 跑 0015＋curl 驗 GET
+- 2026-10-02：三端點＋UI 落地（`POST` 匿名 mint＋三檔限流＋E.2 審核門＋隱身 403，真庫驗 201／429／400；`DELETE` 本人／帖作者；`V2Comments` 自家 Sheet＋他人卡共用＋rejected 行內 banner；`comment*`×9 三語 parity 94；openapi 升 1.2.0；`home-map.md` 第十一節）；21 單測綠／tsc 淨／lint 淨（set-state-in-effect 修兩輪：重置搬 load＋queueMicrotask）；待用戶瀏覽器親驗（登入刪／隱身／審核真鏈）＋合入
+- 2026-10-03：DEF-20261003-001（作者自評無標識）——`is_author`／`is_mine` 雙章（服務端按帖歸屬＋viewer 算，id 永不下發；小紅書作者 badge／IG Author tag 同款；本人看自己另帶「我」標，作者章優先）；`withViewerFlags`＋`rawAnonIdOf`＋6 單測（27 綠）＋真庫 curl＋`commentAuthor`／`commentMe`×3（parity 96）＋openapi 補兩 key；待親驗＋隨車合入
+- 2026-10-03：留言 UI 重排返工（用戶判初版醜）——IG 式行（頭像圓＋名行＋`formatWantTime` 時間＋正文，本人行淡底）＋圓形圖標發送鈕（Send→`LoaderCircle` 轉圈，`motion-safe`）＋樂觀 pending 行（pulse 占位，失敗撤下草稿回框）＋頭像 skeleton 三行；零新 key／零新依賴；待目檢＋隨車合入
+
+---
+
+UR E.8　留言作者通知（站内 Bell，v2）[]
+
+作為帖作者，有人給我留言／回我時，我要在站内第一時間知道並能一點跳回那條帖子。
+
+### 背景
+- E.7 只管留／看／刪，寫了無人知等於白寫，故拆獨立 UR（用戶指令）
+- Bell 現狀：無現成組件（F 線草案“復用 D 線 Bell”只是願景，倉內只有 D 線會話 `unread`，無通用通知表），本 UR 從零起最小閉環；帖作者恒為登入用戶（打卡必登入，无匿名帖），收件人恒有 `user_id`
+
+### 範圍（v2-only）
+1. **寫**：POST 評論成功且評論者非作者本人 → 插 `comment_notifications(id, checkin_id, comment_id, to_user_id, read_at NULL, created_at)`；作者自評不插；RLS owner 讀＋系統寫（沿 D.2 service 建會話口徑）
+2. **讀**：`GET /notifications/comments`（🔒，未讀數＋cursor 列表，帖標題＋評論摘要＋時間）；進帖即清（打開帖子詳情／Sheet 即 `read_at=now()`，沿 D.4 開房清未讀口徑）
+3. **UI**：Bell 入口＋紅點（位置待問答：頂欄 vs TabBar，二選一）＋列表（行點跳帖＋開卡，沿 E.6 Sheet 行點開卡口徑）；空態＋“全部已讀”；`notification*` 新 key×3
+4. 輪詢先行（30s，沿 A.21 心跳口徑；hidden 暫停）；Realtime 訂閱（沿 D.3 配方）列為增強，MVP 後議
+
+### 非目標
+- 推播／郵件／短信（D.5b 另期）、聚合摘要（“3 人評了你”）、v1 任何文件、組局／好友申請通知（各線另議，不共表）
+
+### AC
+- AC1：他人留評→作者 Bell＋1；作者自評→不＋1；進帖→清零
+- AC2：匿名評的通知不洩 IP／cookie（只帶匿名短號＋摘要）；三閘綠；用戶瀏覽器親驗；`git status` 無 v1
+
+*改動記錄*
+- 2026-10-02：建檔置 []（E.7 拆出；Bell 從零起＋收件恒登入已確認；入口位置＋Realtime 範圍待問答；待開工指令）
+
+---
+
 > 生产线 F 新开，主力承载“组局”功能。总体定位：以“每人带一支酒的品酒会”为原型，扩展为主题化小聚引擎（B 主题开放 + C 熟人基座），初期纯信息撮合 + 免责声明 + 公开场所引导（用户自选公开场所，平台建议清单，不指定），后期叠加认证合作场地。MVP 闭环：发布 → 发现（地图+列表）→ 申请 → 审批 → 行前提醒 → 签到 → 互评。法务待复核，PDPO/年龄/免责按 §3 风险矩阵落地。详见 `docs/EPIC_F_GROUP_GATHERING.md` v0.1 与 `docs/F_BACKLOG_DRAFT.md` 草案。
 
 UR F.1　组局发布（最小可用）[WIP]

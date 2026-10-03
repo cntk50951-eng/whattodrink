@@ -16,6 +16,7 @@
   - 验收返工 round-3：数字徽改啤酒气泡徽（`v2beerBadge` 琥珀渐变＋`::before` 泡沫盖＋三粒 `v2beerBubble` 错峰上冒 1.5s 常驻循环，数字包 `relative` 保可读，`overflow-hidden` 收泡，reduced-motion 留静态；抖动幅度加大到 ±8°，触发语义不变——只播一次，HMR 不重播）；tsc＋lint 雙淨
   - 验收返工 round-4：圆徽退役改迷你啤酒杯角标（`v2beerMug` 杯身＋内嵌泡沫顶＋`::after` 小把手＋`v2beerCount` 压杯中＋两粒 `v2mugBubble` 杯内上冒，一个元素不再分离；`top:-6px` 落 `pt-2` 盒内；抖动改 5s 定时——有未读先抖一次之后每 5s 抖 0.9s，读完即停，`prevBellRef` 沿边逻辑退役）；tsc＋lint 雙淨
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
+
 ### Added
 - **UR D.5 推送 P1 顶部 Bell＋全局 Realtime（v2-only，[WIP]，待亲验）**
   - `hooks/useChatBell.ts` 新（在线才拉取＋订阅：`GET /conversations` 求和＋`messages` INSERT 全局订阅沿 B.2 RLS 口径，到对方行即重算＋toast；匿名／隐身门内挡，hidden 不拉，卸载拆频道）
@@ -23,6 +24,14 @@
   - `lib/chat.ts` 加 `sumUnread`（坏行按 0，小数取整，负数钳零）＋3 单测；`lib/chat.test.ts` 11→14 绿
   - 三闸：vitest 14 绿／tsc 净／eslint 4 档净；数据文档无需更新（零新增持久化，未读由既有 conversations 水位现算）
   - 待：用户浏览器亲验（Bell 显隐／跳转／读完即灭）＋双号联验即时性（Publication 沿 D.3 同一条，需确认已开）
+- **UR E.7 打卡帖子留言（v2，[WIP]）**
+  - `0015_checkin_comments.sql`（表＋三索引＋四 policy：公开帖匿名可读，写走路由 service 旁路）
+  - `lib/api/comments.ts`（parse／cursor／匿名短號／映射／三檔限流判定，21 單測綠）
+  - 三端點：`GET /checkins/:id/comments`（🌐，keyset 翻頁）＋`POST`（🌐，匿名 mint cookie＋限流＋E.2 審核門）＋`DELETE /comments/:id`（🔒本人／帖作者）；`api-openapi.yaml` 升 1.2.0
+  - `V2Comments`（自家 Sheet＋他人卡共用；列表＋發送＋兩段刪＋rejected 行內 banner）；`comment*`×9 三語 parity 94；`docs/data/home-map.md` 加第十一節
+  - 待：用戶跑 0015（已跑）＋登入態刪／隱身／審核真鏈親驗＋合入
+- **DEF-20261003-001 留言作者章**：`is_author`／`is_mine`（服務端章；作者 badge＋本人「我」標；27 單測綠；待親驗隨車合入）
+
 ### Fixed
 - **DEF-20261002-001 Ivy Bar iPhone 对讲录不上**：iPhone 全系无 `SpeechRecognition`，旧链空转报“没听清”。修为能力检测＋诚实降级（无能力时麦克风钮置灰 disabled、语种锁隐藏、按压直说原因请打字；安卓/电脑 Chrome 行为不变）
   - round-2：iOS 非 Safari 的摆设接口（WebKit 239816）会骗过存在性检测，加 UA 门判不支持

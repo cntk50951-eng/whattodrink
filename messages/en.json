@@ -397,7 +397,18 @@
     "hotspotView": "View check-ins",
     "hotspotInfo": "{n} check-ins · {d} away",
     "hotspotUnknown": "Nearby",
-    "hotspotCollapse": "Hide pins"
+    "hotspotCollapse": "Hide pins",
+    "commentTitle": "Comments",
+    "commentPlaceholder": "Write a comment…",
+    "commentAnonHint": "Posting anonymously; only 1 comment before the author replies",
+    "commentSend": "Send",
+    "commentEmpty": "No comments yet — grab the first",
+    "commentMore": "Load more",
+    "commentFailed": "Failed to send, try again",
+    "commentDelete": "Delete comment",
+    "commentDeleteConfirm": "Confirm?",
+    "commentAuthor": "Author",
+    "commentMe": "·me"
   },
   "gatherings": {
     "newTitle": "Create Gathering",

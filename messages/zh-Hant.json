@@ -397,7 +397,18 @@
     "hotspotView": "查看打卡",
     "hotspotInfo": "{n} 條打卡 · 距你 {d}",
     "hotspotUnknown": "附近",
-    "hotspotCollapse": "收起打卡點"
+    "hotspotCollapse": "收起打卡點",
+    "commentTitle": "留言",
+    "commentPlaceholder": "寫低你嘅留言…",
+    "commentAnonHint": "未登入以匿名身份留言；作者回覆前只可以留 1 條",
+    "commentSend": "發送",
+    "commentEmpty": "仲未有留言，嚟搶第一條",
+    "commentMore": "載入更多",
+    "commentFailed": "發送失敗，稍後再試",
+    "commentDelete": "刪除留言",
+    "commentDeleteConfirm": "確認刪？",
+    "commentAuthor": "作者",
+    "commentMe": "·我"
   },
   "gatherings": {
     "newTitle": "發起組局",

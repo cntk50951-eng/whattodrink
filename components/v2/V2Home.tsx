@@ -45,6 +45,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { V2Comments } from "@/components/v2/V2Comments";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMyMode } from "@/hooks/useMyMode";
 import { useFriendRelation } from "@/hooks/useFriendRelation";
@@ -2088,6 +2089,10 @@ export function V2Home() {
                       </span>
                     )}
                   </div>
+                  {/* UR E.7：留言（真釘才有 DB id；MOCK 無行不掛）。 */}
+                  {apiPins.some((p) => p.id === card.id) ? (
+                    <V2Comments checkinId={card.id} />
+                  ) : null}
                   {/* UR E.2：他人三件套（詳情按需拉；照片已上移主视觉，此处只剩文字——IG 式 caption 紧贴照片下）。 */}
                   {otherDetail?.audioUrl ? (
                     <audio controls src={otherDetail.audioUrl} className="h-9 w-full" />
@@ -2218,6 +2223,10 @@ export function V2Home() {
                     </Button>
                   )}
                 </div>
+                {/* UR E.7：留言（mine 回顯有 DB id 才掛；本地單機記錄無行不掛）。 */}
+                {rec.id !== undefined && rec.id !== "" ? (
+                  <V2Comments checkinId={rec.id} />
+                ) : null}
                 {swapOpen && (
                   <div>
                     <div className="grid grid-cols-3 gap-2">

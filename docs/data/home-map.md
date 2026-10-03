@@ -88,3 +88,11 @@
 | `scope`（`all` 預設／`friends` 只看好友） | 地圖底部「只看好友」鈕＋pins／牆查詢 | `PinsScope`（`lib/friends.ts`） | state，會話（不持久化；`GET /map/pins?scope=`＋`GET /wall?scope=`，friends 需登入） | 不進庫（查詢參數；server 用 friendships accepted 判定） |
 | `friendsOnly`（按鈕開關） | 同上 | `boolean` | state，會話；匿名點彈登入浮層 | 不進庫（运行时态） |
 | 好友關係（accepted 雙向） | scope 查詢＋綠點過濾＋A.19 引導 | `friendships` 行（`lib/friends.ts` 純函數） | `GET /friends/check`＋route 內查（RLS 自讀沿 0009） | `friendships`（0007 建表，0009 開自讀＋friends 行讀） |
+
+## 十一、打卡留言（UR E.7，v2 卡片內）
+
+| 字段 | 页面位置 | 类型 | 当前来源 | 未来表映射 |
+|---|---|---|---|---|
+| 留言行 | v2 自家 Sheet／他人卡底部 `V2Comments` | `CommentJson[]`（`lib/api/comments.ts`，user 帶暱稱／anon 帶短號） | `GET /checkins/:id/comments`（keyset 翻頁；public 直讀，非公開沿 `canViewCheckin`） | `checkin_comments`（0015；`checkin_id` 級聯，`user_id`／`anon_id` 二選一） |
+| `wtd-anon`（匿名身份） | 首評 Set-Cookie | uuid（httpOnly，1 年） | 服務端 mint（首評 `POST` 回）；IP 哈希墊底同行記庫 | 不進端上 localStorage（cookie）；庫側 `anon_id`＋`anon_ip_hash`（SHA256＋salt，不存原文） |
+| 留言草稿／列表／banner | `V2Comments` 內 state | 會話（切帖重置） | state | 不進庫（运行时态） |

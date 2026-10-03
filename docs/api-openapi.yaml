@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.1.0
+  version: 1.2.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -322,6 +322,143 @@ paths:
           $ref: "#/components/responses/InvalidParams"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/checkins/{id}/comments:
+    get:
+      operationId: listCheckinComments
+      summary: 打卡帖子留言列表（免登入；public 直讀，非公開沿可見門，UR E.7）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            description: 不透明 keyset cursor（上一頁 nextCursor 原樣回傳）
+      responses:
+        "200":
+          description: 新在前一頁留言（只回 visible）＋nextCursor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentsPage"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "404":
+          description: 帖子不存在或無可見權限（陌生／私密不洩露，統一 404）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+    post:
+      operationId: createCheckinComment
+      summary: 打卡帖子留言發表（免登入；匿名 mint cookie＋三檔限流＋審核，UR E.7）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  maxLength: 500
+                  description: 留言正文（去空白後 1–500 字）
+      responses:
+        "201":
+          description: 發表成功（匿名首評帶 Set-Cookie: wtd-anon）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [comment]
+                properties:
+                  comment:
+                    $ref: "#/components/schemas/Comment"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "403":
+          description: 隱身禁評（A.15）／內容未通過審核（E.2 管線 rejected）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 帖子不存在或無可見權限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 限流（匿名回前限 1／登入 10 分鐘 3 條／同 IP 24h 5 條）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+        "503":
+          description: 審核服務全掛（fail-closed 不落地，沿 E.2 包絡）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/v1/comments/{id}:
+    delete:
+      operationId: deleteCheckinComment
+      summary: 留言刪除（需登录；本人或帖作者，UR E.7）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 已刪除
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 留言不存在或非本人／帖作者（不洩歸屬）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/me:
@@ -1224,6 +1361,61 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MineRow"
+    Comment:
+      type: object
+      required: [id, checkin_id, body, status, created_at, author]
+      properties:
+        id:
+          type: string
+          format: uuid
+        checkin_id:
+          type: string
+          format: uuid
+        body:
+          type: string
+          maxLength: 500
+        status:
+          type: string
+          enum: [visible, hidden]
+        created_at:
+          type: string
+          format: date-time
+        author:
+          type: object
+          required: [kind]
+          properties:
+            kind:
+              type: string
+              enum: [user, anon]
+            user_id:
+              type: string
+              format: uuid
+              description: kind=user 時有值
+            name:
+              type: string
+              nullable: true
+              description: kind=user 時的暱稱（缺行回 null，前端兜底）
+            tag:
+              type: string
+              description: kind=anon 時有值（匿名·短號 4 碼）
+        is_author:
+          type: boolean
+          description: 是否帖作者（路由按帖歸屬算，DEF-20261003-001）
+        is_mine:
+          type: boolean
+          description: 是否我发的（登录按 user_id／匿名按 cookie；遊客 false）
+    CommentsPage:
+      type: object
+      required: [comments, nextCursor]
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Comment"
+        nextCursor:
+          type: string
+          nullable: true
+          description: 不透明 keyset cursor（created_at＋id），無下一頁為 null
     Beer:
       type: object
       required: [id, emoji, name, category, tagline, icon_url]
