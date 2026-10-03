@@ -6,6 +6,11 @@ import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
 import { ChatThread, type ChatPeer } from "@/components/v2/ChatThread";
 import { toChatAttachments, type ChatMessage } from "@/lib/chat";
+import {
+  loadCachedThread,
+  mergeMessageLists,
+  saveCachedThread,
+} from "@/lib/chatCache";
 
 type ServerMessage = {
   id: string;
@@ -36,9 +41,15 @@ export function ChatRoomLive({
   const [convId, setConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [failed, setFailed] = useState(false);
+  // DEF-20261003-004：开房加载态（建会话＋拉历史落定前 true；骨架＋输入禁用，防白屏感＋丢字）。
+  const [loading, setLoading] = useState(true);
   // UR D.4：對方讀水位（頁內已讀✓✓翻態源；開房＋收信＋10s 輪詢三路刷新）。
   const [peerReadAt, setPeerReadAt] = useState<number | null>(null);
   const seqRef = useRef(0);
+  // UR D.8：开房期先到的 Realtime 行（history 回包时合并，防 settle 覆盖丢行；落定即清）。
+  const earlyRef = useRef<ChatMessage[]>([]);
+  // UR D.8：缓存 owner（当前登录 uid；换号即换，错主不读写，防串看）。
+  const ownerRef = useRef<string | null>(null);
   const pendingRef = useRef(
     new Map<
       string,
@@ -82,28 +93,70 @@ export function ChatRoomLive({
     setConvId(null);
     setMessages([]);
     setFailed(false);
+    setLoading(true);
     pendingRef.current.clear();
+    earlyRef.current = [];
+    ownerRef.current = null;
     void (async () => {
       try {
         const myId = await myUserId();
+        if (cancelled) return;
+        ownerRef.current = myId;
+        // UR D.8：秒开（peer 缓存命中即先渲染，后台 revalidate；错主／空即沿旧骨架）。
+        try {
+          const hit = await loadCachedThread(peerId, myId);
+          if (hit !== null && hit.messages.length > 0 && !cancelled) {
+            setMessages(hit.messages);
+          }
+        } catch {}
         const cRes = await fetch("/api/v1/conversations", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ user_id: peerId }),
         });
-        if (!cRes.ok || cancelled) return;
+        if (!cRes.ok || cancelled) {
+          if (!cancelled && !cRes.ok) {
+            setFailed(true);
+            setLoading(false);
+          }
+          return;
+        }
         const cJson = (await cRes.json()) as { id?: string };
-        if (typeof cJson.id !== "string" || cancelled) return;
+        if (typeof cJson.id !== "string" || cancelled) {
+          if (!cancelled) {
+            setFailed(true);
+            setLoading(false);
+          }
+          return;
+        }
         setConvId(cJson.id);
         const hRes = await fetch(
           `/api/v1/conversations/${encodeURIComponent(cJson.id)}/messages?limit=50`,
           { credentials: "include" },
         );
-        if (!hRes.ok || cancelled) return;
+        if (!hRes.ok || cancelled) {
+          if (!cancelled && !hRes.ok) {
+            setFailed(true);
+            setLoading(false);
+          }
+          return;
+        }
         const hJson = (await hRes.json()) as { messages?: ServerMessage[] };
-        if (!Array.isArray(hJson.messages) || cancelled) return;
+        if (!Array.isArray(hJson.messages) || cancelled) {
+          if (!cancelled) {
+            setFailed(true);
+            setLoading(false);
+          }
+          return;
+        }
         setMessages(hJson.messages.map((m) => toChat(m, myId)));
+        // UR D.8：后台合（开房期先到的 Realtime 行并入，防覆盖丢行；落定清槽）。
+        if (earlyRef.current.length > 0) {
+          setMessages((prev) => mergeMessageLists(prev, earlyRef.current));
+          earlyRef.current = [];
+        }
+        setLoading(false);
         void fetchReadStatus(cJson.id);
         // 讀水位：開房即已讀到最新（fire-and-forget，失敗不擋）
         const last = hJson.messages[hJson.messages.length - 1];
@@ -116,7 +169,10 @@ export function ChatRoomLive({
           }).catch(() => {});
         }
       } catch {
-        if (!cancelled) setFailed(true);
+        if (!cancelled) {
+          setFailed(true);
+          setLoading(false);
+        }
       }
     })();
     return () => {
@@ -155,6 +211,17 @@ export function ChatRoomLive({
               };
               const at = Date.parse(row.created_at);
               if (!Number.isFinite(at)) return;
+              // UR D.8：开房期先到的行先进槽（history 落定时合并，防覆盖丢行；同 id 去重兜底）。
+              if (row.sender_id !== myId) {
+                const incoming: ChatMessage = {
+                  id: row.id,
+                  role: "friend",
+                  text: row.body ?? "",
+                  at,
+                  read: true,
+                };
+                earlyRef.current = [...earlyRef.current, incoming].slice(-50);
+              }
               setMessages((prev) => {
                 if (prev.some((m) => m.id === row.id)) return prev;
                 // 自己剛發的 echo：按 client_msg_id 換真 id（樂觀位不跳）
@@ -205,6 +272,13 @@ export function ChatRoomLive({
     };
   }, [convId]);
 
+  // UR D.8：持久化（落定後 messages 變化即冪等複寫 peer 緩存；owner 空／失敗靜默，照常走網絡）。
+  useEffect(() => {
+    if (convId === null || loading || messages.length === 0) return;
+    const owner = ownerRef.current;
+    if (owner === null) return;
+    void saveCachedThread(peerId, owner, convId, messages);
+  }, [convId, loading, messages, peerId]);
   // UR D.4：水位輪詢（對方在房外已讀→我房內翻✓✓；10s 一次，hidden 暫停，卸載清）。
   useEffect(() => {
     if (convId === null) return;
@@ -373,6 +447,7 @@ export function ChatRoomLive({
         onSend: (t) => void sendText(t),
         onRetry: (id) => void retrySend(id),
         readAt: peerReadAt,
+        loading,
         onUpload: (kind, payload) => uploadAndSend(kind, payload),
       }}
     />

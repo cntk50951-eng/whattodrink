@@ -2535,6 +2535,7 @@ UR D.4　好友消息列表＋未讀＋已讀✓✓ [WIP]
 - 2026-09-27 fix（房頁離線回退酒友＋末句方向）：房頭像名改 `/friends` 全量解析；`chatMe`×3
 - 2026-09-27 fix（用戶回包定罪：`peer: null`——RLS 只許讀自己 membership 行，路由拿不到對方）：列表＋read-status 改 authed 驗身份＋service 查對方行（建會話同口徑）；tsc 淨／lint 0 error；用戶重啟 server 複驗通過
 - 2026-09-27 fix（同樹回退事故）：D.4 未提交文檔區（本 UR 擴充＋改動記錄）被整樹回退吃掉，已重建；代碼區同步重驗（見 memory）；待複驗＋合入
+- 2026-10-03：DEF-20261003-004 P1 骨架（`ChatRoomLive.loading`＋`ChatSkeleton`＋loading 期输入禁用；失败分支即灭＋失败文案；tsc／lint 净／457 绿；待亲验，未提交）
 
 UR D.5　推送（a 前台含於 D.3／b 後台推播本期一起）[✓]
 
@@ -2600,6 +2601,37 @@ UR D.7　聊天頁殼重做（會話路由＋v2 全屏＋輸入框固定多行�
 - 2026-09-27：建檔置 []（用戶指令四件；C.15 同文件隊友施工中；待問答定路由方案後置 [WIP]）
 - 2026-09-27：問答定案（用戶拍板：URL 零 id）置 [WIP]；實作完待驗（`/v2/chat/room` 無參＋peer 走 sessionStorage（`lib/chatPeer`＋2 單測）＋無 peer 回列表、舊 `[friendId]` 路由刪除、房＋列表改 fixed 全屏蓋 v1 上下、輸入條吸底＋安全區＋毛玻璃、textarea 自動增高＋Enter 發／Shift+Enter 換行＋組字保護；lint 淨／338 綠／build 綠；待用戶瀏覽器親驗，未提交）
 - 2026-09-27：置 [✓]（用戶指令 mark done；零 id 房＋吸底多行在倉實證（PR #36 聯合提交已合入）；D 驗收由用戶另行批量做）
+
+---
+
+UR D.8　聊天房记录本地缓存＋秒开（SWR）[WIP]
+
+作為用户，我第二次打开和好友的聊天房时，记录立刻出现（不转骨架等网络），后台悄悄补上新消息；没网时也能看上次的内容。
+
+### 背景（DEF-20261003-004 拆出；004 P1 骨架先行，本 UR 管“慢”）
+- 现状 waterfall：`POST 建会话→GET 50 条` 串行＋首屏全量＋零缓存（见 004 分析）
+- 本地不用 localStorage（5MB 配额＋同步阻塞＋`wtd-*` 键混乱史），用 IndexedDB（异步大配额）
+
+### 範圍（v2-only：`lib/chatCache` 新＋`ChatRoomLive` 接线；零 migration／零 API／零新 key）
+1. `lib/chatCache.ts`：`wtd-chat` 库（按 peer 存末 50 条＋`ownerUid`＋`v:1` 版本；`load/save` 全 try/catch，配额/隐私模式 fail-open 走网络）
+2. 纯函数（单测锁）：`mergeCachedMessages`（id 去重＋时间升序＋超限裁 50）／`validateCache`（owner 对不上／版本不对即弃，防跨号串看）／`pruneCache`
+3. 接线：开房先读 peer 缓存（命中即秒开＋`loading=false`，后台 revalidate 合并；未命中沿旧骨架）；`save` 点三处（历史落定／发送成功／Realtime 到行，effect 跟 `messages` 走，幂等复写）
+4. 附件只存描述（path／mime／bytes／secs），播时签名照旧现场换（不存短链，过期即脏）
+
+### 非目標
+- 开房并行（`resolve` 端点，另开 UR；会话已存在仍先 POST 一次，本 UR 不动该 waterfall）
+- 长列表虚拟化（ histories 上百条才值，另议）、离线发送 outbox（架构 §6 口，另议）、E2EE（V2 议题）
+- v1 任何文件
+
+### AC
+- AC1：二次进同一房秒出记录（无骨架），后台合并无闪无重
+- AC2：断网＋有缓存→读上次内容；发送失败走现有重试键
+- AC3：换号登录不串看（owner 门）；无痕／配额满静默降级网络
+- AC4：`chatCache.test.ts` 覆盖合并／裁剪／owner／版本；三闸绿；用户浏览器亲验；`git status` 无 v1
+
+*改動記錄*
+- 2026-10-03：建檔置 []（004 分析定案 b→c→d，本 UR 即 P-b 缓存层；P-c resolve／P-d 虚拟化另议）
+- 2026-10-03：置 [WIP] 实作完待验（`chatCache`＋5 单测＋房接线三件；tsc／lint 净／462 绿；待亲验，未提交）
 
 ---
 
