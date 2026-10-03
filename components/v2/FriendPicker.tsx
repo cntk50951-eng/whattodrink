@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import { Check, Search } from "lucide-react";
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { usePlaceName } from "@/hooks/usePlaceName";
+import { setActivePeer } from "@/lib/chatPeer";
 import type { FriendListItem } from "@/lib/friends";
 import styles from "./v2.module.css";
 
@@ -53,8 +56,8 @@ export function FriendPicker({
   lat: number | null;
   lng: number | null;
   onClose: () => void;
-  /** 发完回调（成功数；调用方 toast＋关）。 */
-  onSent: (n: number) => void;
+  /** 发完回调（成功者 uid＋失败数；调用方去留问＋关）。 */
+  onSent: (result: { ok: string[]; failed: number }) => void;
 }) {
   const t = useTranslations("v2");
   // UR E.13：发送时地名落附件（place 空即反查坐标，Nominatim 措辞与 Extra 同源）。
@@ -119,7 +122,8 @@ export function FriendPicker({
     // 留言即正文（卡片标题同步）；空即店名 snippet 兜底旧端显示。
     const body = message.trim() === "" ? snippet : message.trim().slice(0, 200);
     const sharePlace = (resolvedPlace ?? place).trim().slice(0, 120);
-    let ok = 0;
+    let failed = 0;
+    const okUids: string[] = [];
     let firstError: string | null = null;
     // 逐人单发（失败不挡后人；首错行内显，沿 E.7 banner 口径）。
     for (const uid of selected) {
@@ -169,14 +173,15 @@ export function FriendPicker({
             typeof mJson?.error?.message === "string" ? mJson.error.message : "发送失败",
           );
         }
-        ok += 1;
+        okUids.push(uid);
       } catch (e) {
+        failed += 1;
         if (firstError === null) firstError = e instanceof Error ? e.message : "发送失败";
       }
     }
     setSending(false);
-    if (ok > 0) {
-      onSent(ok);
+    if (okUids.length > 0) {
+      onSent({ ok: okUids, failed });
       onClose();
     } else if (firstError !== null) {
       setBanner(firstError);
@@ -275,5 +280,56 @@ export function FriendPicker({
         </Button>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/**
+ * UR E.13 round-2 分享完成去留问（微信式：成功数＋去聊天／留当前）。
+ * 单人直进房（setActivePeer＋push room，沿列表 openRow 口径），
+ * 多人进列表；部分失败即附數，不挡去留。
+ */
+export function ShareDoneDialog({
+  result,
+  onClose,
+}: {
+  result: { ok: string[]; failed: number } | null;
+  onClose: () => void;
+}) {
+  const t = useTranslations("v2");
+  const locale = useLocale();
+  const router = useRouter();
+  if (result === null) return null;
+  const goChat = (): void => {
+    onClose();
+    if (result.ok.length === 1 && result.ok[0] !== undefined) {
+      setActivePeer(result.ok[0]);
+      router.push(locale === "zh-Hant" ? "/v2/chat/room" : `/${locale}/v2/chat/room`);
+    } else {
+      router.push(locale === "zh-Hant" ? "/v2/chat" : `/${locale}/v2/chat`);
+    }
+  };
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className={`${styles.v2scope} max-w-xs`}>
+        <DialogHeader>
+          <DialogTitle className="text-center">
+            {t("friendPickerSent", { n: result.ok.length })}
+          </DialogTitle>
+        </DialogHeader>
+        {result.failed > 0 && (
+          <p className="text-center text-xs text-muted-foreground">
+            {t("sharePartialFail", { n: result.failed })}
+          </p>
+        )}
+        <div className="flex flex-col gap-2">
+          <Button onClick={goChat} className="w-full">
+            {t("shareGoChat")}
+          </Button>
+          <Button variant="outline" onClick={onClose} className="w-full">
+            {t("shareStay")}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

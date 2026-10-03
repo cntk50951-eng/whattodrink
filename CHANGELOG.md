@@ -27,6 +27,7 @@
   - 后端：`parseCreateMessageBody` text 放行一枚 `checkin_id` 附件＋单测；messages 路由仅自家可分享＋对方须可见（403 明拒）＋跳 path 归属校验；Realtime 回调补附件透传（D.6 缺口顺手修）
   - 接收：列表卡片行（📍＋店名，0020 RPC 加法透 `checkin_id`）；房内 `CheckinCardBubble`＋摘要 Dialog（图文分數時地＋查看完整→`/v2?checkin=` 自开）；openapi 1.6.0
   - 新 key：`checkinShareToFriend/friendPickerTitle-Search-Empty-Send-Sent/checkinViewFull`×3 parity；旧端看分享消息即一行店名（body 兜底）
+  - round-2：發完微信式去留問（`ShareDoneDialog`：成功數＋部分失敗附數；單人直進房、多人進列表，沿列表 openRow 口徑；`shareGoChat/shareStay/sharePartialFail`×3 parity）
 - **UR E.12 打卡評分改他人制＋平均分（v2-only，[WIP]，待 0019＋親驗）**
   - 方向反轉（E.10 作者自評作廢）：`POST .../ratings` 他人寫（作者 403／隱身 403／upsert 覆蓋／null 撤分）；GET 詳情吐 `rating_avg/count/rated_by_me/my_rating`（service 聚合，只吐聚合＋本人行）；舊 PATCH 作者端點刪除；0019 新表（待用戶 Dashboard 貼跑）；0020 另起 drop 舊 `checkins.rating` 列
   - UI：他人卡星級器可投可改＋平均回顯；自家面板只讀平均＋人數；`checkinRateTitle` 改字＋新 `checkinRatingCount`×3 parity；openapi 1.5.0；數據文檔 future-schema 同步

@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { V2Comments } from "@/components/v2/V2Comments";
-import { FriendPicker } from "@/components/v2/FriendPicker";
+import { FriendPicker, ShareDoneDialog } from "@/components/v2/FriendPicker";
 import { CheckinDetailExtra } from "@/components/v2/CheckinDetailExtra";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMyMode } from "@/hooks/useMyMode";
@@ -327,7 +327,8 @@ export function V2Home() {
   const [swapOpen, setSwapOpen] = useState(false);
   const [swapBatch, setSwapBatch] = useState<Beer[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  // UR E.13：他人分支自家卡管理（身份走 GET is_author；删除两段＋站内分享）。
+  // UR E.13 round-2：分享完成去留（成功者 uid＋失败数；单人直进房，多人进列表）。
+  const [shareDone, setShareDone] = useState<{ ok: string[]; failed: number } | null>(null);
   const [otherConfirmDelete, setOtherConfirmDelete] = useState(false);
   const [shareTarget, setShareTarget] = useState<{
     checkinId: string;
@@ -2460,7 +2461,7 @@ export function V2Home() {
         </SheetContent>
       </Sheet>
 
-      {/* UR E.13：站内分享好友选择器（自家两入口共用；发完 toast 人数）。 */}
+      {/* UR E.13：站内分享好友选择器（自家两入口共用；发完去留问）。 */}
       {shareTarget !== null && (
         <FriendPicker
           open
@@ -2470,8 +2471,12 @@ export function V2Home() {
           lat={shareTarget.lat}
           lng={shareTarget.lng}
           onClose={() => setShareTarget(null)}
-          onSent={(n) => flashNote(t2("friendPickerSent", { n }))}
+          onSent={(result) => setShareDone(result)}
         />
+      )}
+      {/* UR E.13 round-2：微信式去留（成功数＋去聊天／留当前）。 */}
+      {shareDone !== null && (
+        <ShareDoneDialog result={shareDone} onClose={() => setShareDone(null)} />
       )}
 
       {/* UR C.11 返工 R-A：記錄目錄 Sheet（目錄；行點即飛＋開 want Sheet 詳情管理） */}
