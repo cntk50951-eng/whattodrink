@@ -2950,6 +2950,45 @@ UR E.8　留言作者通知（站内 Bell，v2）[]
 
 ---
 
+UR E.10　打卡面板互动升级（6 项，主流 App 体验对齐）[WIP]
+
+作為看打卡的人，我要点赞、说“我也想喝”、评论@回复、看酒款评分地点，一切和主流 App 一样顺手。
+
+### 背景（2026-10-03 問答定案：只改 v2／6 項全做／我也想喝僅計數／限流保留）
+- 现状（E.7 落地）：留言区在面板底部、可留可看，但无点赞、无想喝、无评分、无回复、无分享，照片大、输入框不吸底
+- 技术约束：Tabler CDN＋原型自定 token 不引入（离线＋v2scope 铁律），图标一律 lucide 现有件＋v2 token；数据缺口见下（两个 migration）
+
+### 範圍（v2-only；分批提交，一次一范畴）
+1. **头部**：头像＋昵称＋相对时间（`formatWantTime` 沿用）；“保密/公开·24h后消失”收成一行小字；删除收进 `⋯` 菜单（DropdownMenu 现成件，base-ui 口径；两段确认沿用）
+2. **照片**：高度压到约 1/4 屏（`max-h-[25svh] object-cover`），评论区不滑动即露头
+3. **酒信息**：地点名（`place_name` 列优先，空才 `/places/reverse` 反查，失败回坐标沿 UR1.8 诚实口径）＋品牌（`beer_id→beers`，无即藏）＋评分（见 6）＋note 原文
+4. **互动栏**：点赞（`post_likes` 表已有，补 toggle 端点＋计数）、评论数（GET 已有，抬头显总数）、“我也想喝”（`checkin_wants` 新表，PK 去重，仅登录可点，计数只读；推荐反哺另议）、分享（`navigator.share`＋剪贴板回退，纯前端零后端）
+5. **评论区前置＋回复/@一层**：评论区搬酒信息下方；回复＝按钮填 `@昵称 ` 进输入框（文本约定，零 migration，沿 E.7 作者回即正文）；作者章沿用 `is_author`；空态改引导（“还没人评论，问问 TA 在哪喝的”）；限流三档保留，提示缩一行
+6. **吸底输入＋快捷回复＋评分**：输入框 sticky 底＋上方 3 快捷（一键走既有 POST）；匿名提示缩一行小字；评分＝作者给自己这杯打 1–5 星（`checkins.rating` 新列，整数，他人只读；聚合平均以后，不伪造小数）
+7. 三语新 key（`checkinLike/checkinWant/checkinShare/checkinReply*/checkinRate*`，×3 同序 parity）；`home-map.md` 补行；openapi 逐端点补
+
+### 非目標
+- 评论多层 threading（`parent_id` 另议）、赞评论、图片评论、私信、通知（E.8）、v1 任何文件
+- 评分聚合／酒款维度评分（本 UR 只存单帖作者分）
+
+### AC
+- AC1：头/图/酒/互动/评论/输入六段顺序与原型一致，手机一屏见评论头
+- AC2：赞增减±1 且刷新不丢；想喝每人只计一次，匿名点请登录
+- AC3：回复填@发出带名前缀；作者行有作者章；空态是引导文案
+- AC4：快捷点即发（走限流，422 照显）；评分作者可设 1–5，他人只读
+- AC5：三闸绿；用户浏览器亲验；`git status` 无 v1
+
+*改動記錄*
+- 2026-10-03：建檔置 [WIP]（问答四定案；原型 6 项全收；Tabler 不引入已声明；待 migration＋分批实现）
+- 2026-10-03 batch2 点赞端点（`POST /:id/like` toggle＋`lib/api/likes` 纯函数＋3 单测＋openapi 升 1.3.0；`0018` 写 policy 待跑；隐身 403 沿 E.7；待用户跑库＋curl 验）
+- 2026-10-03 batch3 想喝端点（`POST /:id/want` toggle，仅计数不进推荐；RLS 沿 0017 无新 migration；`lib/api/wants`＋3 单测＋openapi 升 1.4.0；隐身 403 沿 E.7；三闸 473 绿；待用户 curl 验）
+- 2026-10-03 batch4 评分＋详情扩展（`PATCH /:id {rating}` 仅作者＋`lib/api/rating` 3 单测；GET 加 created_at／place／coords／beer_name／rating／三计数＋本人态，加法兼容；openapi 补 patch＋字段；三闸 476 绿；端点齐，待 UI batch5）
+- 2026-10-03 batch5 UI 六段（`CheckinDetailExtra`＋`useCheckinDetail` 双面板复用；`V2Comments` 回复@＋快捷＋吸底＋引导空态；照片压 25svh；相对时间；删除进⋯；14 新 key parity 117；set-state-in-effect 修两处＋`Date.now` 换计数器；三闸绿；待亲验，未提交）
+- 2026-10-03 batch6 评论区原型对齐＋DEF-20261003-006（`checkinMore` 命名空间 `t`→`t2` 单行；同文件其余混用 grep 全验；`parseReplyTarget` 纯函数＋2 单测；行重排：大头像／名时同行／嵌套缩进／@高亮／大输入＋实心发送钮；478 绿；待亲验，未提交）
+- 2026-10-03 batch6 round-2 输入区返工（`text-accent` 浅色近白隐形：@名／想喝字全看不见，改 `text-primary`；输入 h-14＋text-base 防 iOS 缩放；发送钮 h-14 实心蓝；Button default 即 bg-primary 未被去色，验过 `button.tsx:11`；待亲验，未提交）
+- 2026-10-03 batch6 round-3 shadcn 底样式打架（DOM 实证：`px-2.5` 挤＋`md:text-sm` 盖 16px＋`size-8` 顶 `h-14`；输入补 `px-5`＋`md:text-base` 逐断点压死；发送钮改原生 button 全显式类，提交走 form onSubmit；待亲验，未提交）
+
+---
 > 生产线 F 新开，主力承载“组局”功能。总体定位：以“每人带一支酒的品酒会”为原型，扩展为主题化小聚引擎（B 主题开放 + C 熟人基座），初期纯信息撮合 + 免责声明 + 公开场所引导（用户自选公开场所，平台建议清单，不指定），后期叠加认证合作场地。MVP 闭环：发布 → 发现（地图+列表）→ 申请 → 审批 → 行前提醒 → 签到 → 互评。法务待复核，PDPO/年龄/免责按 §3 风险矩阵落地。详见 `docs/EPIC_F_GROUP_GATHERING.md` v0.1 与 `docs/F_BACKLOG_DRAFT.md` 草案。
 
 UR F.1　组局发布（最小可用）[WIP]

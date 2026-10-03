@@ -23,6 +23,11 @@
   - 三闸：vitest 457 绿／tsc 净／eslint 2 档净；无新单测（纯 UI 态，沿 D.4 room 口径由浏览器亲验）；数据文档无需更新（零持久化）
   - 待：随本车合入后转 Verified（骨架已亲验；慢与缓存见 D.8，另验）
 ### Added
+- **UR E.10 打卡面板互动升级（v2-only，[WIP]，6 项全收未提交）**
+  - 数据：`0017`（`checkins.rating`＋`checkin_wants`＋三 policy）＋`0018`（`post_likes` owner 写 policy）；`future-schema`＋`home-map` 第十三节同步
+  - 端点：`POST /:id/like`＋`POST /:id/want`（toggle＋计数回显，不可见 404，隐身 403）＋`PATCH /:id {rating}`（仅作者）＋GET 详情加法扩展（计数×3＋本人态＋beer／place／coords／rating）；`lib/api/likes|wants|rating` 纯函数 9 单测；openapi 升 1.4.0
+  - UI：`CheckinDetailExtra`（酒 pills＋互动栏＋作者星评＋分享＋反查）双面板复用；`V2Comments`（回复@＋快捷＋吸底＋引导空态＋匿名短提示）；照片压 25svh；相对时间；删除进⋯；14 新 key×3 parity 117
+  - 三闸：vitest 476 绿／tsc 净／lint 净；待用户浏览器亲验（六段顺序＋赞/想喝±1＋回复@＋快捷＋评分＋分享）
 - **UR D.8 聊天房记录本地缓存＋秒开（v2-only，[WIP]，待亲验未提交）**
   - `lib/chatCache.ts` 新（IndexedDB `wtd-chat` 按 peer 存末 50 条＋owner 门＋`v:1`；附件只存描述；不可用 fail-open）＋`mergeMessageLists/validateCache` 纯函数＋5 单测
   - `ChatRoomLive` 接线（开房先读缓存秒开＋后台 revalidate；开房期 Realtime 行进槽落定时合并；落定后 effect 幂等复写；骨架仅真空房出现）

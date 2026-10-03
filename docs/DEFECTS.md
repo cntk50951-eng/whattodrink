@@ -67,6 +67,7 @@
 | DEF-20261003-003 | 消息列表加载 500 读取会话失败 | Fixed | P0 | 2026-10-03 / @user | UR D.6 | kind enum→text 缺显式转换（42804），0016 已跑＋200 已验，见详情 |
 
 | DEF-20261003-004 | 聊天房进房记录加载慢且无骨架 loading | Fixed | P2 | 2026-10-03 / @user | UR D.4 | 骨架＋输入禁用用户亲验通过，待随车合入，见详情 |
+| DEF-20261003-006 | 打卡面板 ⋯ 菜单 key 命名空间错位炸整树 | Fixed | P0 | 2026-10-03 / @user | UR E.10 | 单行命名空间修正，随本车合入，见详情 |
 
 ### DEF-20261003-004 聊天房进房记录加载慢且无骨架 loading
 
@@ -87,6 +88,22 @@
 - **后续**：P-b 缓存层 UR D.8 已建档实作完待验（秒开＋后台合＋持久化三件，462 绿；见 D.8）；P-c resolve／P-d 虚拟化另议
 - **线上验证阻塞（2026-10-03）**：用户在线上（vercel psi）验无骨架——实证 `d6063f6` 的 Vercel deployment 为 failure（GitHub commit status），线上仍跑旧包；本地 `npm run build` 全绿（路由表完整），排除代码构建问题，剩 Vercel 侧（env／配置）。待用户贴 Vercel 失败日志段定罪（重点找 Missing env／Supabase 未配置字样；10-01 转写 500 即 Vercel 缺 key 前科）
 
+### DEF-20261003-006 打卡面板 ⋯ 菜单 key 命名空间错位炸整树
+
+- **状态**：Fixed（2026-10-03 单行已改＋同文件混用全验，随本车合入；待用户开自家 Sheet 复验转 Verified）
+- **严重度**：P0 阻断（`MISSING_MESSAGE` 炸整棵树，自家 Sheet 打不开）
+- **发现日期 / 报告人**：2026-10-03 / @user
+- **复现步骤**：
+  1. `zh-Hans` 进自家足迹 Sheet（带删除 ⋯ 菜单的分支）
+  2. 整树红屏 `MISSING_MESSAGE: map.checkinMore`
+- **期望**：⋯ 按钮正常渲染
+- **实际**：`V2Home` 的 `t` 是 `map` 命名空间，`checkinMore` 建在 `v2` 下——`t("checkinMore")` 整树炸（next-intl 缺 key 即抛）
+- **初判根因**：同确诊（见下）
+- **确诊根因**：命名空间串了（一字之差 `t` vs `t2`）；同文件其余 `t("checkin…` 零残留已 grep 验。本轮另给 `V2Comments` 补齐原型样式（见 E.10 batch6）
+- **关联 UR**：UR E.10（batch5 收尾补丁）
+- **修复验证**：改 `t2("checkinMore")`＋tsc／lint 过；待用户浏览器复验 Sheet 打开转 Verified；回归：其余 `t(`/`t2(` 用法 grep 全验
+- **回归范围**：自家 Sheet 删除菜单；三语 `checkinMore` 已在（parity 117 时进仓）
+- **回归范围**：`ChatThread` mock 态（`external.loading` 缺省即旧行为）、发送/重试/水位（只加门，不改流）
 ### DEF-20260927-002 locale 根首頁不跳 v2（/zh-Hans 落 v1）
 
 - **状态**：Closed（2026-09-27 用戶驗收通過：七路實測全中，已合入 main）

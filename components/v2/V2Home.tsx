@@ -22,6 +22,7 @@ import {
   Map as MapIcon,
   MapPin,
   Martini,
+  MoreHorizontal,
   Radar,
   RefreshCw,
   Sparkles,
@@ -46,6 +47,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { V2Comments } from "@/components/v2/V2Comments";
+import { CheckinDetailExtra } from "@/components/v2/CheckinDetailExtra";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMyMode } from "@/hooks/useMyMode";
 import { useFriendRelation } from "@/hooks/useFriendRelation";
@@ -59,6 +61,7 @@ import { pickRandomIndex } from "@/lib/reveal";
 import { LOGOUT_CLEAR_EVENT, clearUserLocalCaches } from "@/lib/auth/clear";
 import { displayName } from "@/lib/auth/profile";
 import { setActivePeer } from "@/lib/chatPeer";
+import { formatSeenAgo } from "@/lib/chat";
 import { createClient } from "@/lib/supabase/client";
 import {
   DEFAULT_CENTER,
@@ -332,6 +335,8 @@ export function V2Home() {
     if (noteTimer.current !== null) window.clearTimeout(noteTimer.current);
     noteTimer.current = window.setTimeout(() => setNote(null), 2500);
   }
+  // UR E.10：相对时间锚点（render 内禁 Date.now impure，mount 快照一次，沿列表页口径）。
+  const [nowMs] = useState(() => Date.now());
   // UR D.5：好友列表 pill 角标（用户定案 2026-10-03：任何模式都提醒，只挡匿名；
   // 未读>0 才显，点进列表看红点；新消息即轻提示一下）。
   const { total: bellTotal } = useChatBell(isAuthed === true, () => {
@@ -1988,7 +1993,7 @@ export function V2Home() {
                     </SheetTitle>
                     <SheetDescription>
                       {card.checkedInAt !== null
-                        ? formatWantTime(card.checkedInAt, locale)
+                        ? formatSeenAgo(card.checkedInAt, nowMs, locale)
                         : ""}
                     </SheetDescription>
                   </SheetHeader>
@@ -2023,7 +2028,7 @@ export function V2Home() {
                       src={otherDetail.photoUrl}
                       alt=""
                       loading="lazy"
-                      className="max-h-[46svh] w-full rounded-xl object-cover"
+                      className="max-h-[25svh] w-full rounded-xl object-cover"
                     />
                   ) : (
                     <span className="w-full shrink-0 overflow-hidden rounded-xl border bg-card p-1">
@@ -2067,9 +2072,6 @@ export function V2Home() {
                       ? t("cheersLeft", { n: cheersRemaining(sentIds) })
                       : t("cheersLimitReached")}
                   </span>
-                  {card.drink !== "" && (
-                    <p className="text-sm text-muted-foreground">🍺 {card.drink}</p>
-                  )}
                   <div className="flex flex-col gap-1.5 text-sm">
                     {card.sub !== "" && (
                       <span className="flex items-center gap-1.5">
@@ -2089,9 +2091,21 @@ export function V2Home() {
                       </span>
                     )}
                   </div>
+                  {/* UR E.10：酒 pills＋互动栏（DB 真行才挂；品牌／评分／地点＋赞／评数／想喝／分享，沿原型 §3–4）。 */}
+                  {apiPins.some((p) => p.id === card.id) ? (
+                    <CheckinDetailExtra
+                      checkinId={card.id}
+                      fallbackBeerName={card.drink === "" ? null : card.drink}
+                      fallbackPlace={card.sub === "" ? null : card.sub}
+                      lat={card.lat}
+                      lng={card.lng}
+                      canRate={false}
+                      commentsAnchorId="v2c-other"
+                    />
+                  ) : null}
                   {/* UR E.7：留言（真釘才有 DB id；MOCK 無行不掛）。 */}
                   {apiPins.some((p) => p.id === card.id) ? (
-                    <V2Comments checkinId={card.id} />
+                    <V2Comments checkinId={card.id} anchorId="v2c-other" />
                   ) : null}
                   {/* UR E.2：他人三件套（詳情按需拉；照片已上移主视觉，此处只剩文字——IG 式 caption 紧贴照片下）。 */}
                   {otherDetail?.audioUrl ? (
@@ -2139,7 +2153,7 @@ export function V2Home() {
                     <Badge variant="outline">{t(GENDER_KEY[MOCK_ME.gender])}</Badge>
                     <Badge variant="secondary">{modeLabel}</Badge>
                   </SheetTitle>
-                  <SheetDescription>{formatWantTime(rec.at, locale)}</SheetDescription>
+                  <SheetDescription>{formatSeenAgo(rec.at, nowMs, locale)}</SheetDescription>
                 </SheetHeader>
                 <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
@@ -2168,7 +2182,7 @@ export function V2Home() {
                   <img
                     src={rec.photoDataUrl}
                     alt=""
-                    className="max-h-[46svh] w-full rounded-xl object-cover"
+                    className="max-h-[25svh] w-full rounded-xl object-cover"
                   />
                 ) : (
                   <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
@@ -2189,6 +2203,18 @@ export function V2Home() {
                   )}
                   <span className="text-xs text-muted-foreground">{t("wantFrozenNote")}</span>
                 </div>
+                {/* UR E.10：酒 pills＋互动栏＋作者评分（DB 真行才挂；自家可设星，他人只读）。 */}
+                {rec.id !== undefined && rec.id !== "" ? (
+                  <CheckinDetailExtra
+                    checkinId={rec.id}
+                    fallbackBeerName={fresh?.name ?? null}
+                    fallbackPlace={rec.placeName ?? null}
+                    lat={rec.position.lat}
+                    lng={rec.position.lng}
+                    canRate
+                    commentsAnchorId="v2c-self"
+                  />
+                ) : null}
                 {rec.audio && (
                   <audio controls src={rec.audio.url} className="h-9 w-full" />
                 )}
@@ -2212,20 +2238,31 @@ export function V2Home() {
                       {t("confirmDelete")}
                     </Button>
                   ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground"
-                      onClick={() => setConfirmDelete(true)}
-                    >
-                      <Trash2 size={15} aria-hidden />
-                      {t("deleteEntry")}
-                    </Button>
+                    /* UR E.10：删除收进 ⋯ 菜单（原型 §1；两段确认沿用，确认行不变）。 */
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        aria-label={t2("checkinMore")}
+                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+                      >
+                        <MoreHorizontal size={16} aria-hidden />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className={styles.v2scope}>
+                        <DropdownMenuGroup>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => setConfirmDelete(true)}
+                          >
+                            <Trash2 size={15} aria-hidden />
+                            {t("deleteEntry")}
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
                 {/* UR E.7：留言（mine 回顯有 DB id 才掛；本地單機記錄無行不掛）。 */}
                 {rec.id !== undefined && rec.id !== "" ? (
-                  <V2Comments checkinId={rec.id} />
+                  <V2Comments checkinId={rec.id} anchorId="v2c-self" />
                 ) : null}
                 {swapOpen && (
                   <div>
