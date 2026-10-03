@@ -8,6 +8,7 @@ import {
   overWindowLimit,
   parseCommentBody,
   parseCommentsParams,
+  parseReplyTarget,
   rawAnonIdOf,
   toCommentJson,
   withViewerFlags,
@@ -180,5 +181,18 @@ describe("withViewerFlags", () => {
     const j = withViewerFlags(toCommentJson(userRow)!, null, "u1", null);
     expect(j.is_author).toBe(true);
     expect(j.is_mine).toBe(false);
+  });
+});
+
+describe("parseReplyTarget", () => {
+  it("@名前缀即归属该名", () => {
+    expect(parseReplyTarget("@Amy 就在湾仔")).toBe("Amy");
+    expect(parseReplyTarget("@匿名·AB12 你好")).toBe("匿名·AB12");
+  });
+  it("无前缀／空名／非串回 null（顶层行）", () => {
+    expect(parseReplyTarget("哪里喝的？")).toBeNull();
+    expect(parseReplyTarget("@ 孤儿")).toBeNull();
+    expect(parseReplyTarget("@Amy")).toBeNull();
+    expect(parseReplyTarget(null)).toBeNull();
   });
 });

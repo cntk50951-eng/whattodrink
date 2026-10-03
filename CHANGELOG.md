@@ -5,6 +5,9 @@
 ## [Unreleased]
 
 ### Fixed
+- **DEF-20261003-004 打卡面板佔滿屏＋關閉鈕不可見（v2-only，重做中；關聯 UR E.10）**
+  - 回滚前 batch7 固定高＋丢 `max-h` 上限致面板超視口（已隨 bfc08f7 回滚下線）；重做取 dd73920 形（batch6）＋三樣帶修：`max-h-[85svh]` 上限保留、in-flow 常駐關閉行（默認角落 X 關掉防疊字）、`initialFocus={false}` 保開即頂部；固定頭／半屏展開不再引入
+  - 端點＋migration 文件（0017／0018，DB 已跑過，僅回倉對齊）＋三語 key 全數撿回；用戶手機親驗通過，隨本車合入
 - **DEF-20261003-002 Bell 门禁＋列表即时（v2-only，已合入 main，用户亲验通过）**
   - 确诊：远端 `GET /conversations` 200 且 `unread:1`，服务端正常——Bell 不出因 `useChatBell(presence==="online")` 被模式门挡（`mode===null` 加载窗 fail-closed 为 stealth；隐身恒挡），首页全程无该请求；列表红点不翻因首载一次性、无订阅无回焦刷新
   - 用户定案：任何模式都提醒，只挡匿名——`V2Home` 改 `useChatBell(isAuthed===true)`（渲染侧本就只认 `isAuthed`，数据侧对齐；心跳／live 好友仍走 presence 门不动）；hook 注释同步

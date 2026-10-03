@@ -2918,6 +2918,36 @@ UR E.8　留言作者通知（站内 Bell，v2）[]
 
 ---
 
+UR E.10　打卡面板互动升级（6 项，主流 App 体验对齐）[✓]
+
+> E.9 号预留同事快贴烧毁线（未进仓）；本 UR 编号沿用回滚前既定 E.10。
+
+作為打卡的人，我希望點開打卡面板能讚／想喝／評分／分享／看留言，一眼看全且隨時關得掉。
+
+### 背景（2026-10-03 重做：回滚后重建）
+- 回滚前 batch7（b3d7b1d）固定高 `h-[75svh]/[92svh]`＋丢 `max-h` 上限，`cn()` 合并压不过 `sheet.tsx` 的 `data-[side=bottom]:h-auto`，面板超视口顶出关闭钮（DEF-20261003-004，已回滚下线）。
+- 重做取 dd73920 形（batch6，用戶親驗過的六段顺序）＋三樣帶修：`max-h-[85svh]` 上限保留、in-flow 常駐關閉行、`initialFocus={false}`（DEF-20261003-007）；固定照片頭／半屏展開（batch7）不再引入。
+
+### 範圍（v2-only）
+1. **端點**：`POST .../like`、`POST .../want`、`PATCH ...`（rating 1–5｜null，僅作者）、GET 詳情擴展（`like_count/liked_by_me/want_count/wanted_by_me/comment_count/beer_name/rating`）；migration 0017（`checkins.rating`＋`checkin_wants` 表）／0018（`post_likes` 寫 policy）——DB 已跑過，文件僅回倉對齊。
+2. **UI**：`CheckinDetailExtra`（酒 pills＋互動欄＋作者星級＋分享）自家／他人兩 Sheet 同構挂載；`V2Comments` batch6 形（IG 式行＋快捷回覆）；`useCheckinDetail` 樂觀 ±1＋失敗回滾。
+3. **出口**：in-flow 關閉行（抓手＋X，默認角落 X 關掉防疊字）＋`max-h` 上限＋關搶焦；E.7 留言／評論數往返跳沿用。
+4. 新 key（parity 三檔）：`checkinWant/checkinWantLogin/checkinShare/checkinShareCopied/checkinReply/checkinRateTitle/checkinRateClear/checkinQuickWhere/checkinQuickJoin/commentEmptyGuide/commentAnonShort/checkinMore/checkinLikeCount/checkinCommentCount`
+
+### 非目標
+- 固定頭／半屏展開／回覆折疊（batch7，陷阱設計，不再引入）、讚評論／長按菜單（仍排除）、Web Push（D.5b 另期）、v1 任何文件。
+
+### AC
+- AC1：面板六段顺序（頭→酒 pills→評分→互動欄→留言→三件套）＋讚／想喝 ±1＋快捷回覆＋作者評分＋分享
+- AC2：面板永不超視口（`max-h` 上限）＋頂部常駐 X 隨時可關＋打開即頂部（關搶焦）
+- AC3：三閘綠（高風險改動全跑）＋用戶手機瀏覽器親驗＋`git status` 無 v1
+
+*改動記錄*
+- 2026-10-03：建檔置 [WIP]（回滚 bfc08f7 后重建；取 dd73920 形＋出口三樣帶修；關聯 DEF-20261003-004）
+- 2026-10-03：用戶手機親驗通過（半屏＋常駐 X＋六段＋讚／想喝／評分／分享）置 [✓]，DEF-20261003-004 同步轉 Fixed，隨本車合入
+
+---
+
 > 生产线 F 新开，主力承载“组局”功能。总体定位：以“每人带一支酒的品酒会”为原型，扩展为主题化小聚引擎（B 主题开放 + C 熟人基座），初期纯信息撮合 + 免责声明 + 公开场所引导（用户自选公开场所，平台建议清单，不指定），后期叠加认证合作场地。MVP 闭环：发布 → 发现（地图+列表）→ 申请 → 审批 → 行前提醒 → 签到 → 互评。法务待复核，PDPO/年龄/免责按 §3 风险矩阵落地。详见 `docs/EPIC_F_GROUP_GATHERING.md` v0.1 与 `docs/F_BACKLOG_DRAFT.md` 草案。
 
 UR F.1　组局发布（最小可用）[WIP]

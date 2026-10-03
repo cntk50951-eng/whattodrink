@@ -408,7 +408,22 @@
     "commentDelete": "删除留言",
     "commentDeleteConfirm": "确认删？",
     "commentAuthor": "作者",
-    "commentMe": "·我"
+    "commentMe": "·我",
+    "checkinWant": "我也想喝",
+    "checkinWantLogin": "登录后才能“想喝”",
+    "checkinShare": "分享",
+    "checkinShareCopied": "已复制链接",
+    "checkinReply": "回复",
+    "checkinRateTitle": "我的评分",
+    "checkinRateClear": "清除",
+    "checkinQuickWhere": "求地点",
+    "checkinQuickJoin": "下次一起",
+    "commentEmptyGuide": "还没人评论，问问 TA 在哪喝的",
+    "commentAnonShort": "匿名留言 · 登录后显示名字",
+    "checkinMore": "更多",
+    "checkinLikeCount": "赞 {n}",
+    "checkinCommentCount": "评论 {n}",
+    "loginHint": "登入查看你的足跡"
   },
   "gatherings": {
     "newTitle": "发起组局",

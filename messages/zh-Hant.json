@@ -408,7 +408,22 @@
     "commentDelete": "刪除留言",
     "commentDeleteConfirm": "確認刪？",
     "commentAuthor": "作者",
-    "commentMe": "·我"
+    "commentMe": "·我",
+    "checkinWant": "我都想飲",
+    "checkinWantLogin": "登入後先可以「想飲」",
+    "checkinShare": "分享",
+    "checkinShareCopied": "已複製連結",
+    "checkinReply": "回覆",
+    "checkinRateTitle": "我的評分",
+    "checkinRateClear": "清除",
+    "checkinQuickWhere": "求地點",
+    "checkinQuickJoin": "下次一起",
+    "commentEmptyGuide": "仲未有人留言，問下 TA 喺邊度飲",
+    "commentAnonShort": "匿名留言 · 登入後顯示名",
+    "checkinMore": "更多",
+    "checkinLikeCount": "讚 {n}",
+    "checkinCommentCount": "評論 {n}",
+    "loginHint": "登入查看你的足跡"
   },
   "gatherings": {
     "newTitle": "發起組局",

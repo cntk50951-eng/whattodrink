@@ -52,6 +52,8 @@ UI 全确定后按此开工 EPIC 3.0 真表设计。
 - `post_likes(post_id, user_id, created_at)` —— UR4.1 公開牆讚（唯一鍵防重讚，
   計數實時 `count`，不存列；24h 熱門＝`created_at` 範圍查＋索引）。前端
   mock（`wtd-wall-my-posts`＋`wtd-wall-overrides`）屆時整塊刪
+- `checkin_wants(checkin_id, user_id, created_at)` —— **UR E.10 “我也想喝”计数（0017 已跑）**：PK 双列天然去重一人一次；仅登录可写（匿名由路由 403）；计数实时 `count`，不进推荐（反哺另议）；读沿 post_likes 公开帖口径
+- `checkins.rating` —— **UR E.10 评分（0017 已跑）**：作者给自己这杯打 1–5 整数星，可空；他人只读（owner update 旧 policy 覆盖，无新 policy）；聚合平均以后
 - `post_reports(post_id, reporter_id, reason, created_at)` —— UR4.1 檢舉
   （V1 口徑：被檢舉即前端隱藏；多檢舉升級走 EPIC 3.0 審核隊列，不在 V1 設計）
 - `conversations(id, type, direct_key, created_at, expires_at)` —— **EPIC D 聊天（0012 已建，UI 殼先行 mock）**：首期 direct，`direct_key`（min|max）1v1 去重唯一；`expires_at`＝末條＋90d，讀時懶刪；group 預留 type 不動行

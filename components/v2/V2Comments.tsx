@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import type { CommentJson } from "@/lib/api/comments";
+import { parseReplyTarget } from "@/lib/api/comments";
 import { formatWantTime } from "@/lib/wantRecord";
 
 /**
@@ -17,7 +18,7 @@ import { formatWantTime } from "@/lib/wantRecord";
  * 匿名展示 `匿名·短號`，登入展示暱稱（缺行回 `酒友·前4`）。
  * 刪除鍵全行可見但服務端把關（本人／帖作者才刪得掉，無 session 辨身份是 MVP 誠實口徑）。
  */
-export function V2Comments({ checkinId }: { checkinId: string }): React.JSX.Element {
+export function V2Comments({ checkinId, anchorId }: { checkinId: string; anchorId?: string }): React.JSX.Element {
   const t = useTranslations("v2");
   const locale = useLocale();
   const [comments, setComments] = useState<CommentJson[]>([]);
@@ -29,6 +30,11 @@ export function V2Comments({ checkinId }: { checkinId: string }): React.JSX.Elem
   const [banner, setBanner] = useState<string | null>(null);
   const [arming, setArming] = useState<string | null>(null);
   const seq = useRef(0);
+  const sendSeq = useRef(0);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // UR E.10：一层回复（文本约定零 migration）：填 `@名 ` 进框＋聚焦，发出即带名前缀；
+  // 作者回即正文沿 E.7（作者章已在行上，对话感不靠 thread 结构）。
 
   const load = useCallback(
     async (next: string | null, append: boolean) => {
@@ -86,12 +92,17 @@ export function V2Comments({ checkinId }: { checkinId: string }): React.JSX.Elem
   }, [checkinId, load]);
 
   const send = async (): Promise<void> => {
-    const text = draft.trim();
+    await sendText(draft);
+  };
+
+  // UR E.10：快捷回复走同一发送核（限流／审核／乐观占位全沿用，不另起路径）。
+  const sendText = async (raw: string): Promise<void> => {
+    const text = raw.trim();
     if (text === "" || sending) return;
     setSending(true);
     setBanner(null);
-    // 樂觀占位：先上 pulse 行（pending id 本地唯一，不進翻頁 cursor）。
-    const pendingId = `pending-${Date.now()}`;
+    // 樂觀占位：先上 pulse 行（pending id 计数器唯一，同毫秒连点不重键，不進翻頁 cursor）。
+    const pendingId = `pending-${++sendSeq.current}`;
     const optimistic: CommentJson = {
       id: pendingId,
       checkin_id: checkinId,
@@ -170,8 +181,14 @@ export function V2Comments({ checkinId }: { checkinId: string }): React.JSX.Elem
     return Number.isFinite(ms) ? formatWantTime(ms, locale) : "";
   };
 
+  // UR E.10 回复（见 helpers 注释）：填 @名＋聚焦，发出即带名前缀。
+  const replyTo = (c: CommentJson): void => {
+    setDraft(`@${nameOf(c)} `);
+    inputRef.current?.focus();
+  };
+
   return (
-    <div className="flex flex-col gap-2.5 border-t pt-3">
+    <div id={anchorId} className="flex scroll-mt-2 flex-col gap-2.5 border-t pt-3">
       <p className="text-sm font-bold">
         {t("commentTitle")}
         {comments.length > 0 && (
@@ -191,22 +208,39 @@ export function V2Comments({ checkinId }: { checkinId: string }): React.JSX.Elem
           ))}
         </div>
       ) : comments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("commentEmpty")}</p>
+        <p className="text-sm text-muted-foreground">{t("commentEmptyGuide")}</p>
       ) : (
-        <div className="flex max-h-64 flex-col gap-1 overflow-y-auto">
-          {comments.map((c) => {
+        <div className="flex max-h-72 flex-col gap-3 overflow-y-auto">
+          {comments.map((c, i) => {
             const pending = c.id.startsWith("pending-");
+            // 一层回复归属：@名 取最近上文同名（零 migration 的对话感，见 E.10）。
+            const target = pending ? null : parseReplyTarget(c.body);
+            let nested = false;
+            if (target !== null) {
+              for (let j = i - 1; j >= 0; j--) {
+                const pj = comments[j];
+                if (!pj.id.startsWith("pending-") && nameOf(pj) === target) {
+                  nested = true;
+                  break;
+                }
+              }
+            }
+            const rest = nested && target !== null ? c.body.slice(target.length + 2) : c.body;
             return (
               <div
                 key={c.id}
-                className={`flex items-start gap-2 rounded-xl px-1 py-1.5 ${
+                className={`flex items-start gap-2.5 rounded-xl px-1 py-1 ${
+                  nested ? "ml-12" : ""
+                } ${
                   // 本人的行淡底（token 透明度，不新增色值）；pending 行呼吸占位。
                   c.is_mine ? "bg-primary/[0.05]" : ""
                 } ${pending ? "motion-safe:animate-pulse" : ""}`}
               >
                 <span
                   aria-hidden
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                  className={`flex shrink-0 items-center justify-center rounded-full font-bold ${
+                    nested ? "h-7 w-7 text-[11px]" : "h-11 w-11 text-sm"
+                  } ${
                     c.is_author
                       ? "bg-secondary text-secondary-foreground"
                       : "bg-muted text-muted-foreground"
@@ -215,7 +249,11 @@ export function V2Comments({ checkinId }: { checkinId: string }): React.JSX.Elem
                   {avatarOf(c)}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs">
+                  <p
+                    className={`flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 ${
+                      nested ? "text-[13px]" : "text-[15px]"
+                    }`}
+                  >
                     <span className="truncate font-bold">{nameOf(c)}</span>
                     {/* DEF-20261003-001：作者章（all 人可见，小红书／IG 同款）＋本人「我」標。 */}
                     {c.is_author && (
@@ -234,7 +272,25 @@ export function V2Comments({ checkinId }: { checkinId: string }): React.JSX.Elem
                       </span>
                     )}
                   </p>
-                  <p className="break-words pt-0.5 text-sm leading-relaxed">{c.body}</p>
+                  <p
+                    className={`break-words pt-0.5 leading-relaxed ${
+                      nested ? "text-sm" : "text-[15px]"
+                    }`}
+                  >
+                    {nested && target !== null && (
+                      <span className="text-primary">@{target} </span>
+                    )}
+                    {rest}
+                  </p>
+                  {!pending && (
+                    <button
+                      type="button"
+                      onClick={() => replyTo(c)}
+                      className="mt-0.5 w-fit shrink-0 rounded px-1 py-0.5 text-xs text-muted-foreground opacity-70 transition-opacity hover:text-foreground hover:opacity-100 focus-visible:opacity-100"
+                    >
+                      {t("checkinReply")}
+                    </button>
+                  )}
                 </div>
                 {!pending && (
                   <button
@@ -267,9 +323,25 @@ export function V2Comments({ checkinId }: { checkinId: string }): React.JSX.Elem
           {banner}
         </p>
       )}
-      <div className="flex items-center gap-2">
-        <Input
-          value={draft}
+      {/* UR E.10：吸底输入（sticky 贴面板滚动底；快捷一键走 sendText 同核；匿名提示缩一行）。 */}
+      <div className="sticky bottom-0 z-10 -mb-1 bg-background/95 pt-2 pb-1 backdrop-blur">
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {[t("checkinWant"), t("checkinQuickWhere"), t("checkinQuickJoin")].map((q) => (
+            <button
+              key={q}
+              type="button"
+              onClick={() => void sendText(q)}
+              disabled={sending}
+              className="shrink-0 rounded-full border px-4 py-1.5 text-[13px] text-muted-foreground transition-opacity hover:text-foreground disabled:opacity-50"
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2.5">
+          <Input
+            ref={inputRef}
+            value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") void send();
@@ -278,23 +350,24 @@ export function V2Comments({ checkinId }: { checkinId: string }): React.JSX.Elem
           aria-label={t("commentPlaceholder")}
           maxLength={500}
           disabled={sending}
-          className="min-w-0 flex-1 rounded-full"
+          className="h-14 min-w-0 flex-1 rounded-full px-5 text-base md:text-base"
         />
-        <Button
-          size="icon"
-          onClick={() => void send()}
+        {/* UR E.10：发送用原生 button（shadcn size-8 会和 h-14 打架，见本轮；语义 token 照用；提交走 form onSubmit）。 */}
+        <button
+          type="submit"
           disabled={sending || draft.trim() === ""}
           aria-label={t("commentSend")}
-          className="h-9 w-9 shrink-0 rounded-full"
+          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition hover:bg-primary/80 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-50"
         >
           {sending ? (
-            <LoaderCircle size={16} aria-hidden className="motion-safe:animate-spin" />
+            <LoaderCircle size={20} aria-hidden className="size-5 motion-safe:animate-spin" />
           ) : (
-            <Send size={16} aria-hidden />
+            <Send size={20} aria-hidden className="size-5" />
           )}
-        </Button>
+        </button>
       </div>
-      <p className="text-xs text-muted-foreground">{t("commentAnonHint")}</p>
+      <p className="pt-1 text-xs text-muted-foreground">{t("commentAnonShort")}</p>
+      </div>
     </div>
   );
 }
