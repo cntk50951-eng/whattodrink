@@ -34,11 +34,6 @@ export type ChatExternalSource = {
   onRetry?: (id: string) => void;
   /** UR D.4：對方讀水位 ms（我方行 at<=水位即✓✓；null 即沿舊 mock read 旗）。 */
   readAt?: number | null;
-  /**
-   * DEF-20261003-004：开房加载中（父層建會話＋拉歷史未落定）。
-   * 真即骨架＋輸入禁用；缺省即旧行为（mock 态不受影响）。
-   */
-  loading?: boolean;
   /** UR D.6：附件上傳（父層簽名→直傳→發送；mock 態不傳即藏附件鍵）。 */
   onUpload?: (
     kind: "image" | "audio",
@@ -114,22 +109,6 @@ export function ChatAttachmentBubble({ att }: { att: ChatAttachmentView }) {
 }
 
 /**
- * DEF-20261003-004：线程骨架（开房加载期占位；左右交错气泡形，
- * 沿列表骨架 `animate-pulse＋bg-muted` 口径；`motion-safe` 包动画，
- * reduced-motion 下静止；aria-hidden 不进读屏）。
- */
-function ChatSkeleton() {
-  return (
-    <div className="flex flex-col gap-2" aria-hidden>
-      <span className="h-9 w-3/5 rounded-2xl rounded-bl-md bg-muted motion-safe:animate-pulse" />
-      <span className="h-9 w-2/5 self-end rounded-2xl rounded-br-md bg-muted motion-safe:animate-pulse" />
-      <span className="h-14 w-4/5 rounded-2xl rounded-bl-md bg-muted motion-safe:animate-pulse" />
-      <span className="h-9 w-1/2 self-end rounded-2xl rounded-br-md bg-muted motion-safe:animate-pulse" />
-    </div>
-  );
-}
-
-/**
  * UR C.15 聊天線程（v2 共用件：完整頁與舊 Sheet 同源；Sheet 已退役，現只掛完整頁）。
  * 真通道未建——發送／say-hi 一律本地樂觀追加（會話態，不持久化不寫庫），
  * 語音走 `onVoice`（父層提示，沿 addFriendSoon 口徑）；通道另開 C-chat-2。
@@ -174,8 +153,6 @@ export function ChatThread({
 
   // 受控源開關：external 在即渲染父層消息（D.3 真通道），否則沿舊本地 mock。
   const shown = external?.messages ?? messages;
-  // DEF-20261003-004：加载中（只可能来自真通道；mock 态 external.loading 缺省即 false）。
-  const loading = external?.loading === true;
 
   useEffect(() => {
     seqRef.current = 0;
@@ -190,7 +167,7 @@ export function ChatThread({
 
   function send(text: string): void {
     const body = text.trim();
-    if (body === "" || loading) return;
+    if (body === "") return;
     if (external !== null) {
       external.onSend(body);
       setDraft("");
@@ -221,10 +198,7 @@ export function ChatThread({
             <span className="text-xs text-muted-foreground">{t2("chatToday")}</span>
             <span className="h-px flex-1 bg-border" />
           </div>
-          {loading && shown.length === 0 ? (
-            <ChatSkeleton />
-          ) : (
-            shown.map((m) =>
+          {shown.map((m) =>
             m.role === "me" ? (
               <div key={m.id} className="flex flex-col items-end gap-0.5">
                 {(m.attachments ?? []).map((att, i) => (
@@ -272,13 +246,13 @@ export function ChatThread({
                 </div>
               </div>
             ),
-          ))}
+          )}
           <div ref={endRef} aria-hidden />
         </div>
       </ScrollArea>
 
       <div className="flex shrink-0 flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={() => send("👋")} disabled={loading}>
+        <Button variant="outline" size="sm" onClick={() => send("👋")}>
           {t2("chatHi")}
         </Button>
       </div>
@@ -355,7 +329,6 @@ export function ChatThread({
           rows={1}
           aria-label={t2("chatPlaceholder")}
           value={draft}
-          disabled={loading}
           onChange={(e) => {
             setDraft(e.target.value);
             autoresize();
@@ -374,7 +347,6 @@ export function ChatThread({
           variant="outline"
           size="icon"
           aria-label={t2("chatSend")}
-          disabled={loading}
           className="shrink-0 rounded-full"
         >
           <Send size={16} aria-hidden className="size-4" />

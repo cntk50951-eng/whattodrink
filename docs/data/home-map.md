@@ -96,11 +96,3 @@
 | 留言行 | v2 自家 Sheet／他人卡底部 `V2Comments` | `CommentJson[]`（`lib/api/comments.ts`，user 帶暱稱／anon 帶短號） | `GET /checkins/:id/comments`（keyset 翻頁；public 直讀，非公開沿 `canViewCheckin`） | `checkin_comments`（0015；`checkin_id` 級聯，`user_id`／`anon_id` 二選一） |
 | `wtd-anon`（匿名身份） | 首評 Set-Cookie | uuid（httpOnly，1 年） | 服務端 mint（首評 `POST` 回）；IP 哈希墊底同行記庫 | 不進端上 localStorage（cookie）；庫側 `anon_id`＋`anon_ip_hash`（SHA256＋salt，不存原文） |
 | 留言草稿／列表／banner | `V2Comments` 內 state | 會話（切帖重置） | state | 不進庫（运行时态） |
-
-## 十三、打卡互动（UR E.10：赞／想喝／评分／计数）
-
-| 字段 | 页面位置 | 类型 | 当前来源 | 未来表映射 |
-|---|---|---|---|---|
-| 赞行／计数 | 两面板 `CheckinDetailExtra` 互动栏（红心＋数，乐观 ±1） | `post_likes(post_id, user_id)`（双列 PK 防重） | `POST /checkins/:id/like` toggle；计数读 `GET /checkins/:id`（`like_count`＋`liked_by_me`） | `post_likes`（0001 建表，0018 补 owner 写 policy；计数实时算不存列） |
-| 想喝行／计数 | 同上（`checkinWant` 钮＋数，乐观 ±1；仅计数不进推荐） | `checkin_wants(checkin_id, user_id)`（双列 PK） | `POST /checkins/:id/want` toggle；计数读详情（`want_count`＋`wanted_by_me`） | `checkin_wants`（0017 新表＋三 policy；推荐反哺另议） |
-| 评分 | 作者 pills 星 Pill（他人只读）＋自家 5 星设置器 | `checkins.rating`（1–5 整数可空） | 读详情 `rating`；写 `PATCH /checkins/:id`（仅作者，404 不泄归属） | `checkins.rating`（0017 新列；聚合平均以后） |

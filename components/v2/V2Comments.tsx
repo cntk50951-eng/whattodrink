@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import type { CommentJson } from "@/lib/api/comments";
-import { parseReplyTarget } from "@/lib/api/comments";
 import { formatWantTime } from "@/lib/wantRecord";
 
 /**
@@ -18,7 +17,7 @@ import { formatWantTime } from "@/lib/wantRecord";
  * 匿名展示 `匿名·短號`，登入展示暱稱（缺行回 `酒友·前4`）。
  * 刪除鍵全行可見但服務端把關（本人／帖作者才刪得掉，無 session 辨身份是 MVP 誠實口徑）。
  */
-export function V2Comments({ checkinId, anchorId }: { checkinId: string; anchorId?: string }): React.JSX.Element {
+export function V2Comments({ checkinId }: { checkinId: string }): React.JSX.Element {
   const t = useTranslations("v2");
   const locale = useLocale();
   const [comments, setComments] = useState<CommentJson[]>([]);
@@ -30,11 +29,6 @@ export function V2Comments({ checkinId, anchorId }: { checkinId: string; anchorI
   const [banner, setBanner] = useState<string | null>(null);
   const [arming, setArming] = useState<string | null>(null);
   const seq = useRef(0);
-  const sendSeq = useRef(0);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  // UR E.10：一层回复（文本约定零 migration）：填 `@名 ` 进框＋聚焦，发出即带名前缀；
-  // 作者回即正文沿 E.7（作者章已在行上，对话感不靠 thread 结构）。
 
   const load = useCallback(
     async (next: string | null, append: boolean) => {
@@ -92,17 +86,12 @@ export function V2Comments({ checkinId, anchorId }: { checkinId: string; anchorI
   }, [checkinId, load]);
 
   const send = async (): Promise<void> => {
-    await sendText(draft);
-  };
-
-  // UR E.10：快捷回复走同一发送核（限流／审核／乐观占位全沿用，不另起路径）。
-  const sendText = async (raw: string): Promise<void> => {
-    const text = raw.trim();
+    const text = draft.trim();
     if (text === "" || sending) return;
     setSending(true);
     setBanner(null);
-    // 樂觀占位：先上 pulse 行（pending id 计数器唯一，同毫秒连点不重键，不進翻頁 cursor）。
-    const pendingId = `pending-${++sendSeq.current}`;
+    // 樂觀占位：先上 pulse 行（pending id 本地唯一，不進翻頁 cursor）。
+    const pendingId = `pending-${Date.now()}`;
     const optimistic: CommentJson = {
       id: pendingId,
       checkin_id: checkinId,
@@ -181,138 +170,8 @@ export function V2Comments({ checkinId, anchorId }: { checkinId: string; anchorI
     return Number.isFinite(ms) ? formatWantTime(ms, locale) : "";
   };
 
-  // UR E.10 回复（见 helpers 注释）：填 @名＋聚焦，发出即带名前缀。
-  const replyTo = (c: CommentJson): void => {
-    setDraft(`@${nameOf(c)} `);
-    inputRef.current?.focus();
-  };
-  // UR E.10 batch7 回复折叠（启发式一层：@名挂最近上文同名；默认折“展开 N 条”，点开展示）：
-  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set());
-  const toggleExpanded = (id: string): void => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-  type Thread = { top: CommentJson; kids: CommentJson[] };
-  const threads: Thread[] = [];
-  {
-    const topIndexById = new Map<string, number>();
-    comments.forEach((c) => {
-      if (c.id.startsWith("pending-")) {
-        topIndexById.set(c.id, threads.length);
-        threads.push({ top: c, kids: [] });
-        return;
-      }
-      const target = parseReplyTarget(c.body);
-      let parent = -1;
-      if (target !== null) {
-        for (let j = threads.length - 1; j >= 0; j--) {
-          const t = threads[j].top;
-          if (!t.id.startsWith("pending-") && nameOf(t) === target) {
-            parent = j;
-            break;
-          }
-        }
-      }
-      if (parent === -1) {
-        topIndexById.set(c.id, threads.length);
-        threads.push({ top: c, kids: [] });
-      } else {
-        threads[parent].kids.push(c);
-      }
-    });
-  }
-
-  // 行渲染（nested 即缩进小字＋@高亮；抽出供折叠复用，pending 永不嵌套）。
-  const renderRow = (c: CommentJson, nested: boolean): React.JSX.Element => {
-    const pending = c.id.startsWith("pending-");
-    const target = parseReplyTarget(c.body);
-    const rest = nested && target !== null ? c.body.slice(target.length + 2) : c.body;
-    return (
-      <div
-        key={c.id}
-        className={`flex items-start gap-2.5 rounded-xl px-1 py-1 ${
-          nested ? "ml-12" : ""
-        } ${
-          // 本人的行淡底（token 透明度，不新增色值）；pending 行呼吸占位。
-          c.is_mine ? "bg-primary/[0.05]" : ""
-        } ${pending ? "motion-safe:animate-pulse" : ""}`}
-      >
-        <span
-          aria-hidden
-          className={`flex shrink-0 items-center justify-center rounded-full font-bold ${
-            nested ? "h-7 w-7 text-[11px]" : "h-11 w-11 text-sm"
-          } ${
-            c.is_author
-              ? "bg-secondary text-secondary-foreground"
-              : "bg-muted text-muted-foreground"
-          }`}
-        >
-          {avatarOf(c)}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p
-            className={`flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 ${
-              nested ? "text-[13px]" : "text-[15px]"
-            }`}
-          >
-            <span className="truncate font-bold">{nameOf(c)}</span>
-            {/* DEF-20261003-001：作者章（all 人可见，小红书／IG 同款）＋本人「我」標。 */}
-            {c.is_author && (
-              <Badge variant="secondary" className="h-4 shrink-0 px-1 text-[10px] leading-none">
-                {t("commentAuthor")}
-              </Badge>
-            )}
-            {c.is_mine && !c.is_author && (
-              <span className="shrink-0 font-normal text-muted-foreground">
-                {t("commentMe")}
-              </span>
-            )}
-            {!pending && timeOf(c) !== "" && (
-              <span className="shrink-0 font-normal text-muted-foreground">
-                {timeOf(c)}
-              </span>
-            )}
-          </p>
-          <p
-            className={`break-words pt-0.5 leading-relaxed ${
-              nested ? "text-sm" : "text-[15px]"
-            }`}
-          >
-            {nested && target !== null && (
-              <span className="text-primary">@{target} </span>
-            )}
-            {rest}
-          </p>
-          {!pending && (
-            <button
-              type="button"
-              onClick={() => replyTo(c)}
-              className="mt-0.5 w-fit shrink-0 rounded px-1 py-0.5 text-xs text-muted-foreground opacity-70 transition-opacity hover:text-foreground hover:opacity-100 focus-visible:opacity-100"
-            >
-              {t("checkinReply")}
-            </button>
-          )}
-        </div>
-        {!pending && (
-          <button
-            type="button"
-            onClick={() => void remove(c.id)}
-            aria-label={t("commentDelete")}
-            className="shrink-0 rounded px-1.5 py-0.5 text-xs text-muted-foreground opacity-40 transition-opacity hover:text-destructive hover:opacity-100 focus-visible:opacity-100"
-          >
-            {arming === c.id ? t("commentDeleteConfirm") : "×"}
-          </button>
-        )}
-      </div>
-    );
-  };
-
   return (
-    <div id={anchorId} className="flex scroll-mt-2 flex-col gap-2.5 border-t pt-3">
+    <div className="flex flex-col gap-2.5 border-t pt-3">
       <p className="text-sm font-bold">
         {t("commentTitle")}
         {comments.length > 0 && (
@@ -332,22 +191,59 @@ export function V2Comments({ checkinId, anchorId }: { checkinId: string; anchorI
           ))}
         </div>
       ) : comments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("commentEmptyGuide")}</p>
+        <p className="text-sm text-muted-foreground">{t("commentEmpty")}</p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {threads.map(({ top, kids }) => {
-            const open = expandedIds.has(top.id);
+        <div className="flex max-h-64 flex-col gap-1 overflow-y-auto">
+          {comments.map((c) => {
+            const pending = c.id.startsWith("pending-");
             return (
-              <div key={top.id} className="flex flex-col gap-1">
-                {renderRow(top, false)}
-                {open && kids.map((k) => renderRow(k, true))}
-                {kids.length > 0 && !open && (
+              <div
+                key={c.id}
+                className={`flex items-start gap-2 rounded-xl px-1 py-1.5 ${
+                  // 本人的行淡底（token 透明度，不新增色值）；pending 行呼吸占位。
+                  c.is_mine ? "bg-primary/[0.05]" : ""
+                } ${pending ? "motion-safe:animate-pulse" : ""}`}
+              >
+                <span
+                  aria-hidden
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                    c.is_author
+                      ? "bg-secondary text-secondary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {avatarOf(c)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs">
+                    <span className="truncate font-bold">{nameOf(c)}</span>
+                    {/* DEF-20261003-001：作者章（all 人可见，小红书／IG 同款）＋本人「我」標。 */}
+                    {c.is_author && (
+                      <Badge variant="secondary" className="h-4 shrink-0 px-1 text-[10px] leading-none">
+                        {t("commentAuthor")}
+                      </Badge>
+                    )}
+                    {c.is_mine && !c.is_author && (
+                      <span className="shrink-0 font-normal text-muted-foreground">
+                        {t("commentMe")}
+                      </span>
+                    )}
+                    {!pending && timeOf(c) !== "" && (
+                      <span className="shrink-0 font-normal text-muted-foreground">
+                        {timeOf(c)}
+                      </span>
+                    )}
+                  </p>
+                  <p className="break-words pt-0.5 text-sm leading-relaxed">{c.body}</p>
+                </div>
+                {!pending && (
                   <button
                     type="button"
-                    onClick={() => toggleExpanded(top.id)}
-                    className="ml-12 w-fit rounded px-1 py-0.5 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                    onClick={() => void remove(c.id)}
+                    aria-label={t("commentDelete")}
+                    className="shrink-0 rounded px-1.5 py-0.5 text-xs text-muted-foreground opacity-40 transition-opacity hover:text-destructive hover:opacity-100 focus-visible:opacity-100"
                   >
-                    {t("checkinRepliesMore", { n: kids.length })}
+                    {arming === c.id ? t("commentDeleteConfirm") : "×"}
                   </button>
                 )}
               </div>
@@ -371,25 +267,9 @@ export function V2Comments({ checkinId, anchorId }: { checkinId: string; anchorI
           {banner}
         </p>
       )}
-      {/* UR E.10：吸底输入（sticky 贴面板滚动底；快捷一键走 sendText 同核；匿名提示缩一行）。 */}
-      <div className="sticky bottom-0 z-10 -mb-1 bg-background/95 pt-2 pb-1 backdrop-blur">
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {[t("checkinWant"), t("checkinQuickWhere"), t("checkinQuickJoin")].map((q) => (
-            <button
-              key={q}
-              type="button"
-              onClick={() => void sendText(q)}
-              disabled={sending}
-              className="shrink-0 rounded-full border px-4 py-1.5 text-[13px] text-muted-foreground transition-opacity hover:text-foreground disabled:opacity-50"
-            >
-              {q}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2.5">
-          <Input
-            ref={inputRef}
-            value={draft}
+      <div className="flex items-center gap-2">
+        <Input
+          value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") void send();
@@ -398,24 +278,23 @@ export function V2Comments({ checkinId, anchorId }: { checkinId: string; anchorI
           aria-label={t("commentPlaceholder")}
           maxLength={500}
           disabled={sending}
-          className="h-14 min-w-0 flex-1 rounded-full px-5 text-base md:text-base"
+          className="min-w-0 flex-1 rounded-full"
         />
-        {/* UR E.10：发送用原生 button（shadcn size-8 会和 h-14 打架，见本轮；语义 token 照用；提交走 form onSubmit）。 */}
-        <button
-          type="submit"
+        <Button
+          size="icon"
+          onClick={() => void send()}
           disabled={sending || draft.trim() === ""}
           aria-label={t("commentSend")}
-          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition hover:bg-primary/80 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-50"
+          className="h-9 w-9 shrink-0 rounded-full"
         >
           {sending ? (
-            <LoaderCircle size={20} aria-hidden className="size-5 motion-safe:animate-spin" />
+            <LoaderCircle size={16} aria-hidden className="motion-safe:animate-spin" />
           ) : (
-            <Send size={20} aria-hidden className="size-5" />
+            <Send size={16} aria-hidden />
           )}
-        </button>
+        </Button>
       </div>
-      <p className="pt-1 text-xs text-muted-foreground">{t("commentAnonShort")}</p>
-      </div>
+      <p className="text-xs text-muted-foreground">{t("commentAnonHint")}</p>
     </div>
   );
 }

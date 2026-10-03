@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.4.0
+  version: 1.2.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -252,39 +252,6 @@ paths:
                       transcript:
                         type: string
                         nullable: true
-                      created_at:
-                        type: string
-                        format: date-time
-                      place_name:
-                        type: string
-                        nullable: true
-                      lat:
-                        type: number
-                        nullable: true
-                      lng:
-                        type: number
-                        nullable: true
-                      beer_name:
-                        type: string
-                        nullable: true
-                      rating:
-                        type: integer
-                        minimum: 1
-                        maximum: 5
-                        nullable: true
-                      like_count:
-                        type: integer
-                        minimum: 0
-                      liked_by_me:
-                        type: boolean
-                      want_count:
-                        type: integer
-                        minimum: 0
-                      wanted_by_me:
-                        type: boolean
-                      comment_count:
-                        type: integer
-                        minimum: 0
         "403":
           description: 無權查看（陌生／private 他人，fail-closed）
           content:
@@ -295,57 +262,6 @@ paths:
           $ref: "#/components/responses/NotFound"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/Internal"
-    patch:
-      operationId: rateCheckin
-      summary: 打卡评分设置（需登录；仅作者，1–5 整数或 null 清除，UR E.10）
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [rating]
-              properties:
-                rating:
-                  type: integer
-                  minimum: 1
-                  maximum: 5
-                  nullable: true
-      responses:
-        "200":
-          description: 保存成功（回写后值）
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [rating]
-                properties:
-                  rating:
-                    type: integer
-                    minimum: 1
-                    maximum: 5
-                    nullable: true
-        "400":
-          $ref: "#/components/responses/InvalidParams"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          description: 非本人或帖子不存在（不泄归属）
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
     delete:
@@ -509,104 +425,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
-  /api/v1/checkins/{id}/like:
-    post:
-      operationId: toggleCheckinLike
-      summary: 打卡点赞切换（需登录；有行删无行插，回显计数，UR E.10）
-      security:
-        - cookieAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: 切换成功（liked 本次后状态＋实时总数）
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [liked, like_count]
-                properties:
-                  liked:
-                    type: boolean
-                  like_count:
-                    type: integer
-                    minimum: 0
-        "400":
-          $ref: "#/components/responses/InvalidParams"
-        "401":
-          description: 未登录（匿名请先登录）
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorBody"
-        "403":
-          description: 隱身禁赞（沿 E.7 评论口径）
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorBody"
-        "404":
-          description: 帖子不存在或無可見權限（不泄归属）
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorBody"
-        "500":
-          $ref: "#/components/responses/Internal"
-  /api/v1/checkins/{id}/want:
-    post:
-      operationId: toggleCheckinWant
-      summary: 打卡“想喝”计数切换（需登录；有行删无行插，仅计数不进推荐，UR E.10）
-      security:
-        - cookieAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: 切换成功（wanted 本次后状态＋实时总数）
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [wanted, want_count]
-                properties:
-                  wanted:
-                    type: boolean
-                  want_count:
-                    type: integer
-                    minimum: 0
-        "400":
-          $ref: "#/components/responses/InvalidParams"
-        "401":
-          description: 未登录（匿名请先登录）
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorBody"
-        "403":
-          description: 隱身禁表态（沿 E.7 评论口径）
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorBody"
-        "404":
-          description: 帖子不存在或無可見權限（不泄归属）
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorBody"
-        "500":
-          $ref: "#/components/responses/Internal"
   /api/v1/comments/{id}:
     delete:
       operationId: deleteCheckinComment

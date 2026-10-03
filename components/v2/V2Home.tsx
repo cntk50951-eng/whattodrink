@@ -22,7 +22,6 @@ import {
   Map as MapIcon,
   MapPin,
   Martini,
-  MoreHorizontal,
   Radar,
   RefreshCw,
   Sparkles,
@@ -46,7 +45,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { CheckinDetailExtra, CheckinSheetHead } from "@/components/v2/CheckinDetailExtra";
 import { V2Comments } from "@/components/v2/V2Comments";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMyMode } from "@/hooks/useMyMode";
@@ -61,7 +59,6 @@ import { pickRandomIndex } from "@/lib/reveal";
 import { LOGOUT_CLEAR_EVENT, clearUserLocalCaches } from "@/lib/auth/clear";
 import { displayName } from "@/lib/auth/profile";
 import { setActivePeer } from "@/lib/chatPeer";
-import { formatSeenAgo } from "@/lib/chat";
 import { createClient } from "@/lib/supabase/client";
 import {
   DEFAULT_CENTER,
@@ -319,8 +316,6 @@ export function V2Home() {
   // UR C.11 round-3：詳情返回目錄（目錄來才記 "stops"；地圖釘直開為 null 不帶返回鈕）。
   const [wantReturnTo, setWantReturnTo] = useState<"stops" | null>(null);
   const [swapOpen, setSwapOpen] = useState(false);
-  // UR E.10 batch7：半屏展开态（默认 75svh，展开 92svh；只在事件里改，不进 effect，沿 lint 豁免外口径）。
-  const [sheetFull, setSheetFull] = useState(false);
   const [swapBatch, setSwapBatch] = useState<Beer[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -337,8 +332,6 @@ export function V2Home() {
     if (noteTimer.current !== null) window.clearTimeout(noteTimer.current);
     noteTimer.current = window.setTimeout(() => setNote(null), 2500);
   }
-  // UR E.10：相对时间锚点（render 内禁 Date.now impure，mount 快照一次，沿列表页口径）。
-  const [nowMs] = useState(() => Date.now());
   // UR D.5：好友列表 pill 角标（用户定案 2026-10-03：任何模式都提醒，只挡匿名；
   // 未读>0 才显，点进列表看红点；新消息即轻提示一下）。
   const { total: bellTotal } = useChatBell(isAuthed === true, () => {
@@ -1966,7 +1959,6 @@ export function V2Home() {
           otherDetailFor.current = null;
           setSwapOpen(false);
           setConfirmDelete(false);
-          setSheetFull(false);
           // UR C.11 round-3：關詳情自動回目錄（直開時 returnTo 為 null，不回）。
           if (wantReturnTo === "stops") {
             setWantReturnTo(null);
@@ -1976,13 +1968,10 @@ export function V2Home() {
       >
         {/* DEF-20260929-006：此前 key 随卡变 remount Popup，开着换卡直接搞乱
             base-ui Dialog 开关机（残留吞点击）——改 id＋effect 回顶，身份稳定。 */}
-        {/* DEF-20261003-007：关自动抢焦（默认抢底部输入框，浏览器滚到底盖过回顶 effect）；
-            焦点 trap 不动，Tab 照进，手机键盘不弹。 */}
         <SheetContent
           id="wtd-checkin-sheet"
           side="bottom"
-          initialFocus={false}
-          className={`${styles.v2scope} gap-4 overflow-hidden rounded-t-2xl p-4 sm:mx-auto sm:w-full sm:max-w-md ${sheetFull ? "h-[92svh]" : "h-[75svh]"}`}
+          className={`${styles.v2scope} max-h-[85svh] gap-4 overflow-y-auto rounded-t-2xl p-4 sm:mx-auto sm:w-full sm:max-w-md`}
         >
           {(() => {
             // UR C.10 返工：他人卡進同一 Sheet（grabber／Header／X 共用，
@@ -1990,23 +1979,7 @@ export function V2Home() {
             if (card !== null && card.kind === "other") {
               return (
                 <>
-                  <div aria-hidden className="mx-auto h-1 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
-                  {/* UR E.10 batch7：半屏固定头（缩略图＋酒款＋展开钮；滚动区外）。 */}
-                  <CheckinSheetHead
-                    photoUrl={otherDetail?.photoUrl ?? null}
-                    title={card.drink === "" ? card.title : card.drink}
-                    sub={
-                      card.checkedInAt !== null
-                        ? formatSeenAgo(card.checkedInAt, nowMs, locale)
-                        : ""
-                    }
-                    expanded={sheetFull}
-                    onToggleExpand={() => setSheetFull((v) => !v)}
-                  />
-                  <div
-                    id="v2c-scroll-other"
-                    className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto"
-                  >
+                  <div aria-hidden className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
                   <SheetHeader className="text-left">
                     <SheetTitle className="flex min-w-0 flex-wrap items-center gap-1.5">
                       <span className="truncate">{card.title}</span>
@@ -2015,7 +1988,7 @@ export function V2Home() {
                     </SheetTitle>
                     <SheetDescription>
                       {card.checkedInAt !== null
-                        ? formatSeenAgo(card.checkedInAt, nowMs, locale)
+                        ? formatWantTime(card.checkedInAt, locale)
                         : ""}
                     </SheetDescription>
                   </SheetHeader>
@@ -2050,7 +2023,7 @@ export function V2Home() {
                       src={otherDetail.photoUrl}
                       alt=""
                       loading="lazy"
-                      className="max-h-[25svh] w-full rounded-xl object-cover"
+                      className="max-h-[46svh] w-full rounded-xl object-cover"
                     />
                   ) : (
                     <span className="w-full shrink-0 overflow-hidden rounded-xl border bg-card p-1">
@@ -2094,6 +2067,9 @@ export function V2Home() {
                       ? t("cheersLeft", { n: cheersRemaining(sentIds) })
                       : t("cheersLimitReached")}
                   </span>
+                  {card.drink !== "" && (
+                    <p className="text-sm text-muted-foreground">🍺 {card.drink}</p>
+                  )}
                   <div className="flex flex-col gap-1.5 text-sm">
                     {card.sub !== "" && (
                       <span className="flex items-center gap-1.5">
@@ -2113,28 +2089,14 @@ export function V2Home() {
                       </span>
                     )}
                   </div>
-                  {/* UR E.10：酒 pills＋互动栏（DB 真行才挂；品牌／评分／地点＋赞／评数／想喝／分享，沿原型 §3–4）。 */}
-                  {apiPins.some((p) => p.id === card.id) ? (
-                    <CheckinDetailExtra
-                      checkinId={card.id}
-                      fallbackBeerName={card.drink === "" ? null : card.drink}
-                      fallbackPlace={card.sub === "" ? null : card.sub}
-                      lat={card.lat}
-                      lng={card.lng}
-                      canRate={false}
-                      commentsAnchorId="v2c-other"
-                      scrollContainerId="v2c-scroll-other"
-                    />
-                  ) : null}
                   {/* UR E.7：留言（真釘才有 DB id；MOCK 無行不掛）。 */}
                   {apiPins.some((p) => p.id === card.id) ? (
-                    <V2Comments checkinId={card.id} anchorId="v2c-other" />
+                    <V2Comments checkinId={card.id} />
                   ) : null}
                   {/* UR E.2：他人三件套（詳情按需拉；照片已上移主视觉，此处只剩文字——IG 式 caption 紧贴照片下）。 */}
                   {otherDetail?.audioUrl ? (
                     <audio controls src={otherDetail.audioUrl} className="h-9 w-full" />
                   ) : null}
-                  </div>
                 </>
               );
             }
@@ -2151,19 +2113,7 @@ export function V2Home() {
                 : null;
             return (
               <>
-                <div aria-hidden className="mx-auto h-1 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
-                {/* UR E.10 batch7：半屏固定头（缩略图＋酒款＋展开钮；滚动区外）。 */}
-                <CheckinSheetHead
-                  photoUrl={rec.photoDataUrl ?? null}
-                  title={fresh?.name ?? t("you")}
-                  sub={formatSeenAgo(rec.at, nowMs, locale)}
-                  expanded={sheetFull}
-                  onToggleExpand={() => setSheetFull((v) => !v)}
-                />
-                <div
-                  id="v2c-scroll-self"
-                  className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto"
-                >
+                <div aria-hidden className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
                 {/* UR C.11 round-3：目錄來才有返回（沿 C.5 返回鍵口徑，文案复用 trailBack） */}
                 {wantReturnTo === "stops" && (
                   <div className="flex items-center">
@@ -2189,7 +2139,7 @@ export function V2Home() {
                     <Badge variant="outline">{t(GENDER_KEY[MOCK_ME.gender])}</Badge>
                     <Badge variant="secondary">{modeLabel}</Badge>
                   </SheetTitle>
-                  <SheetDescription>{formatSeenAgo(rec.at, nowMs, locale)}</SheetDescription>
+                  <SheetDescription>{formatWantTime(rec.at, locale)}</SheetDescription>
                 </SheetHeader>
                 <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
@@ -2218,7 +2168,7 @@ export function V2Home() {
                   <img
                     src={rec.photoDataUrl}
                     alt=""
-                    className="max-h-[25svh] w-full rounded-xl object-cover"
+                    className="max-h-[46svh] w-full rounded-xl object-cover"
                   />
                 ) : (
                   <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
@@ -2239,19 +2189,6 @@ export function V2Home() {
                   )}
                   <span className="text-xs text-muted-foreground">{t("wantFrozenNote")}</span>
                 </div>
-                {/* UR E.10：酒 pills＋互动栏＋作者评分（DB 真行才挂；自家可设星，他人只读）。 */}
-                {rec.id !== undefined && rec.id !== "" ? (
-                  <CheckinDetailExtra
-                    checkinId={rec.id}
-                    fallbackBeerName={fresh?.name ?? null}
-                    fallbackPlace={rec.placeName ?? null}
-                    lat={rec.position.lat}
-                    lng={rec.position.lng}
-                    canRate
-                    commentsAnchorId="v2c-self"
-                    scrollContainerId="v2c-scroll-self"
-                  />
-                ) : null}
                 {rec.audio && (
                   <audio controls src={rec.audio.url} className="h-9 w-full" />
                 )}
@@ -2275,31 +2212,20 @@ export function V2Home() {
                       {t("confirmDelete")}
                     </Button>
                   ) : (
-                    /* UR E.10：删除收进 ⋯ 菜单（原型 §1；两段确认沿用，确认行不变）。 */
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        aria-label={t2("checkinMore")}
-                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
-                      >
-                        <MoreHorizontal size={16} aria-hidden />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className={styles.v2scope}>
-                        <DropdownMenuGroup>
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onClick={() => setConfirmDelete(true)}
-                          >
-                            <Trash2 size={15} aria-hidden />
-                            {t("deleteEntry")}
-                          </DropdownMenuItem>
-                        </DropdownMenuGroup>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground"
+                      onClick={() => setConfirmDelete(true)}
+                    >
+                      <Trash2 size={15} aria-hidden />
+                      {t("deleteEntry")}
+                    </Button>
                   )}
                 </div>
                 {/* UR E.7：留言（mine 回顯有 DB id 才掛；本地單機記錄無行不掛）。 */}
                 {rec.id !== undefined && rec.id !== "" ? (
-                  <V2Comments checkinId={rec.id} anchorId="v2c-self" />
+                  <V2Comments checkinId={rec.id} />
                 ) : null}
                 {swapOpen && (
                   <div>
@@ -2323,7 +2249,6 @@ export function V2Home() {
                     </Button>
                   </div>
                 )}
-                </div>
               </>
             );
           })()}

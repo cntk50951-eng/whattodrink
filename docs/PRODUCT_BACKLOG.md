@@ -2535,7 +2535,6 @@ UR D.4　好友消息列表＋未讀＋已讀✓✓ [WIP]
 - 2026-09-27 fix（房頁離線回退酒友＋末句方向）：房頭像名改 `/friends` 全量解析；`chatMe`×3
 - 2026-09-27 fix（用戶回包定罪：`peer: null`——RLS 只許讀自己 membership 行，路由拿不到對方）：列表＋read-status 改 authed 驗身份＋service 查對方行（建會話同口徑）；tsc 淨／lint 0 error；用戶重啟 server 複驗通過
 - 2026-09-27 fix（同樹回退事故）：D.4 未提交文檔區（本 UR 擴充＋改動記錄）被整樹回退吃掉，已重建；代碼區同步重驗（見 memory）；待複驗＋合入
-- 2026-10-03：DEF-20261003-004 P1 骨架（`ChatRoomLive.loading`＋`ChatSkeleton`＋loading 期输入禁用；失败分支即灭＋失败文案；tsc／lint 净／457 绿；待亲验，未提交）
 
 UR D.5　推送（a 前台含於 D.3／b 後台推播本期一起）[✓]
 
@@ -2601,37 +2600,6 @@ UR D.7　聊天頁殼重做（會話路由＋v2 全屏＋輸入框固定多行�
 - 2026-09-27：建檔置 []（用戶指令四件；C.15 同文件隊友施工中；待問答定路由方案後置 [WIP]）
 - 2026-09-27：問答定案（用戶拍板：URL 零 id）置 [WIP]；實作完待驗（`/v2/chat/room` 無參＋peer 走 sessionStorage（`lib/chatPeer`＋2 單測）＋無 peer 回列表、舊 `[friendId]` 路由刪除、房＋列表改 fixed 全屏蓋 v1 上下、輸入條吸底＋安全區＋毛玻璃、textarea 自動增高＋Enter 發／Shift+Enter 換行＋組字保護；lint 淨／338 綠／build 綠；待用戶瀏覽器親驗，未提交）
 - 2026-09-27：置 [✓]（用戶指令 mark done；零 id 房＋吸底多行在倉實證（PR #36 聯合提交已合入）；D 驗收由用戶另行批量做）
-
----
-
-UR D.8　聊天房记录本地缓存＋秒开（SWR）[WIP]
-
-作為用户，我第二次打开和好友的聊天房时，记录立刻出现（不转骨架等网络），后台悄悄补上新消息；没网时也能看上次的内容。
-
-### 背景（DEF-20261003-004 拆出；004 P1 骨架先行，本 UR 管“慢”）
-- 现状 waterfall：`POST 建会话→GET 50 条` 串行＋首屏全量＋零缓存（见 004 分析）
-- 本地不用 localStorage（5MB 配额＋同步阻塞＋`wtd-*` 键混乱史），用 IndexedDB（异步大配额）
-
-### 範圍（v2-only：`lib/chatCache` 新＋`ChatRoomLive` 接线；零 migration／零 API／零新 key）
-1. `lib/chatCache.ts`：`wtd-chat` 库（按 peer 存末 50 条＋`ownerUid`＋`v:1` 版本；`load/save` 全 try/catch，配额/隐私模式 fail-open 走网络）
-2. 纯函数（单测锁）：`mergeCachedMessages`（id 去重＋时间升序＋超限裁 50）／`validateCache`（owner 对不上／版本不对即弃，防跨号串看）／`pruneCache`
-3. 接线：开房先读 peer 缓存（命中即秒开＋`loading=false`，后台 revalidate 合并；未命中沿旧骨架）；`save` 点三处（历史落定／发送成功／Realtime 到行，effect 跟 `messages` 走，幂等复写）
-4. 附件只存描述（path／mime／bytes／secs），播时签名照旧现场换（不存短链，过期即脏）
-
-### 非目標
-- 开房并行（`resolve` 端点，另开 UR；会话已存在仍先 POST 一次，本 UR 不动该 waterfall）
-- 长列表虚拟化（ histories 上百条才值，另议）、离线发送 outbox（架构 §6 口，另议）、E2EE（V2 议题）
-- v1 任何文件
-
-### AC
-- AC1：二次进同一房秒出记录（无骨架），后台合并无闪无重
-- AC2：断网＋有缓存→读上次内容；发送失败走现有重试键
-- AC3：换号登录不串看（owner 门）；无痕／配额满静默降级网络
-- AC4：`chatCache.test.ts` 覆盖合并／裁剪／owner／版本；三闸绿；用户浏览器亲验；`git status` 无 v1
-
-*改動記錄*
-- 2026-10-03：建檔置 []（004 分析定案 b→c→d，本 UR 即 P-b 缓存层；P-c resolve／P-d 虚拟化另议）
-- 2026-10-03：置 [WIP] 实作完待验（`chatCache`＋5 单测＋房接线三件；tsc／lint 净／462 绿；待亲验，未提交）
 
 ---
 
@@ -2947,48 +2915,6 @@ UR E.8　留言作者通知（站内 Bell，v2）[]
 
 *改動記錄*
 - 2026-10-02：建檔置 []（E.7 拆出；Bell 從零起＋收件恒登入已確認；入口位置＋Realtime 範圍待問答；待開工指令）
-
----
-
-UR E.10　打卡面板互动升级（6 项，主流 App 体验对齐）[WIP]
-
-作為看打卡的人，我要点赞、说“我也想喝”、评论@回复、看酒款评分地点，一切和主流 App 一样顺手。
-
-### 背景（2026-10-03 問答定案：只改 v2／6 項全做／我也想喝僅計數／限流保留）
-- 现状（E.7 落地）：留言区在面板底部、可留可看，但无点赞、无想喝、无评分、无回复、无分享，照片大、输入框不吸底
-- 技术约束：Tabler CDN＋原型自定 token 不引入（离线＋v2scope 铁律），图标一律 lucide 现有件＋v2 token；数据缺口见下（两个 migration）
-
-### 範圍（v2-only；分批提交，一次一范畴）
-1. **头部**：头像＋昵称＋相对时间（`formatWantTime` 沿用）；“保密/公开·24h后消失”收成一行小字；删除收进 `⋯` 菜单（DropdownMenu 现成件，base-ui 口径；两段确认沿用）
-2. **照片**：高度压到约 1/4 屏（`max-h-[25svh] object-cover`），评论区不滑动即露头
-3. **酒信息**：地点名（`place_name` 列优先，空才 `/places/reverse` 反查，失败回坐标沿 UR1.8 诚实口径）＋品牌（`beer_id→beers`，无即藏）＋评分（见 6）＋note 原文
-4. **互动栏**：点赞（`post_likes` 表已有，补 toggle 端点＋计数）、评论数（GET 已有，抬头显总数）、“我也想喝”（`checkin_wants` 新表，PK 去重，仅登录可点，计数只读；推荐反哺另议）、分享（`navigator.share`＋剪贴板回退，纯前端零后端）
-5. **评论区前置＋回复/@一层**：评论区搬酒信息下方；回复＝按钮填 `@昵称 ` 进输入框（文本约定，零 migration，沿 E.7 作者回即正文）；作者章沿用 `is_author`；空态改引导（“还没人评论，问问 TA 在哪喝的”）；限流三档保留，提示缩一行
-6. **吸底输入＋快捷回复＋评分**：输入框 sticky 底＋上方 3 快捷（一键走既有 POST）；匿名提示缩一行小字；评分＝作者给自己这杯打 1–5 星（`checkins.rating` 新列，整数，他人只读；聚合平均以后，不伪造小数）
-7. 三语新 key（`checkinLike/checkinWant/checkinShare/checkinReply*/checkinRate*`，×3 同序 parity）；`home-map.md` 补行；openapi 逐端点补
-
-### 非目標
-- 评论多层 threading（`parent_id` 另议）、赞评论、图片评论、私信、通知（E.8）、v1 任何文件
-- 评分聚合／酒款维度评分（本 UR 只存单帖作者分）
-
-### AC
-- AC1：头/图/酒/互动/评论/输入六段顺序与原型一致，手机一屏见评论头
-- AC2：赞增减±1 且刷新不丢；想喝每人只计一次，匿名点请登录
-- AC3：回复填@发出带名前缀；作者行有作者章；空态是引导文案
-- AC4：快捷点即发（走限流，422 照显）；评分作者可设 1–5，他人只读
-- AC5：三闸绿；用户浏览器亲验；`git status` 无 v1
-
-*改動記錄*
-- 2026-10-03：建檔置 [WIP]（问答四定案；原型 6 项全收；Tabler 不引入已声明；待 migration＋分批实现）
-- 2026-10-03 batch2 点赞端点（`POST /:id/like` toggle＋`lib/api/likes` 纯函数＋3 单测＋openapi 升 1.3.0；`0018` 写 policy 待跑；隐身 403 沿 E.7；待用户跑库＋curl 验）
-- 2026-10-03 batch3 想喝端点（`POST /:id/want` toggle，仅计数不进推荐；RLS 沿 0017 无新 migration；`lib/api/wants`＋3 单测＋openapi 升 1.4.0；隐身 403 沿 E.7；三闸 473 绿；待用户 curl 验）
-- 2026-10-03 batch4 评分＋详情扩展（`PATCH /:id {rating}` 仅作者＋`lib/api/rating` 3 单测；GET 加 created_at／place／coords／beer_name／rating／三计数＋本人态，加法兼容；openapi 补 patch＋字段；三闸 476 绿；端点齐，待 UI batch5）
-- 2026-10-03 batch5 UI 六段（`CheckinDetailExtra`＋`useCheckinDetail` 双面板复用；`V2Comments` 回复@＋快捷＋吸底＋引导空态；照片压 25svh；相对时间；删除进⋯；14 新 key parity 117；set-state-in-effect 修两处＋`Date.now` 换计数器；三闸绿；待亲验，未提交）
-- 2026-10-03 batch6 评论区原型对齐＋DEF-20261003-006（`checkinMore` 命名空间 `t`→`t2` 单行；同文件其余混用 grep 全验；`parseReplyTarget` 纯函数＋2 单测；行重排：大头像／名时同行／嵌套缩进／@高亮／大输入＋实心发送钮；478 绿；待亲验，未提交）
-- 2026-10-03 batch6 round-2 输入区返工（`text-accent` 浅色近白隐形：@名／想喝字全看不见，改 `text-primary`；输入 h-14＋text-base 防 iOS 缩放；发送钮 h-14 实心蓝；Button default 即 bg-primary 未被去色，验过 `button.tsx:11`；待亲验，未提交）
-- 2026-10-03 batch6 round-3 shadcn 底样式打架（DOM 实证：`px-2.5` 挤＋`md:text-sm` 盖 16px＋`size-8` 顶 `h-14`；输入补 `px-5`＋`md:text-base` 逐断点压死；发送钮改原生 button 全显式类，提交走 form onSubmit；待亲验，未提交）
-- 2026-10-03 batch7 半屏重构（问答定案：75% 半屏＋固定照片头＋评论独立滚动＋吸底输入；启发式折叠；无新表；赞评论／长按菜单仍排除；待实现，未提交）
-- 2026-10-03 batch7 落地＋DEF-20261003-007（`initialFocus={false}` 关抢焦＋回顶 effect 重掌定位；固定头／75svh／展开 92svh／启发式折叠＋展开 N 条／评数往返跳；`checkinRepliesMore/Expand/Collapse`×3 parity 120；三闸 478 绿；待亲验，未提交）
 
 ---
 

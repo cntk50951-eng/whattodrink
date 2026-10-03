@@ -206,16 +206,3 @@ export function anonHasOutstanding(
 export function overWindowLimit(countInWindow: number, max: number): boolean {
   return countInWindow >= max;
 }
-
-/**
- * UR E.10 回复归属（纯函数）：正文 `@名 ` 前缀即对该名的一层回复。
- * 名取 @ 后首个空白前连续串；无前缀／空名回 null（顶层行）。
- * 匹配由调用方按展示名找最近上文（作者分得清人即可的短号口径，不做 id 绑定）。
- */
-export function parseReplyTarget(body: unknown): string | null {
-  if (typeof body !== "string") return null;
-  const m = body.match(/^@(\S+)\s/);
-  if (m === null) return null;
-  const name = m[1].trim();
-  return name === "" ? null : name;
-}

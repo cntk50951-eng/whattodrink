@@ -16,24 +16,8 @@
   - 验收返工 round-3：数字徽改啤酒气泡徽（`v2beerBadge` 琥珀渐变＋`::before` 泡沫盖＋三粒 `v2beerBubble` 错峰上冒 1.5s 常驻循环，数字包 `relative` 保可读，`overflow-hidden` 收泡，reduced-motion 留静态；抖动幅度加大到 ±8°，触发语义不变——只播一次，HMR 不重播）；tsc＋lint 雙淨
   - 验收返工 round-4：圆徽退役改迷你啤酒杯角标（`v2beerMug` 杯身＋内嵌泡沫顶＋`::after` 小把手＋`v2beerCount` 压杯中＋两粒 `v2mugBubble` 杯内上冒，一个元素不再分离；`top:-6px` 落 `pt-2` 盒内；抖动改 5s 定时——有未读先抖一次之后每 5s 抖 0.9s，读完即停，`prevBellRef` 沿边逻辑退役）；tsc＋lint 雙淨
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
-- **DEF-20261003-004 聊天房骨架 loading（v2-only，用户亲验通过，随本车合入）**
-  - `ChatRoomLive` 加 `loading`（建会话＋拉历史落定前 true，失败分支即灭不卡骨架；失败即 `failed` 文案，旧静默空房一并收敛）
-  - `ChatThread` 加 `ChatSkeleton`（左右交错气泡，`motion-safe`＋aria-hidden，零新 key）＋loading 期输入禁用（textarea／发送／招呼钮，`convId null` 丢字根除）
-  - 三闸：vitest 457 绿／tsc 净／eslint 2 档净；无新单测（纯 UI 态，沿 D.4 room 口径由浏览器亲验）；数据文档无需更新（零持久化）
-  - 待：随本车合入后转 Verified（骨架已亲验；慢与缓存见 D.8，另验）
 
 ### Added
-- **UR E.10 打卡面板互动升级（v2-only，[WIP]，6 项全收未提交）**
-  - 数据：`0017`（`checkins.rating`＋`checkin_wants`＋三 policy）＋`0018`（`post_likes` owner 写 policy）；`future-schema`＋`home-map` 第十三节同步
-  - 端点：`POST /:id/like`＋`POST /:id/want`（toggle＋计数回显，不可见 404，隐身 403）＋`PATCH /:id {rating}`（仅作者）＋GET 详情加法扩展（计数×3＋本人态＋beer／place／coords／rating）；`lib/api/likes|wants|rating` 纯函数 9 单测；openapi 升 1.4.0
-  - UI：`CheckinDetailExtra`（酒 pills＋互动栏＋作者星评＋分享＋反查）双面板复用；`V2Comments`（回复@＋快捷＋吸底＋引导空态＋匿名短提示）；照片压 25svh；相对时间；删除进⋯；14 新 key×3 parity 117
-  - 三闸：vitest 476 绿／tsc 净／lint 净；待用户浏览器亲验（六段顺序＋赞/想喝±1＋回复@＋快捷＋评分＋分享）
-  - batch7 半屏重构＋DEF-20261003-007（`initialFocus={false}` 关抢焦；75svh＋固定照片头展开 92svh；启发式折叠＋展开 N 条；评数往返跳；三闸 478 绿；用户亲验通过，随本车合入）
-- **UR D.8 聊天房记录本地缓存＋秒开（v2-only，[WIP]，待亲验未提交）**
-  - `lib/chatCache.ts` 新（IndexedDB `wtd-chat` 按 peer 存末 50 条＋owner 门＋`v:1`；附件只存描述；不可用 fail-open）＋`mergeMessageLists/validateCache` 纯函数＋5 单测
-  - `ChatRoomLive` 接线（开房先读缓存秒开＋后台 revalidate；开房期 Realtime 行进槽落定时合并；落定后 effect 幂等复写；骨架仅真空房出现）
-  - 三闸：vitest 462 绿／tsc 净／eslint 4 档净；零 migration／零 API／零新 key；数据文档无需更新（缓存是网络的影子，无新语义）
-  - 待：用户浏览器亲验（二次进房秒开＋断网读缓存＋换号不串看）
 - **UR D.5 推送 P1 顶部 Bell＋全局 Realtime（v2-only，[WIP]，待亲验）**
   - `hooks/useChatBell.ts` 新（在线才拉取＋订阅：`GET /conversations` 求和＋`messages` INSERT 全局订阅沿 B.2 RLS 口径，到对方行即重算＋toast；匿名／隐身门内挡，hidden 不拉，卸载拆频道）
   - `V2Home` 顶栏 Bell（总未读>0 才显＋99+ 封顶，点进 `/v2/chat`；`chatBellLabel/chatBellNew`×3 三语同位）
