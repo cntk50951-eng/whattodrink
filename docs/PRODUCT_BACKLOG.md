@@ -2561,6 +2561,7 @@ UR D.6　圖片＋語音附件 [WIP]
 
 *改動記錄*
 - 2026-09-27：開工置 [WIP]；實作完待驗（0013 RLS＋0014 RPC＋sign/view 雙端點＋發送附件校验＋列表單 RPC＋composer 圖／音＋氣泡＋snippet 章＋7 組 key；`VoicePlayer` 牆耦合另起小件；轉寫另議；tsc 我方淨（同伴 V2Home/moderation 施工中紅＋刪頁 artifact，不碰）／lint 0 error（同伴 gathering 1 error 不碰）／單測綠；待用戶 Dashboard 三動作＋雙號聯驗＋合入）
+- 2026-10-03：DEF-20261003-003 定罪＋修复（`kind` enum→text 缺显式转换致 42804；其余列已对版）——`0016_conversations_kind_text.sql`（`lm.kind::text`，可重放）已写＋用户 Dashboard 跑通＋`GET /conversations` 回 200 已验，随本车合入
 
 ---
 

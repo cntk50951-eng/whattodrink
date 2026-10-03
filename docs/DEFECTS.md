@@ -63,6 +63,7 @@
 | DEF-20261002-001 | Ivy Bar 手机语音对讲一直录不上 | Fixing | P1 | 2026-10-02 / @user | UR F.1 | iPhone 浏览器无 SpeechRecognition，对讲链空转，见详情 |
 | DEF-20261002-002 | Ivy Bar 手机打字时键盘把 Ivy 顶出屏幕 | Fixing | P2 | 2026-10-02 / @user | UR F.1 | 待确认，见详情 |
 
+| DEF-20261003-003 | 消息列表加载 500 读取会话失败 | Fixed | P0 | 2026-10-03 / @user | UR D.6 | kind enum→text 缺显式转换（42804），0016 已跑＋200 已验，见详情 |
 ### DEF-20260927-002 locale 根首頁不跳 v2（/zh-Hans 落 v1）
 
 - **状态**：Closed（2026-09-27 用戶驗收通過：七路實測全中，已合入 main）
@@ -714,3 +715,22 @@
 - **关联 UR**：UR F.1（3D 酒吧 Ivy；与 DEF-20261002-001 同车修，走完整 10 步）
 - **修复验证**：待定（iPhone 真机：点输入框→键盘起→Ivy 可见→输入框在键盘上；收键盘回满屏；桌面无回归）
 - **回归范围**：`bar-room` 页根容器高度、画布重排、聊天面板／底部输入组定位
+### DEF-20261003-003 消息列表加载 500 读取会话失败
+
+- **状态**：Fixed（2026-10-03：`0016` 已写＋用户 Dashboard 跑通＋本地 `GET /conversations` 回 200 已验，随本车合入 main）
+- **严重度**：P0 阻断（`/v2/chat` 列表整页无数据；且 Bell 与列表同源，003 即 002 的强嫌疑同根）
+- **发现日期 / 报告人**：2026-10-03 / @user
+- **复现步骤**：
+  1. 登入态进 `/v2/chat`（或首页 Bell 拉取）
+  2. `GET /api/v1/conversations?limit=50` 回 `{"error":{"code":"internal","message":"读取会话失败"}}`
+- **期望**：回会话数组（含末条＋未读数）
+- **实际**：500（`conversations/route.ts:155-158` rpcErr 分支；终端应有 `[api/v1/conversations] rpc error: code=…` 一行）
+- **初判根因**：`get_conversations`（`0014`，D.6 改动记录“待用户 Dashboard 三动作”之一）要么根本没在库里执行（函数缺失即 500），要么函数内报错（首嫌 `(attachments->0->>'secs')::int` 遇非数字串即炸整查询；次嫌 `auth.uid()<>p_uid` 抛 forbidden）。N+1 切 RPC 后无降级，一炸全页无数据
+- **排查进展（2026-10-03，用户实证）**：①排除——`pg_proc` 有 `get_conversations`，0014 跑过；E 支（Publication 未开）排除——`messages` 在 `supabase_realtime` 内。剩 ② secs 强转 vs ③ forbidden，待 dev 终端 `rpc error` 行 code/message 一锤定音
+- **排查进展（2026-10-03，agent 自查，零打扰用户）**：本机 dev（PID 6182/6183）跑的正是这份工作区代码——Bell 代码在服，排除“没代码”；函数经 REST 直调可达（schema 缓存 fine）；全库仅 8 条消息且全纯文本零附件——② secs 强转排除；匿名自助建会话被 `anonymous_provider_disabled` 拦（零污染，未建脏用户）。剩唯一未知：登录态下 RPC 报的精确 code（P0001 则锁 ③ 会话上下文，22P02 则另有脏行）
+- **排查进展（2026-10-03，用户终端日志）**：首页加载全程**无** `GET /api/v1/conversations` 请求（Bell hook 未触发；`/me` 200 证明已登录）——指向隐身／匿名门禁（hook `enabled` 假）而非 RPC 本体；003 的单次 500 与本次“无请求”是两回事，003 待一次新鲜复现确认是否仍在
+- **确诊根因**：`messages.kind` 是 `message_kind` **ENUM**（`0012` 建表），而 `0014` 函数声明 `last_kind text` 且查询直出 `lm.kind`——enum→text 无隐式转换，PG 报 42804 全查询失败。证据链：`0012_chat_tables.sql:enum`＋`0014:17/41`＋用户终端 `code=42804` 三点对上。修法＝`0016` migration `lm.kind::text` 显式转换（其余列已逐一核对：uuid/text/timestamptz/int/bigint/boolean 全对版，无第二处）
+- **关联 UR**：UR D.6（RPC 引入方；`0016` 已写好，待用户 Dashboard 贴跑，见改动记录）
+- **修复验证**：用户 Dashboard 跑完 0016，`GET /conversations` 回 200（终端无 rpc error 行）＋列表末条未读正确；002 Bell＋红点待同源复验（见 002 F 支）
+- **回归范围**：会话列表、Bell 汇总；room 历史／read-status 独立端点不受影响
+
