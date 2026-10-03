@@ -2325,6 +2325,59 @@ export function V2Home() {
                       )}
                     </p>
                   </div>
+                  {/* DEF-20261003-008：管理⋯统一到頂部頭像行（与他人分支自家卡同位；
+                      删除两段确认同行，底部按钮行只留换酒）。 */}
+                  <span className="shrink-0">
+                    {confirmDelete ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-destructive text-destructive"
+                        onClick={() => {
+                          void handleDeleteWant();
+                        }}
+                      >
+                        <Trash2 size={15} aria-hidden />
+                        {t("confirmDelete")}
+                      </Button>
+                    ) : (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          aria-label={t2("checkinMore")}
+                          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+                        >
+                          <MoreHorizontal size={16} aria-hidden />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className={styles.v2scope}>
+                          <DropdownMenuGroup>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => setConfirmDelete(true)}
+                            >
+                              <Trash2 size={15} aria-hidden />
+                              {t("deleteEntry")}
+                            </DropdownMenuItem>
+                            {rec.id !== undefined && rec.id !== "" && (
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  setShareTarget({
+                                    checkinId: rec.id as string,
+                                    snippet: rec.placeName ?? fresh?.name ?? t("you"),
+                                    place: rec.placeName ?? "",
+                                    lat: rec.position.lat,
+                                    lng: rec.position.lng,
+                                  })
+                                }
+                              >
+                                <Share2 size={15} aria-hidden />
+                                {t2("checkinShareToFriend")}
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </span>
                 </div>
                 {/* DEF-20260929-007 round-4：文案压图（作者视角不加名字，header 已有作者）。 */}
                 {rec.note && (
@@ -2370,65 +2423,15 @@ export function V2Home() {
                 {rec.audio && (
                   <audio controls src={rec.audio.url} className="h-9 w-full" />
                 )}
-                <div className="flex flex-wrap items-center gap-2">
-                  {fresh !== null && (
+                {/* 底部只留换酒（管理⋯已上移頭像行，见 DEF-20261003-008）。 */}
+                {fresh !== null && (
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button variant="outline" size="sm" onClick={handleSwapToggle}>
                       <Dices size={15} aria-hidden />
                       {t("swapBeer")}
                     </Button>
-                  )}
-                  {confirmDelete ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-destructive text-destructive"
-                      onClick={() => {
-                        void handleDeleteWant();
-                      }}
-                    >
-                      <Trash2 size={15} aria-hidden />
-                      {t("confirmDelete")}
-                    </Button>
-                  ) : (
-                    /* UR E.10：删除收进 ⋯ 菜单（原型 §1；两段确认沿用，确认行不变）。
-                       UR E.13：加站内分享项（仅 DB 真行；本地单机记录无 id 不挂）。 */
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        aria-label={t2("checkinMore")}
-                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
-                      >
-                        <MoreHorizontal size={16} aria-hidden />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className={styles.v2scope}>
-                        <DropdownMenuGroup>
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onClick={() => setConfirmDelete(true)}
-                          >
-                            <Trash2 size={15} aria-hidden />
-                            {t("deleteEntry")}
-                          </DropdownMenuItem>
-                          {rec.id !== undefined && rec.id !== "" && (
-                            <DropdownMenuItem
-                              onClick={() =>
-                                setShareTarget({
-                                  checkinId: rec.id as string,
-                                  snippet: rec.placeName ?? fresh?.name ?? t("you"),
-                                  place: rec.placeName ?? "",
-                                  lat: rec.position.lat,
-                                  lng: rec.position.lng,
-                                })
-                              }
-                            >
-                              <Share2 size={15} aria-hidden />
-                              {t2("checkinShareToFriend")}
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuGroup>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
+                  </div>
+                )}
                 {/* UR E.7：留言（mine 回顯有 DB id 才掛；本地單機記錄無行不掛）。 */}
                 {rec.id !== undefined && rec.id !== "" ? (
                   <V2Comments checkinId={rec.id} anchorId="v2c-self" />
