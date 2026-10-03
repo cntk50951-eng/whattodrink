@@ -1365,7 +1365,6 @@ export function V2Home() {
                     )}
                   </AvatarFallback>
                 </Avatar>
-                </span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className={styles.v2scope}>
                 {/* DEF-009：Label 必須在 Group 內（base-ui GroupLabel 硬性要求，游離即炸） */}
