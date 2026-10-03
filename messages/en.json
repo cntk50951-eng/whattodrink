@@ -349,6 +349,8 @@
     "chatRetry": "Retry",
     "chatOnlineGroup": "Online",
     "chatOfflineGroup": "Offline",
+    "chatBellLabel": "New message notifications",
+    "chatBellNew": "New message",
     "chatLocate": "Locate on map",
     "chatMe": "Me",
     "chatAttach": "Attach",

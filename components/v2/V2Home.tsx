@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import {
+  Bell,
   Camera,
   ChevronLeft,
   ChevronRight,
@@ -45,11 +46,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { V2Comments } from "@/components/v2/V2Comments";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMyMode } from "@/hooks/useMyMode";
 import { useFriendRelation } from "@/hooks/useFriendRelation";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useLiveFriends } from "@/hooks/useLiveFriends";
+import { useChatBell } from "@/hooks/useChatBell";
 import { V2FriendCard } from "./V2FriendCard";
 import { V2RevealOverlay } from "./V2RevealOverlay";
 import { revealPhotoAt, revealPhotoCount } from "@/components/drinks/gallery";
@@ -330,6 +333,10 @@ export function V2Home() {
     if (noteTimer.current !== null) window.clearTimeout(noteTimer.current);
     noteTimer.current = window.setTimeout(() => setNote(null), 2500);
   }
+  // UR D.5：顶部 Bell（在线才响＋才订；新消息即轻提示一下，点 Bell 进列表看红点）。
+  const { total: bellTotal } = useChatBell(presence === "online", () => {
+    flashNote(t2("chatBellNew"));
+  });
 
   // 登入態＋牆紅點＋酒目錄＋乾杯額度（mount 各一次，沿既有配方）
   // UR C.16：頭像資料同源 auth（沿 v1 HeaderAuth 口徑：metadata 取名＋圖）。
@@ -1402,6 +1409,22 @@ export function V2Home() {
               </p>
             )}
           </div>
+          {/* UR D.5：顶部 Bell（总未读>0 才显；点进好友列表看各行红点；
+              读完即灭，已读不重现。未登录／隐身不显示，hook 门内已挡）。 */}
+          {isAuthed === true && bellTotal > 0 && (
+            <Button
+              size="icon"
+              variant="outline"
+              aria-label={t2("chatBellLabel")}
+              onClick={goChatList}
+              className="relative h-11 w-11 shrink-0 rounded-full bg-card shadow-md ring-1 ring-foreground/10"
+            >
+              <Bell size={18} aria-hidden />
+              <Badge className="absolute -top-1 -right-1 h-5 min-w-5 rounded-full px-1">
+                {bellTotal > 99 ? "99+" : bellTotal}
+              </Badge>
+            </Button>
+          )}
         </div>
 
       {/* 橫滑 pills（容器內緊貼頂欄行，同一左對齊；UR C.12：橫滑保留，禁雙擊縮放） */}

@@ -349,6 +349,8 @@
     "chatRetry": "重試",
     "chatOnlineGroup": "在線",
     "chatOfflineGroup": "離線",
+    "chatBellLabel": "新訊息通知",
+    "chatBellNew": "有新訊息",
     "chatLocate": "地圖定位",
     "chatMe": "我",
     "chatAttach": "加附件",

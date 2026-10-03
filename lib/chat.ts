@@ -130,6 +130,27 @@ export type FriendListEntry = {
   updated_at: number | null;
 };
 
+/**
+ * UR D.5 Bell 未读汇总（纯函数）：conversations 行数组 → 总未读。
+ * 坏行按 0 计（逐行窄校验，坏行不炸汇总，沿 toChatMessage 口径）；
+ * 非数组回 0；小数下取整、负数钳零。
+ */
+export function sumUnread(rows: unknown): number {
+  if (!Array.isArray(rows)) return 0;
+  let total = 0;
+  for (const r of rows) {
+    if (typeof r !== "object" || r === null) continue;
+    const u = (r as Record<string, unknown>).unread;
+    if (typeof u !== "number" || !Number.isFinite(u) || u <= 0) continue;
+    total += Math.floor(u);
+  }
+  return total;
+}
+
+/**
+ * UR D.4 列表合併排序（純函數）：好友全量＋會話末動 map →
+ * 在線組置頂＋離線在後，組內按末信倒序，無記錄沉底（按暱稱穩序）。
+ */
 export function mergeFriendList(
   friends: { user_id: string; nickname: string; avatar_url: string | null; online: boolean }[],
   updatedByPeer: Map<string, number>,

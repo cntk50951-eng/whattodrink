@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { appendLocalEcho, formatChatTime, formatListTime, formatSeenAgo, mergeFriendList, mockThread, toChatAttachments } from "./chat";
+import { appendLocalEcho, formatChatTime, formatListTime, formatSeenAgo, mergeFriendList, mockThread, sumUnread, toChatAttachments } from "./chat";
 
 const NOW = 1_757_000_000_000;
 
@@ -93,5 +93,20 @@ describe("toChatAttachments", () => {
   });
   it("非數組回空", () => {
     expect(toChatAttachments(null)).toEqual([]);
+  });
+});
+
+describe("sumUnread", () => {
+  it("各行 unread 求和", () => {
+    expect(sumUnread([{ unread: 2 }, { unread: 0 }, { unread: 5 }])).toBe(7);
+  });
+  it("壞行按 0（非對象／缺鍵／非數／NaN／負數）", () => {
+    expect(
+      sumUnread([{ unread: 3 }, null, "x", {}, { unread: "2" }, { unread: NaN }, { unread: -4 }]),
+    ).toBe(3);
+  });
+  it("非數組回 0，小數下取整", () => {
+    expect(sumUnread(null)).toBe(0);
+    expect(sumUnread([{ unread: 2.9 }])).toBe(2);
   });
 });

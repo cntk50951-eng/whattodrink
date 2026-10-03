@@ -2536,10 +2536,11 @@ UR D.4　好友消息列表＋未讀＋已讀✓✓ [WIP]
 - 2026-09-27 fix（用戶回包定罪：`peer: null`——RLS 只許讀自己 membership 行，路由拿不到對方）：列表＋read-status 改 authed 驗身份＋service 查對方行（建會話同口徑）；tsc 淨／lint 0 error；用戶重啟 server 複驗通過
 - 2026-09-27 fix（同樹回退事故）：D.4 未提交文檔區（本 UR 擴充＋改動記錄）被整樹回退吃掉，已重建；代碼區同步重驗（見 memory）；待複驗＋合入
 
-UR D.5　推送（a 前台含於 D.3／b 後台推播另期）[]
+UR D.5　推送（a 前台含於 D.3／b 後台推播本期一起）[WIP]
 
 - D.5a：含於 D.3（前台訂閱＋降級），本條不單獨驗收
-- D.5b（另期）：`devices(platform, push_token)`（A.4-15 未建）＋寫入後 server 扇出（Web Push 先行，APNs／FCM 隨原生；pg_net 或 QStash 削峰重試，量級到了才上）；payload 只帶誰＋哪會話不帶正文（鎖屏隱私＋PDPO）；`muted`／隱身／陌生人三刀
+- D.5b（本期一起，用戶 2026-10-03 定案）：`devices(platform, push_token)`（A.4-15 未建）＋寫入後 server 扇出（Web Push 先行，APNs／FCM 隨原生；pg_net 或 QStash 削峰重試，量級到了才上）；payload 只帶誰＋哪會話不帶正文（鎖屏隱私＋PDPO）；`muted`／隱身／陌生人三刀
+- 2026-10-03：範圍擴充置 [WIP]（用戶問答定案：v2-only／前台 Realtime 即時／頂部 Bell＋列表紅點聯動：Bell 僅總未讀>0 才顯，點進列表，讀完即滅，已讀不重現／後台推播本期一起做；iOS 非安裝 PWA 無 Web Push 系統限制，站內 Bell 补偿；E.8 留言 Bell 另表另議，本次不共表不聚合）
 
 UR D.6　圖片＋語音附件 [WIP]
 
