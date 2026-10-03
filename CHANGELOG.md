@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+### Fixed
+- **DEF-20261003-002 Bell 门禁＋列表即时（v2-only，已合入 main，用户亲验通过）**
+  - 确诊：远端 `GET /conversations` 200 且 `unread:1`，服务端正常——Bell 不出因 `useChatBell(presence==="online")` 被模式门挡（`mode===null` 加载窗 fail-closed 为 stealth；隐身恒挡），首页全程无该请求；列表红点不翻因首载一次性、无订阅无回焦刷新
+  - 用户定案：任何模式都提醒，只挡匿名——`V2Home` 改 `useChatBell(isAuthed===true)`（渲染侧本就只认 `isAuthed`，数据侧对齐；心跳／live 好友仍走 presence 门不动）；hook 注释同步
+  - 列表页加 `chat-list` 频道（`messages` INSERT 沿 D.3 同一条，不新增 publication）＋`focus` 回焦重拉（好友缓存 `friendsRef`，会话重排；断网静默保旧）
+  - 三闸：tsc 净；lint／test 按用户偏好跳过，本地亲验覆盖；数据文档无需更新（零新增持久化）
+  - 用户本地亲验通过（pill 啤酒杯角标／5s 定时抖／进列表红点／进房读完即灭；公开＋隐身）＋随本车合入 main
+  - 用户纠正返工：顶部独立钮退役，角标改挂好友列表 pill 右上角（`relative`  wrap＋`Badge absolute -top-2 -right-2`，`99+` 封顶＋计数 `aria-label`；横滑容器补 `pt-1` 防裁剪；`Bell` import 删干净；tsc 净）
+  - 验收返工 round-2：角标顶部仍被裁（`overflow-x-auto` 下 y 方向按 auto 裁，`pt-1` 不够）——容器 `pt-2`＋角标退 `-top-1 -right-1` 落进 padding 盒内；新消息要抖动——`bellTotal` 上跳沿边觸發 pill 抖一次（`v2pillShake` 0.9s rotate±6°，播完即收，reduced-motion 全关；含首载 0→N）；tsc＋lint 雙淨
+  - 验收返工 round-3：数字徽改啤酒气泡徽（`v2beerBadge` 琥珀渐变＋`::before` 泡沫盖＋三粒 `v2beerBubble` 错峰上冒 1.5s 常驻循环，数字包 `relative` 保可读，`overflow-hidden` 收泡，reduced-motion 留静态；抖动幅度加大到 ±8°，触发语义不变——只播一次，HMR 不重播）；tsc＋lint 雙淨
+  - 验收返工 round-4：圆徽退役改迷你啤酒杯角标（`v2beerMug` 杯身＋内嵌泡沫顶＋`::after` 小把手＋`v2beerCount` 压杯中＋两粒 `v2mugBubble` 杯内上冒，一个元素不再分离；`top:-6px` 落 `pt-2` 盒内；抖动改 5s 定时——有未读先抖一次之后每 5s 抖 0.9s，读完即停，`prevBellRef` 沿边逻辑退役）；tsc＋lint 雙淨
+  - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 ### Added
 - **UR D.5 推送 P1 顶部 Bell＋全局 Realtime（v2-only，[WIP]，待亲验）**
   - `hooks/useChatBell.ts` 新（在线才拉取＋订阅：`GET /conversations` 求和＋`messages` INSERT 全局订阅沿 B.2 RLS 口径，到对方行即重算＋toast；匿名／隐身门内挡，hidden 不拉，卸载拆频道）

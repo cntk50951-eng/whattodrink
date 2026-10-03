@@ -6,13 +6,14 @@ import { createClient } from "@/lib/supabase/client";
 import { sumUnread } from "@/lib/chat";
 
 /**
- * UR D.5 顶部 Bell（v2-only）：全局未读汇总＋新消息即时感知。
+ * UR D.5 好友列表 pill 角标（v2-only）：全局未读汇总＋新消息即时感知。
  * - 总数：`GET /conversations` 各行 unread 求和（`sumUnread` 纯函数；坏行按 0）。
  * - 即时：全局订阅 `messages` INSERT（RLS 只放行我能读的行，沿 B.2 口径；
  *   Publication 沿 D.3 `messages` 同一条，不新增表不新增 publication）。
  *   到行且发件人非我 → 重算总数＋调 `onNewMessage`（调用方走 flashNote）。
- * - 门禁：`enabled` 假（匿名／隐身）即不拉不订，返回总数恒 0
- *  （沿 useLiveFriends 失能即空口径）；hidden 页不拉取；卸载拆频道。
+ * - 门禁：`enabled` 假（匿名）即不拉不订，返回总数恒 0；
+ *  用户定案 2026-10-03：任何模式（公开／好友／隐身）都提醒，模式不挡 Bell
+ * （心跳／live 好友仍走 presence 门，不动）；hidden 页不拉取；卸载拆频道。
  */
 export function useChatBell(
   enabled: boolean,

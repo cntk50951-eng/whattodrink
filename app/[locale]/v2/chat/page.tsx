@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { setActivePeer } from "@/lib/chatPeer";
+import { createClient } from "@/lib/supabase/client";
 import { formatListTime, mergeFriendList, type FriendListEntry } from "@/lib/chat";
 import styles from "@/components/v2/v2.module.css";
 
@@ -52,6 +53,34 @@ export default function V2ChatListPage() {
   // 列表時間錨點凍結（render 內禁 impure，沿 V2FriendCard 口徑）。
   const [nowMs] = useState(() => Date.now());
 
+  // DEF-20261003-002：好友缓存（首载后留存，供新消息到达时重排，不重拉好友）。
+  const friendsRef = useRef<
+    { user_id: string; nickname: string; avatar_url: string | null; online: boolean }[]
+  >([]);
+  // DEF-20261003-002：会话重拉（新消息／回焦时刷新未读＋末句＋排序，好友源不动）。
+  const refreshConvos = useCallback(async (): Promise<void> => {
+    try {
+      const cRes = await fetch("/api/v1/conversations?limit=50", { credentials: "include" });
+      if (!cRes.ok) return;
+      const cJson = (await cRes.json().catch(() => null)) as {
+        conversations?: ConvoRow[];
+      } | null;
+      const convos = Array.isArray(cJson?.conversations) ? (cJson as { conversations: ConvoRow[] }).conversations : [];
+      const updated = new Map<string, number>();
+      const byPeer = new Map<string, ConvoRow>();
+      for (const c of convos) {
+        if (c.peer !== null) {
+          updated.set(c.peer.user_id, c.updated_at);
+          byPeer.set(c.peer.user_id, c);
+        }
+      }
+      setEntries(mergeFriendList(friendsRef.current, updated));
+      setConvoByPeer(byPeer);
+    } catch {
+      // 断网：静默保持旧列表（fail-closed，不炸页）
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -71,6 +100,7 @@ export default function V2ChatListPage() {
           if (!cancelled) setLoaded(true);
           return;
         }
+        friendsRef.current = fJson?.friends ?? [];
         const convos = Array.isArray(cJson?.conversations) ? (cJson as { conversations: ConvoRow[] }).conversations : [];
         const updated = new Map<string, number>();
         const byPeer = new Map<string, ConvoRow>();
@@ -81,7 +111,7 @@ export default function V2ChatListPage() {
           }
         }
         if (cancelled) return;
-        setEntries(mergeFriendList(fJson?.friends ?? [], updated));
+        setEntries(mergeFriendList(friendsRef.current, updated));
         setConvoByPeer(byPeer);
         setLoaded(true);
       } catch {
@@ -93,6 +123,43 @@ export default function V2ChatListPage() {
       cancelled = true;
     };
   }, []);
+
+  // DEF-20261003-002：列表页即时＋回焦刷新（坐列表页等消息也翻红点；
+  // 沿 useChatBell 同一条 messages INSERT，不新增 publication）。
+  useEffect(() => {
+    let channel: { unsubscribe: () => void } | null = null;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const supabase = createClient();
+        if (cancelled) return;
+        const ch = supabase
+          .channel("chat-list")
+          .on(
+            "postgres_changes",
+            { event: "INSERT", schema: "public", table: "messages" },
+            () => {
+              void refreshConvos();
+            },
+          )
+          .subscribe();
+        channel = { unsubscribe: () => ch.unsubscribe() };
+      } catch {
+        // Publication 未开／断线：保持首载值，回焦刷新仍在（沿 D.3 口径）
+      }
+    })();
+    const onFocus = (): void => {
+      void refreshConvos();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      try {
+        channel?.unsubscribe();
+      } catch {}
+    };
+  }, [refreshConvos]);
 
   const online = entries.filter((e) => e.online);
   const offline = entries.filter((e) => !e.online);

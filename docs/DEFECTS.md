@@ -63,7 +63,7 @@
 | DEF-20261002-001 | Ivy Bar 手机语音对讲一直录不上 | Fixing | P1 | 2026-10-02 / @user | UR F.1 | iPhone 浏览器无 SpeechRecognition，对讲链空转，见详情 |
 | DEF-20261002-002 | Ivy Bar 手机打字时键盘把 Ivy 顶出屏幕 | Fixing | P2 | 2026-10-02 / @user | UR F.1 | 待确认，见详情 |
 
-| DEF-20261003-002 | 好友发消息无 Bell 且列表无红点 | Investigating | P1 | 2026-10-03 / @user | UR D.5 | 待确认，见详情 |
+| DEF-20261003-002 | 好友发消息无 Bell 且列表无红点 | Fixed | P1 | 2026-10-03 / @user | UR D.5 | 前端双门（模式门＋列表一次性），见详情 |
 | DEF-20261003-003 | 消息列表加载 500 读取会话失败 | Fixed | P0 | 2026-10-03 / @user | UR D.6 | kind enum→text 缺显式转换（42804），0016 已跑＋200 已验，见详情 |
 
 ### DEF-20260927-002 locale 根首頁不跳 v2（/zh-Hans 落 v1）
@@ -720,7 +720,7 @@
 
 ### DEF-20261003-002 好友发消息无 Bell 且列表无红点
 
-- **状态**：Investigating（2026-10-03 当轮落条先记后查）
+- **状态**：Fixed（2026-10-03 用户本地亲验通过，已合入 main；远端复验后转 Verified；关联 UR D.5 复用）
 - **严重度**：P1 主要（D.5 通知主链：Bell＋红点双无等于通知全断）
 - **发现日期 / 报告人**：2026-10-03 / @user
 - **复现步骤**：
@@ -733,8 +733,10 @@
 - **确诊根因**：强相关 DEF-20261003-003（`GET /conversations` 500 则服务端 unread 永不可读，Bell 与红点同源双灭；用户已排除“先进房”（停主页→点列表），A 支排除；B/C 支待 003 定罪后复看——若 003 修好后红点出而 Bell 不出，再拆 Bell 分支）
 - **E 支（2026-10-03 代码实证新增）**：`messages` 表 Realtime 从未进仓（`supabase/migrations` 全仓 grep publication／replica 零命中；D.3 改动记录“Publication 待用戶開”后无执行回填）——若 Dashboard 也没手动开，则房内即时＋Bell 即时全聋，坐主页等多久都不刷。表现与本次“停留主页无 Bell”完全一致，且与 003 是**叠加关系**（003 坏则总数永 0，Publication 关则活不更新，两条各杀一半）
 - **F 支（2026-10-03 用户终端定罪 003，002 同源）**：`code=42804` 即 003 确诊（`kind` enum→text，`0016` 已跑＋200 已验，随 A 车合入）——在这之前 Bell 总数永 0、红点永不出，与模式无关。0016 合入后复验 002，若 Bell 出而行为仍不及预期再拆隐身分支
+- **G 支（2026-10-03 远端复验反转）**：`fetch origin/main` 后本地＝远端＝`d6063f6`（此前 `origin/main` 引用过期误报落后 2 个提交；`push` 回 `Everything up-to-date`）——“远端无代码”排除，Bell 代码在远端已在服。且用户远端 `GET /conversations` 回 200、`unread:1`（`HK Trash` 公开发送），服务端总数为 1，Bell 应显而未显——定罪转向前端三道门（`V2Home.tsx:1414 isAuthed===true && bellTotal>0`＋`useChatBell(presence==="online")`，`presence` 在 `mode===null` 加载窗内 fail-closed 为 `stealth` 即 `enabled=false`；另 `document.hidden`／`res.ok` 静默分支）。待用户补首页 Network（有无该请求＋回包）一定是门禁哪一刀
 - **关联 UR**：UR D.5（P1 Bell；修法：003 修好后复验，Bell 仍不及预期则查隐身门禁／发送 403／误投三支）
-- **修复验证**：待定
+- **确诊根因（2026-10-03，远端 200＋unread:1 定罪）**：服务端正常，问题在前端两处——① Bell 数据门 `useChatBell(presence==="online")`（`V2Home.tsx:337`）：`mode===null` 加载窗 fail-closed 为 stealth＋隐身恒挡，首页全程无 `GET /conversations` 请求（用户实证），总数恒 0；渲染门 `isAuthed===true && bellTotal>0` 本就模式无关，数据侧与之对不齐。② 列表一次性（`page.tsx` mount 拉一次，无订阅无回焦）：坐列表页等消息永不翻红点。修法＝用户定案“任何模式都提醒，只挡匿名”：Bell 改 `useChatBell(isAuthed===true)`（心跳／live 好友仍走 presence 门）；列表加 `chat-list` 频道＋`focus` 重拉（`friendsRef` 缓存，沿 D.3 同一条 publication）
+- **修复验证**：用户本地亲验通过（pill 啤酒杯角标显／5s 定时抖／进列表红点／进房读完即灭；公开＋隐身两遍）；tsc＋lint 双净；test 按偏好跳过
 - **回归范围**：Bell 汇总、列表红点、读水位、发送守卫
 
 ### DEF-20261003-003 消息列表加载 500 读取会话失败
