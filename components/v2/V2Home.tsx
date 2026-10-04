@@ -575,12 +575,14 @@ export function V2Home() {
       // 本地 SVG 組件一併帶下（地圖 createRoot 注入），無圖回 img／emoji 舊鏈
       wantHistory.map((w) => {
         // UR E.3：无酒打卡钉走照片主视觉（📷 通用钉，无品牌图链）。
+        // UR E.17：有实拍即缩影钉（photoDataUrl 本地 data:，Sheet 同源）。
         const fresh = w.beer === null ? null : resolveFreshBeer(w.beer);
         return {
           id: `want-${w.at}`,
           lat: w.position.lat,
           lng: w.position.lng,
           emoji: fresh === null ? "📷" : fresh.emoji,
+          photoUrl: w.photoDataUrl ?? null,
           iconUrl:
             fresh !== null &&
             fresh.icon_url !== undefined && fresh.icon_url !== null && fresh.icon_url !== ""
@@ -670,7 +672,7 @@ export function V2Home() {
   }, [trailOn, stopsOpen]);
   const wantMarkers = useMemo(
     () =>
-      wants.map((w) => ({ id: w.id, lat: w.lat, lng: w.lng, emoji: w.emoji, iconUrl: w.iconUrl, Icon: w.Icon })),
+      wants.map((w) => ({ id: w.id, lat: w.lat, lng: w.lng, emoji: w.emoji, iconUrl: w.iconUrl, Icon: w.Icon, photoUrl: w.photoUrl })),
     [wants],
   );
   // UR C.11 round-9（DEF-002）：self 防抖——watch 每回調都換對象，

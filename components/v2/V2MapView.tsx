@@ -47,6 +47,8 @@ export type V2WantMarker = {
   iconUrl: string | null;
   /** UR A.20：本地 SVG 組件（有則 createRoot 注入優先於 img／emoji）。 */
   Icon: BeerIconComponent | null;
+  /** UR E.17：实拍缩影（data:/http 均可；有即钉面第一优先，无则沿旧链）。 */
+  photoUrl: string | null;
 };
 
 export type V2TrailMarker = {
@@ -675,10 +677,25 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       });
     }
 
-    // 我的想喝釘（UR A.20 本地 SVG 注入優先；無圖沿舊 img／emoji 鏈）
+    // 我的想喝釘（UR E.17 实拍缩影第一优先；无拍沿 A.20 本地 SVG 注入；再无沿旧 img／emoji 鏈）
     // UR E.6 热点模式藏自家钉（纯热斑）。
     if (!heatMode) {
       for (const w of wants) {
+      if (w.photoUrl !== null && /^(https?:\/\/|data:image\/)/.test(w.photoUrl)) {
+        // UR C.14 round-2：想喝釘也避 live（自家想喝常與自釘同點）。
+        const [wlat0, wlng0] = nudge(`w:${w.id}`, w.lat, w.lng);
+        const marker = L.marker([wlat0, wlng0], {
+          icon: L.divIcon({
+            className: "",
+            html: `<div class="${styles.v2pinWantImg}"><img src="${escAttr(w.photoUrl)}" alt="" loading="lazy" /></div>`,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20],
+          }),
+        });
+        marker.on("click", () => cbRef.current.onWantClick(w.id));
+        marker.addTo(layer);
+        continue;
+      }
       if (w.Icon !== null) {
         const Icon = w.Icon;
         // UR C.14 round-2：想喝釘也避 live（自家想喝常與自釘同點）。

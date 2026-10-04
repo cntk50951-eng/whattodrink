@@ -21,6 +21,9 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR E.17 自家釘实拍缩影（v2-only，[✓]，用戶手機親驗通過，隨本車合入）**
+  - `V2WantMarker.photoUrl`＋两映射透传；钉层实拍第一优先（data:/http），无拍沿旧链；同步钉不动（pins API 无 photo 字段，另议）
+  - tsc＋lint 雙淨；vitest 按偏好跳過（純視覺無邏輯分支）；`git status` 無 v1
 - **UR E.16 約喝酒邀請＋好友列表邀請籤（v2-only，[✓]，用戶雙人親驗通過，隨本車合入）**
   - 後端：0023（place／start／expires／recalled＋RLS 双边读／from 写／双边改）＋`POST /invites`（checkin 解作者＋自約／隱身／對方隱身屏蔽中性 403＋3／天同對象1／天 429）＋`GET ?box`（is_friend）＋`PATCH :id`（accept 自动双向好友＋會話調用方建／decline 静默／recall；过期 410）
   - 前端：卡片內 composer（店＋三段時＋陌生首見安全提示＋發出等待態；mock 退役）＋列表好友／邀請雙籤（待回倒計時＋陌生人折叠＋已約好卡安全卡去聊天＋送出等待撤回未成局）＋Bell 併入＋好友邀 toast（陌生人只亮入口）＋隱身切換並續
