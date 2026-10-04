@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import {
+  Beer as BeerIcon,
   Camera,
   ChevronLeft,
   ChevronRight,
@@ -18,6 +19,7 @@ import {
   Globe,
   LoaderCircle,
   LocateFixed,
+  Lock,
   LogOut,
   Map as MapIcon,
   MapPin,
@@ -49,6 +51,7 @@ import {
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { V2Comments } from "@/components/v2/V2Comments";
 import { FriendPicker, ShareDoneDialog } from "@/components/v2/FriendPicker";
+import { CheersMailbox } from "@/components/v2/CheersMailbox";
 import { CheckinDetailExtra } from "@/components/v2/CheckinDetailExtra";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMyMode } from "@/hooks/useMyMode";
@@ -57,6 +60,7 @@ import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useLiveFriends } from "@/hooks/useLiveFriends";
 import { useChatBell } from "@/hooks/useChatBell";
 import { useCheersInbox } from "@/hooks/useCheersInbox";
+import { useInvitesInbox } from "@/hooks/useInvitesInbox";
 import { V2FriendCard } from "./V2FriendCard";
 import { V2RevealOverlay } from "./V2RevealOverlay";
 import { revealPhotoAt, revealPhotoCount } from "@/components/drinks/gallery";
@@ -333,11 +337,24 @@ export function V2Home() {
   const [cheersFx, setCheersFx] = useState<{ id: string; key: number } | null>(null);
   // UR E.14：敬后权威计数对账（Extra refreshTick 翻即重拉）。
   const [cheersTick, setCheersTick] = useState(0);
+  // UR E.15：敬酒留言草稿（按钮下可尔输入＋快捷短语；随 POST 发，成功即清）。
+  const [cheersMsg, setCheersMsg] = useState("");
+  const [cheersMsgOpen, setCheersMsgOpen] = useState(false);
   const [reducedMotion] = useState(
     () =>
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
+  // UR E.15 信箱开关（地图右缘入口＋未读点，沿 C.11 工具列口径）。
+  const [mailOpen, setMailOpen] = useState(false);
+  // UR E.15：切换并敬（pending intent；切完自动补敬，不丢冲动）＋同会话免打扰旗。
+  const pendingCheersRef = useRef<string | null>(null);
+  const refusedCheersRef = useRef(false);
+  const firePendingCheers = (): void => {
+    const id = pendingCheersRef.current;
+    pendingCheersRef.current = null;
+    if (id !== null) handleCheers(id);
+  };
   // UR E.13 round-2：分享完成去留（成功者 uid＋失败数；单人直进房，多人进列表）。
   const [shareDone, setShareDone] = useState<{ ok: string[]; failed: number } | null>(null);
   const [otherConfirmDelete, setOtherConfirmDelete] = useState(false);
@@ -370,10 +387,14 @@ export function V2Home() {
     flashNote(t2("chatBellNew"));
   });
   // UR E.14：乾杯未读并入 Bell 总数（pill 即未读总数；toast 🍻 可辨，沿 UR 定案）。
-  const { unread: cheersUnread, refresh: refreshCheers } = useCheersInbox(isAuthed === true, () => {
-    flashNote(t2("cheersNew"));
+  const { unread: cheersUnread, refresh: refreshCheers } = useCheersInbox(isAuthed === true, (n) => {
+    flashNote(t2("cheersNewMulti", { n }));
   });
-  const bellAll = bellTotal + cheersUnread;
+  // UR E.16：邀請未读并入 Bell 总数（陌生人不 toast，只亮入口，沿 UR 定案）。
+  const { pending: invitePending, refresh: refreshInvites } = useInvitesInbox(isAuthed === true, () => {
+    flashNote(t2("inviteNew"));
+  });
+  const bellAll = bellTotal + cheersUnread + invitePending;
   // UR E.14：开自己面板即标已读（fire-and-forget；只清数，名单照看）。
   useEffect(() => {
     if (wantSheetAt === null || isAuthed !== true) return;
@@ -771,6 +792,8 @@ export function V2Home() {
   function openPin(id: string): void {
     // 他人卡進 Sheet：關自家 Sheet（互斥， latest tap 贏）。
     setWantSheetAt(null);
+    setCheersMsg("");
+    setCheersMsgOpen(false);
     const api = apiPins.find((p) => p.id === id);
     if (api !== undefined) {
       setCard({
@@ -978,9 +1001,16 @@ export function V2Home() {
   function handleCheers(id: string): void {
     // DEF-009 修正：乾杯除隱身直過（加好友門只攔邀約）。
     if (mode === "stealth") {
+      // UR E.15 免打扰：同会话拒绝过一次，再点只轻提示（不重弹面板）。
+      if (refusedCheersRef.current) {
+        flashNote(t2("cheersNudge"));
+        return;
+      }
       setFriendState("unknown");
       setAddState("idle");
       setGuard({ action: "cheers", target: id });
+      pendingCheersRef.current = id;
+      pendingInviteRef.current = null;
       return;
     }
     if (cheersFx !== null || sentIds.includes(id) || !canCheers(sentIds)) return;
@@ -999,57 +1029,120 @@ export function V2Home() {
   }
 
   async function postCheers(id: string): Promise<void> {
+    // 留言同行（草稿在按钮下可尔输入；空即无，沿 FriendPicker 口径）。
+    const msg = cheersMsg.trim().slice(0, 40);
     try {
       const res = await fetch("/api/v1/cheers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ checkin_id: id }),
+        body: JSON.stringify(msg === "" ? { checkin_id: id } : { checkin_id: id, message: msg }),
       });
       if (!res.ok) {
-        if (res.status === 429) flashNote(t("cheersLimitReached"));
-        else flashNote(t2("cheersFailed"));
+        // 服务端明文优先（对方隐身中性码／同对象限额／上限，沿 E.15 口径）。
+        const j = (await res.json().catch(() => null)) as {
+          error?: { message?: unknown };
+        } | null;
+        const serverMsg =
+          typeof j?.error?.message === "string" && j.error.message !== "" ? j.error.message : null;
+        flashNote(serverMsg ?? (res.status === 429 ? t("cheersLimitReached") : t2("cheersFailed")));
         return;
       }
       const next = [...sentIds, id];
       setSentIds(next);
       saveSentToday(next, new Date());
+      setCheersMsg("");
+      setCheersMsgOpen(false);
       setCheersTick((v) => v + 1);
     } catch {
       flashNote(t2("cheersFailed"));
     }
   }
 
-  function fireInvite(id: string): void {
-    if (invites[id] !== undefined) return;
-    setInvites((prev) => ({ ...prev, [id]: "sent" as const }));
-    window.setTimeout(() => {
-      buzz(BUZZ_FOUND);
-      setInvites((prev) => ({ ...prev, [id]: "accepted" as const }));
-    }, 3000);
-  }
+  // UR E.16 真邀約流程（mock 退役）：隱身走 guard；匿名先登入；
+  // 登入直開 composer（陌生人不攔，沿問答可約＋分層口徑）。
+  const [inviteFor, setInviteFor] = useState<string | null>(null);
+  const [inviteBar, setInviteBar] = useState("");
+  const [inviteSlot, setInviteSlot] = useState<"now" | "half" | "tonight">("now");
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteStrangerTip, setInviteStrangerTip] = useState(false);
+  const pendingInviteRef = useRef<string | null>(null);
+  const firePendingInvite = (): void => {
+    const id = pendingInviteRef.current;
+    pendingInviteRef.current = null;
+    if (id !== null) openInviteComposer(id);
+  };
 
   function handleInvite(id: string): void {
-    // 隱身全攔；匿名直過；authed 查關係（好友／未知直過，非好友彈加好友層）。
+    // 隱身走 guard（切換並繼續）；匿名先登入；登入直開 composer（陌生不攔）。
     if (mode === "stealth") {
       setFriendState("unknown");
       setAddState("idle");
       setGuard({ action: "invite", target: id });
+      pendingInviteRef.current = id;
+      pendingCheersRef.current = null;
       return;
     }
     if (isAuthed === false) {
-      fireInvite(id);
+      flashNote(t("loginRequiredTitle"));
       return;
     }
+    openInviteComposer(id);
+  }
+
+  // 邀約 composer（店＋時段；陌生人首見安全提示，localStorage 记一次）。
+  function openInviteComposer(id: string): void {
+    setInviteFor(id);
+    setInviteBar("");
+    setInviteSlot("now");
+    setInviteStrangerTip(false);
     void isFriendCached(id).then((rel) => {
-      if (rel !== false) {
-        fireInvite(id);
+      if (rel !== false) return;
+      try {
+        if (window.localStorage.getItem("wtd-invite-safety") !== "1") {
+          setInviteStrangerTip(true);
+        }
+      } catch {
+        setInviteStrangerTip(true);
+      }
+    });
+  }
+
+  async function sendInvite(): Promise<void> {
+    if (inviteFor === null || inviteBusy) return;
+    const bar = inviteBar.trim();
+    if (bar === "") return;
+    setInviteBusy(true);
+    try {
+      const res = await fetch("/api/v1/invites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ checkin_id: inviteFor, place: bar.slice(0, 30), slot: inviteSlot }),
+      });
+      const j = (await res.json().catch(() => null)) as {
+        error?: { message?: unknown };
+      } | null;
+      if (!res.ok) {
+        flashNote(
+          typeof j?.error?.message === "string" && j.error.message !== ""
+            ? j.error.message
+            : t2("cheersFailed"),
+        );
         return;
       }
-      setFriendState("nonfriend");
-      setAddState("idle");
-      setGuard({ action: "invite", target: id });
-    });
+      try {
+        window.localStorage.setItem("wtd-invite-safety", "1");
+      } catch {}
+      setInvites((prev) => ({ ...prev, [inviteFor]: "sent" as const }));
+      setInviteFor(null);
+      setInviteBar("");
+      buzz(BUZZ_FOUND);
+    } catch {
+      flashNote(t2("cheersFailed"));
+    } finally {
+      setInviteBusy(false);
+    }
   }
 
   // 守衛層開層即查關係（有 target 才查；checking 期間 fail-open）。
@@ -1078,10 +1171,10 @@ export function V2Home() {
     void addFriendByCheckin(target).then((st) => {
       if (st === null) return;
       setAddState(st === "accepted" ? "accepted" : "sent");
-      // 公開邀約：加完即發（卡不關，原地續操作；等接受會死胡同）。
+      // 公開邀約：加完即開 composer（卡不關，原地續操作；等接受會死胡同）。
       if (mode === "public" && act === "invite") {
         setGuard(null);
-        fireInvite(target);
+        openInviteComposer(target);
       }
       if (st === "accepted") {
         // 即成好友：關係翻轉（層內選項跟著變對，由 friendState 驅動）。
@@ -1641,6 +1734,26 @@ export function V2Home() {
 
       {/* 右緣工具列 */}
       <div className="absolute top-1/3 right-3 z-[1000] flex flex-col gap-2">
+        {/* UR E.15 信箱入口（登入才挂；未读红点，沿 Bell 角标口径）。 */}
+        {isAuthed === true && (
+          <span className="relative">
+            <Button
+              size="icon"
+              variant="outline"
+              aria-label={t2("mailTitle")}
+              className="rounded-full bg-card shadow-md ring-1 ring-foreground/10"
+              onClick={() => setMailOpen(true)}
+            >
+              <BeerIcon aria-hidden />
+            </Button>
+            {cheersUnread > 0 && (
+              <span
+                aria-hidden
+                className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-destructive ring-2 ring-background"
+              />
+            )}
+          </span>
+        )}
         <Button
           size="icon"
           variant="outline"
@@ -2018,7 +2131,20 @@ export function V2Home() {
 
       {/* 守衛 Sheet（矩陣：stealth 雙鈕／加鈕；friends 非好友公開＋加鈕；
           公開邀約非好友僅加鈕（加完即發）；乾杯除隱身直過不開層） */}
-      <Sheet open={guard !== null} onOpenChange={(v) => !v && setGuard(null)}>
+      <Sheet
+        open={guard !== null}
+        onOpenChange={(v) => {
+          if (!v) {
+            // UR E.15 免打扰：乾杯 pending 下关层＝拒绝过一次（切了模式不算，fire 成功即清）。
+            if (pendingCheersRef.current !== null && mode === "stealth") {
+              refusedCheersRef.current = true;
+            }
+            pendingCheersRef.current = null;
+            pendingInviteRef.current = null;
+            setGuard(null);
+          }
+        }}
+      >
         <SheetContent side="bottom" className={`${styles.v2scope} rounded-t-2xl sm:mx-auto sm:w-full sm:max-w-md`}>
           {guard !== null &&
             (() => {
@@ -2038,26 +2164,81 @@ export function V2Home() {
                       {mode === "friends"
                         ? tm("guardBodyFriend", { action: tm(guardActKey) })
                         : tm("guardBody", { action: tm(guardActKey) })}
+                      {/* UR E.15：乾杯一句話原因（刚好够用，不唠叨）。 */}
+                      {guard.action === "cheers" && (
+                        <span className="block pt-1 font-bold">{t2("guardCheersWhy")}</span>
+                      )}
                     </SheetDescription>
                   </SheetHeader>
                   <div
                     className={`grid gap-2 ${showFriends || fallback ? "grid-cols-2" : "grid-cols-1"}`}
                   >
-                    {(showPublic || fallback) && (
-                      <Button
-                        variant="outline"
-                        onClick={() => void patchMode("public").then(() => setGuard(null))}
-                      >
-                        {tm("switchPublic")}
-                      </Button>
-                    )}
-                    {(showFriends || fallback) && (
-                      <Button
-                        variant="outline"
-                        onClick={() => void patchMode("friends").then(() => setGuard(null))}
-                      >
-                        {tm("switchFriends")}
-                      </Button>
+                    {/* UR E.15：乾杯单推荐（好友→好友模式，陌生→公開；unknown 沿旧双钮）。
+                        切完自动补敬；公開附后果一句。 */}
+                    {guard.action === "cheers" && friendState !== "unknown" ? (
+                      <>
+                        {isNonfriend ? (
+                          <Button
+                            variant="outline"
+                            onClick={() =>
+                              void patchMode("public").then(() => {
+                                setGuard(null);
+                                firePendingCheers();
+                              })
+                            }
+                          >
+                            {t2("switchAndCheers")}（{tm("switchPublic")}）
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            onClick={() =>
+                              void patchMode("friends").then(() => {
+                                setGuard(null);
+                                firePendingCheers();
+                              })
+                            }
+                          >
+                            {t2("switchAndCheers")}（{tm("switchFriends")}）
+                          </Button>
+                        )}
+                        {isNonfriend && (
+                          <p className="text-center text-xs text-muted-foreground">
+                            {t2("guardPublicWarn")}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {(showPublic || fallback) && (
+                          <Button
+                            variant="outline"
+                            onClick={() =>
+                              void patchMode("public").then(() => {
+                                setGuard(null);
+                                firePendingCheers();
+                                firePendingInvite();
+                              })
+                            }
+                          >
+                            {tm("switchPublic")}
+                          </Button>
+                        )}
+                        {(showFriends || fallback) && (
+                          <Button
+                            variant="outline"
+                            onClick={() =>
+                              void patchMode("friends").then(() => {
+                                setGuard(null);
+                                firePendingCheers();
+                                firePendingInvite();
+                              })
+                            }
+                          >
+                            {tm("switchFriends")}
+                          </Button>
+                        )}
+                      </>
                     )}
                     {showAdd && (
                       <Button
@@ -2278,27 +2459,125 @@ export function V2Home() {
                       disabled={cheersFx !== null || !canCheers(sentIds)}
                       className="h-11 flex-1 rounded-full text-[15px] font-bold"
                     >
+                      {/* UR E.15：隐身锁样式（点前即知有门槛；点照进 guard，不断流）。 */}
+                      {mode === "stealth" && <Lock size={15} aria-hidden />}
                       {sentIds.includes(card.id)
                         ? t("cheersSent")
                         : t("cheers")}
                     </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => handleInvite(card.id)}
-                      className="h-11 flex-1 rounded-full text-[15px] font-bold"
-                    >
-                      {invites[card.id] === "accepted"
-                        ? t("inviteAccepted")
-                        : invites[card.id] === "sent"
-                          ? t("inviteSent")
+                    {/* UR E.16 round-2：自家卡藏邀約鈕（服務端本就 403，這裡連入口都不給）。 */}
+                    {otherDetail?.isAuthor !== true && (
+                      <Button
+                        variant="outline"
+                        onClick={() => handleInvite(card.id)}
+                        className="h-11 flex-1 rounded-full text-[15px] font-bold"
+                      >
+                        {invites[card.id] === "sent"
+                          ? t2("inviteWaiting")
                           : t("inviteCta")}
-                    </Button>
+                      </Button>
+                    )}
                   </div>
                   <span className="text-xs text-muted-foreground">
                     {canCheers(sentIds)
                       ? t("cheersLeft", { n: cheersRemaining(sentIds) })
                       : t("cheersLimitReached")}
                   </span>
+                  {/* UR E.15：留言可尔输入（默认收起保一键速度；短语点即填，40 字随 POST）。 */}
+                  {cheersMsgOpen ? (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex flex-wrap gap-1.5">
+                        {[t2("cheersP1"), t2("cheersP2"), t2("cheersP3"), t2("cheersP4")].map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setCheersMsg(p)}
+                            className="shrink-0 rounded-full border px-2.5 py-1 text-xs text-muted-foreground"
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        value={cheersMsg}
+                        onChange={(e) => setCheersMsg(e.target.value)}
+                        placeholder={t2("cheersMsgPh")}
+                        aria-label={t2("cheersMsgPh")}
+                        maxLength={40}
+                        className="h-9 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setCheersMsgOpen(true)}
+                      className="w-fit text-xs text-muted-foreground underline-offset-2 hover:underline"
+                    >
+                      {t2("cheersMsgPh")}
+                    </button>
+                  )}
+                  {/* UR E.16 真邀約 composer（店＋三段時＋陌生首見安全提示；發出即等待態）。 */}
+                  {inviteFor === card.id && otherDetail?.isAuthor !== true && (
+                    <div className="flex flex-col gap-2 rounded-2xl border p-3">
+                      {inviteStrangerTip && (
+                        <p className="text-xs text-muted-foreground">{t2("inviteSafety")}</p>
+                      )}
+                      <input
+                        value={inviteBar}
+                        onChange={(e) => setInviteBar(e.target.value)}
+                        placeholder={t2("inviteBarPh")}
+                        aria-label={t2("inviteBarPh")}
+                        maxLength={30}
+                        disabled={inviteBusy}
+                        className="h-9 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+                      />
+                      <div className="flex gap-1.5">
+                        {(
+                          [
+                            ["now", t2("inviteNow")],
+                            ["half", t2("inviteHalf")],
+                            ["tonight", t2("inviteTonight")],
+                          ] as const
+                        ).map(([v, label]) => (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => setInviteSlot(v)}
+                            disabled={inviteBusy}
+                            aria-pressed={inviteSlot === v}
+                            className={`flex-1 rounded-full border px-2 py-1.5 text-xs font-bold ${
+                              inviteSlot === v
+                                ? "border-primary bg-primary/[0.08] text-primary"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setInviteFor(null)}
+                          className="flex-1 rounded-full"
+                        >
+                          {t("cancel")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => void sendInvite()}
+                          disabled={inviteBar.trim() === "" || inviteBusy}
+                          className="flex-1 rounded-full font-bold"
+                        >
+                          {inviteBusy && (
+                            <LoaderCircle size={14} aria-hidden className="animate-spin" />
+                          )}
+                          {t2("inviteSend")}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex flex-col gap-1.5 text-sm">
                     {card.sub !== "" && (
                       <span className="flex items-center gap-1.5">
@@ -2555,6 +2834,15 @@ export function V2Home() {
       {/* UR E.13 round-2：微信式去留（成功数＋去聊天／留当前）。 */}
       {shareDone !== null && (
         <ShareDoneDialog result={shareDone} onClose={() => setShareDone(null)} />
+      )}
+      {/* UR E.15 信箱（收到／送出双籤；动作后 refreshCheers 刷 Bell）。 */}
+      {mailOpen && (
+        <CheersMailbox
+          open
+          stealth={mode === "stealth"}
+          onClose={() => setMailOpen(false)}
+          onRead={() => refreshCheers()}
+        />
       )}
 
       {/* UR C.11 返工 R-A：記錄目錄 Sheet（目錄；行點即飛＋開 want Sheet 詳情管理） */}

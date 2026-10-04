@@ -1,5 +1,6 @@
 import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { friendIdsOf, type FriendshipRow } from "@/lib/friends";
 
 /**
  * UR E.14 被敬收件箱（🔒）。
@@ -18,7 +19,7 @@ export async function GET(req: Request): Promise<Response> {
       : 20;
   const { data: rows, error } = await supabase
     .from("cheers")
-    .select("id,from_user_id,checkin_id,created_at,seen_at")
+    .select("id,from_user_id,checkin_id,created_at,seen_at,message")
     .eq("to_user_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -49,14 +50,44 @@ export async function GET(req: Request): Promise<Response> {
       id: r.id as string,
       from: { user_id: fromId, nickname: peer.nickname, avatar_url: peer.avatar_url },
       checkin_id: (r.checkin_id as string | null) ?? null,
+      message: typeof r.message === "string" ? r.message : null,
       created_at: r.created_at as string,
       seen: r.seen_at !== null,
     };
   });
+  // UR E.15 互敬＋好友态（互敬卡＋撤销入口；批量各一查，不 N+1）。
+  const peerIds = [...new Set(items.map((i) => i.from.user_id))];
+  let backSet = new Set<string>();
+  let friendSet = new Set<string>();
+  if (peerIds.length > 0) {
+    const { data: backRows } = await supabase
+      .from("cheers")
+      .select("to_user_id")
+      .eq("from_user_id", userId)
+      .in("to_user_id", peerIds);
+    backSet = new Set(
+      (((backRows ?? []) as unknown[]) as { to_user_id: string }[]).map((r) => r.to_user_id),
+    );
+    const { data: fsRows } = await supabase
+      .from("friendships")
+      .select("user_id,friend_id,status")
+      .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+      .limit(200);
+    const frows = ((fsRows ?? []) as unknown[]).filter(
+      (r): r is FriendshipRow =>
+        typeof r === "object" && r !== null && "user_id" in (r as Record<string, unknown>),
+    );
+    friendSet = new Set(friendIdsOf(userId, frows));
+  }
+  const enriched = items.map((i) => ({
+    ...i,
+    mutual: backSet.has(i.from.user_id),
+    is_friend: friendSet.has(i.from.user_id),
+  }));
   const { count: unread } = await supabase
     .from("cheers")
     .select("id", { count: "exact", head: true })
     .eq("to_user_id", userId)
     .is("seen_at", null);
-  return apiOk({ unread: unread ?? 0, items });
+  return apiOk({ unread: unread ?? 0, items: enriched });
 }

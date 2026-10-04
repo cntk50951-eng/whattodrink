@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cheersQuota, parseCheersBody } from "./cheers";
+import { cheersQuota, parseCheersBody, parseCheersMessage } from "./cheers";
 
 describe("parseCheersBody", () => {
   it("checkin_id｜to_user_id 二选一收", () => {
@@ -13,6 +13,15 @@ describe("parseCheersBody", () => {
     expect(parseCheersBody(null)).toHaveProperty("error");
     expect(parseCheersBody({ checkin_id: "../x" })).toHaveProperty("error");
     expect(parseCheersBody({ to_user_id: "" })).toHaveProperty("error");
+  });
+});
+
+describe("parseCheersMessage", () => {
+  it("有字截 200；空／非串即无", () => {
+    expect(parseCheersMessage("Cheers！")).toBe("Cheers！");
+    expect(parseCheersMessage("  ")).toBeNull();
+    expect(parseCheersMessage(null)).toBeNull();
+    expect(parseCheersMessage("x".repeat(300))?.length).toBe(200);
   });
 });
 

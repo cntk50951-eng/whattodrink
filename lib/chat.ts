@@ -136,6 +136,24 @@ export function formatListTime(atMs: number, nowMs: number): string {
 }
 
 /**
+ * UR E.16 倒计时剩余（纯时间算，可单测；调用方给字典 encour 外显文案，
+ * 本函数只回分段数字，避免三语进纯函数）。
+ * 回 {over}（已过／非法）或 {d, h, m}（向下取整，至少 1 分钟）。
+ */
+export function remainParts(targetMs: number, nowMs: number): { over: true } | { over: false; d: number; h: number; m: number } {
+  if (!Number.isFinite(targetMs) || !Number.isFinite(nowMs) || targetMs <= nowMs) {
+    return { over: true };
+  }
+  let rest = Math.floor((targetMs - nowMs) / 60_000);
+  const d = Math.floor(rest / 1440);
+  rest -= d * 1440;
+  const h = Math.floor(rest / 60);
+  const m = rest - h * 60;
+  if (d === 0 && h === 0 && m === 0) return { over: false, d: 0, h: 0, m: 1 };
+  return { over: false, d, h, m };
+}
+
+/**
  * UR D.4 列表合併排序（純函數）：好友全量＋會話末動 map →
  * 在線組置頂＋離線在後，組內按末信倒序，無記錄沉底（按暱稱穩序）。
  */

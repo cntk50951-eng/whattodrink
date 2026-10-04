@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.7.0
+  version: 1.9.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -661,6 +661,10 @@ paths:
                 to_user_id:
                   type: string
                   format: uuid
+                message:
+                  type: string
+                  maxLength: 200
+                  description: E.15 快捷留言（可选，空即无）
               description: 二选一（双给／双空 400）
       responses:
         "200":
@@ -747,6 +751,203 @@ paths:
                     minimum: 0
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/cheers/sent:
+    get:
+      operationId: cheersSentBox
+      summary: 送出箱（需登录；倒序 20＋对方回敬／好友态，UR E.15）
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: 送出箱（对方公开三列＋reciprocal＋is_friend）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/cheers/blocks:
+    post:
+      operationId: cheersBlock
+      summary: 屏蔽（需登录；upsert 幂等，双向任一有行发送侧静默拒，UR E.15）
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [blocked_id]
+              properties:
+                blocked_id:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: 屏蔽成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [blocked]
+                properties:
+                  blocked:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/cheers/reports:
+    post:
+      operationId: cheersReport
+      summary: 举报（需登录；只存，审核队列另议，UR E.15）
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_user_id]
+              properties:
+                target_user_id:
+                  type: string
+                  format: uuid
+                reason:
+                  type: string
+                  maxLength: 200
+      responses:
+        "200":
+          description: 举报成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reported]
+                properties:
+                  reported:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/invites:
+    post:
+      operationId: sendInvite
+      summary: 發約喝酒（需登录；{to_user_id}｜{checkin_id}二选一＋店1–30字＋三段時；自約／隱身 403；3／天＋同對象1／天 429，UR E.16）
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [place, slot]
+              properties:
+                to_user_id:
+                  type: string
+                  format: uuid
+                checkin_id:
+                  type: string
+                  format: uuid
+                place:
+                  type: string
+                  maxLength: 30
+                slot:
+                  type: string
+                  enum: [now, half, tonight]
+      responses:
+        "200":
+          description: 發出成功（回 id＋過期）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, expires_at]
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 自約／隱身／對方隱身或屏蔽（中性文案）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 對象不存在／帖子不可見
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 3／天或同對象1／天
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+    get:
+      operationId: listInvites
+      summary: 收發箱（需登录；?box=inbox|sent，陌生人分區客戶端按 is_friend 切，UR E.16）
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: 邀約行（含對方公開三列＋is_friend＋pending 數）
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/invites/{id}:
+    patch:
+      operationId: advanceInvite
+      summary: 推進（需登录；accept｜decline｜recall；接受即自動雙向好友＋回 peer，UR E.16）
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: 推进成功
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非當事人
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "410":
+          description: 已過期（讀時判，無 cron）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/comments/{id}:
@@ -876,6 +1077,39 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/Internal"
+    delete:
+      operationId: removeFriend
+      summary: 解除好友（需登录；双向 accepted→pending，沿 0010 绝交语义，UR E.15）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [friend_id]
+              properties:
+                friend_id:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: 已解除（非好友幂等同回）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [removed]
+                properties:
+                  removed:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
     get:

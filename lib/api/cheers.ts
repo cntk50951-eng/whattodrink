@@ -25,3 +25,14 @@ export function cheersQuota(countToday: number, limit = 15): { ok: boolean; rema
   const safe = Number.isFinite(countToday) && countToday > 0 ? Math.floor(countToday) : 0;
   return { ok: safe < limit, remaining: Math.max(0, limit - safe) };
 }
+
+/**
+ * UR E.15 快捷留言（服务端截 200 兜底；空／非串即无，不挡发送）。
+ * 客户端限 40 字＋3–4 快捷短语，服务端只做形状守护。
+ */
+export function parseCheersMessage(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const t = raw.trim();
+  if (t === "") return null;
+  return t.slice(0, 200);
+}

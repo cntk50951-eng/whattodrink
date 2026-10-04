@@ -187,3 +187,35 @@ export async function GET(req: Request): Promise<Response> {
   }
   return apiOk({ friends });
 }
+
+/**
+ * UR E.15 解除好友（🔒，互敬卡撤销入口）。
+ * `DELETE /api/v1/friends {friend_id}` —— 双向行 accepted→pending（沿 0010
+ * “accepted→pending 即絕交”语义；UPDATE policy 已覆盖，无需新 migration）。
+ */
+export async function DELETE(req: Request): Promise<Response> {
+  const { supabase, userId } = await getAuthedClient(req);
+  if (userId === null) {
+    return apiError("unauthorized", "未登录", 401);
+  }
+  let raw: unknown = null;
+  try {
+    raw = await req.json();
+  } catch {
+    return apiError("invalid_params", "body 需为 JSON", 400);
+  }
+  const fid = (raw as Record<string, unknown>).friend_id;
+  if (typeof fid !== "string" || fid === "" || fid === userId || fid.length > 64) {
+    return apiError("invalid_params", "friend_id 非法", 400);
+  }
+  const { error } = await supabase
+    .from("friendships")
+    .update({ status: "pending" })
+    .eq("status", "accepted")
+    .or(`and(user_id.eq.${userId},friend_id.eq.${fid}),and(user_id.eq.${fid},friend_id.eq.${userId})`);
+  if (error !== null) {
+    console.error(`[api/v1/friends] remove error: code=${error.code} message=${error.message}`);
+    return apiError("internal", "解除好友失败", 500);
+  }
+  return apiOk({ removed: true });
+}

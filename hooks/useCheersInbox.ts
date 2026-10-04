@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  */
 export function useCheersInbox(
   enabled: boolean,
-  onNewCheers?: () => void,
+  onNewCheers?: (unread: number) => void,
 ): { unread: number; refresh: () => void } {
   const [unread, setUnread] = useState(0);
   const enabledRef = useRef(enabled);
@@ -35,7 +35,7 @@ export function useCheersInbox(
         const n = (j as Record<string, unknown>).unread;
         if (typeof n !== "number" || !Number.isFinite(n) || n < 0) return;
         const v = Math.floor(n);
-        if (v > prevRef.current && v > 0) cbRef.current?.();
+        if (v > prevRef.current && v > 0) cbRef.current?.(v);
         prevRef.current = v;
         setUnread(v);
       })

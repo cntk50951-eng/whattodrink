@@ -30,11 +30,12 @@ UI 全确定后按此开工 EPIC 3.0 真表设计。
   user_id, friend_id, status, created_at)`（0007 已建，A.15 轉正：好友＝
   任一方向 `status='accepted'` 即互為好友；`blocked` 保留 V1 不用；
   RLS 沿 0006 owner 檔 `user_id=uid OR friend_id=uid` 可讀，寫 V1 僅驗證行）
-- `drink_invites(id, from_user_id, to_user_id, checkin_id, status, created_at)` ——
+- `drink_invites(id, from_user_id, to_user_id, checkin_id, status, place, start_at, expires_at, created_at)` ——
   **UR3.3 新增（EPIC 3.0 实现，UI 先行 mock）**：`status` enum
   （sent／accepted／declined／expired），发出写 sent 行，对方点接受／拒绝
   更新同行（不另起行）；过期由定时任务扫（sent 超 24h→expired）。前端
   mock（`invites` state＋`declinesInvite` 剧本＋3s 定时）届时整块删
+  **UR E.16 已落库（0023 已跑）**：`place`（1–30 字公共场所）＋`start_at`／`expires_at`（三段時窗，读时判过期无 cron）＋`recalled` 态＋RLS（读双边／写 from／改双边）；mock 整块删，换真端点。
 - `beers(id, emoji, name, category, tagline)` —— 现 15 条静态直迁
 - `checkins(id, user_id, beer_id, lat, lng, place_name, photo_url, audio_url, audio_seconds, note, transcript, type, visibility, created_at)` —— 想喝／拍照／心情三流归一；`type`（want／share／mood）＋`visibility`（private 預設／public，僅 share 行可 public，UR A.1 分析師缺口，行級可見性優先於欄位級）
 - `cheers(id, from_user_id, to_user_id, checkin_id, created_at, seen_at)` —— 计数不存列，实时 `count`

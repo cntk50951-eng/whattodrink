@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { appendLocalEcho, formatChatTime, formatListTime, formatSeenAgo, mergeFriendList, mockThread, sumUnread, toChatAttachments } from "./chat";
+import { appendLocalEcho, formatChatTime, formatListTime, formatSeenAgo, mergeFriendList, mockThread, remainParts, sumUnread, toChatAttachments } from "./chat";
 
 const NOW = 1_757_000_000_000;
 
@@ -110,6 +110,16 @@ describe("toChatAttachments", () => {
     expect(toChatAttachments([{ checkin_id: "abc-123", place: "  " }])).toEqual([
       { checkin_id: "abc-123" },
     ]);
+  });
+});
+
+describe("remainParts", () => {
+  it("过期／非法即 over；分段向下取整，不足 1 分钟按 1 分钟", () => {
+    expect(remainParts(1000, 2000)).toEqual({ over: true });
+    expect(remainParts(NaN, 0)).toEqual({ over: true });
+    expect(remainParts(90_000, 0)).toEqual({ over: false, d: 0, h: 0, m: 1 });
+    expect(remainParts(90 * 60_000, 0)).toEqual({ over: false, d: 0, h: 1, m: 30 });
+    expect(remainParts(26 * 3600_000, 0)).toEqual({ over: false, d: 1, h: 2, m: 0 });
   });
 });
 

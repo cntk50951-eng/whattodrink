@@ -21,6 +21,14 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR E.16 約喝酒邀請＋好友列表邀請籤（v2-only，[✓]，用戶雙人親驗通過，隨本車合入）**
+  - 後端：0023（place／start／expires／recalled＋RLS 双边读／from 写／双边改）＋`POST /invites`（checkin 解作者＋自約／隱身／對方隱身屏蔽中性 403＋3／天同對象1／天 429）＋`GET ?box`（is_friend）＋`PATCH :id`（accept 自动双向好友＋會話調用方建／decline 静默／recall；过期 410）
+  - 前端：卡片內 composer（店＋三段時＋陌生首見安全提示＋發出等待態；mock 退役）＋列表好友／邀請雙籤（待回倒計時＋陌生人折叠＋已約好卡安全卡去聊天＋送出等待撤回未成局）＋Bell 併入＋好友邀 toast（陌生人只亮入口）＋隱身切換並續
+  - `invite*／tab*`×3 parity；openapi 1.9.0
+- **UR E.15 乾杯信箱＋隱身＋鏈路（v2-only，[WIP]，待 0022＋雙人親驗）**
+  - 後端：0022（message 列＋去 CASCADE＋blocks/reports 表）＋`POST /cheers` 留言／同對象一天一次／屏蔽／對方隱身中性碼＋`GET sent`＋`POST blocks/reports`＋`DELETE /friends`（accepted→pending 絕交語義）＋inbox 加 message／mutual／is_friend
+  - 前端：敬酒留言（可折輸入＋4 短語，成功即清）＋`CheersMailbox`（地圖右緣入口＋紅點＋收到／送出＋回敬＋加／解好友＋屏蔽舉報＋空態＋隱身提示）＋隱身五件套（鎖樣式＋單推薦＋切換並敬＋後果句＋免打擾）＋合併 toast 計數
+  - openapi 1.8.0；已知舊賬：yaml 438 行既有縮進壞（HEAD 即壞，不屬本輪）
 - **UR E.14 v2 乾杯儀式＋雙邊記錄＋通知（v2-only，[✓]，用戶雙人親驗通過，隨本車合入）**
   - `CheersClink` 碰杯（v1 移植去 doodle：lucide 杯＋琥珀星＋主色环，2.2s；按钮流程改动画→POST→收据／回滚；localStorage 键保留仅按钮回显，限额走服务端）
   - 後端：0021（`seen_at`＋RLS 双边读／from 写／to 改）＋`POST /cheers`（敬帖｜回敬解最新可见帖；自敬／隱身 403；15／天 429）＋`GET inbox`＋`PATCH seen`＋GET 詳情 `cheers_count/recent`（名单仅作者）

@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { setActivePeer } from "@/lib/chatPeer";
 import { createClient } from "@/lib/supabase/client";
+import { InviteList } from "@/components/v2/InviteList";
 import { formatListTime, mergeFriendList, type FriendListEntry } from "@/lib/chat";
 import styles from "@/components/v2/v2.module.css";
 
@@ -52,6 +53,9 @@ export default function V2ChatListPage() {
   const [loaded, setLoaded] = useState(false);
   // 列表時間錨點凍結（render 內禁 impure，沿 V2FriendCard 口徑）。
   const [nowMs] = useState(() => Date.now());
+  // UR E.16：好友／邀請雙籤（邀請紅點＋倒計時＋陌生人折叠；默認好友籤）。
+  const [chatTab, setChatTab] = useState<"friends" | "invites">("friends");
+  const [invitePending, setInvitePending] = useState(0);
 
   // DEF-20261003-002：好友缓存（首载后留存，供新消息到达时重排，不重拉好友）。
   const friendsRef = useRef<
@@ -265,9 +269,37 @@ export default function V2ChatListPage() {
           <ChevronLeft size={18} aria-hidden className="size-[18px]" />
         </Button>
         <h1 className="text-base font-semibold">{t("chatListTitle")}</h1>
+        {/* UR E.16：邀請籤（紅點＋數；陌生人默認只 App 內提示，不推送）。 */}
+        <div role="tablist" aria-label={t("chatListTitle")} className="ml-auto flex shrink-0 items-center gap-1 rounded-full border border-border bg-muted p-0.5">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={chatTab === "friends"}
+            onClick={() => setChatTab("friends")}
+            className={`rounded-full px-2.5 py-1 text-xs font-bold ${chatTab === "friends" ? "bg-card shadow" : "text-muted-foreground"}`}
+          >
+            {t("tabFriends")}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={chatTab === "invites"}
+            onClick={() => setChatTab("invites")}
+            className={`relative rounded-full px-2.5 py-1 text-xs font-bold ${chatTab === "invites" ? "bg-card shadow" : "text-muted-foreground"}`}
+          >
+            {t("tabInvites")}
+            {invitePending > 0 && (
+              <span aria-hidden className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-0.5 text-[10px] font-bold text-white">
+                {invitePending > 99 ? "99+" : invitePending}
+              </span>
+            )}
+          </button>
+        </div>
       </header>
 
-      {!loaded ? (
+      {chatTab === "invites" ? (
+        <InviteList onPending={setInvitePending} />
+      ) : !loaded ? (
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden" aria-hidden>
           {[0, 1, 2].map((i) => (
             <div key={i} className="flex items-center gap-3 rounded-2xl p-2">
@@ -307,7 +339,8 @@ export default function V2ChatListPage() {
             </>
           )}
         </div>
-      )}
+      )
+      }
     </div>
   );
 }
