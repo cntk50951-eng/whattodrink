@@ -21,6 +21,10 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR E.19 未成年硬拒＋舊號一次性提示（v2-only，[✓]，用戶手機親驗通過，隨本車合入）**
+  - `parseProfileBody` 足歲判（服務器時間；`AGE_RESTRICTED`）＋PATCH 422 明文（生日可改，不打戳不落库）；表單 422 留現場改生日；`ageRestricted`×3 parity
+  - `toMeJson` 加 `birthRestricted`（內聯足歲，防循環 import；缺席未知不扰）＋舊號提示條（改生日入口＋一次即忘）；單測（足歲／422／旗三色）
+  - round-2 全鏈禁寫（開卡禁＋敬邀按鈕禁＋讚想喝投分留言回敬端點禁；共用 `isMinorDob`；改生日即恢復；dob 缺席放行）
 - **UR E.18 首登資料＋個人面板＋面板性別年齡（v2-only，[✓]，用戶新老號雙路親驗通過，隨本車合入）**
   - 0024（dob／bio／onboarded_at＋avatars 公開桶）；sign 擴 avatar；GET／PATCH `/me` 四字段＋打戳；`OnboardingSheet`（首登必填閘＋跳過打戳＋頭像直傳＋失敗留場）＋頭像菜單個人項；雙面板「♂ · 25歲」＋簽名行（`ageOf`＋單測）；`onboard*/profile*/ageYears/avatarBadType/profileSaveFail/profileItem`×3 parity；openapi 1.10.0
 - **UR E.17 自家釘实拍缩影（v2-only，[✓]，用戶手機親驗通過，隨本車合入）**

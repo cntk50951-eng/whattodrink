@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { isMinorDob } from "@/lib/api/cheers";
 import { canViewCheckin, parseCheckinIdParam } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
@@ -247,6 +248,18 @@ export async function POST(
       const mode = (meRow as { mode?: string } | null)?.mode ?? "public";
       if (mode === "stealth") {
         return apiError("forbidden", "隱身模式不可留言，請切換至好友或公開模式", 403);
+      }
+    }
+
+    // UR E.19 未成年禁留言（登录态；匿名沿旧口径，首登闸另管）。
+    if (userId !== null) {
+      const { data: dobRow } = await service
+        .from("users")
+        .select("dob")
+        .eq("id", userId)
+        .maybeSingle();
+      if (isMinorDob((dobRow as { dob?: unknown } | null)?.dob, Date.now())) {
+        return apiError("forbidden", "未滿 18 歲不可留言", 403);
       }
     }
 

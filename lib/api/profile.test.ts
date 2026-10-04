@@ -39,6 +39,7 @@ describe("parseProfileBody", () => {
     expect(parseProfileBody({ avatar_url: "https://lh3.googleusercontent.com/a/abc=s96-c" })).not.toHaveProperty(
       "error",
     );
+    expect(parseProfileBody({ dob: "2020-01-01" })).toEqual({ error: "AGE_RESTRICTED" });
   });
 });
 

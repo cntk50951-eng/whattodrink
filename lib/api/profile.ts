@@ -51,6 +51,11 @@ export function parseProfileBody(raw: unknown): {
     if (r.dob < DOB_MIN || Date.parse(`${r.dob}T00:00:00Z`) > Date.now()) {
       return { error: "dob 超出合理范围" };
     }
+    // UR E.19：未成年硬拒（服務器時間算足歲；不建資，调用方 422 明拒）。
+    const minorAge = ageOf(r.dob, Date.now());
+    if (minorAge !== null && minorAge < 18) {
+      return { error: "AGE_RESTRICTED" };
+    }
     out.dob = r.dob;
   }
   if (r.bio !== undefined) {

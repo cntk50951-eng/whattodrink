@@ -416,6 +416,24 @@ export function V2Home() {
   }
   // UR E.10：相对时间锚点（render 内禁 Date.now impure，mount 快照一次，沿列表页口径）。
   const [nowMs] = useState(() => Date.now());
+  // UR E.19 舊號未成年一次性提示（birthRestricted 真即彈，關即忘 localStorage）。
+  const [ageNote, setAgeNote] = useState(false);
+  useEffect(() => {
+    if (isAuthed !== true || meJson?.birthRestricted !== true) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      try {
+        if (window.localStorage.getItem("wtd-age-note") === "1") return;
+      } catch {
+        return;
+      }
+      setAgeNote(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthed, meJson]);
   // UR E.18 首登閘（nowMs 之後算，避 TDZ）。
   const showOnboard =
     isAuthed === true &&
@@ -831,7 +849,14 @@ export function V2Home() {
     setWantReturnTo("stops");
   }
 
+  // UR E.19 未成年只读地图（meJson 358 行已声明，此处直接用；沿 showOnboard 口径）。
+  const minorLocked = meJson?.birthRestricted === true;
   function openPin(id: string): void {
+    // UR E.19 未成年只读地图（禁开卡＋明文提示，不静默吞点击，沿按钮口径）。
+    if (minorLocked) {
+      flashNote(t2("ageRestricted"));
+      return;
+    }
     // 他人卡進 Sheet：關自家 Sheet（互斥， latest tap 贏）。
     setWantSheetAt(null);
     setCheersMsg("");
@@ -934,6 +959,11 @@ export function V2Home() {
 
   // UR C.4：自家想喝釘改開底部 Sheet（浮動卡只留他人 kind）。
   function openWant(id: string): void {
+    // UR E.19 未成年只读地图（同 openPin 口径）。
+    if (minorLocked) {
+      flashNote(t2("ageRestricted"));
+      return;
+    }
     const at = Number(id.replace("want-", ""));
     const rec = wantHistory.find((w) => w.at === at);
     if (rec === undefined) return;
@@ -1045,6 +1075,11 @@ export function V2Home() {
   }
 
   function handleCheers(id: string): void {
+    // UR E.19 未成年禁敬（服务端同判；提示条改生日即恢复，不静默吞点击）。
+    if (minorLocked) {
+      flashNote(t2("ageRestricted"));
+      return;
+    }
     // DEF-009 修正：乾杯除隱身直過（加好友門只攔邀約）。
     if (mode === "stealth") {
       // UR E.15 免打扰：同会话拒绝过一次，再点只轻提示（不重弹面板）。
@@ -1120,6 +1155,11 @@ export function V2Home() {
   };
 
   function handleInvite(id: string): void {
+    // UR E.19 未成年禁約（同敬酒口径）。
+    if (minorLocked) {
+      flashNote(t2("ageRestricted"));
+      return;
+    }
     // 隱身走 guard（切換並繼續）；匿名先登入；登入直開 composer（陌生不攔）。
     if (mode === "stealth") {
       setFriendState("unknown");
@@ -1783,6 +1823,43 @@ export function V2Home() {
       )}
       </div>
 
+      {ageNote && meJson !== null && (
+        <div
+          role="alert"
+          className="absolute inset-x-3 top-20 z-[1000] rounded-2xl border bg-card p-4 shadow-lg"
+        >
+          <p className="text-sm font-bold">{t2("ageRestricted")}</p>
+          <p className="pt-1 text-xs text-muted-foreground">{t2("ageNoteFix")}</p>
+          <div className="flex gap-2 pt-3">
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 rounded-full"
+              onClick={() => {
+                try {
+                  window.localStorage.setItem("wtd-age-note", "1");
+                } catch {}
+                setAgeNote(false);
+              }}
+            >
+              {t2("onboardSkip")}
+            </Button>
+            <Button
+              size="sm"
+              className="flex-1 rounded-full font-bold"
+              onClick={() => {
+                try {
+                  window.localStorage.setItem("wtd-age-note", "1");
+                } catch {}
+                setAgeNote(false);
+                setProfileOpen(true);
+              }}
+            >
+              {t2("profileItem")}
+            </Button>
+          </div>
+        </div>
+      )}
       {/* 右緣工具列 */}
       <div className="absolute top-1/3 right-3 z-[1000] flex flex-col gap-2">
         {/* UR E.15 信箱入口（登入才挂；未读红点，沿 Bell 角标口径）。 */}

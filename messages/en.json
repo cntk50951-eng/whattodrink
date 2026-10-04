@@ -512,7 +512,9 @@
     "profileItem": "Profile",
     "genderMale": "Male",
     "genderFemale": "Female",
-    "genderSecret": "Private"
+    "genderSecret": "Private",
+    "ageRestricted": "Sorry, you must be 18 or older to use this app",
+    "ageNoteFix": "If you are 18+, fix your birthday in Profile to restore"
   },
   "gatherings": {
     "newTitle": "Create Gathering",

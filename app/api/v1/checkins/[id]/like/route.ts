@@ -3,6 +3,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { canViewCheckin, parseCheckinIdParam } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
 import { buildLikeJson } from "@/lib/api/likes";
+import { isMinorDob } from "@/lib/api/cheers";
 
 type PostRow = { id: string; user_id: string | null; visibility: unknown };
 
@@ -20,6 +21,15 @@ export async function POST(
   const { supabase, userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
+  }
+  // UR E.19 未成年禁写（赞／想喝／投分／回敬共用；dob 缺席放行）。
+  const { data: minorRow } = await supabase
+    .from("users")
+    .select("dob")
+    .eq("id", userId)
+    .maybeSingle();
+  if (isMinorDob((minorRow as { dob?: unknown } | null)?.dob, Date.now())) {
+    return apiError("forbidden", "未滿 18 歲不可點贊", 403);
   }
   const { id } = await params;
   const parsedId = parseCheckinIdParam(id);

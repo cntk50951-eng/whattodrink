@@ -87,6 +87,20 @@ describe("toMeJson (UR A.16)", () => {
     expect(row?.bio).toBe("hi");
     expect(row?.onboarded_at).toBeNull();
     expect(row?.created_at).toBe("2026-10-04T00:00:00Z");
+    expect(row?.birthRestricted).toBe(false);
+  });
+  it("E.19 舊號未成年旗（缺席即 undefined；未成年 true，成年 false）", () => {
+    const base = {
+      id: "u1",
+      nickname: "阿怡",
+      avatar_url: null,
+      gender: "secret" as const,
+      mode: "public" as const,
+      mode_updated_at: "2026-09-26T00:00:00Z",
+    };
+    expect(toMeJson({ ...base })?.birthRestricted).toBeUndefined();
+    expect(toMeJson({ ...base, dob: "2015-01-01" })?.birthRestricted).toBe(true);
+    expect(toMeJson({ ...base, dob: "2000-01-01" })?.birthRestricted).toBe(false);
   });
   it("壞行回 null（缺 id／壞時間／非法 gender）", () => {
     expect(

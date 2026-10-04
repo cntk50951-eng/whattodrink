@@ -20,11 +20,26 @@ export function parseCheersBody(raw: unknown): { checkin_id?: string; to_user_id
     : { to_user_id: r.to_user_id as string };
 }
 
-/** 当日已敬数→还能敬（服务端计数直查，HK 天界沿 lib/cheers hkTodayKey 口径由调用方定）。 */
+/**
+ * UR E.19 未成年禁写（服务端时间算足岁；dob 缺席即未知放行，首登闸另管）。
+ * 赞／想喝／投分／回敬共用（敬酒／邀约端点内联同式，体量小不抽共用层）。
+ */
+export function isMinorDob(dob: unknown, nowMs: number): boolean {
+  if (typeof dob !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dob)) return false;
+  const birth = Date.parse(`${dob}T00:00:00Z`);
+  if (!Number.isFinite(birth)) return false;
+  const b = new Date(birth);
+  const n = new Date(nowMs);
+  let age = n.getUTCFullYear() - b.getUTCFullYear();
+  if (n.getUTCMonth() * 100 + n.getUTCDate() < b.getUTCMonth() * 100 + b.getUTCDate()) age -= 1;
+  return age >= 0 && age < 18;
+}
 export function cheersQuota(countToday: number, limit = 15): { ok: boolean; remaining: number } {
   const safe = Number.isFinite(countToday) && countToday > 0 ? Math.floor(countToday) : 0;
   return { ok: safe < limit, remaining: Math.max(0, limit - safe) };
 }
+
+/** 当日已敬数→还能敬（服务端计数直查，HK 天界沿 lib/cheers hkTodayKey 口径由调用方定）。 */
 
 /**
  * UR E.15 快捷留言（服务端截 200 兜底；空／非串即无，不挡发送）。

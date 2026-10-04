@@ -43,6 +43,8 @@ export type MeJson = {
   dob?: string | null;
   bio?: string | null;
   onboarded_at?: string | null;
+  /** UR E.19 舊號未成年旗（缺席即未知不扰；true 即弹过一次即忘）。 */
+  birthRestricted?: boolean;
   created_at?: string;
 };
 
@@ -97,5 +99,17 @@ export function toMeJson(raw: unknown): MeJson | null {
       ? {}
       : { onboarded_at: typeof r.onboarded_at === "string" ? r.onboarded_at : null }),
     ...(typeof r.created_at === "string" ? { created_at: r.created_at } : {}),
+    // UR E.19：旧号未成年一次性提示（birthRestricted；缺席即未知不扰；ageOf 内联防循环 import）。
+    ...(() => {
+      if (r.dob === undefined) return {};
+      if (typeof r.dob !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(r.dob)) return { birthRestricted: false };
+      const birth = Date.parse(`${r.dob}T00:00:00Z`);
+      if (!Number.isFinite(birth) || birth > Date.now()) return { birthRestricted: false };
+      const b = new Date(birth);
+      const n = new Date(Date.now());
+      let age = n.getUTCFullYear() - b.getUTCFullYear();
+      if (n.getUTCMonth() * 100 + n.getUTCDate() < b.getUTCMonth() * 100 + b.getUTCDate()) age -= 1;
+      return { birthRestricted: age >= 0 && age < 18 };
+    })(),
   };
 }

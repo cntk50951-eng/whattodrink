@@ -512,7 +512,9 @@
     "profileItem": "个人资料",
     "genderMale": "男",
     "genderFemale": "女",
-    "genderSecret": "保密"
+    "genderSecret": "保密",
+    "ageRestricted": "未满 18 岁暂时不能使用，不好意思",
+    "ageNoteFix": "如果你已满 18 岁，去个人资料改生日即恢复"
   },
   "gatherings": {
     "newTitle": "发起组局",

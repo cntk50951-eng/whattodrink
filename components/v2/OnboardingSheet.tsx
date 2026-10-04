@@ -119,7 +119,17 @@ export function OnboardingSheet({
         credentials: "include",
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("save");
+      if (!res.ok) {
+        // UR E.19：未成年硬拒（422 明文；不打戳不关单，留现场改生日）。
+        const j = (await res.json().catch(() => null)) as {
+          error?: { code?: unknown; message?: unknown };
+        } | null;
+        if (res.status === 422 || j?.error?.code === "AGE_RESTRICTED") {
+          setBanner(t2("ageRestricted"));
+          return;
+        }
+        throw new Error("save");
+      }
       onSaved();
       onClose();
     } catch {

@@ -113,7 +113,7 @@ export async function PATCH(req: Request): Promise<Response> {
     return apiError("invalid_params", parsed.error, 400);
   }
   if (!hasMode && "error" in profile) {
-    return apiError("invalid_params", profile.error, 400);
+    return apiError("invalid_params", profile.error, profile.error === "AGE_RESTRICTED" ? 422 : 400);
   }
   try {
     await ensureUserRow(supabase, userId);

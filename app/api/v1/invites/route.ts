@@ -3,6 +3,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { canViewCheckin } from "@/lib/api/checkins";
 import { friendIdsOf, type FriendshipRow } from "@/lib/friends";
 import { inviteWindow, parseInviteBody } from "@/lib/api/invites";
+import { isMinorDob } from "@/lib/api/cheers";
 
 /** HK 今日 0 点 UTC ISO（3／天窗口下界，沿 cheers 口径）。 */
 function hkDayStartISO(nowMs: number): string {
@@ -115,6 +116,15 @@ export async function POST(req: Request): Promise<Response> {
     .gte("created_at", dayStart);
   if ((pairCount ?? 0) > 0) {
     return apiError("rate_limited", "今日已約過 TA，明天再來", 429);
+  }
+  // UR E.19 未成年禁约（共用 isMinorDob；同敬酒口径）。
+  const { data: inviterRow } = await supabase
+    .from("users")
+    .select("dob")
+    .eq("id", userId)
+    .maybeSingle();
+  if (isMinorDob((inviterRow as { dob?: unknown } | null)?.dob, Date.now())) {
+    return apiError("forbidden", "未滿 18 歲不可約喝酒", 403);
   }
   const w = inviteWindow(parsed.slot, Date.now());
   const { data: inserted, error: iErr } = await supabase

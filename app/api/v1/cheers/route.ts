@@ -2,7 +2,7 @@ import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { canViewCheckin } from "@/lib/api/checkins";
 import { type FriendshipRow, friendIdsOf } from "@/lib/friends";
-import { cheersQuota, parseCheersBody, parseCheersMessage } from "@/lib/api/cheers";
+import { cheersQuota, isMinorDob, parseCheersBody, parseCheersMessage } from "@/lib/api/cheers";
 
 type CheckinRow = {
   id: string;
@@ -110,37 +110,17 @@ export async function POST(req: Request): Promise<Response> {
   if (toUserId === null || toUserId === userId) {
     return apiError("forbidden", "不可敬自己", 403);
   }
-  // UR E.15：屏蔽双查（任一方向有行即静默拒；中性文案，不泄谁屏蔽谁）。
-  const { data: blockRows } = await supabase
-    .from("cheers_blocks")
-    .select("blocker_id,blocked_id")
-    .or(
-      `and(blocker_id.eq.${toUserId},blocked_id.eq.${userId}),and(blocker_id.eq.${userId},blocked_id.eq.${toUserId})`,
-    )
-    .limit(2);
-  if (Array.isArray(blockRows) && blockRows.length > 0) {
-    return apiError("forbidden", "TA 暫時不接收乾杯", 403);
-  }
-  // UR E.15：对方隐身中性化（绝不写对方隐身；按钮不预置灰，不可探测）。
-  const { data: peerRow } = await supabase
+  // UR E.19 未成年禁写（共用 isMinorDob；dob 缺席放行，首登闸另管）。
+  const { data: fromRow } = await supabase
     .from("users")
-    .select("mode")
-    .eq("id", toUserId)
+    .select("dob")
+    .eq("id", userId)
     .maybeSingle();
-  if ((peerRow as { mode?: unknown } | null)?.mode === "stealth") {
-    return apiError("forbidden", "TA 暫時不接收乾杯", 403);
+  if (isMinorDob((fromRow as { dob?: unknown } | null)?.dob, Date.now())) {
+    return apiError("forbidden", "未滿 18 歲不可乾杯", 403);
   }
-  // UR E.15：同一对象一天一次（总量 15 另计；第二次即 429 明拒，防纠缠）。
+  // 15／天（HK自然天；RLS 只管行归属，限额路由强制）。
   const dayStart = hkDayStartISO(Date.now());
-  const { count: pairCount } = await supabase
-    .from("cheers")
-    .select("id", { count: "exact", head: true })
-    .eq("from_user_id", userId)
-    .eq("to_user_id", toUserId)
-    .gte("created_at", dayStart);
-  if ((pairCount ?? 0) > 0) {
-    return apiError("rate_limited", "今日已敬過 TA，明天再來", 429);
-  }
   // 15／天（HK自然天；RLS 只管行归属，限额路由强制）。
   const { count: todayCount } = await supabase
     .from("cheers")
