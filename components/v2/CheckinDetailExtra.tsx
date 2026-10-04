@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Beer, Check, Heart, MapPin, MessageCircle, Share2, Star } from "lucide-react";
 
 import { formatAvgRating } from "@/lib/api/rating";
 import { useCheckinDetail } from "@/hooks/useCheckinDetail";
+import { formatWantTime } from "@/lib/wantRecord";
 
 /**
  * UR E.12 打卡面板共享段（v2-only；自家 Sheet＋他人卡同构，数据源只有 checkinId）。
@@ -20,6 +21,7 @@ export function CheckinDetailExtra({
   lat,
   lng,
   commentsAnchorId,
+  refreshTick,
 }: {
   /** DB id（无即整块不挂，沿 V2Comments 口径） */
   checkinId: string;
@@ -29,9 +31,23 @@ export function CheckinDetailExtra({
   lng?: number | null;
   /** 评论区容器 id（评数按钮点即滚过去；V2Comments 同传此 id） */
   commentsAnchorId: string;
+  /** 外部敬酒成功即 bump，觸發重拉對賬（V2Home 乾杯鈕用，沿 E.14 口徑）。 */
+  refreshTick?: number;
 }) {
   const t = useTranslations("v2");
-  const { detail, busy, failed, toggleLike, toggleWant, rate } = useCheckinDetail(checkinId);
+  const locale = useLocale();
+  const { detail, busy, failed, toggleLike, toggleWant, rate, refresh } = useCheckinDetail(checkinId);
+  const [toasting, setToasting] = useState<string | null>(null);
+  const [toastErr, setToastErr] = useState(false);
+  // 外部敬酒对账（refreshTick 翻即重拉；首挂不拉，沿首拉 effect 口径）。
+  const firstTick = useRef(true);
+  useEffect(() => {
+    if (firstTick.current) {
+      firstTick.current = false;
+      return;
+    }
+    refresh();
+  }, [refreshTick, refresh]);
   const [reverseName, setReverseName] = useState<string | null>(null);
   const reverseKey = useRef<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -124,6 +140,28 @@ export function CheckinDetailExtra({
     })();
   };
 
+  const toastBack = (toUserId: string): void => {
+    if (toasting !== null) return;
+    setToasting(toUserId);
+    setToastErr(false);
+    void (async () => {
+      try {
+        const res = await fetch("/api/v1/cheers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ to_user_id: toUserId }),
+        });
+        if (!res.ok) throw new Error("bad");
+        refresh();
+      } catch {
+        setToastErr(true);
+      } finally {
+        setToasting(null);
+      }
+    })();
+  };
+
   const scrollToComments = (): void => {
     document.getElementById(commentsAnchorId)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -211,6 +249,61 @@ export function CheckinDetailExtra({
           )}
         </div>
       )}
+      {/* UR E.14 乾杯區（計數＋名單所有人可見，沿 IG 口径；回敬钮仅作者）。 */}
+      <div className="flex flex-col gap-1.5">
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Beer size={13} aria-hidden />
+          {detail.cheers_count > 0
+            ? t("cheersCount", { n: detail.cheers_count })
+            : t("cheersEmpty")}
+        </p>
+        {detail.cheers_recent.map((r) => {
+          const ms = Date.parse(r.created_at);
+          return (
+            <div key={`${r.user_id}-${r.created_at}`} className="flex items-center gap-2">
+              {r.avatar_url !== null && /^https?:\/\//.test(r.avatar_url) ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={r.avatar_url}
+                  alt=""
+                  loading="lazy"
+                  className="h-6 w-6 shrink-0 rounded-full object-cover"
+                />
+              ) : (
+                <span
+                  aria-hidden
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-muted-foreground"
+                >
+                  {r.nickname.slice(0, 1)}
+                </span>
+              )}
+              <span className="min-w-0 flex-1 truncate text-xs">
+                <span className="font-bold">{r.nickname}</span>
+                {Number.isFinite(ms) && (
+                  <span className="pl-1.5 text-muted-foreground">
+                    {formatWantTime(ms, locale)}
+                  </span>
+                )}
+              </span>
+              {detail.is_author && (
+                <button
+                  type="button"
+                  onClick={() => toastBack(r.user_id)}
+                  disabled={toasting !== null}
+                  className="shrink-0 rounded-full border border-primary px-2.5 py-1 text-xs text-primary disabled:opacity-50"
+                >
+                  {t("cheersBack")}
+                </button>
+              )}
+            </div>
+          );
+        })}
+        {toastErr && (
+          <p role="alert" className="text-xs text-destructive">
+            {t("cheersFailed")}
+          </p>
+        )}
+      </div>
       <div className="flex items-center gap-2 border-y py-2">
         <button
           type="button"

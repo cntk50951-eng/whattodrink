@@ -37,7 +37,7 @@ UI 全确定后按此开工 EPIC 3.0 真表设计。
   mock（`invites` state＋`declinesInvite` 剧本＋3s 定时）届时整块删
 - `beers(id, emoji, name, category, tagline)` —— 现 15 条静态直迁
 - `checkins(id, user_id, beer_id, lat, lng, place_name, photo_url, audio_url, audio_seconds, note, transcript, type, visibility, created_at)` —— 想喝／拍照／心情三流归一；`type`（want／share／mood）＋`visibility`（private 預設／public，僅 share 行可 public，UR A.1 分析師缺口，行級可見性優先於欄位級）
-- `cheers(id, from_user_id, to_user_id, checkin_id, created_at)` —— 计数不存列，实时 `count`
+- `cheers(id, from_user_id, to_user_id, checkin_id, created_at, seen_at)` —— 计数不存列，实时 `count`
   **UR3.0 双边记录口径（EPIC 3.0 实现，UI 先行 mock）**：点一次乾杯只写**一行**，
   但双方记录各＋一条——发送方 sent 列表多一条（`from_user_id = 我`），接收方
   inbox 多一条（`to_user_id = 对方` 的这同一行）。不做镜像双行（一行双读足够，
@@ -48,6 +48,7 @@ UI 全确定后按此开工 EPIC 3.0 真表设计。
   即拒（429＋剩余额度 0），口径与前端 `canCheers` 一致；`created_at` 建索引
   （按天范围查），不另加计数列（计数实时算，沿本表既有原则）。前端 mock
   （`wtd-cheers-daily`／HK 日期键）届时整块删，换读服务端剩余额度。
+  **UR E.14 已落库（0021 已跑）**：`seen_at` 可空（null＝未读，开自己面板 PATCH 全标）＋RLS（读本人双边／写 from＝自己／改 to＝自己）；`POST /cheers`（敬帖｜回敬解最新可见帖）＋`GET inbox`＋`PATCH seen`；回敬 checkin 可空＝人级（0001 列本就 nullable）。
 - `mood_logs(id, user_id, mood_text, created_at)` —— 心情输入流
 - `post_likes(post_id, user_id, created_at)` —— UR4.1 公開牆讚（唯一鍵防重讚，
   計數實時 `count`，不存列；24h 熱門＝`created_at` 範圍查＋索引）。前端

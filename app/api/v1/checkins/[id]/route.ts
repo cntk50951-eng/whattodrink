@@ -106,6 +106,37 @@ export async function GET(
   const mineRating = ratingList.find((r) => r.user_id === userId)?.rating;
   const myRating =
     typeof mineRating === "number" && Number.isInteger(mineRating) ? mineRating : null;
+  // UR E.14 乾杯聚合（service 直讀，路由已过可见门）。
+  // 名单对所有可见者开放（沿 IG 讚名单＋E.7 留言具名口径；回敬钮仍仅作者，见 Extra）。
+  const { count: cheersCount, data: cheersRows } = await service
+    .from("cheers")
+    .select("from_user_id,created_at", { count: "exact" })
+    .eq("checkin_id", postId)
+    .order("created_at", { ascending: false })
+    .limit(5);
+  type CheersRecent = { user_id: string; nickname: string; avatar_url: string | null; created_at: string };
+  let cheersRecent: CheersRecent[] = [];
+  if (Array.isArray(cheersRows) && cheersRows.length > 0) {
+    const fromIds = [...new Set(cheersRows.map((r) => (r as { from_user_id: string }).from_user_id))];
+    const { data: cheerUsers } = await service
+      .from("users")
+      .select("id,nickname,avatar_url")
+      .in("id", fromIds);
+    const peerMap = new Map(
+      (((cheerUsers ?? []) as unknown[]) as { id: string; nickname: string; avatar_url: string | null }[]).map(
+        (u) => [u.id, u],
+      ),
+    );
+    cheersRecent = (cheersRows as { from_user_id: string; created_at: string }[]).map((r) => {
+      const peer = peerMap.get(r.from_user_id);
+      return {
+        user_id: r.from_user_id,
+        nickname: peer?.nickname ?? "酒友",
+        avatar_url: peer?.avatar_url ?? null,
+        created_at: r.created_at,
+      };
+    });
+  }
   return apiOk({
     checkin: {
       id: row.id as string,
@@ -124,8 +155,11 @@ export async function GET(
       rating_count: ratingCount,
       rated_by_me: myRating !== null,
       my_rating: myRating,
-      // UR E.12 作者身份服务端说了算（自家帖从地图钉点开会落他人分支，分支 prop 不可信）。
+      // UR E.14 作者身份服务端说了算（自家帖从地图钉点开会落他人分支，分支 prop 不可信）。
       is_author: ownerId !== null && ownerId === userId,
+      // UR E.14 乾杯聚合（名单仅作者，他人只看数）。
+      cheers_count: typeof cheersCount === "number" && cheersCount > 0 ? cheersCount : 0,
+      cheers_recent: cheersRecent,
       like_count: clamp(likeCount),
       liked_by_me: likedRow !== null,
       want_count: clamp(wantCount),

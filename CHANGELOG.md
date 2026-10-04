@@ -21,6 +21,10 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR E.14 v2 乾杯儀式＋雙邊記錄＋通知（v2-only，[✓]，用戶雙人親驗通過，隨本車合入）**
+  - `CheersClink` 碰杯（v1 移植去 doodle：lucide 杯＋琥珀星＋主色环，2.2s；按钮流程改动画→POST→收据／回滚；localStorage 键保留仅按钮回显，限额走服务端）
+  - 後端：0021（`seen_at`＋RLS 双边读／from 写／to 改）＋`POST /cheers`（敬帖｜回敬解最新可见帖；自敬／隱身 403；15／天 429）＋`GET inbox`＋`PATCH seen`＋GET 詳情 `cheers_count/recent`（名单仅作者）
+  - 前端：面板乾杯區（計數＋名單＋回敬一鍵）＋Bell 總數並入乾杯未讀（toast 🍻可辨）＋開自己面板即標已讀；`cheersFailed/New/Count/Back/Empty`×3 parity；openapi 1.7.0
 - **他人卡主行动双排（v2-only，用户亲验通过，随本車合入）**
   - 照片下乾杯／約酒放大成半寬主鈕（h-11 圓滿＋15px 粗體，左實心右描邊）；讚／評／想喝／分享留 Extra 第二排（主次分明，問答定案A）
   - tsc＋lint 雙淨；vitest 按偏好跳過（純視覺無邏輯分支）；`git status` 無 v1

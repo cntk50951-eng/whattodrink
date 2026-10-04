@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.6.0
+  version: 1.7.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -640,6 +640,113 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/cheers:
+    post:
+      operationId: cheersToast
+      summary: 敬酒（需登录；{checkin_id}敬作者｜{to_user_id}回敬解最新可见帖；自敬／隱身 403；15／天 429，UR E.14）
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                checkin_id:
+                  type: string
+                  format: uuid
+                to_user_id:
+                  type: string
+                  format: uuid
+              description: 二选一（双给／双空 400）
+      responses:
+        "200":
+          description: 敬酒成功（回剩余次数＋该帖总数）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cheered, remaining, cheers_count]
+                properties:
+                  cheered:
+                    type: boolean
+                  remaining:
+                    type: integer
+                    minimum: 0
+                  cheers_count:
+                    type: integer
+                    minimum: 1
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 自敬／隱身禁敬
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 帖子不存在／無可見權限／對方暫無可敬打卡
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 今日乾杯已達上限（HK 自然天 15）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/cheers/inbox:
+    get:
+      operationId: cheersInbox
+      summary: 被敬收件箱（需登录；倒序 20＋未读数，UR E.14）
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: 收件箱（只吐敬酒人公开三列＋帖 id＋时间）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [unread, items]
+                properties:
+                  unread:
+                    type: integer
+                    minimum: 0
+                  items:
+                    type: array
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/cheers/seen:
+    patch:
+      operationId: cheersSeen
+      summary: 全标已读（需登录；开自己面板即调，UR E.14）
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: 本次标数
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [seen]
+                properties:
+                  seen:
+                    type: integer
+                    minimum: 0
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/comments/{id}:

@@ -9,6 +9,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * - 全程 credentials 同源。
  */
 
+/** 乾杯名单行（作者侧 recent；他人侧空数组，只看数）。 */
+export type CheersRecentRow = {
+  user_id: string;
+  nickname: string;
+  avatar_url: string | null;
+  created_at: string;
+};
+
 export type CheckinDetail = {
   id: string;
   beer_name: string | null;
@@ -19,6 +27,8 @@ export type CheckinDetail = {
   my_rating: number | null;
   /** 服务端判的作者身份（分支 prop 不可信，见 GET is_author）。 */
   is_author: boolean;
+  cheers_count: number;
+  cheers_recent: CheersRecentRow[];
   place_name: string | null;
   lat: number | null;
   lng: number | null;
@@ -47,6 +57,19 @@ function toDetail(row: DetailRow, id: string): CheckinDetail {
     my_rating:
       my !== null && Number.isInteger(my) && my >= 1 && my <= 5 ? my : null,
     is_author: row.is_author === true,
+    cheers_count: count(row.cheers_count),
+    cheers_recent: Array.isArray(row.cheers_recent)
+      ? (row.cheers_recent as unknown[])
+          .filter((r): r is Record<string, unknown> => typeof r === "object" && r !== null)
+          .slice(0, 5)
+          .map((r) => ({
+            user_id: typeof r.user_id === "string" ? r.user_id : "",
+            nickname: typeof r.nickname === "string" && r.nickname !== "" ? r.nickname : "酒友",
+            avatar_url: typeof r.avatar_url === "string" ? r.avatar_url : null,
+            created_at: typeof r.created_at === "string" ? r.created_at : "",
+          }))
+          .filter((r) => r.user_id !== "" && r.created_at !== "")
+      : [],
     place_name: typeof row.place_name === "string" ? row.place_name : null,
     lat: num(row.lat),
     lng: num(row.lng),
@@ -66,6 +89,8 @@ export function useCheckinDetail(checkinId: string | null): {
   toggleLike: () => void;
   toggleWant: () => void;
   rate: (rating: number | null) => void;
+  /** 重拉对账（敬酒 POST 后刷权威计数用；切帖竞态守卫沿首拉口径）。 */
+  refresh: () => void;
 } {
   const [detail, setDetail] = useState<CheckinDetail | null>(null);
   const [busy, setBusy] = useState(false);
@@ -286,5 +311,23 @@ export function useCheckinDetail(checkinId: string | null): {
     [checkinId],
   );
 
-  return { detail, busy, failed, toggleLike, toggleWant, rate };
+  const refresh = useCallback(() => {
+    if (checkinId === null) return;
+    const my = ++seq.current;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/v1/checkins/${encodeURIComponent(checkinId)}`, {
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const j = (await res.json()) as { checkin?: DetailRow };
+        if (seq.current !== my || typeof j.checkin !== "object" || j.checkin === null) return;
+        setDetail(toDetail(j.checkin, checkinId));
+      } catch {
+        /* 静默；旧数留着，下次切帖重拉 */
+      }
+    })();
+  }, [checkinId]);
+
+  return { detail, busy, failed, toggleLike, toggleWant, rate, refresh };
 }

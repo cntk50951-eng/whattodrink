@@ -56,6 +56,7 @@ import { useFriendRelation } from "@/hooks/useFriendRelation";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useLiveFriends } from "@/hooks/useLiveFriends";
 import { useChatBell } from "@/hooks/useChatBell";
+import { useCheersInbox } from "@/hooks/useCheersInbox";
 import { V2FriendCard } from "./V2FriendCard";
 import { V2RevealOverlay } from "./V2RevealOverlay";
 import { revealPhotoAt, revealPhotoCount } from "@/components/drinks/gallery";
@@ -113,6 +114,7 @@ import { iconForDrinkName, iconForPickId } from "@/components/marketing/beer-ico
 import { WallIcon } from "@/components/marketing/beer-icons/doodle";
 import { hasUnseenWall, loadWall, loadWallSeenAt } from "@/lib/posts";
 import { buzz, BUZZ_CHEERS, BUZZ_FOUND } from "@/lib/haptics";
+import { CheersClink, CHEERS_FX_MS } from "@/components/v2/CheersClink";
 import { V2MapView } from "./V2MapView";
 import type { V2MapApi } from "./V2MapView";
 import { V2CameraSheet } from "./V2CameraSheet";
@@ -327,6 +329,15 @@ export function V2Home() {
   const [swapOpen, setSwapOpen] = useState(false);
   const [swapBatch, setSwapBatch] = useState<Beer[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // UR E.14 碰杯时刻（点即播 2.2s，播完 POST；连点守卫；reduced-motion 直接收据不渲染）。
+  const [cheersFx, setCheersFx] = useState<{ id: string; key: number } | null>(null);
+  // UR E.14：敬后权威计数对账（Extra refreshTick 翻即重拉）。
+  const [cheersTick, setCheersTick] = useState(0);
+  const [reducedMotion] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
   // UR E.13 round-2：分享完成去留（成功者 uid＋失败数；单人直进房，多人进列表）。
   const [shareDone, setShareDone] = useState<{ ok: string[]; failed: number } | null>(null);
   const [otherConfirmDelete, setOtherConfirmDelete] = useState(false);
@@ -358,11 +369,36 @@ export function V2Home() {
   const { total: bellTotal } = useChatBell(isAuthed === true, () => {
     flashNote(t2("chatBellNew"));
   });
+  // UR E.14：乾杯未读并入 Bell 总数（pill 即未读总数；toast 🍻 可辨，沿 UR 定案）。
+  const { unread: cheersUnread, refresh: refreshCheers } = useCheersInbox(isAuthed === true, () => {
+    flashNote(t2("cheersNew"));
+  });
+  const bellAll = bellTotal + cheersUnread;
+  // UR E.14：开自己面板即标已读（fire-and-forget；只清数，名单照看）。
+  useEffect(() => {
+    if (wantSheetAt === null || isAuthed !== true) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/v1/cheers/seen", {
+          method: "PATCH",
+          credentials: "include",
+        });
+        if (!res.ok || cancelled) return;
+        refreshCheers();
+      } catch {
+        /* 静默；数留着，下次开面板再清 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [wantSheetAt, isAuthed, refreshCheers]);
   // UR D.5 round-4：有未读即好友列表 pill 定时抖（到達／反白先抖一次，之后每 5s
   // 抖 0.9s；读完即停；set-state-in-effect 沿 UR1.8 microtask 配方，
   // reduced-motion 由 CSS 全关）。
   const [pillShake, setPillShake] = useState(false);
-  const hasUnread = isAuthed === true && bellTotal > 0;
+  const hasUnread = isAuthed === true && bellAll > 0;
   useEffect(() => {
     if (!hasUnread) {
       void Promise.resolve().then(() => setPillShake(false));
@@ -947,11 +983,41 @@ export function V2Home() {
       setGuard({ action: "cheers", target: id });
       return;
     }
-    if (sentIds.includes(id) || !canCheers(sentIds)) return;
+    if (cheersFx !== null || sentIds.includes(id) || !canCheers(sentIds)) return;
     buzz(BUZZ_CHEERS);
-    const next = [...sentIds, id];
-    setSentIds(next);
-    saveSentToday(next, new Date());
+    // UR E.14：先播碰杯（reduced-motion 直接收据），播完 POST 落库；
+    // 失败回滚（按钮回可敬态＋toast），成功记本地回显＋刷权威计数。
+    if (reducedMotion) {
+      void postCheers(id);
+      return;
+    }
+    setCheersFx({ id, key: Date.now() });
+    window.setTimeout(() => {
+      setCheersFx((prev) => (prev !== null && prev.id === id ? null : prev));
+      void postCheers(id);
+    }, CHEERS_FX_MS);
+  }
+
+  async function postCheers(id: string): Promise<void> {
+    try {
+      const res = await fetch("/api/v1/cheers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ checkin_id: id }),
+      });
+      if (!res.ok) {
+        if (res.status === 429) flashNote(t("cheersLimitReached"));
+        else flashNote(t2("cheersFailed"));
+        return;
+      }
+      const next = [...sentIds, id];
+      setSentIds(next);
+      saveSentToday(next, new Date());
+      setCheersTick((v) => v + 1);
+    } catch {
+      flashNote(t2("cheersFailed"));
+    }
   }
 
   function fireInvite(id: string): void {
@@ -1532,19 +1598,19 @@ export function V2Home() {
             className="shrink-0 rounded-full bg-card shadow-md ring-1 ring-foreground/10"
             onClick={goChatList}
             aria-label={
-              isAuthed === true && bellTotal > 0
-                ? `${t2("chatBellLabel")} (${bellTotal > 99 ? "99+" : bellTotal})`
+              isAuthed === true && bellAll > 0
+                ? `${t2("chatBellLabel")} (${bellAll > 99 ? "99+" : bellAll})`
                 : undefined
             }
           >
             <Users aria-hidden />
             {t2("chatFriendsOnly")}
           </Button>
-          {isAuthed === true && bellTotal > 0 && (
+          {isAuthed === true && bellAll > 0 && (
             <span aria-hidden className={styles.v2beerMug}>
               <span aria-hidden className={styles.v2mugBubble} />
               <span aria-hidden className={styles.v2mugBubble} />
-              <span className={styles.v2beerCount}>{bellTotal > 99 ? "99+" : bellTotal}</span>
+              <span className={styles.v2beerCount}>{bellAll > 99 ? "99+" : bellAll}</span>
             </span>
           )}
         </span>
@@ -2174,13 +2240,19 @@ export function V2Home() {
                         <p className="pt-1 text-sm">{otherDetail.note}</p>
                       )}
                       {otherDetail?.photoUrl ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img
-                          src={otherDetail.photoUrl}
-                          alt=""
-                          loading="lazy"
-                          className="max-h-[25svh] w-full rounded-xl object-cover"
-                        />
+                        <div className="relative">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={otherDetail.photoUrl}
+                            alt=""
+                            loading="lazy"
+                            className="max-h-[25svh] w-full rounded-xl object-cover"
+                          />
+                          {/* UR E.14 碰杯层（卡内绝对覆盖；播完自拆，沿 v1 口径）。 */}
+                          {cheersFx !== null && cheersFx.id === card.id && !reducedMotion && (
+                            <CheersClink key={cheersFx.key} label={t("cheers")} />
+                          )}
+                        </div>
                       ) : (
                         <span className="w-full shrink-0 overflow-hidden rounded-xl border bg-card p-1">
                           {(() => {
@@ -2203,7 +2275,7 @@ export function V2Home() {
                   <div className="flex items-center gap-2">
                     <Button
                       onClick={() => handleCheers(card.id)}
-                      disabled={!canCheers(sentIds)}
+                      disabled={cheersFx !== null || !canCheers(sentIds)}
                       className="h-11 flex-1 rounded-full text-[15px] font-bold"
                     >
                       {sentIds.includes(card.id)
@@ -2255,6 +2327,7 @@ export function V2Home() {
                       lat={card.lat}
                       lng={card.lng}
                       commentsAnchorId="v2c-other"
+                      refreshTick={cheersTick}
                     />
                   ) : null}
                   {/* UR E.7：留言（真釘才有 DB id；MOCK 無行不掛）。 */}
