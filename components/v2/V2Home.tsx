@@ -2198,20 +2198,22 @@ export function V2Home() {
                       )}
                     </>
                   )}
-                  <div className="flex flex-wrap items-center gap-2">
+                  {/* 主行动双排（问答定案A）：对人的乾杯／约酒放大紧贴照片，半宽主钮；
+                      对内容的赞／评／想喝／分享留 Extra 第二排。 */}
+                  <div className="flex items-center gap-2">
                     <Button
-                      size="sm"
                       onClick={() => handleCheers(card.id)}
                       disabled={!canCheers(sentIds)}
+                      className="h-11 flex-1 rounded-full text-[15px] font-bold"
                     >
                       {sentIds.includes(card.id)
                         ? t("cheersSent")
                         : t("cheers")}
                     </Button>
                     <Button
-                      size="sm"
                       variant="outline"
                       onClick={() => handleInvite(card.id)}
+                      className="h-11 flex-1 rounded-full text-[15px] font-bold"
                     >
                       {invites[card.id] === "accepted"
                         ? t("inviteAccepted")
