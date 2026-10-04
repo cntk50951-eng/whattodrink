@@ -70,6 +70,24 @@ describe("toMeJson (UR A.16)", () => {
     });
     expect(row?.mode).toBe("public");
   });
+  it("E.18 加法字段直通（缺席即 undefined，不炸舊行）", () => {
+    const row = toMeJson({
+      id: "u1",
+      nickname: "阿怡",
+      avatar_url: null,
+      gender: "secret",
+      mode: "public",
+      mode_updated_at: "2026-09-26T00:00:00Z",
+      dob: "2000-01-01",
+      bio: "hi",
+      onboarded_at: null,
+      created_at: "2026-10-04T00:00:00Z",
+    });
+    expect(row?.dob).toBe("2000-01-01");
+    expect(row?.bio).toBe("hi");
+    expect(row?.onboarded_at).toBeNull();
+    expect(row?.created_at).toBe("2026-10-04T00:00:00Z");
+  });
   it("壞行回 null（缺 id／壞時間／非法 gender）", () => {
     expect(
       toMeJson({

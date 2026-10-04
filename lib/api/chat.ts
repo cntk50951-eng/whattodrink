@@ -213,21 +213,24 @@ function parseAttachments(
 }
 
 /** `POST /uploads/sign {purpose, ext, bytes}`（D.6 直傳簽名）。 */
+export const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+export const AVATAR_EXTS = ["jpg", "jpeg", "png", "webp"] as const;
+
 export function parseSignBody(
   raw: unknown,
-): { purpose: "image" | "voice"; ext: string; bytes: number } | { error: string } {
+): { purpose: "image" | "voice" | "avatar"; ext: string; bytes: number } | { error: string } {
   if (!isRecord(raw)) return { error: "body 需为对象" };
   const purpose = raw.purpose;
-  if (purpose !== "image" && purpose !== "voice") {
-    return { error: "purpose 只要 image|voice" };
+  if (purpose !== "image" && purpose !== "voice" && purpose !== "avatar") {
+    return { error: "purpose 只要 image|voice|avatar" };
   }
   const ext = typeof raw.ext === "string" ? raw.ext.toLowerCase() : "";
-  const allow = purpose === "image" ? CHAT_IMAGE_EXTS : CHAT_VOICE_EXTS;
+  const allow = purpose === "image" ? CHAT_IMAGE_EXTS : purpose === "voice" ? CHAT_VOICE_EXTS : AVATAR_EXTS;
   if (!(allow as readonly string[]).includes(ext)) {
     return { error: `ext 非法（${allow.join("/")}）` };
   }
   const bytes = typeof raw.bytes === "number" && Number.isFinite(raw.bytes) ? raw.bytes : -1;
-  const cap = purpose === "image" ? CHAT_IMAGE_MAX_BYTES : CHAT_VOICE_MAX_BYTES;
+  const cap = purpose === "image" ? CHAT_IMAGE_MAX_BYTES : purpose === "voice" ? CHAT_VOICE_MAX_BYTES : AVATAR_MAX_BYTES;
   if (bytes <= 0 || bytes > cap) return { error: "bytes 非法" };
   return { purpose, ext, bytes };
 }

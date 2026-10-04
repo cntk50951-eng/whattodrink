@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.9.0
+  version: 1.10.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1009,7 +1009,7 @@ paths:
           $ref: "#/components/responses/Internal"
     patch:
       operationId: patchMeMode
-      summary: 切換可見模式（需登录，A.16：stealth|friends|public）
+      summary: 切換可見模式＋個人資料（需登录；A.16 三檔＋E.18 四字段＋打戳，字段全可选但至少一有效）
       security:
         - bearerAuth: []
       requestBody:
@@ -1018,11 +1018,23 @@ paths:
           application/json:
             schema:
               type: object
-              required: [mode]
               properties:
                 mode:
                   type: string
                   enum: [stealth, friends, public]
+                gender:
+                  type: string
+                  enum: [male, female]
+                dob:
+                  type: string
+                  format: date
+                bio:
+                  type: string
+                  maxLength: 140
+                avatar_url:
+                  type: string
+                onboarded:
+                  type: boolean
       responses:
         "200":
           description: 切換成功，回最新 me
@@ -1625,7 +1637,7 @@ components:
     Me:
       type: object
       required: [id, nickname, avatar_url, gender, mode, mode_updated_at]
-      description: 自己的 profile 公開列＋可見模式（A.16）
+      description: 自己的 profile 公開列＋可見模式（A.16；E.18 加 dob／bio／onboarded_at／created_at）
       properties:
         id:
           type: string
@@ -1638,6 +1650,20 @@ components:
         gender:
           type: string
           enum: [male, female, secret]
+        dob:
+          type: string
+          format: date
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        onboarded_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
         mode:
           type: string
           enum: [stealth, friends, public]

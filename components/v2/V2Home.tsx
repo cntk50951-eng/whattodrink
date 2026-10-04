@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -52,6 +52,9 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTi
 import { V2Comments } from "@/components/v2/V2Comments";
 import { FriendPicker, ShareDoneDialog } from "@/components/v2/FriendPicker";
 import { CheersMailbox } from "@/components/v2/CheersMailbox";
+import { OnboardingSheet } from "@/components/v2/OnboardingSheet";
+import { ageOf, shouldOnboard } from "@/lib/api/profile";
+import type { MeJson } from "@/lib/mode";
 import { CheckinDetailExtra } from "@/components/v2/CheckinDetailExtra";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMyMode } from "@/hooks/useMyMode";
@@ -155,6 +158,10 @@ type V2Card =
       avatarEmoji: string | null;
       /** UR C.10：三態（api 自由串經 parseGender，MOCK 直用）。 */
       gender: Gender;
+      /** UR E.18：作者生日（面板年齡徽章；MOCK 無即 null）。 */
+      authorDob: string | null;
+      /** UR E.18：作者簽名（完全公開；MOCK 無即 null）。 */
+      bio: string | null;
       /** UR C.10：打卡時間 epoch ms（無則不渲染時間行）。 */
       checkedInAt: number | null;
     };
@@ -347,6 +354,34 @@ export function V2Home() {
   );
   // UR E.15 信箱开关（地图右缘入口＋未读点，沿 C.11 工具列口径）。
   const [mailOpen, setMailOpen] = useState(false);
+  // UR E.18：服务端我（首登閘＋面板徽章＋表單初值；auth 態驱动，沿 Bell 口径）。
+  const [meJson, setMeJson] = useState<MeJson | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const refreshMe = useCallback(async (): Promise<void> => {
+    try {
+      const res = await fetch("/api/v1/me", { credentials: "include" });
+      if (!res.ok) return;
+      const j = (await res.json()) as { me?: MeJson };
+      if (j.me !== undefined && typeof j.me.id === "string") setMeJson(j.me);
+    } catch {
+      /* 靜默；旧面板照跑，徽章回退旧口径 */
+    }
+  }, []);
+  useEffect(() => {
+    // 全包 microtask（set-state-in-effect 规则，沿 V2Comments 口径；refreshMe 内含 setMe）。
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      if (isAuthed !== true) {
+        setMeJson(null);
+        return;
+      }
+      void refreshMe();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthed, refreshMe]);
   // UR E.15：切换并敬（pending intent；切完自动补敬，不丢冲动）＋同会话免打扰旗。
   const pendingCheersRef = useRef<string | null>(null);
   const refusedCheersRef = useRef(false);
@@ -381,6 +416,11 @@ export function V2Home() {
   }
   // UR E.10：相对时间锚点（render 内禁 Date.now impure，mount 快照一次，沿列表页口径）。
   const [nowMs] = useState(() => Date.now());
+  // UR E.18 首登閘（nowMs 之後算，避 TDZ）。
+  const showOnboard =
+    isAuthed === true &&
+    meJson !== null &&
+    shouldOnboard(meJson.onboarded_at ?? null, meJson.created_at ?? null, nowMs);
   // UR D.5：好友列表 pill 角标（用户定案 2026-10-03：任何模式都提醒，只挡匿名；
   // 未读>0 才显，点进列表看红点；新消息即轻提示一下）。
   const { total: bellTotal } = useChatBell(isAuthed === true, () => {
@@ -812,6 +852,8 @@ export function V2Home() {
         avatarUrl: api.avatarUrl,
         avatarEmoji: null,
         gender: parseGender(api.gender),
+        authorDob: api.authorDob,
+        bio: api.authorBio,
         checkedInAt:
           typeof api.checkedInAt === "number" &&
           Number.isFinite(api.checkedInAt)
@@ -878,6 +920,8 @@ export function V2Home() {
         avatarUrl: null,
         avatarEmoji: m.avatarEmoji,
         gender: m.gender,
+        authorDob: null,
+        bio: null,
         checkedInAt: m.checkedInAt,
       });
       // UR E.2：MOCK 無詳情端點，清殘留防串卡。
@@ -1622,6 +1666,11 @@ export function V2Home() {
                   ))}
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
+                {/* UR E.18：個人資料入口（四字段表單複用 OnboardingSheet）。 */}
+                <DropdownMenuItem onClick={() => setProfileOpen(true)}>
+                  <Users size={15} aria-hidden />
+                  {t2("profileItem")}
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   variant="destructive"
                   onClick={() => void handleLogout()}
@@ -2326,7 +2375,14 @@ export function V2Home() {
                   <SheetHeader className="text-left">
                     <SheetTitle className="flex min-w-0 flex-wrap items-center gap-1.5">
                       <span className="truncate">{card.title}</span>
-                      <Badge variant="outline">{t(GENDER_KEY[card.gender])}</Badge>
+                      {/* UR E.18：性別符號＋年齡徽章（secret 沿舊文字；无 dob 不编岁数）。 */}
+                      <Badge variant="outline">
+                        {card.gender === "male" ? "♂ " : card.gender === "female" ? "♀ " : ""}
+                        {(() => {
+                          const a = ageOf(card.authorDob, nowMs);
+                          return a === null ? t(GENDER_KEY[card.gender]) : t2("ageYears", { n: a });
+                        })()}
+                      </Badge>
                       {card.online && <Badge>{t("onlineNow")}</Badge>}
                     </SheetTitle>
                     <SheetDescription>
@@ -2409,6 +2465,10 @@ export function V2Home() {
                       </span>
                     )}
                   </div>
+                  {/* UR E.18：簽名行（完全公開；有即顯，无即藏）。 */}
+                  {card.bio !== null && card.bio !== "" && (
+                    <p className="truncate text-xs text-muted-foreground">{card.bio}</p>
+                  )}
                   {/* UR E.3 round-3 IG 式单视觉槽：有实拍即主视觉（限高），酒 hero 只在无图时垫底，不再双图三明治。 */}
                   {/* UR E.11：三件套在飛即骨架佔位（照片＋文字；語音稀有段到才掛，不佔位）；
                       落定／失敗走舊口徑（真圖／hero／藏行），不無限骨架。 */}
@@ -2659,7 +2719,21 @@ export function V2Home() {
                 <SheetHeader className="text-left">
                   <SheetTitle className="flex flex-wrap items-center gap-1.5">
                     {t("wantTitle")}
-                    <Badge variant="outline">{t(GENDER_KEY[MOCK_ME.gender])}</Badge>
+                    {/* UR E.18：真 profile 性別年齡（MOCK 占位退役；未同步沿舊口徑）。 */}
+                    <Badge variant="outline">
+                      {(meJson?.gender ?? "secret") === "male"
+                        ? "♂ "
+                        : (meJson?.gender ?? "secret") === "female"
+                          ? "♀ "
+                          : ""}
+                      {(() => {
+                        const a = ageOf(meJson?.dob ?? null, nowMs);
+                        const g = meJson?.gender ?? "secret";
+                        return a === null
+                          ? t(GENDER_KEY[g === "male" || g === "female" ? g : "secret"])
+                          : t2("ageYears", { n: a });
+                      })()}
+                    </Badge>
                     <Badge variant="secondary">{modeLabel}</Badge>
                   </SheetTitle>
                   <SheetDescription>{formatSeenAgo(rec.at, nowMs, locale)}</SheetDescription>
@@ -2735,6 +2809,10 @@ export function V2Home() {
                     )}
                   </span>
                 </div>
+                {/* UR E.18：自家簽名行（完全公開；me 未同步／无签名即藏）。 */}
+                {meJson?.bio !== null && meJson?.bio !== undefined && meJson.bio !== "" && (
+                  <p className="truncate text-xs text-muted-foreground">{meJson.bio}</p>
+                )}
                 {/* DEF-20260929-007 round-4：文案压图（作者视角不加名字，header 已有作者）。 */}
                 {rec.note && (
                   <p className="pt-1 text-sm">{rec.note}</p>
@@ -2844,6 +2922,38 @@ export function V2Home() {
           stealth={mode === "stealth"}
           onClose={() => setMailOpen(false)}
           onRead={() => refreshCheers()}
+        />
+      )}
+      {/* UR E.18 首登＋個人表單（条件挂载，初值新鲜；保存即刷 me）。 */}
+      {showOnboard && meJson !== null && (
+        <OnboardingSheet
+          open
+          mode="onboard"
+          initial={{
+            gender: meJson.gender,
+            avatarUrl: meJson.avatar_url,
+            dob: meJson.dob ?? null,
+            bio: meJson.bio ?? null,
+          }}
+          onClose={() => void refreshMe()}
+          onSaved={() => void refreshMe()}
+        />
+      )}
+      {profileOpen && meJson !== null && (
+        <OnboardingSheet
+          open
+          mode="profile"
+          initial={{
+            gender: meJson.gender,
+            avatarUrl: meJson.avatar_url,
+            dob: meJson.dob ?? null,
+            bio: meJson.bio ?? null,
+          }}
+          onClose={() => setProfileOpen(false)}
+          onSaved={() => {
+            flashNote(t2("profileSaved"));
+            void refreshMe();
+          }}
         />
       )}
 

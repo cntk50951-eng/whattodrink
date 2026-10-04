@@ -39,6 +39,11 @@ export type MeJson = {
   gender: "male" | "female" | "secret";
   mode: UserMode;
   mode_updated_at: string; // ISO
+  /** UR E.18 加法字段（0024 未跑即 undefined，调用方按缺省处理）。 */
+  dob?: string | null;
+  bio?: string | null;
+  onboarded_at?: string | null;
+  created_at?: string;
 };
 
 /**
@@ -76,6 +81,8 @@ export function toMeJson(raw: unknown): MeJson | null {
     return null;
   }
   if (!Number.isFinite(Date.parse(updatedAt))) return null;
+  const dob = r.dob === undefined || r.dob === null ? null : typeof r.dob === "string" ? r.dob : null;
+  const bio = r.bio === undefined || r.bio === null ? null : typeof r.bio === "string" ? r.bio : null;
   return {
     id,
     nickname,
@@ -83,5 +90,12 @@ export function toMeJson(raw: unknown): MeJson | null {
     gender,
     mode,
     mode_updated_at: updatedAt,
+    ...(dob !== undefined ? { dob } : {}),
+    ...(bio !== undefined ? { bio } : {}),
+    // onboarded null 显式保留（首登判定靠它；列未选即整键缺席，调用方按未知不弹）。
+    ...(r.onboarded_at === undefined
+      ? {}
+      : { onboarded_at: typeof r.onboarded_at === "string" ? r.onboarded_at : null }),
+    ...(typeof r.created_at === "string" ? { created_at: r.created_at } : {}),
   };
 }

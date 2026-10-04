@@ -40,6 +40,10 @@ export type PinJson = {
   nickname: string | null;
   avatarUrl: string | null;
   gender: string | null;
+  /** UR E.18 作者生日（面板年齡徽章；YYYY-MM-DD 形，无即 null）。 */
+  authorDob: string | null;
+  /** UR E.18 作者簽名（完全公開；无即 null）。 */
+  authorBio: string | null;
   checkedInAt: number; // epoch ms
   isOnline: boolean;
 };
@@ -120,12 +124,17 @@ export function toPinJson(raw: unknown, nowMs: number = Date.now()): PinJson | n
   let avatarUrl: string | null = null;
   let gender: string | null = null;
   let lastSeenAt: string | null = null;
+  let authorDob: string | null = null;
+  let authorBio: string | null = null;
   if (users !== null && typeof users === "object") {
     const u = users as Record<string, unknown>;
     nickname = typeof u.nickname === "string" ? u.nickname : null;
     avatarUrl = typeof u.avatar_url === "string" ? u.avatar_url : u.avatar_url === null ? null : null;
     gender = typeof u.gender === "string" ? u.gender : null;
     lastSeenAt = typeof u.last_seen_at === "string" ? u.last_seen_at : null;
+    authorDob =
+      typeof u.dob === "string" && /^\d{4}-\d{2}-\d{2}$/.test(u.dob) ? u.dob : null;
+    authorBio = typeof u.bio === "string" && u.bio.trim() !== "" ? u.bio.trim().slice(0, 140) : null;
   }
 
   // beers join（可能 null）
@@ -165,6 +174,8 @@ export function toPinJson(raw: unknown, nowMs: number = Date.now()): PinJson | n
     nickname,
     avatarUrl,
     gender,
+    authorDob,
+    authorBio,
     checkedInAt,
     isOnline,
   };

@@ -21,6 +21,8 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR E.18 首登資料＋個人面板＋面板性別年齡（v2-only，[✓]，用戶新老號雙路親驗通過，隨本車合入）**
+  - 0024（dob／bio／onboarded_at＋avatars 公開桶）；sign 擴 avatar；GET／PATCH `/me` 四字段＋打戳；`OnboardingSheet`（首登必填閘＋跳過打戳＋頭像直傳＋失敗留場）＋頭像菜單個人項；雙面板「♂ · 25歲」＋簽名行（`ageOf`＋單測）；`onboard*/profile*/ageYears/avatarBadType/profileSaveFail/profileItem`×3 parity；openapi 1.10.0
 - **UR E.17 自家釘实拍缩影（v2-only，[✓]，用戶手機親驗通過，隨本車合入）**
   - `V2WantMarker.photoUrl`＋两映射透传；钉层实拍第一优先（data:/http），无拍沿旧链；同步钉不动（pins API 无 photo 字段，另议）
   - tsc＋lint 雙淨；vitest 按偏好跳過（純視覺無邏輯分支）；`git status` 無 v1

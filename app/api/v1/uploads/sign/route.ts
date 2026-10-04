@@ -26,7 +26,7 @@ export async function POST(req: Request): Promise<Response> {
   if ("error" in parsed) {
     return apiError("invalid_params", parsed.error, 400);
   }
-  const bucket = parsed.purpose === "image" ? "chat-images" : "chat-voice";
+  const bucket = parsed.purpose === "image" ? "chat-images" : parsed.purpose === "voice" ? "chat-voice" : "avatars";
   const path = `${userId}/${crypto.randomUUID()}.${parsed.ext}`;
   try {
     const env = requireSupabaseEnv();

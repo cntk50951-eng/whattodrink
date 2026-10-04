@@ -17,7 +17,7 @@ import { friendIdsOf, hideOnlineForViewer } from "@/lib/friends";
  */
 
 const PINS_COLUMNS =
-  "id,lat,lng,place_name,created_at,kind,expires_at,user_id,users!checkins_user_id_fkey(nickname,avatar_url,gender,last_seen_at,mode),beers(name,emoji)";
+  "id,lat,lng,place_name,created_at,kind,expires_at,user_id,users!checkins_user_id_fkey(nickname,avatar_url,gender,dob,bio,last_seen_at,mode),beers(name,emoji)";
 
 export async function GET(req: Request): Promise<Response> {
   const parsed = parsePinsParams(new URL(req.url).searchParams);
@@ -94,7 +94,7 @@ export async function GET(req: Request): Promise<Response> {
         console.warn(`[api/v1/map/pins] kind column missing (code=${firstErr?.code}), fallback to bbox-only: ${firstErr?.message}`);
         const { data: fbData, error: fbError } = await supabase
           .from("checkins")
-          .select("id,lat,lng,place_name,created_at,users!checkins_user_id_fkey(nickname,avatar_url,gender,last_seen_at),beers(name,emoji)")
+          .select("id,lat,lng,place_name,created_at,users!checkins_user_id_fkey(nickname,avatar_url,gender,dob,bio,last_seen_at),beers(name,emoji)")
           .eq("visibility", "public")
           .not("lat", "is", null)
           .not("lng", "is", null)

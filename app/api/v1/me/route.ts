@@ -1,6 +1,7 @@
 import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parsePatchModeBody, toMeJson } from "@/lib/mode";
+import { parseProfileBody } from "@/lib/api/profile";
 
 /**
  * UR A.16 隱身模式（A.4-6 子集先行，一次一個端點）。
@@ -10,7 +11,7 @@ import { parsePatchModeBody, toMeJson } from "@/lib/mode";
  */
 
 const ME_SELECT =
-  "id,nickname,avatar_url,gender,mode,mode_updated_at";
+  "id,nickname,avatar_url,gender,mode,mode_updated_at,dob,bio,onboarded_at,created_at";
 const ME_SELECT_LEGACY = "id,nickname,avatar_url,gender,created_at";
 
 async function ensureUserRow(
@@ -106,22 +107,49 @@ export async function PATCH(req: Request): Promise<Response> {
     return apiError("invalid_params", "body 需为 JSON", 400);
   }
   const parsed = parsePatchModeBody(raw);
-  if ("error" in parsed) {
+  const profile = parseProfileBody(raw);
+  const hasMode = (raw as Record<string, unknown>).mode !== undefined;
+  if (hasMode && "error" in parsed) {
     return apiError("invalid_params", parsed.error, 400);
+  }
+  if (!hasMode && "error" in profile) {
+    return apiError("invalid_params", profile.error, 400);
   }
   try {
     await ensureUserRow(supabase, userId);
     const nowIso = new Date().toISOString();
+    const update: Record<string, unknown> = {};
+    if (!("error" in parsed)) {
+      update.mode = parsed.body.mode;
+      update.mode_updated_at = nowIso;
+    }
+    if (!("error" in profile)) {
+      // UR E.18 首登資料（四段全可选；首登必填由调用方表单判，不进端点）。
+      if (profile.gender !== undefined) update.gender = profile.gender;
+      if (profile.dob !== undefined) update.dob = profile.dob;
+      if (profile.bio !== undefined) update.bio = profile.bio;
+      if (profile.avatar_url !== undefined) update.avatar_url = profile.avatar_url;
+      if ((raw as Record<string, unknown>).onboarded === true) {
+        update.onboarded_at = nowIso;
+      }
+    }
+    if (Object.keys(update).length === 0) {
+      return apiError("invalid_params", "body 無有效字段", 400);
+    }
+      // UR E.18：舊誤導文案退役（缺列直報真名，沿 0024 口徑；不再提 0007）。
     const { data, error } = await supabase
       .from("users")
-      .update({ mode: parsed.body.mode, mode_updated_at: nowIso })
+      .update(update)
       .eq("id", userId)
       .select(ME_SELECT)
       .maybeSingle();
     if (error) {
-      // 0007 未遷移無法寫 mode：誠實 500（不靜默假裝切了）
+      if (error.code === "42703") {
+        const m = /column "?(\w+)"? (of relation|does not exist)/.exec(error.message);
+        return apiError("internal", `字段缺失（${m?.[1] ?? error.message}，請執行對應 migration）`, 500);
+      }
       console.error(`[api/v1/me] update error: code=${error.code} message=${error.message}`);
-      return apiError("internal", "模式切換失敗（users.mode 未遷移，請執行 0007）", 500);
+      return apiError("internal", "保存失敗", 500);
     }
     const me = toMeJson(data);
     if (me === null) {

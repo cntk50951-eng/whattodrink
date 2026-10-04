@@ -100,7 +100,7 @@ describe("toPinJson", () => {
       lng: 114.18299,
       place_name: "銅鑼灣",
       created_at: "2026-09-15T11:55:00Z",
-      users: { nickname: "阿怡", avatar_url: null, gender: "female", last_seen_at: "2026-09-15T11:58:00Z" },
+      users: { nickname: "阿怡", avatar_url: null, gender: "female", dob: "2000-01-01", last_seen_at: "2026-09-15T11:58:00Z" },
       beers: { name: "Asahi 生啤", emoji: "🍻" },
     };
     const pin = toPinJson(row, now);
@@ -110,6 +110,8 @@ describe("toPinJson", () => {
     expect(pin?.area).toBe("銅鑼灣");
     expect(pin?.isOnline).toBe(true);
     expect(pin?.checkedInAt).toBe(Date.parse("2026-09-15T11:55:00Z"));
+    expect(pin?.authorDob).toBe("2000-01-01");
+    expect(pin?.authorBio).toBeNull();
   });
 
   it("returns null on bad id/lat/created_at", () => {

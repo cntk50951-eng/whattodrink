@@ -22,6 +22,7 @@ UI 全确定后按此开工 EPIC 3.0 真表设计。
 - `users(id, nickname, avatar_url, gender, created_at)` —— 头像＋性别
   **UR2.0 已落定**：`MOCK_ME`（`lib/me.ts`）占位，`gender` enum 三值
   （male／female／secret）与本草图同名，直迁无改名
+  **UR E.18 加 `dob`／`bio`／`onboarded_at`（0024 待跑）**：生日存 date（年龄随算）＋签名 140＋首登戳（空＋7 天内新号即弹）；`avatars` 公開桶（SQL 建桶＋公读 policy，直传签名沿 uploads 口径）
   **UR3.3 加 `last_seen_at`**：APP 前台心跳（~30s 写一次），查 5km 内
   `last_seen_at >= now - 5min` 即在线（口径与前端 `isNearbyOnline` 一致，
   mock 用 `Checkin.onlineAt` 相对时间戳占位）；建索引（范围查）
