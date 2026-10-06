@@ -160,6 +160,17 @@ describe("parseCreateCheckinBody 三件套 (UR E.2)", () => {
     expect("body" in res && res.body.note).toBe("今晚第一杯");
     expect("body" in res && res.body.audio_seconds).toBe(12);
   });
+  it("UR E.20 縮圖合法即收（缺即不帶；壞形／超長即 400）", () => {
+    const ok = parseCreateCheckinBody({ ...BASE, photo_thumb: "data:image/jpeg;base64,/9j/" });
+    expect("body" in ok && ok.body.photo_thumb).toBe("data:image/jpeg;base64,/9j/");
+    expect(parseCreateCheckinBody({ ...BASE })).not.toHaveProperty("error");
+    expect(
+      parseCreateCheckinBody({ ...BASE, photo_thumb: "http://x/y.jpg" }),
+    ).toEqual({ error: expect.stringContaining("photo_thumb") });
+    expect(
+      parseCreateCheckinBody({ ...BASE, photo_thumb: `data:image/jpeg;base64,${"a".repeat(40000)}` }),
+    ).toEqual({ error: expect.stringContaining("photo_thumb") });
+  });
   it("壞值即 400（非圖／超長／note 超限／秒數超限）", () => {
     expect(
       parseCreateCheckinBody({ ...BASE, photo_url: "http://x/y.jpg" }),

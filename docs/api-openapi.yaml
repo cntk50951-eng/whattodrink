@@ -165,6 +165,10 @@ paths:
                   type: string
                   nullable: true
                   description: UR E.2 三件套——jpeg dataURL（≤1M 字符，抓幀已壓 ≤1024）
+                photo_thumb:
+                  type: string
+                  nullable: true
+                  description: UR E.20 他人釘縮影——96px jpeg dataURL（≤32K 字符，拍攝順手壓）
                 note:
                   type: string
                   nullable: true
@@ -1837,6 +1841,10 @@ components:
         gender:
           type: string
           nullable: true
+        photoThumb:
+          type: string
+          nullable: true
+          description: 他人釘縮影（96px data: URL；舊帖／無圖即 null，UR E.20）
         checkedInAt:
           type: integer
           description: Epoch ms

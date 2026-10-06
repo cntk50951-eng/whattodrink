@@ -33,6 +33,8 @@ export async function POST(req: Request): Promise<Response> {
   }
   const { beer_id, lat, lng, place_name, kind } = parsed.body;
   const photoUrl = parsed.body.photo_url ?? null;
+  // UR E.20 縮圖隨單（缺即 null；42703 老庫回退鏈不碰此列，見下）。
+  const photoThumb = parsed.body.photo_thumb ?? null;
   const noteText = parsed.body.note ?? null;
   const audioUrl = parsed.body.audio_url ?? null;
   const audioSeconds = parsed.body.audio_seconds ?? null;
@@ -175,6 +177,7 @@ export async function POST(req: Request): Promise<Response> {
           visibility,
           expires_at: expiresAt,
           photo_url: photoUrl,
+          photo_thumb: photoThumb,
           note: noteText ?? "",
           audio_url: audioUrl,
           audio_seconds: audioSeconds,

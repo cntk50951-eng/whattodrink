@@ -5,6 +5,8 @@
 ## [Unreleased]
 
 ### Fixed
+- **DEF-20261006-001 打卡後出現兩條（v2-only，隨本車合入，用戶手機親驗通過）**
+  - 同帖本地＋服務端雙層各渲染一次（用戶截圖實錘；服務端 12 行逐查排除）；修法＝落库去重＋`visibleWants` 显示吸收＋`others` 按服務端 id 剔除；`visibleWants`＋3 單測
 - **DEF-20261003-004 打卡面板佔滿屏＋關閉鈕不可見（v2-only，重做已合入，用戶手機親驗通過）**
   - 回滚前 batch7 固定高＋丢 `max-h` 上限致面板超視口（已隨 bfc08f7 回滚下線）；重做取 dd73920 形（batch6）＋三樣帶修：`max-h-[85svh]` 上限保留、in-flow 常駐關閉行（默認角落 X 關掉防疊字）、`initialFocus={false}` 保開即頂部；固定頭／半屏展開不再引入
   - 端點＋migration 文件（0017／0018，DB 已跑過，僅回倉對齊）＋三語 key 全數撿回；用戶手機親驗通過，隨本車合入
@@ -21,6 +23,9 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR E.20 他人釘照片縮影（v2-only，[WIP]，待 0025＋雙人親驗）**
+  - 0025（`checkins.photo_thumb` text 可空；用戶 Dashboard 跑）；拍攝 canvas 順手壓 96px（jpeg 0.7）→POST 白名單（data:image／≤32K）→pins 只回縮圖列（原圖永不進列表；42703 老庫回退鏈不動）
+  - 讀：`toPinJson.photoThumb`（壞形即 null）→`V2Marker`→他人釘面第一優先（同圓釘形，作者同視角）；舊帖／無圖沿舊鏈；openapi MapPin＋POST 雙補句
 - **UR E.19 未成年硬拒＋舊號一次性提示（v2-only，[✓]，用戶手機親驗通過，隨本車合入）**
   - `parseProfileBody` 足歲判（服務器時間；`AGE_RESTRICTED`）＋PATCH 422 明文（生日可改，不打戳不落库）；表單 422 留現場改生日；`ageRestricted`×3 parity
   - `toMeJson` 加 `birthRestricted`（內聯足歲，防循環 import；缺席未知不扰）＋舊號提示條（改生日入口＋一次即忘）；單測（足歲／422／旗三色）

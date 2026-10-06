@@ -8,6 +8,7 @@
 import { HK_BOUNDS } from "../geo";
 import { parseScope } from "../friends";
 import type { PinsScope } from "../friends";
+import { CHECKIN_PHOTO_THUMB_MAX_CHARS } from "./checkins";
 
 export const PINS_DEFAULT_LIMIT = 100;
 export const PINS_MAX_LIMIT = 200;
@@ -44,6 +45,8 @@ export type PinJson = {
   authorDob: string | null;
   /** UR E.18 作者簽名（完全公開；无即 null）。 */
   authorBio: string | null;
+  /** UR E.20 他人釘縮影（96px data: URL；形狀不對即 null，舊帖回退）。 */
+  photoThumb: string | null;
   checkedInAt: number; // epoch ms
   isOnline: boolean;
 };
@@ -136,6 +139,14 @@ export function toPinJson(raw: unknown, nowMs: number = Date.now()): PinJson | n
       typeof u.dob === "string" && /^\d{4}-\d{2}-\d{2}$/.test(u.dob) ? u.dob : null;
     authorBio = typeof u.bio === "string" && u.bio.trim() !== "" ? u.bio.trim().slice(0, 140) : null;
   }
+  // UR E.20 縮圖直通（白名單 data:image；壞形即 null，不炸整行，沿舊容錯口徑）。
+  const thumbRaw = r.photo_thumb;
+  const photoThumb =
+    typeof thumbRaw === "string" &&
+    thumbRaw.startsWith("data:image/") &&
+    thumbRaw.length <= CHECKIN_PHOTO_THUMB_MAX_CHARS
+      ? thumbRaw
+      : null;
 
   // beers join（可能 null）
   const beers = r.beers as unknown;
@@ -176,6 +187,7 @@ export function toPinJson(raw: unknown, nowMs: number = Date.now()): PinJson | n
     gender,
     authorDob,
     authorBio,
+    photoThumb,
     checkedInAt,
     isOnline,
   };

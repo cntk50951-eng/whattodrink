@@ -2734,6 +2734,7 @@ E.1 前端閉環後，照片／文字／語音只活在本地。DB 列全有（0
 - 2026-09-28：連通＋功能實測全綠（OPENAI_KEY 真 key：乾淨文→放行／暴力文→拒＋harassment/violence 類／圖文一次→放行；主審 key 錯→Minimax 3s 頂上放行；key 名兼容 `OPENAI_API_KEY` 優先＋`OPENAI_KEY` 回退；live 測試文件跑完即刪未留倉）
 - 2026-09-28：問答定案（OpenAI omni-moderation 免費已官方實證＋key 位／發送→審核→發布 fail-closed／dataURL 直存）置 [WIP]；實作完待驗（`lib/moderation`＋4 單測、`parseCreateCheckinBody` 三件套＋上限、`POST` 審核門＋落庫＋回顯、`GET [id]` 詳情＋`canViewCheckin`、`mine` 回顯、`dropWant` 送三件套＋rejected 直顯不落地、他人卡按需拉＋渲染；lint 淨／378 綠；全樹 build 被隊友 `ChatRoomLive` 未提交語法錯擋住（非我方）；待用戶雙號＋審核親驗，未提交）
 - 2026-09-29：DEF-20260929-001 修復中（暴力文本静默发布：OpenAI 地域封锁＋Minimax 平台信号瞎，双实测实锤；修法＝vendor 错误分级日志＋分级失败＋Minimax 模型裁决 OR 化；图片审核代码本就在链上，本轮验证 plumbing＋补 body 断言；单测 19 绿＋Minimax 真 key live 双绿跑完即删；tsc 净／eslint 净；待用户原路径复测＋合入指令，未提交）
+- 2026-10-06 round-3 跨層去重（DEF-20261006-001）：同帖本地＋服務端雙層各渲染一次，用戶截圖實錘；修法＝落库同 id 替换＋吸收同位近期孤兒＋`visibleWants` 显示吸收＋`others` 按服務端 id 剔除；待驗未提交
 
 ---
 
@@ -3220,6 +3221,34 @@ UR E.19　未成年硬拒＋舊號一次性提示（v2-only）[✓]
 *改動記錄*
 - 2026-10-04：建檔置 [WIP]（問答兩題定案；直做）
 - 2026-10-04 round-2：全鏈禁寫（開卡禁＋按鈕禁＋六端點禁）＋開卡明文 toast；用戶手機親驗通過置 [✓]，隨本車合入
+---
+
+UR E.20　他人釘照片縮影（v2-only）[WIP]
+
+> 作者視角（本地原圖釘，E.17） vs 好友視角（白底 emoji 釘）不對稱的根因：pins API 無照片字段（E.2 省流量設計）。本 UR 補縮圖鏈，不動原圖鏈。
+
+作為看地圖的人，我希望別人的打卡釘也是照片縮影，和作者看到的一樣。
+
+### 背景（2026-10-06 定案：客戶端產縮圖，列表只回縮圖）
+- 原圖 data: URL 約 200KB，100 顆釘即 20MB——永不進列表。拍攝即產 96px JPEG 縮圖（約 3–6KB），隨單存新列，pins 只回縮圖列。
+- 舊帖無縮圖即 emoji 回退（不回填，另議）；42703 老庫回退鏈不動（新列只進主插入）。
+
+### 範圍（v2-only；API 加法，舊客戶端忽略即兼容）
+1. **數據**：migration（`checkins.photo_thumb text` 可空；用戶 Dashboard 跑）。
+2. **寫**：拍攝 canvas 順手壓 96px（jpeg 0.7）→ `PublishShot.photoThumb` → dropWant → POST `photo_thumb`（白名單 data:image／≤32K，壞值 400，沿 photo_url 口徑）。
+3. **讀**：pins select 加列 → `toPinJson.photoThumb`（形狀不對即 null）→ `V2Marker` → 他人釘面第一優先（同 `v2pinWantImg` 圓釘形，和作者視角一致）。
+4. openapi MapPin 補字段句；`checkins.test.ts`＋`pins.test.ts` 補用例。
+
+### 非目標
+- 原圖進列表、舊帖回填、同步釘外其他面、v1 任何文件。
+
+### AC
+- AC1：新發照片帖，好友地圖即見照片圓釘（和作者同形）；無圖／舊帖沿舊鏈不變
+- AC2：非法 thumb（非 data:image／超 32K）即 400；XSS 位（`javascript:`）進不了釘面 innerHTML
+- AC3：三閘綠＋作者＋好友雙人親驗＋`git status` 無 v1
+
+*改動記錄*
+- 2026-10-06：建檔置 [WIP]（用戶指令他人同視角；直做）
 ---
 
 > 生产线 F 新开，主力承载“组局”功能。总体定位：以“每人带一支酒的品酒会”为原型，扩展为主题化小聚引擎（B 主题开放 + C 熟人基座），初期纯信息撮合 + 免责声明 + 公开场所引导（用户自选公开场所，平台建议清单，不指定），后期叠加认证合作场地。MVP 闭环：发布 → 发现（地图+列表）→ 申请 → 审批 → 行前提醒 → 签到 → 互评。法务待复核，PDPO/年龄/免责按 §3 风险矩阵落地。详见 `docs/EPIC_F_GROUP_GATHERING.md` v0.1 与 `docs/F_BACKLOG_DRAFT.md` 草案。

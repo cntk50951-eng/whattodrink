@@ -196,6 +196,28 @@ export function upsertWantHistory(
     .slice(-MAX_WANT_HISTORY);
 }
 
+/** DEF-20261006-001 同位重影吸收窗（离线裸存＋随后成功，两行同帖只差一次网络）。 */
+export const WANT_MERGE_WINDOW_MS = 30 * 60_000;
+
+/**
+ * DEF-20261006-001 显示层去重（不删数据，只定显隐）。
+ * 无 id 孤儿若同位 10m 内有更新的已同步行（30min 内），即判定为同帖重影吸收；
+ * 真离线未同步（无 serveur 对应）原样保留。
+ */
+export function visibleWants(records: readonly WantRecord[]): WantRecord[] {
+  const synced = records.filter((r) => r.id !== undefined);
+  if (synced.length === 0) return [...records];
+  return records.filter((r) => {
+    if (r.id !== undefined) return true;
+    return !synced.some(
+      (s) =>
+        s.at >= r.at &&
+        s.at - r.at < WANT_MERGE_WINDOW_MS &&
+        haversineMeters(s.position, r.position) < SAME_SPOT_M,
+    );
+  });
+}
+
 /**
  * UR3.7 纯换酒：按 at 换掉条目的 beer，时间／位置／地名原样保留
  * （pin 不动，只换酒）；对不上 at 原样返回。

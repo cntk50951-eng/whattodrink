@@ -12,6 +12,8 @@ import {
   resolvePlaceName,
   swapWantBeer,
   upsertWantHistory,
+  visibleWants,
+  WANT_MERGE_WINDOW_MS,
 } from "./wantRecord";
 
 const GOOD = {
@@ -153,6 +155,39 @@ describe("upsertWantHistory (UR3.4)", () => {
       position: { lat: GOOD.position.lat + 0.000045, lng: GOOD.position.lng },
     };
     expect(upsertWantHistory([base], drifted)).toHaveLength(1);
+  });
+});
+
+describe("visibleWants (DEF-20261006-001)", () => {
+  const T0 = 1785628320000;
+  const spot = { lat: 22.2819, lng: 114.1577 };
+  const far = { lat: 23, lng: 115 };
+  const mk = (at: number, id?: string, position = spot) => ({
+    beer: null,
+    at,
+    position: { ...position },
+    ...(id !== undefined ? { id } : {}),
+  });
+
+  it("双同步行全留；无同步行原样返回", () => {
+    const rows = [mk(T0, "a"), mk(T0 + 1000, "b")];
+    expect(visibleWants(rows)).toHaveLength(2);
+    expect(visibleWants([mk(T0)])).toHaveLength(1);
+    expect(visibleWants([])).toHaveLength(0);
+  });
+
+  it("同位近期孤儿被已同步行吸收（离线裸存＋随后成功）", () => {
+    const rows = [mk(T0), mk(T0 + 5000, "srv-1")];
+    const out = visibleWants(rows);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toEqual(mk(T0 + 5000, "srv-1"));
+  });
+
+  it("异位孤儿保留；超窗孤儿保留（真离线未同步）", () => {
+    expect(visibleWants([mk(T0), mk(T0 + 5000, "srv-1", far)])).toHaveLength(2);
+    expect(
+      visibleWants([mk(T0), mk(T0 + WANT_MERGE_WINDOW_MS + 1, "srv-2")]),
+    ).toHaveLength(2);
   });
 });
 

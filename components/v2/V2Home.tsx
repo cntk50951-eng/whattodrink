@@ -112,6 +112,9 @@ import {
   upsertWantHistory,
   formatWantCoords,
   formatWantTime,
+  visibleWants,
+  SAME_SPOT_M,
+  WANT_MERGE_WINDOW_MS,
 } from "@/lib/wantRecord";
 import type { WantRecord } from "@/lib/wantRecord";
 import { MOCK_ME, parseGender } from "@/lib/me";
@@ -623,15 +626,21 @@ export function V2Home() {
   }, []);
 
   const useApi = apiPinsLoaded && apiPins.length > 0;
-  const others = useMemo(
-    () => (useApi ? apiPinsToMarkers(apiPins) : mockToMarkers()),
-    [useApi, apiPins],
-  );
+  const others = useMemo(() => {
+    // DEF-20261006-001 跨层去重：已同步行只走自家 wants 层（照片缩影＋自家 Sheet），
+    // 他人层按服務端 id 剔除（mine 未到前的闪现可接受，见 UR）。
+    const syncedIds = new Set(
+      wantHistory.map((w) => w.id).filter((id): id is string => id !== undefined),
+    );
+    const pins = useApi ? apiPins.filter((p) => !syncedIds.has(p.id)) : null;
+    return pins !== null ? apiPinsToMarkers(pins) : mockToMarkers();
+  }, [useApi, apiPins, wantHistory]);
   const wants = useMemo(
     () =>
       // UR C.4＋A.20：釘圖與 Sheet 同源（resolveFreshBeer 目錄取新，換酒即換釘圖）；
       // 本地 SVG 組件一併帶下（地圖 createRoot 注入），無圖回 img／emoji 舊鏈
-      wantHistory.map((w) => {
+      // DEF-20261006-001 同位重影显示层吸收（不删数据，见 visibleWants）。
+      visibleWants(wantHistory).map((w) => {
         // UR E.3：无酒打卡钉走照片主视觉（📷 通用钉，无品牌图链）。
         // UR E.17：有实拍即缩影钉（photoDataUrl 本地 data:，Sheet 同源）。
         const fresh = w.beer === null ? null : resolveFreshBeer(w.beer);
@@ -1316,7 +1325,7 @@ export function V2Home() {
   function dropWant(
     beer: Beer | null,
     kind: "flash" | "post",
-    shot: { photoDataUrl: string; note: string } | null,
+    shot: { photoDataUrl: string; photoThumb: string; note: string } | null,
   ): Promise<DropWantResult> {
     if (isAuthed === false) {
       setPickStage("login");
@@ -1331,6 +1340,7 @@ export function V2Home() {
             ...(shot.note !== "" ? { note: shot.note } : {}),
           };
     // UR E.2：POST 同款三件套（server 字段名；空值不送，沿上）。
+    // UR E.20 縮圖隨單（空即不送，他人釘回退）。
     const postExtra =
       shot === null
         ? {}
@@ -1338,6 +1348,7 @@ export function V2Home() {
             ...(shot.photoDataUrl !== ""
               ? { photo_url: shot.photoDataUrl }
               : {}),
+            ...(shot.photoThumb !== "" ? { photo_thumb: shot.photoThumb } : {}),
             ...(shot.note !== "" ? { note: shot.note } : {}),
           };
     // UR C.18：同 tick 連點只收一次（ref 即時，state 慢半拍擋不住）。
@@ -1417,7 +1428,21 @@ export function V2Home() {
           ...shotExtra,
         };
         // 登入以 DB 為準：只進會話態，不寫本地（沿 A.10）。
-        setWantHistory((prev) => [...prev, record].sort((a, b) => a.at - b.at));
+        // DEF-20261006-001 落库去重：同 id 替换＋吸收同位近期无 id 孤儿
+        // （离线裸存＋随后成功；显示层另有 visibleWants 双保险）。
+        setWantHistory((prev) => {
+          const rest = prev.filter(
+            (r) =>
+              r.id !== row.id &&
+              !(
+                r.id === undefined &&
+                r.at <= at &&
+                at - r.at < WANT_MERGE_WINDOW_MS &&
+                haversineMeters(r.position, position) < SAME_SPOT_M
+              ),
+          );
+          return [...rest, record].sort((a, b) => a.at - b.at);
+        });
         setPickOpen(false);
         mapApi.current?.flyTo(position, 15);
         done();
@@ -1454,6 +1479,7 @@ export function V2Home() {
     }
     const r = await dropWant(null, args.kind, {
       photoDataUrl: args.photoDataUrl,
+      photoThumb: args.photoThumb,
       note: args.note,
     });
     if (r.ok) return { ok: true };

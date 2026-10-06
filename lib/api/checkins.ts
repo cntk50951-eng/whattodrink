@@ -20,6 +20,8 @@ export type CreateCheckinBody = {
   kind: "flash" | "post";
   /** UR E.2 三件套（dataURL 直存口徑；後端再驗上限＋審核，見 POST 路由）。 */
   photo_url?: string | null;
+  /** UR E.20 他人釘縮影（96px JPEG data: URL；pins 只回此列，原圖永不進列表）。 */
+  photo_thumb?: string | null;
   note?: string | null;
   audio_url?: string | null;
   audio_seconds?: number | null;
@@ -27,7 +29,9 @@ export type CreateCheckinBody = {
 };
 
 /** E.2 上限（body 肥大即 400；抓幀 ≤1024 jpeg 約 200–400k，60s 語音約 1M 內）。 */
+/** UR E.20 縮圖上限（96px jpeg 約 3–6k；32k 封頂防濫用，沿 photo 口徑）。 */
 export const CHECKIN_PHOTO_MAX_CHARS = 1_000_000;
+export const CHECKIN_PHOTO_THUMB_MAX_CHARS = 32_000;
 export const CHECKIN_AUDIO_MAX_CHARS = 2_000_000;
 export const CHECKIN_NOTE_MAX = 500;
 export const CHECKIN_TRANSCRIPT_MAX = 2000;
@@ -140,6 +144,19 @@ export function parseCreateCheckinBody(
     }
     photoUrl = photoRaw;
   }
+  // UR E.20 縮圖（白名單＋上限；壞值即 400，不靜默丟——沿 photo 口徑）。
+  const thumbRaw = r.photo_thumb;
+  let photoThumb: string | null = null;
+  if (thumbRaw !== undefined && thumbRaw !== null) {
+    if (
+      typeof thumbRaw !== "string" ||
+      !thumbRaw.startsWith("data:image/") ||
+      thumbRaw.length > CHECKIN_PHOTO_THUMB_MAX_CHARS
+    ) {
+      return { error: "photo_thumb 非法：要 data:image 且 ≤32K 字符" };
+    }
+    photoThumb = thumbRaw;
+  }
   const noteRaw = r.note;
   let note: string | null = null;
   if (noteRaw !== undefined && noteRaw !== null) {
@@ -200,6 +217,7 @@ export function parseCreateCheckinBody(
       ...(placeName === null ? { place_name: null } : { place_name: placeName }),
       kind,
       ...(photoUrl !== null ? { photo_url: photoUrl } : {}),
+      ...(photoThumb !== null ? { photo_thumb: photoThumb } : {}),
       ...(note !== null ? { note } : {}),
       ...(audioUrl !== null ? { audio_url: audioUrl } : {}),
       ...(audioSeconds !== null ? { audio_seconds: audioSeconds } : {}),

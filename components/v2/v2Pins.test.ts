@@ -17,11 +17,12 @@ describe("apiPinsToMarkers (UR C.1)", () => {
         gender: "female",
         authorDob: "2000-01-01",
         authorBio: null,
+        photoThumb: "data:image/jpeg;base64,/9j/",
         checkedInAt: 1,
         isOnline: true,
       },
     ]);
-    expect(out).toEqual([{ id: "u1", lat: 22.28, lng: 114.15, label: "阿", online: true, drink: "Heineken", drinkEmoji: "🍺", at: 1 }]);
+    expect(out).toEqual([{ id: "u1", lat: 22.28, lng: 114.15, label: "阿", online: true, drink: "Heineken", drinkEmoji: "🍺", at: 1, photoThumb: "data:image/jpeg;base64,/9j/" }]);
   });
   it("酒字段透傳（釘面圖標用，無則 null）", () => {
     const out = apiPinsToMarkers([
@@ -37,6 +38,7 @@ describe("apiPinsToMarkers (UR C.1)", () => {
         gender: null,
         authorDob: null,
         authorBio: null,
+        photoThumb: null,
         checkedInAt: 1,
         isOnline: false,
       },
@@ -57,6 +59,7 @@ describe("apiPinsToMarkers (UR C.1)", () => {
         gender: null,
         authorDob: null,
         authorBio: null,
+        photoThumb: null,
         checkedInAt: 1,
         isOnline: false,
       },
@@ -87,6 +90,6 @@ describe("mockToMarkers (UR C.1)", () => {
         mock: true,
       },
     ]);
-    expect(out).toEqual([{ id: "m1", lat: 22.28, lng: 114.15, label: "測", online: false, drink: "測試酒", drinkEmoji: "🍺", at: 1 }]);
+    expect(out).toEqual([{ id: "m1", lat: 22.28, lng: 114.15, label: "測", online: false, drink: "測試酒", drinkEmoji: "🍺", at: 1, photoThumb: null }]);
   });
 });

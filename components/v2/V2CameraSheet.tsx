@@ -24,6 +24,8 @@ import { PHOTO_FILTER_IDS, fitPhotoSize, photoFilterCss } from "@/lib/photoFilte
 
 export type PublishShot = {
   photoDataUrl: string;
+  /** UR E.20 他人釘縮影（96px JPEG data:，可空；缺即他人釘回退）。 */
+  photoThumb: string;
   note: string;
   kind: "flash" | "post";
 };
@@ -70,6 +72,8 @@ export function V2CameraSheet({
   const [filterId, setFilterId] = useState<PhotoFilterId>("none");
   const [beauty, setBeauty] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
+  // UR E.20 他人釘縮影（拍攝即產，發布隨單；失败即空串，他人釘回退）。
+  const [photoThumb, setPhotoThumb] = useState("");
   const [note, setNote] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -88,6 +92,7 @@ export function V2CameraSheet({
     }
     setKind(null);
     setPhoto(null);
+    setPhotoThumb("");
     setNote("");
     setPublishing(false);
     setPublishError(null);
@@ -182,6 +187,24 @@ export function V2CameraSheet({
     ctx.filter = photoFilterCss(filterId, beauty);
     ctx.drawImage(v, 0, 0, w, h);
     setPhoto(canvas.toDataURL("image/jpeg", 0.85));
+    // UR E.20 縮圖順手壓（最長邊 96px，jpeg 0.7 約 3–6k；异常即空串回退）。
+    try {
+      const scale = Math.min(1, 96 / Math.max(w, h));
+      const tw = Math.max(1, Math.round(w * scale));
+      const th = Math.max(1, Math.round(h * scale));
+      const tiny = document.createElement("canvas");
+      tiny.width = tw;
+      tiny.height = th;
+      const tctx = tiny.getContext("2d");
+      if (tctx !== null) {
+        tctx.drawImage(canvas, 0, 0, tw, th);
+        setPhotoThumb(tiny.toDataURL("image/jpeg", 0.7));
+      } else {
+        setPhotoThumb("");
+      }
+    } catch {
+      setPhotoThumb("");
+    }
     setPublishError(null);
     setPhase("review");
   }
@@ -219,6 +242,7 @@ export function V2CameraSheet({
     setPublishError(null);
     const res = await onPublish({
       photoDataUrl: photo,
+      photoThumb,
       note: note.trim(),
       kind,
     });
@@ -458,6 +482,7 @@ export function V2CameraSheet({
                   disabled={publishing}
                   onClick={() => {
                     setPhoto(null);
+                    setPhotoThumb("");
                     setPublishError(null);
                     setPhase("live");
                   }}

@@ -27,6 +27,7 @@ import {
 import type { TileSpec } from "@/lib/maps/provider";
 import { avoidLive, planSpread } from "@/lib/mapSpread";
 import { HEAT_WINDOW_MS } from "@/lib/heatmap";
+import { CHECKIN_PHOTO_THUMB_MAX_CHARS } from "@/lib/api/checkins";
 import {
   ANCHOR_ZOOM_MAX,
   groupByAnchor,
@@ -123,6 +124,18 @@ function escAttr(s: string): string {
  */
 function otherPinContent(m: V2Marker): { html: string; Icon: BeerIconComponent | null } {
   const dot = m.online ? `<span class="${styles.v2pinOnline}"></span>` : "";
+  // UR E.20 他人釘縮影第一优先（同 v2pinWantImg 圓釘形，和作者視角一致；
+  // data:image 白名單＋escAttr，javascript: 进不来，沿 E.17 口徑）。
+  if (
+    m.photoThumb !== null &&
+    m.photoThumb.startsWith("data:image/") &&
+    m.photoThumb.length <= CHECKIN_PHOTO_THUMB_MAX_CHARS
+  ) {
+    return {
+      html: `<div class="${styles.v2pinWantImg}"><img src="${escAttr(m.photoThumb)}" alt="" loading="lazy" /></div>`,
+      Icon: null,
+    };
+  }
   const Icon = m.drink !== null ? iconForDrinkName(m.drink) : null;
   if (Icon !== null) {
     return {
