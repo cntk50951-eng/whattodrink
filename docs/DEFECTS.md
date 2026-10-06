@@ -68,6 +68,7 @@
 | DEF-20261003-004 | 打卡面板占满屏回不去＋关闭钮不可见 | Fixed | P0 | 2026-10-03 / @user | UR E.10 | 取batch6形＋出口三樣帶修，用戶手機親驗通過隨本車合入，見詳情 |
 | DEF-20261003-008 | 自家快貼／帖子管理⋯位置不統一（底部 vs 頂部） | Fixed | P2 | 2026-10-03 / @user | UR E.13 | 自家 Sheet⋯上移頭像行与钉卡同位，用戶親驗通過隨本車合入，見詳情 |
 | DEF-20261006-001 | 打卡後出現兩條：一無字想喝記錄＋一正常快貼 | Fixed | P1 | 2026-10-06 / @user | UR E.2 | 同帖雙層渲染截圖實錘；三件去重隨本車合入，用戶親驗通過，見詳情 |
+| DEF-20261006-002 | iOS 好友釘 pill 无走马灯（pins 缺 note 字段） | Open | P2 | 2026-10-06 / @user | UR E.20 | 待确认，见详情 |
 
 
 - **严重度**：P2 次要（慢＋白屏感；记录最终能出来）
@@ -835,3 +836,19 @@
 - **关联 UR**：UR E.2（round-3 跨層去重；E.2 改動記錄回鏈）
 - **修复验证**：待驗＋用户手机亲验（殺進程重進看單釘單 Sheet）
 - **回归范围**：地圖雙層釘、足跡目錄、離線回退（修去重不能丟未同步真數據）
+
+### DEF-20261006-002 iOS 好友釘 pill 无走马灯（pins 缺 note 字段）
+
+- **状态**：Fixing（2026-10-06 码完＋单测绿，待亲验＋合入；关联 UR E.20 复用）
+- **严重度**：P2 次要（iOS pill 信息缺失；打卡／地图主链可用）
+- **发现日期 / 报告人**：2026-10-06 / @user（iOS 同事转述）
+- **复现步骤**：
+  1. 好友发布带文字快贴
+  2. iOS 端以朋友视角看该钉上方 pill：无走马灯，只剩"快贴"两字
+  3. 作者本人视角走马灯正常
+- **期望 vs 实际**：期望 pill 播 note 走马灯；实际 pins 无 note 可播
+- **初判根因**：`PINS_COLUMNS` 无 `note` 列，`toPinJson` 无映射，openapi `MapPin` 无字段（写链 POST／详情早有 note，读链 pins 漏了——同事修了一半）
+- **确诊根因**：读链三处全缺（与初判一致）：① `app/api/v1/map/pins/route.ts:20` `PINS_COLUMNS` 无 `note`；② `lib/api/pins.ts` `toPinJson` 无 note 分支（`PinJson` 无此键）；③ `docs/api-openapi.yaml` `MapPin` 无 note。`checkins.note` 列自 0001 即有（`text NOT NULL DEFAULT ''`，零 migration），写链 POST／详情／mine 早透传，唯 pins 列表漏了——故作者本地（读 mine／详情）有字、好友（读 pins）无字。
+- **关联 UR**：UR E.20（复用，对标 photoThumb 做法；改動記錄回链）
+- **修复验证**：`pins.test.ts` 新用例（原文透传＋空／空白／非串／缺席即 null）＋`v2Pins.test.ts` 三处补 `note` 键；`vitest` 23 绿＋`tsc` 零错；待 iOS 端亲验走马灯
+- **回归范围**：pins 列表（web 双端读同一包，忽略新字段即兼容）、openapi

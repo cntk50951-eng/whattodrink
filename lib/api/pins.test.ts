@@ -103,6 +103,7 @@ describe("toPinJson", () => {
       users: { nickname: "阿怡", avatar_url: null, gender: "female", dob: "2000-01-01", last_seen_at: "2026-09-15T11:58:00Z" },
       beers: { name: "Asahi 生啤", emoji: "🍻" },
       photo_thumb: "data:image/jpeg;base64,/9j/",
+      note: "今晚好開心🍻",
     };
     const pin = toPinJson(row, now);
     expect(pin).not.toBeNull();
@@ -114,6 +115,7 @@ describe("toPinJson", () => {
     expect(pin?.authorDob).toBe("2000-01-01");
     expect(pin?.authorBio).toBeNull();
     expect(pin?.photoThumb).toBe("data:image/jpeg;base64,/9j/");
+    expect(pin?.note).toBe("今晚好開心🍻");
   });
 
   it("UR E.20 縮圖壞形即 null 不炸行（非 data:image／超長／缺席）", () => {
@@ -129,6 +131,23 @@ describe("toPinJson", () => {
     expect(toPinJson({ ...base, photo_thumb: "javascript:alert(1)" })?.photoThumb).toBeNull();
     expect(toPinJson({ ...base, photo_thumb: `data:image/jpeg;base64,${"a".repeat(40000)}` })?.photoThumb).toBeNull();
     expect(toPinJson({ ...base })?.photoThumb).toBeNull();
+  });
+
+  it("iOS 走馬燈 note 原文透传，空串／空白／非字符串／缺席即 null", () => {
+    const base = {
+      id: "x",
+      lat: 22.27889,
+      lng: 114.18299,
+      place_name: null,
+      created_at: "2026-09-15T11:55:00Z",
+      users: null,
+      beers: null,
+    };
+    expect(toPinJson({ ...base, note: "今晚好開心🍻" })?.note).toBe("今晚好開心🍻");
+    expect(toPinJson({ ...base, note: "" })?.note).toBeNull();
+    expect(toPinJson({ ...base, note: "   " })?.note).toBeNull();
+    expect(toPinJson({ ...base, note: 123 })?.note).toBeNull();
+    expect(toPinJson({ ...base })?.note).toBeNull();
   });
 
   it("returns null on bad id/lat/created_at", () => {

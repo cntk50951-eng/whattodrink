@@ -17,7 +17,7 @@ import { friendIdsOf, hideOnlineForViewer } from "@/lib/friends";
  */
 
 const PINS_COLUMNS =
-  "id,lat,lng,place_name,created_at,kind,expires_at,user_id,photo_thumb,users!checkins_user_id_fkey(nickname,avatar_url,gender,dob,bio,last_seen_at,mode),beers(name,emoji)";
+  "id,lat,lng,place_name,created_at,kind,expires_at,user_id,photo_thumb,note,users!checkins_user_id_fkey(nickname,avatar_url,gender,dob,bio,last_seen_at,mode),beers(name,emoji)";
 
 export async function GET(req: Request): Promise<Response> {
   const parsed = parsePinsParams(new URL(req.url).searchParams);

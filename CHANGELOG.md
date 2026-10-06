@@ -5,6 +5,10 @@
 ## [Unreleased]
 
 ### Fixed
+- **DEF-20261006-002 iOS 好友釘 pill 无走马灯（v2-only，未提交；pins 补 note 读链）**
+  - 读链三处全缺：`PINS_COLUMNS` 无 `note` → `toPinJson` 无映射 → openapi `MapPin` 无字段（写链 POST／详情早有 note，唯列表漏了）
+  - 修法对标 E.20 photoThumb：select 加列 → `toPinJson.note` 原文透传（空／空白／非串／缺席即 null）→ `PinJson` 类型 → openapi 补字段句；零 migration（`note` 列 0001 已有）；`pins.test` 新用例＋主映射断言＋`v2Pins.test` 三处补键
+  - `vitest` 23 绿＋`tsc` 零错；待 iOS 端亲验走马灯
 - **DEF-20261006-001 打卡後出現兩條（v2-only，隨本車合入，用戶手機親驗通過）**
   - 同帖本地＋服務端雙層各渲染一次（用戶截圖實錘；服務端 12 行逐查排除）；修法＝落库去重＋`visibleWants` 显示吸收＋`others` 按服務端 id 剔除；`visibleWants`＋3 單測
 - **DEF-20261003-004 打卡面板佔滿屏＋關閉鈕不可見（v2-only，重做已合入，用戶手機親驗通過）**

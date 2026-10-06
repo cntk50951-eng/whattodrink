@@ -1845,6 +1845,10 @@ components:
           type: string
           nullable: true
           description: 他人釘縮影（96px data: URL；舊帖／無圖即 null，UR E.20）
+        note:
+          type: string
+          nullable: true
+          description: 打卡原文（iOS pill 走馬燈用；空串／舊帖即 null，截斷 iOS 側，E.20 round-2）
         checkedInAt:
           type: integer
           description: Epoch ms

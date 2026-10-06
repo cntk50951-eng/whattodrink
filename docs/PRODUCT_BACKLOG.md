@@ -3249,6 +3249,7 @@ UR E.20　他人釘照片縮影（v2-only）[WIP]
 
 *改動記錄*
 - 2026-10-06：建檔置 [WIP]（用戶指令他人同視角；直做）
+- 2026-10-06：DEF-20261006-002 round-2（iOS pill 走馬燈缺 note：`PINS_COLUMNS`＋`note` 列 → `toPinJson.note` 原文透传（空／空白／非串／缺席即 null）→ `PinJson` 类型 → openapi `MapPin` 补字段句 → `pins.test.ts` 新用例＋主映射断言＋`v2Pins.test.ts` 三处补键；零 migration（`note` 列 0001 已有）；23 绿＋tsc 零错；待 iOS 亲验）
 ---
 
 > 生产线 F 新开，主力承载“组局”功能。总体定位：以“每人带一支酒的品酒会”为原型，扩展为主题化小聚引擎（B 主题开放 + C 熟人基座），初期纯信息撮合 + 免责声明 + 公开场所引导（用户自选公开场所，平台建议清单，不指定），后期叠加认证合作场地。MVP 闭环：发布 → 发现（地图+列表）→ 申请 → 审批 → 行前提醒 → 签到 → 互评。法务待复核，PDPO/年龄/免责按 §3 风险矩阵落地。详见 `docs/EPIC_F_GROUP_GATHERING.md` v0.1 与 `docs/F_BACKLOG_DRAFT.md` 草案。

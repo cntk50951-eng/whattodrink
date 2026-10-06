@@ -47,6 +47,8 @@ export type PinJson = {
   authorBio: string | null;
   /** UR E.20 他人釘縮影（96px data: URL；形狀不對即 null，舊帖回退）。 */
   photoThumb: string | null;
+  /** iOS pill 走馬燈（note 原文；空串／舊帖即 null，截斷 iOS 側按 0.38 規則）。 */
+  note: string | null;
   checkedInAt: number; // epoch ms
   isOnline: boolean;
 };
@@ -147,6 +149,9 @@ export function toPinJson(raw: unknown, nowMs: number = Date.now()): PinJson | n
     thumbRaw.length <= CHECKIN_PHOTO_THUMB_MAX_CHARS
       ? thumbRaw
       : null;
+  // iOS pill 走馬燈（note 原文下发，截斷 iOS 側做；空串／空白／舊帖即 null，沿舊鏈）。
+  const noteRaw = r.note;
+  const note = typeof noteRaw === "string" && noteRaw.trim() !== "" ? noteRaw : null;
 
   // beers join（可能 null）
   const beers = r.beers as unknown;
@@ -188,6 +193,7 @@ export function toPinJson(raw: unknown, nowMs: number = Date.now()): PinJson | n
     authorDob,
     authorBio,
     photoThumb,
+    note,
     checkedInAt,
     isOnline,
   };
