@@ -678,7 +678,7 @@ paths:
   /api/v1/cheers:
     post:
       operationId: cheersToast
-      summary: 敬酒（需登录；{checkin_id}敬作者｜{to_user_id}回敬解最新可见帖；自敬／隱身 403；15／天 429，UR E.14）
+      summary: 敬酒（需登录；{checkin_id}敬作者｜{to_user_id}回敬解最新可见帖；自敬／隱身 403；15／天 429；重敬 200 幂等不重计，UR E.14 round-5）
       security:
         - cookieAuth: []
       requestBody:
@@ -734,6 +734,48 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "429":
           description: 今日乾杯已達上限（HK 自然天 15）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+    delete:
+      operationId: uncheersCheckin
+      summary: 取消碰杯（需登录；删自己在该帖的行；有帖无行也 200 幂等，404 只＝帖不存在／无权，UR E.14 round-5）
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [checkin_id]
+              properties:
+                checkin_id:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: 已取消（cheered=false 现态＋帖现总数；无行同回）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cheered, cheers_count]
+                properties:
+                  cheered:
+                    type: boolean
+                  cheers_count:
+                    type: integer
+                    minimum: 0
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 帖不存在或無可見權限（iOS 404＝帖问题）
           content:
             application/json:
               schema:

@@ -119,8 +119,32 @@ export async function POST(req: Request): Promise<Response> {
   if (isMinorDob((fromRow as { dob?: unknown } | null)?.dob, Date.now())) {
     return apiError("forbidden", "未滿 18 歲不可乾杯", 403);
   }
-  // 15／天（HK自然天；RLS 只管行归属，限额路由强制）。
+  // UR E.14 round-5 防重刷：已敬過即 200 冪等（不重計、不額扣 quota；
+  // 限額之前判，滿額重發舊敬仍 200，沿 iOS-0.53 口径）。
+  const { data: dupRow } = await supabase
+    .from("cheers")
+    .select("id")
+    .eq("from_user_id", userId)
+    .eq("checkin_id", targetPost.id)
+    .maybeSingle();
   const dayStart = hkDayStartISO(Date.now());
+  if (dupRow !== null) {
+    const { count: todayCount } = await supabase
+      .from("cheers")
+      .select("id", { count: "exact", head: true })
+      .eq("from_user_id", userId)
+      .gte("created_at", dayStart);
+    const { count: postCount } = await supabase
+      .from("cheers")
+      .select("id", { count: "exact", head: true })
+      .eq("checkin_id", targetPost.id);
+    const quota = cheersQuota(todayCount ?? 0);
+    return apiOk({
+      cheered: true,
+      remaining: quota.remaining,
+      cheers_count: typeof postCount === "number" && postCount > 0 ? postCount : 1,
+    });
+  }
   // 15／天（HK自然天；RLS 只管行归属，限额路由强制）。
   const { count: todayCount } = await supabase
     .from("cheers")
@@ -149,5 +173,74 @@ export async function POST(req: Request): Promise<Response> {
     cheered: true,
     remaining: quota.remaining - 1,
     cheers_count: typeof postCount === "number" && postCount > 0 ? postCount : 1,
+  });
+}
+
+/**
+ * UR E.14 round-5 取消碰杯（🔒，沿 POST 认证口径；iOS-0.53 联调）。
+ * `DELETE /api/v1/cheers {checkin_id}` —— 删 viewer 在该帖的碰杯行。
+ * 只验 owner（`from_user_id == viewer`），不判 stealth／未成年
+ * （删除不是新互动，旧行是当时合法产生）；
+ * 有帖无行也 200 幂等（`{cheered:false, cheers_count}`）；404 只＝帖不存在／无权
+ * （沿 POST 不泄归属口径；iOS 404＝帖问题，toast 对齐此口径）。
+ */
+export async function DELETE(req: Request): Promise<Response> {
+  const { supabase, userId } = await getAuthedClient(req);
+  if (userId === null) {
+    return apiError("unauthorized", "未登录", 401);
+  }
+  let raw: unknown = null;
+  try {
+    raw = await req.json();
+  } catch {
+    return apiError("invalid_params", "body 需为 JSON", 400);
+  }
+  const cid = (raw as Record<string, unknown>).checkin_id;
+  if (typeof cid !== "string" || cid === "" || cid.length > 64) {
+    return apiError("invalid_params", "checkin_id 非法", 400);
+  }
+  // 帖存在＋可见（沿 POST 口径；不可见 404 不泄归属）。
+  const { data: postRaw } = await supabase
+    .from("checkins")
+    .select("id,user_id,visibility")
+    .eq("id", cid)
+    .maybeSingle();
+  const post = postRaw as { id: string; user_id: string | null; visibility: unknown } | null;
+  if (post === null) {
+    return apiError("not_found", "打卡不存在", 404);
+  }
+  if (post.user_id !== userId && post.visibility !== "public") {
+    let friendIds: string[] = [];
+    if (post.visibility === "friends") {
+      const { data: fsRows } = await supabase
+        .from("friendships")
+        .select("user_id,friend_id,status")
+        .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+        .limit(200);
+      const rows = ((fsRows ?? []) as unknown[]).filter(
+        (r): r is FriendshipRow =>
+          typeof r === "object" &&
+          r !== null &&
+          "user_id" in (r as Record<string, unknown>),
+      );
+      friendIds = friendIdsOf(userId, rows);
+    }
+    if (!canViewCheckin(userId, post.user_id, post.visibility, friendIds)) {
+      return apiError("not_found", "打卡不存在", 404);
+    }
+  }
+  // 只删自己的行（owner 验；无行即 200 幂等，不 404）。
+  await supabase
+    .from("cheers")
+    .delete()
+    .eq("checkin_id", cid)
+    .eq("from_user_id", userId);
+  const { count } = await supabase
+    .from("cheers")
+    .select("id", { count: "exact", head: true })
+    .eq("checkin_id", cid);
+  return apiOk({
+    cheered: false,
+    cheers_count: typeof count === "number" && count > 0 ? count : 0,
   });
 }
