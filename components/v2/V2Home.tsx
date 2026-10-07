@@ -1155,6 +1155,8 @@ export function V2Home() {
   const [inviteFor, setInviteFor] = useState<string | null>(null);
   const [inviteBar, setInviteBar] = useState("");
   const [inviteSlot, setInviteSlot] = useState<"now" | "half" | "tonight">("now");
+  // UR E.16 round-2：買單默認隨意（iOS 同口徑；web 暫不做 custom 檔）。
+  const [inviteBill, setInviteBill] = useState<"host" | "aa" | "flexible">("flexible");
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteStrangerTip, setInviteStrangerTip] = useState(false);
   const pendingInviteRef = useRef<string | null>(null);
@@ -1214,7 +1216,7 @@ export function V2Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ checkin_id: inviteFor, place: bar.slice(0, 30), slot: inviteSlot }),
+        body: JSON.stringify({ checkin_id: inviteFor, place: bar.slice(0, 30), slot: inviteSlot, bill_intent: inviteBill }),
       });
       const j = (await res.json().catch(() => null)) as {
         error?: { message?: unknown };
@@ -2713,6 +2715,30 @@ export function V2Home() {
                             aria-pressed={inviteSlot === v}
                             className={`flex-1 rounded-full border px-2 py-1.5 text-xs font-bold ${
                               inviteSlot === v
+                                ? "border-primary bg-primary/[0.08] text-primary"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex gap-1.5">
+                        {(
+                          [
+                            ["host", t2("inviteBillHost")],
+                            ["aa", t2("inviteBillAa")],
+                            ["flexible", t2("inviteBillFlexible")],
+                          ] as const
+                        ).map(([v, label]) => (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => setInviteBill(v)}
+                            disabled={inviteBusy}
+                            aria-pressed={inviteBill === v}
+                            className={`flex-1 rounded-full border px-2 py-1.5 text-xs font-bold ${
+                              inviteBill === v
                                 ? "border-primary bg-primary/[0.08] text-primary"
                                 : "text-muted-foreground"
                             }`}

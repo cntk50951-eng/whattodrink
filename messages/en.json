@@ -517,7 +517,10 @@
     "genderFemale": "Female",
     "genderSecret": "Private",
     "ageRestricted": "Sorry, you must be 18 or older to use this app",
-    "ageNoteFix": "If you are 18+, fix your birthday in Profile to restore"
+    "ageNoteFix": "If you are 18+, fix your birthday in Profile to restore",
+    "inviteBillHost": "My treat",
+    "inviteBillAa": "Split",
+    "inviteBillFlexible": "Flexible"
   },
   "gatherings": {
     "newTitle": "Create Gathering",

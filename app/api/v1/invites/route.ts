@@ -126,7 +126,11 @@ export async function POST(req: Request): Promise<Response> {
   if (isMinorDob((inviterRow as { dob?: unknown } | null)?.dob, Date.now())) {
     return apiError("forbidden", "未滿 18 歲不可約喝酒", 403);
   }
-  const w = inviteWindow(parsed.slot, Date.now());
+  const w = inviteWindow(
+    parsed.slot,
+    Date.now(),
+    parsed.custom_time !== undefined ? Date.parse(parsed.custom_time) : undefined,
+  );
   const { data: inserted, error: iErr } = await supabase
     .from("drink_invites")
     .insert({
@@ -134,6 +138,9 @@ export async function POST(req: Request): Promise<Response> {
       to_user_id: peer.id,
       checkin_id: parsed.checkin_id ?? null,
       place: parsed.place,
+      bill_intent: parsed.bill_intent,
+      custom_time: parsed.custom_time ?? null,
+      poi_id: parsed.poi_id ?? null,
       start_at: new Date(w.startAt).toISOString(),
       expires_at: new Date(w.expiresAt).toISOString(),
       status: "sent",
@@ -154,6 +161,7 @@ type InviteRow = {
   to_user_id: string;
   checkin_id: string | null;
   place: string;
+  bill_intent: string | null;
   start_at: string | null;
   expires_at: string | null;
   status: string;
@@ -169,7 +177,7 @@ export async function GET(req: Request): Promise<Response> {
   const col = box === "sent" ? "from_user_id" : "to_user_id";
   const { data: rows, error } = await supabase
     .from("drink_invites")
-    .select("id,from_user_id,to_user_id,checkin_id,place,start_at,expires_at,status,created_at")
+    .select("id,from_user_id,to_user_id,checkin_id,place,bill_intent,start_at,expires_at,status,created_at")
     .eq(col, userId)
     .order("created_at", { ascending: false })
     .limit(30);
@@ -212,6 +220,7 @@ export async function GET(req: Request): Promise<Response> {
       peer: { user_id: pid, nickname: peer.nickname, avatar_url: peer.avatar_url },
       place: r.place,
       checkin_id: r.checkin_id,
+      bill_intent: r.bill_intent ?? "flexible",
       start_at: r.start_at,
       expires_at: r.expires_at,
       status: r.status,

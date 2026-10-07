@@ -517,7 +517,10 @@
     "genderFemale": "女",
     "genderSecret": "保密",
     "ageRestricted": "未滿 18 歲暫時不能使用，唔好意思",
-    "ageNoteFix": "如果你已滿 18 歲，去個人資料改生日即恢復"
+    "ageNoteFix": "如果你已滿 18 歲，去個人資料改生日即恢復",
+    "inviteBillHost": "我請",
+    "inviteBillAa": "AA",
+    "inviteBillFlexible": "隨意"
   },
   "gatherings": {
     "newTitle": "發起組局",

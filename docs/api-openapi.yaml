@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.10.0
+  version: 1.11.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -923,7 +923,7 @@ paths:
   /api/v1/invites:
     post:
       operationId: sendInvite
-      summary: 發約喝酒（需登录；{to_user_id}｜{checkin_id}二选一＋店1–30字＋三段時；自約／隱身 403；3／天＋同對象1／天 429，UR E.16）
+      summary: 發約喝酒（需登录；對象二选一＋店＋時段＋買單必填；custom 帶 custom_time；自約／隱身 403；3／天＋同對象1／天 429，UR E.16 round-2）
       security:
         - cookieAuth: []
       requestBody:
@@ -932,7 +932,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [place, slot]
+              required: [place, slot, bill_intent]
               properties:
                 to_user_id:
                   type: string
@@ -945,7 +945,19 @@ paths:
                   maxLength: 30
                 slot:
                   type: string
-                  enum: [now, half, tonight]
+                  enum: [now, half, tonight, custom]
+                bill_intent:
+                  type: string
+                  enum: [host, aa, flexible]
+                  description: 買單意圖（必填；iOS round-2）
+                custom_time:
+                  type: string
+                  format: date-time
+                  description: slot=custom 時必填（未來 14 天内，否則 400）
+                poi_id:
+                  type: string
+                  maxLength: 64
+                  description: 外部 POI 鍵（可選，字母数字-_）
       responses:
         "200":
           description: 發出成功（回 id＋過期）
@@ -985,7 +997,7 @@ paths:
         - cookieAuth: []
       responses:
         "200":
-          description: 邀約行（含對方公開三列＋is_friend＋pending 數）
+          description: 邀約行（含對方公開三列＋is_friend＋bill_intent＋pending 數，UR E.16 round-2）
           content:
             application/json:
               schema:
