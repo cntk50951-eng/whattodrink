@@ -440,6 +440,8 @@
     "checkinLikeCount": "{n} likes",
     "checkinCommentCount": "{n} comments",
     "checkinRatingCount": "{n} ratings",
+    "flashLeftH": "{h}h left",
+    "flashLeftM": "{m}m left",
     "checkinNoRating": "No ratings yet",
     "loginHint": "Log in to see your trail",
     "cheersMsgPh": "Add a note (optional, 40 chars)",

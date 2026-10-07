@@ -440,6 +440,8 @@
     "checkinLikeCount": "讚 {n}",
     "checkinCommentCount": "評論 {n}",
     "checkinRatingCount": "{n} 人已評",
+    "flashLeftH": "剩餘 {h} 小時",
+    "flashLeftM": "剩餘 {m} 分鐘",
     "checkinNoRating": "暫無評分",
     "loginHint": "登入查看你的足跡",
     "cheersMsgPh": "順便講句嘢（可空，40字內）",

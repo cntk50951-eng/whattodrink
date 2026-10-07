@@ -3252,6 +3252,33 @@ UR E.20　他人釘照片縮影（v2-only）[WIP]
 - 2026-10-06：DEF-20261006-002 round-2（iOS pill 走馬燈缺 note：`PINS_COLUMNS`＋`note` 列 → `toPinJson.note` 原文透传（空／空白／非串／缺席即 null）→ `PinJson` 类型 → openapi `MapPin` 补字段句 → `pins.test.ts` 新用例＋主映射断言＋`v2Pins.test.ts` 三处补键；零 migration（`note` 列 0001 已有）；23 绿＋tsc 零错；待 iOS 亲验）
 ---
 
+UR E.21　pins 快貼倒計時（API kind＋expiresAt＋web 足跡剩餘，v2-only）[WIP]
+
+> iOS-0.49 等米下鍋：iOS 成員表快貼"剩餘 X 小時"，自家 /mine 有 `expires_at`，公開 pins 鏈沒有。API 對標 E.20 photoThumb／note 做法；web 足跡目錄同口徑顯示。
+
+作為看地圖／足跡的人，我希望快貼顯示還剩多久燒毀（24h 有效），永久帖不顯示。
+
+### 背景（2026-10-07：iOS 契约＋web 對齊）
+- API：`PINS_COLUMNS` 早選了 kind／expires_at（route.ts:20），`toPinJson` 扔了——補透出即完，無 migration。
+- web：足跡目錄行有 `expiresAt`（本地 WantRecord 自帶），直接顯示，無需等 API。
+- 剩餘一律小於 24h（快貼窗），只需小時／分鐘兩檔；計算各端做，服務端只透原文。
+
+### 範圍（v2-only；加法，舊客戶端忽略即兼容）
+1. **API**：`PinJson.kind／expiresAt`＋`toPinJson` 白名單直通（壞形即 null）＋openapi MapPin＋單測兩例（flash 透出／壞形 null）；AC：flash 帶 kind＋ISO，post 為 null。
+2. **web**：足跡目錄快貼行加"剩餘X小時／X分鐘"（`flashLeftH／flashLeftM`×3 parity；過期／永久帖不顯；快照 nowMs，開單即定格）。
+3. route.ts:88 `msg.includes("kind")` 過寬另記（memory，不混入本輪）。
+
+### 非目標
+- 秒級 tick（目錄快照即定格）、詳情面板倒計時（另議）、v1 任何文件。
+
+### AC
+- AC1：pins 任一快貼帶 kind＋ISO；post 為 null；iOS AC 照其 iOS-0.49
+- AC2：足跡快貼行剩餘顯示正確（23h→"剩餘23小時"，59m→"剩餘59分鐘"）；三閘綠＋用戶手機親驗＋`git status` 無 v1
+
+*改動記錄*
+- 2026-10-07：建檔置 [WIP]（iOS 契约直做＋web 足跡對齊）`＋`note` 列 → `toPinJson.note` 原文透传（空／空白／非串／缺席即 null）→ `PinJson` 类型 → openapi `MapPin` 补字段句 → `pins.test.ts` 新用例＋主映射断言＋`v2Pins.test.ts` 三处补键；零 migration（`note` 列 0001 已有）；23 绿＋tsc 零错；待 iOS 亲验）
+---
+
 > 生产线 F 新开，主力承载“组局”功能。总体定位：以“每人带一支酒的品酒会”为原型，扩展为主题化小聚引擎（B 主题开放 + C 熟人基座），初期纯信息撮合 + 免责声明 + 公开场所引导（用户自选公开场所，平台建议清单，不指定），后期叠加认证合作场地。MVP 闭环：发布 → 发现（地图+列表）→ 申请 → 审批 → 行前提醒 → 签到 → 互评。法务待复核，PDPO/年龄/免责按 §3 风险矩阵落地。详见 `docs/EPIC_F_GROUP_GATHERING.md` v0.1 与 `docs/F_BACKLOG_DRAFT.md` 草案。
 
 UR F.1　组局发布（最小可用）[WIP]

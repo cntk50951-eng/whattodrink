@@ -49,6 +49,10 @@ export type PinJson = {
   photoThumb: string | null;
   /** iOS pill 走馬燈（note 原文；空串／舊帖即 null，截斷 iOS 側按 0.38 規則）。 */
   note: string | null;
+  /** 快貼種類（flash 24h／post 永久；iOS 剩餘时间＋種類詞用）。 */
+  kind: "flash" | "post" | null;
+  /** 過期時間 ISO（快貼僅有；null＝永久帖或舊數據，沿舊容錯口徑）。 */
+  expiresAt: string | null;
   checkedInAt: number; // epoch ms
   isOnline: boolean;
 };
@@ -152,6 +156,12 @@ export function toPinJson(raw: unknown, nowMs: number = Date.now()): PinJson | n
   // iOS pill 走馬燈（note 原文下发，截斷 iOS 側做；空串／空白／舊帖即 null，沿舊鏈）。
   const noteRaw = r.note;
   const note = typeof noteRaw === "string" && noteRaw.trim() !== "" ? noteRaw : null;
+  // iOS 快贴剩余时间（白名单直通，不做计算；坏形／缺席即 null，不炸整行）。
+  const kindRaw = r.kind;
+  const kind = kindRaw === "flash" || kindRaw === "post" ? kindRaw : null;
+  const expiresRaw = r.expires_at;
+  const expiresAt =
+    typeof expiresRaw === "string" && Number.isFinite(Date.parse(expiresRaw)) ? expiresRaw : null;
 
   // beers join（可能 null）
   const beers = r.beers as unknown;
@@ -194,6 +204,8 @@ export function toPinJson(raw: unknown, nowMs: number = Date.now()): PinJson | n
     authorBio,
     photoThumb,
     note,
+    kind,
+    expiresAt,
     checkedInAt,
     isOnline,
   };

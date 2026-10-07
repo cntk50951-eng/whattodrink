@@ -106,6 +106,7 @@ import { toMineRow, mineRowToWantRecord } from "@/lib/api/checkins";
 import type { PinJson } from "@/lib/api/pins";
 import {
   loadWantHistory,
+  remainHM,
   removeWantAt,
   saveWantHistory,
   swapWantBeer,
@@ -3123,8 +3124,16 @@ export function V2Home() {
                           {r.beer === null ? (r.note && r.note !== "" ? r.note : t("you")) : r.beer.name}
                         </span>
                         <span className="block truncate pt-0.5 text-xs font-normal text-muted-foreground">
-                          {formatWantTime(r.at, locale)} ·{" "}
-                          {r.placeName ?? formatWantCoords(r.position)}
+                          {formatWantTime(r.at, locale)}
+                          {/* UR E.21 快貼剩餘（快照 nowMs，開單即定格；永久帖／過期不顯）。 */}
+                          {r.kind === "flash" &&
+                            typeof r.expiresAt === "number" &&
+                            (() => {
+                              const left = remainHM(r.expiresAt as number, nowMs);
+                              if (left === null) return "";
+                              return ` · ${left.h > 0 ? t2("flashLeftH", { h: left.h }) : t2("flashLeftM", { m: left.m })}`;
+                            })()}{" "}
+                          · {r.placeName ?? formatWantCoords(r.position)}
                         </span>
                       </span>
                       <ChevronRight size={16} aria-hidden className="shrink-0 text-muted-foreground" />

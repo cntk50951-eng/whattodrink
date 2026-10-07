@@ -1845,6 +1845,16 @@ components:
           type: string
           nullable: true
           description: 他人釘縮影（96px data: URL；舊帖／無圖即 null，UR E.20）
+        kind:
+          type: string
+          enum: [flash, post]
+          nullable: true
+          description: 快貼種類（iOS 剩餘时间＋種類詞用；舊數據 null）
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 快贴过期 ISO（永久帖／舊數據 null；剩余计算 iOS 做）
         note:
           type: string
           nullable: true

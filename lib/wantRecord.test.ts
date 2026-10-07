@@ -14,6 +14,7 @@ import {
   upsertWantHistory,
   visibleWants,
   WANT_MERGE_WINDOW_MS,
+  remainHM,
 } from "./wantRecord";
 
 const GOOD = {
@@ -367,5 +368,19 @@ describe("parseWantRecord 三件套 (UR E.1)", () => {
       photoDataUrl: `data:image/jpeg;base64,${"a".repeat(400_001)}`,
     });
     expect(big?.photoDataUrl).toBeUndefined();
+  });
+});
+
+describe("remainHM (UR E.21)", () => {
+  const NOW = 1_700_000_000_000;
+  it("小時＋分鐘向下取整（23h／59m）", () => {
+    expect(remainHM(NOW + 23 * 3600_000, NOW)).toEqual({ h: 23, m: 0 });
+    expect(remainHM(NOW + 59 * 60_000, NOW)).toEqual({ h: 0, m: 59 });
+    expect(remainHM(NOW + 90 * 60_000 + 30_000, NOW)).toEqual({ h: 1, m: 30 });
+  });
+  it("过期／非法／不足一分钟按 null（调用方藏）", () => {
+    expect(remainHM(NOW - 1000, NOW)).toBeNull();
+    expect(remainHM(NaN, NOW)).toBeNull();
+    expect(remainHM(NOW + 30_000, NOW)).toEqual({ h: 0, m: 1 });
   });
 });

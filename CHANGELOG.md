@@ -27,6 +27,9 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR E.21 pins 快貼倒計時（v2-only，[WIP]，待親驗； iOS-0.49 到貨可 merge）**
+  - API：`PinJson.kind／expiresAt` 白名單直通（壞形 null）＋openapi MapPin＋單測兩例；live 驗 flash 帶 ISO
+  - web：足跡目錄快貼行"剩餘X小時／分鐘"（`remainHM`＋單測＋`flashLeftH／M`×3；快照定格，永久／過期不顯）
 - **UR E.20 他人釘照片縮影（v2-only，[WIP]，待 0025＋雙人親驗）**
   - 0025（`checkins.photo_thumb` text 可空；用戶 Dashboard 跑）；拍攝 canvas 順手壓 96px（jpeg 0.7）→POST 白名單（data:image／≤32K）→pins 只回縮圖列（原圖永不進列表；42703 老庫回退鏈不動）
   - 讀：`toPinJson.photoThumb`（壞形即 null）→`V2Marker`→他人釘面第一優先（同圓釘形，作者同視角）；舊帖／無圖沿舊鏈；openapi MapPin＋POST 雙補句

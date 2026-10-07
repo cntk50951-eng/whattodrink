@@ -133,6 +133,42 @@ describe("toPinJson", () => {
     expect(toPinJson({ ...base })?.photoThumb).toBeNull();
   });
 
+  it("快貼 kind＋expiresAt 透传（iOS 剩餘时间用；post 无 expiresAt）", () => {
+    const base = {
+      id: "x",
+      lat: 22.27889,
+      lng: 114.18299,
+      place_name: null,
+      created_at: "2026-09-15T11:55:00Z",
+      users: null,
+      beers: null,
+    };
+    const flash = toPinJson({ ...base, kind: "flash", expires_at: "2026-09-16T11:55:00Z" });
+    expect(flash?.kind).toBe("flash");
+    expect(flash?.expiresAt).toBe("2026-09-16T11:55:00Z");
+    const post = toPinJson({ ...base, kind: "post", expires_at: null });
+    expect(post?.kind).toBe("post");
+    expect(post?.expiresAt).toBeNull();
+  });
+
+  it("kind／expiresAt 壞形／缺席回 null 整行不炸", () => {
+    const base = {
+      id: "x",
+      lat: 22.27889,
+      lng: 114.18299,
+      place_name: null,
+      created_at: "2026-09-15T11:55:00Z",
+      users: null,
+      beers: null,
+    };
+    expect(toPinJson({ ...base, kind: "story", expires_at: "昨天" })?.kind).toBeNull();
+    expect(toPinJson({ ...base, kind: "story", expires_at: "昨天" })?.expiresAt).toBeNull();
+    const bare = toPinJson({ ...base });
+    expect(bare?.kind).toBeNull();
+    expect(bare?.expiresAt).toBeNull();
+    expect(bare?.id).toBe("x");
+  });
+
   it("iOS 走馬燈 note 原文透传，空串／空白／非字符串／缺席即 null", () => {
     const base = {
       id: "x",

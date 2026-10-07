@@ -323,6 +323,17 @@ export function formatWantCoords(position: LatLng): string {
   return `${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}`;
 }
 
+/** UR E.21 快貼剩餘（纯时间算；iOS 同口径各端自算，服务端只透原文）。
+ * 回 null 即不顯示（过期／非法／永久帖）；不足 1 分钟按 1 分钟（截断不进位）。
+ */
+export function remainHM(targetMs: number, nowMs: number): { h: number; m: number } | null {
+  if (!Number.isFinite(targetMs) || !Number.isFinite(nowMs)) return null;
+  const diff = targetMs - nowMs;
+  if (diff <= 0) return null;
+  const totalM = Math.max(1, Math.floor(diff / 60_000));
+  return { h: Math.floor(totalM / 60), m: totalM % 60 };
+}
+
 /** Minimal Nominatim reverse-response shape (jsonv2 + addressdetails). */
 export type ReverseGeocodeResult = {
   display_name?: string;
