@@ -27,7 +27,7 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
-- **UR E.14 round-5 取消碰杯＋防重刷（v2-only，[WIP]，待 0028＋iOS 联调）**
+- **UR E.14 round-5 取消碰杯＋防重刷（v2-only，[✓]，0028 已跑＋iOS 联调通过，隨本車合入）**
   - 0028（去重＋`cheers_from_post_unique`；NULL 帖天然放过）；`DELETE /cheers`（同路径，owner 删＋无行 200＋404 只帖问题，不判 stealth／未成年）；POST 重敬 200 幂等（限額前判，不重計不扣 quota；409 不用）；openapi 同步；iOS-0.53 对齐 200／404 口径
 - **UR E.14 round-4 iOS 碰杯记录契约（v2-only，[WIP]，待 iOS＋web 親驗）**
   - `recent_cheers` 統一名（web 同步改，`cheers_recent` 退役；最近 3＋MailPeer＋時間；隱身者過濾，數量以 count 為準）＋`cheered_by_me`（匿名 401 無此分支）；POST 不動；openapi 先行補段
