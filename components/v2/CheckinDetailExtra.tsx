@@ -168,6 +168,12 @@ export function CheckinDetailExtra({
 
   return (
     <>
+      {/* UR E.22 歸檔只讀徽（快照態；按鈕同置灰，沿 reduced-motion 口徑無動畫）。 */}
+      {detail.archived && (
+        <p className="w-fit rounded-full border px-2.5 py-1 text-xs text-muted-foreground">
+          {t("archivedBadge")}
+        </p>
+      )}
       {(beerName !== null || ratingText !== null || placeName !== null) && (
         <div className="flex flex-wrap gap-1.5">
           {beerName !== null && (
@@ -219,7 +225,7 @@ export function CheckinDetailExtra({
               key={n}
               type="button"
               onClick={() => rate(detail.my_rating === n ? null : n)}
-              disabled={busy}
+              disabled={busy || detail.archived}
               aria-label={`${t("checkinRateTitle")} ${n}`}
               className="rounded p-0.5 disabled:opacity-50"
             >
@@ -234,7 +240,7 @@ export function CheckinDetailExtra({
             <button
               type="button"
               onClick={() => rate(null)}
-              disabled={busy}
+              disabled={busy || detail.archived}
               className="rounded px-1 py-0.5 text-xs text-muted-foreground underline-offset-2 hover:underline disabled:opacity-50"
             >
               {t("checkinRateClear")}
@@ -257,7 +263,7 @@ export function CheckinDetailExtra({
             ? t("cheersCount", { n: detail.cheers_count })
             : t("cheersEmpty")}
         </p>
-        {detail.cheers_recent.map((r) => {
+        {detail.recent_cheers.map((r) => {
           const ms = Date.parse(r.created_at);
           return (
             <div key={`${r.user_id}-${r.created_at}`} className="flex items-center gap-2">
@@ -289,7 +295,7 @@ export function CheckinDetailExtra({
                 <button
                   type="button"
                   onClick={() => toastBack(r.user_id)}
-                  disabled={toasting !== null}
+                  disabled={toasting !== null || detail.archived}
                   className="shrink-0 rounded-full border border-primary px-2.5 py-1 text-xs text-primary disabled:opacity-50"
                 >
                   {t("cheersBack")}
@@ -308,7 +314,7 @@ export function CheckinDetailExtra({
         <button
           type="button"
           onClick={toggleLike}
-          disabled={busy}
+          disabled={busy || detail.archived}
           aria-label={t("checkinLikeCount", { n: detail.like_count })}
           className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm disabled:opacity-50 ${
             detail.liked_by_me ? "border-primary text-primary" : "text-muted-foreground"
@@ -329,7 +335,7 @@ export function CheckinDetailExtra({
         <button
           type="button"
           onClick={toggleWant}
-          disabled={busy}
+          disabled={busy || detail.archived}
           className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm disabled:opacity-50 ${
             detail.wanted_by_me
               ? "border-primary bg-primary/[0.08] text-primary"

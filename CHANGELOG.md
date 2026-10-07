@@ -27,6 +27,10 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR E.14 round-4 iOS 碰杯记录契约（v2-only，[WIP]，待 iOS＋web 親驗）**
+  - `recent_cheers` 統一名（web 同步改，`cheers_recent` 退役；最近 3＋MailPeer＋時間；隱身者過濾，數量以 count 為準）＋`cheered_by_me`（匿名 401 無此分支）；POST 不動；openapi 先行補段
+- **UR E.22 過期快貼歸檔備查（v2-only，[WIP]，待 0026＋手動驗＋親驗）**
+  - 0026（鏡像表＋6 快照＋RLS＋搬運函數＋每日 04:00 HKT cron；全 UTC instant，零時區換算）；`/mine` 聯查歸檔（主优先＋排序＋截断，表未遷移靜默跳過）；詳情主缺查歸檔（只讀＋徽＋全禁，hook 透 `archived`）；`archivedBadge`×3 parity；openapi checkin 補字段
 - **UR E.21 pins 快貼倒計時（v2-only，[WIP]，待親驗； iOS-0.49 到貨可 merge）**
   - API：`PinJson.kind／expiresAt` 白名單直通（壞形 null）＋openapi MapPin＋單測兩例；live 驗 flash 帶 ISO
   - web：足跡目錄快貼行"剩餘X小時／分鐘"（`remainHM`＋單測＋`flashLeftH／M`×3；快照定格，永久／過期不顯）

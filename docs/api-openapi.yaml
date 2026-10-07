@@ -290,6 +290,32 @@ paths:
                       is_author:
                         type: boolean
                         description: 服务端判的作者身份（分支不可信，UR E.12）
+                      cheers_count:
+                        type: integer
+                        minimum: 0
+                        description: 该帖被碰杯总数（E.14 round-4）
+                      cheered_by_me:
+                        type: boolean
+                        description: viewer 是否已碰过（E.14 round-4）
+                      recent_cheers:
+                        type: array
+                        maxItems: 3
+                        description: 最近 3 个（倒序；MailPeer 三列＋时间；隐身者过滤，数量以 count 为准，E.14 round-4）
+                        items:
+                          type: object
+                          required: [user_id, nickname, created_at]
+                          properties:
+                            user_id:
+                              type: string
+                              format: uuid
+                            nickname:
+                              type: string
+                            avatar_url:
+                              type: string
+                              nullable: true
+                            created_at:
+                              type: string
+                              format: date-time
                       like_count:
                         type: integer
                         minimum: 0
@@ -303,6 +329,9 @@ paths:
                       comment_count:
                         type: integer
                         minimum: 0
+                      archived:
+                        type: boolean
+                        description: 歸檔只讀快照（E.22；主缺查歸檔，交互全禁）
         "403":
           description: 無權查看（陌生／private 他人，fail-closed）
           content:

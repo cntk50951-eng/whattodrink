@@ -28,7 +28,8 @@ export type CheckinDetail = {
   /** 服务端判的作者身份（分支 prop 不可信，见 GET is_author）。 */
   is_author: boolean;
   cheers_count: number;
-  cheers_recent: CheersRecentRow[];
+  cheered_by_me: boolean;
+  recent_cheers: CheersRecentRow[];
   place_name: string | null;
   lat: number | null;
   lng: number | null;
@@ -37,6 +38,8 @@ export type CheckinDetail = {
   want_count: number;
   wanted_by_me: boolean;
   comment_count: number;
+  /** UR E.22 歸檔只讀（主缺查歸檔；真即置灰＋禁寫，沿 reduced-motion 口徑無動畫）。 */
+  archived: boolean;
 };
 
 type DetailRow = Record<string, unknown>;
@@ -58,8 +61,9 @@ function toDetail(row: DetailRow, id: string): CheckinDetail {
       my !== null && Number.isInteger(my) && my >= 1 && my <= 5 ? my : null,
     is_author: row.is_author === true,
     cheers_count: count(row.cheers_count),
-    cheers_recent: Array.isArray(row.cheers_recent)
-      ? (row.cheers_recent as unknown[])
+    cheered_by_me: row.cheered_by_me === true,
+    recent_cheers: Array.isArray(row.recent_cheers)
+      ? (row.recent_cheers as unknown[])
           .filter((r): r is Record<string, unknown> => typeof r === "object" && r !== null)
           .slice(0, 5)
           .map((r) => ({
@@ -78,6 +82,7 @@ function toDetail(row: DetailRow, id: string): CheckinDetail {
     want_count: count(row.want_count),
     wanted_by_me: row.wanted_by_me === true,
     comment_count: count(row.comment_count),
+    archived: row.archived === true,
   };
 }
 
