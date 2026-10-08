@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.12.0
+  version: 1.13.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1004,6 +1004,229 @@ paths:
                 type: object
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/parties:
+    post:
+      operationId: createParty
+      summary: 發攢局（需登录；總量2–12＋名額和≤總量＋門檻2..總量＋start未來14天；隱身／未成年 403；3／天 429；host 不占席，UR E.23）
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [place, lat, lng, start_at, seats_total, min_members, bill_intent]
+              properties:
+                place:
+                  type: string
+                  maxLength: 30
+                poi_id:
+                  type: string
+                  maxLength: 64
+                city:
+                  type: string
+                  maxLength: 30
+                lat:
+                  type: number
+                lng:
+                  type: number
+                start_at:
+                  type: string
+                  format: date-time
+                seats_total:
+                  type: integer
+                  minimum: 2
+                  maximum: 12
+                seats_male:
+                  type: integer
+                  minimum: 0
+                seats_female:
+                  type: integer
+                  minimum: 0
+                min_members:
+                  type: integer
+                  minimum: 2
+                bill_intent:
+                  type: string
+                  enum: [host, aa, flexible]
+      responses:
+        "201":
+          description: 發局成功（回 id＋過期＝開始＋3h）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, expires_at]
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 隱身／未成年禁發
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 3／天
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+    get:
+      operationId: listParties
+      summary: 看板列表（匿名可看；未过期非 cancelled；計數＋host＋本人旗＋距離，UR E.23）
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: bbox
+          in: query
+          schema:
+            type: string
+        - name: near
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 酒局行（含 joined_count／host／joined_by_me／is_mine／distance_m）
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/parties/{id}:
+    get:
+      operationId: getParty
+      summary: 局詳情（匿名可看；members 含性別＋is_host，UR E.23）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 詳情＋成員
+          content:
+            application/json:
+              schema:
+                type: object
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/Internal"
+    patch:
+      operationId: cancelParty
+      summary: 撤局（需登录；仅 host；已撤幂等，UR E.23）
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [cancel]
+      responses:
+        "200":
+          description: 已撤銷
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非 host
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/parties/{id}/joins:
+    post:
+      operationId: joinParty
+      summary: 参加（需登录；名额事務判 party_full／gender_full 409；已参加幂等 200；secret 占开放席；过期 410，UR E.23）
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: 已参加
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 隱身／未成年禁参加
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 名額已滿（party_full／gender_full）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "410":
+          description: 已撤銷／已過期
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+    delete:
+      operationId: leaveParty
+      summary: 退席（需登录；无行幂等 200；过期 410，UR E.23）
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: 已退席
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "410":
+          description: 已過期
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/invites/{id}:

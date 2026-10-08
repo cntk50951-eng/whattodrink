@@ -9,6 +9,8 @@ export type ApiErrorCode =
   | "not_found"
   | "rate_limited"
   | "rejected"
+  | "party_full"
+  | "gender_full"
   | "internal";
 
 export function apiError(

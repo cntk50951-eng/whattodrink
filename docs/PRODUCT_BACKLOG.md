@@ -3734,3 +3734,31 @@ UR F.1　3D 酒吧漫游＋Ivy 对话语音（POC 转正）[✓]
 - 2026-10-01：建档＋实作＋用户逐轮验收（身高 1.65→3.3、落位三次、环绕改扇形、规则回复合MiniMax、尺度两轮）置 [✓]；`2a445af` 已合入；男版 GLB 待用户给
 - 2026-10-01：语音改纯浏览器（语种记忆＋手动锁）＋面板交互＋等待反馈＋hydration 修，用户验收通过
 - 2026-10-01：英文默认＋语音对讲（浏览器免费识别＋讯飞回落）＋圆钮＋键盘收起＋TTS 自动语种，用户验收通过；三闸绿
+
+---
+
+UR E.23　公開攢局看板 API（v2-only，iOS-0.57 输入）[WIP]
+
+> iOS 先行（mock UI 已落地等契约）；1v1 邀约（E.16）不动，两套并存；F.1 旧组局（审批制）模型不同表独立，不冲突。
+
+### 背景（2026-10-08 問答定案）
+- `expires_at`＝`start_at`＋3h（散席宽限）；发起 3／天（沿 invites）；secret 性别只占开放席；
+  城市客户端 area 文直存（沿 checkins place_name，不做服务端逆地理）；成局门槛 host 自设（问答定案）。
+- 參加不開好友（陌生人语义保持）；群聊／候补／踢人／签到／推送二期。
+
+### 範圍（v2-only；純 API，web 無 UI）
+1. **數據**：0032（`parties`＋`joins`＋RLS：parties 全公開讀／登入非隱身建／host 撤；joins 公開讀／本人删；min_members 2..seats）。
+2. **端點**：`POST /parties`（總量 2–12、男女和≤總量、門檻 2..總量、`start_at` 未来 14 天；隱身／未成年 403；3／天 429；201 `{id, expires_at}`）＋`GET /parties`（匿名可看，未过期非 cancelled；計數＋host＋joined_by_me＋is_mine＋distance_m）＋`GET /parties/{id}`（members 含性別＋is_host）＋`POST :joins`（事務判满 409 party_full／gender_full；已参加幂等 200；secret 占开放席；过期 410）＋`DELETE :joins`（到期前退，幂等）＋`PATCH :{action:cancel}`（仅 host）。
+3. openapi 1.13.0＋單測（纯函数：名额分配／窗口／校验）。
+
+### 非目標
+- web 地圖落點、群聊／候补／踢人／签到／推送、F 線改動、v1 任何文件。
+
+### AC
+- AC1：發局校验全拒（总量／名额和／門檻／14 天／隱身／未成年／3 天）；满员锁分 total／gender 两码
+- AC2：列表匿名可看（計數＋距離＋本人旗）；参加退出回池即時；发起人撤局后不可参加；iOS 按契约直通
+- AC3：三閘綠＋iOS 联调＋`git status` 無 v1
+
+*改動記錄*
+- 2026-10-08：建檔置 [WIP]（iOS-0.57 输入＋成局门槛问答；直做）
+- 2026-10-08：同事中断接手续做：host 去掉自動占席（joined_count 從 0 起，用戶定案）＋列表補 `male/female_count`（spec §2）＋0032 加 3 索引／`min_members` CHECK 對齊路由（2..总量）＋openapi 去重 `500`＋revert package-lock 誤刪
