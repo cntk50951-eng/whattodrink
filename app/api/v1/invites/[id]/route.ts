@@ -29,8 +29,8 @@ export async function PATCH(
     return apiError("invalid_params", "body 需为 JSON", 400);
   }
   const action = (raw as Record<string, unknown>).action;
-  if (action !== "accept" && action !== "decline" && action !== "recall") {
-    return apiError("invalid_params", "action 只要 accept｜decline｜recall", 400);
+  if (action !== "accept" && action !== "decline" && action !== "recall" && action !== "complete") {
+    return apiError("invalid_params", "action 只要 accept｜decline｜recall｜complete", 400);
   }
   const { data: rowRaw } = await supabase
     .from("drink_invites")
@@ -49,6 +49,28 @@ export async function PATCH(
     created_at: string;
   } | null;
   if (row === null) return apiError("not_found", "邀約不存在", 404);
+  // UR E.16 round-5 完成态（iOS-0.55）：仅发方点；已 completed 重复点幂等 200；
+  // 非 accepted 终态 400；已过期点按 410（accepted＋过期＋未 completed 客户端按过期显示）。
+  if (action === "complete") {
+    if (row.from_user_id !== userId) return apiError("forbidden", "只能完成自己發的", 403);
+    if (row.status === "completed") return apiOk({ completed: true });
+    if (row.status !== "accepted") {
+      return apiError("invalid_params", "邀約不在可完成態", 400);
+    }
+    if (typeof row.expires_at === "string" && Date.parse(row.expires_at) < Date.now()) {
+      return apiError("invalid_params", "邀約已過期", 410);
+    }
+    const { error } = await supabase
+      .from("drink_invites")
+      .update({ status: "completed" })
+      .eq("id", id)
+      .eq("status", "accepted");
+    if (error !== null) {
+      console.error(`[api/v1/invites] complete error: code=${error.code} message=${error.message}`);
+      return apiError("internal", "完成失敗", 500);
+    }
+    return apiOk({ completed: true });
+  }
   if (row.status !== "sent") {
     return apiError("invalid_params", "邀約已不在等待中", 400);
   }

@@ -76,7 +76,7 @@ export function InviteList({ onPending }: { onPending: (n: number) => void }) {
       if (iRes.ok) {
         const j = (await iRes.json()) as { items?: InviteItem[] };
         if (Array.isArray(j.items)) {
-          const rows = j.items.filter((r) => r.status === "sent" || r.status === "accepted");
+          const rows = j.items.filter((r) => r.status === "sent" || r.status === "accepted" || r.status === "completed");
           setInbox(rows);
           pendingRef.current?.(rows.filter((r) => r.status === "sent").length);
         }
@@ -187,6 +187,7 @@ export function InviteList({ onPending }: { onPending: (n: number) => void }) {
 
   const pending = inbox.filter((r) => r.status === "sent");
   const upcoming = inbox.filter((r) => r.status === "accepted");
+  const done = inbox.filter((r) => r.status === "completed");
   const friendPend = pending.filter((r) => r.is_friend);
   const strangerPend = pending.filter((r) => !r.is_friend);
 
@@ -214,7 +215,7 @@ export function InviteList({ onPending }: { onPending: (n: number) => void }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-      {pending.length === 0 && upcoming.length === 0 && sent.length === 0 ? (
+      {pending.length === 0 && upcoming.length === 0 && done.length === 0 && sent.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">{t("mailEmpty")}</p>
       ) : (
         <>
@@ -299,24 +300,33 @@ export function InviteList({ onPending }: { onPending: (n: number) => void }) {
               <p className="pt-0.5 text-xs text-muted-foreground">{t("inviteSafetyCard")}</p>,
             ),
           )}
+          {done.map((r) =>
+            inviteRow(
+              r,
+              undefined,
+              <p className="pt-0.5 text-xs text-muted-foreground">{t("inviteCompleted")}</p>,
+            ),
+          )}
           {sent.length > 0 && (
             <>
               <p className="px-2 pt-2 text-xs font-bold text-muted-foreground">{t("inviteMine")}</p>
               {sent.map((s) => {
                 const st =
-                  s.status === "accepted"
-                    ? t("inviteAccepted")
-                    : s.status === "recalled"
-                      ? t("inviteRecalled")
-                      : s.status === "declined"
-                        ? t("inviteNoReply")
-                        : (() => {
-                            const r = remainParts(
-                              s.expires_at === null ? NaN : Date.parse(s.expires_at),
-                              nowMs,
-                            );
-                            return r.over ? t("inviteNoReply") : t("inviteWaiting");
-                          })();
+                  s.status === "completed"
+                    ? t("inviteCompleted")
+                    : s.status === "accepted"
+                      ? t("inviteAccepted")
+                      : s.status === "recalled"
+                        ? t("inviteRecalled")
+                        : s.status === "declined"
+                          ? t("inviteNoReply")
+                          : (() => {
+                              const r = remainParts(
+                                s.expires_at === null ? NaN : Date.parse(s.expires_at),
+                                nowMs,
+                              );
+                              return r.over ? t("inviteNoReply") : t("inviteWaiting");
+                            })();
                 return inviteRow(
                   { ...s, peer: s.peer },
                   s.status === "sent" ? (
@@ -330,14 +340,25 @@ export function InviteList({ onPending }: { onPending: (n: number) => void }) {
                       {t("inviteRecall")}
                     </Button>
                   ) : s.status === "accepted" ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => goChat(s.peer.user_id)}
-                      className="rounded-full"
-                    >
-                      {t("inviteGoChat")}
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => goChat(s.peer.user_id)}
+                        className="rounded-full"
+                      >
+                        {t("inviteGoChat")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy !== null}
+                        onClick={() => void patch(`c-${s.id}`, s.id, "complete")}
+                        className="rounded-full text-muted-foreground"
+                      >
+                        {t("inviteComplete")}
+                      </Button>
+                    </>
                   ) : undefined,
                   <p className="pt-0.5 text-xs text-muted-foreground">{st}</p>,
                 );

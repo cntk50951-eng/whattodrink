@@ -520,7 +520,9 @@
     "ageNoteFix": "If you are 18+, fix your birthday in Profile to restore",
     "inviteBillHost": "My treat",
     "inviteBillAa": "Split",
-    "inviteBillFlexible": "Flexible"
+    "inviteBillFlexible": "Flexible",
+    "inviteCompleted": "Completed",
+    "inviteComplete": "Mark done"
   },
   "gatherings": {
     "newTitle": "Create Gathering",

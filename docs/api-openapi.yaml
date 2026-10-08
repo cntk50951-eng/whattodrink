@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.11.0
+  version: 1.12.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1009,7 +1009,7 @@ paths:
   /api/v1/invites/{id}:
     patch:
       operationId: advanceInvite
-      summary: 推進（需登录；accept｜decline｜recall；接受即自動雙向好友＋回 peer，UR E.16）
+      summary: 推進（需登录；accept｜decline｜recall｜complete；接受即自動雙向好友＋回 peer；complete 僅發方＋accepted可點＋過期410＋重複冪等，UR E.16 round-5）
       security:
         - cookieAuth: []
       responses:

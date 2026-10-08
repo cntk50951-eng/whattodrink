@@ -3080,6 +3080,7 @@ UR E.16　約喝酒邀請＋好友列表邀請籤（v2-only）[✓]
 - 2026-10-04 round-2：自家藏邀約鈕＋邀請 30s 輪詢＋接受進房默认首语（含打卡卡）＋邀請存帖链
 - 2026-10-04 round-3：發送／接受加載圈＋輸入鎖死；用戶雙人手機親驗通過置 [✓]，隨本車合入
 - 2026-10-07 round-4：iOS bill／custom／poi（0030 已跑，用戶確認；custom 窗 3h 沿 tonight；web custom 檔暫不跟；待其驗證）
+- 2026-10-08 round-5：邀約完成態（0031 status 放行 completed；`PATCH :id` 加 complete 僅發方＋非 accepted 400＋過期 410＋重複冪等；web 送收箱完成態＋標為完成；GET 零改动；openapi 1.12.0）
 
 ---
 

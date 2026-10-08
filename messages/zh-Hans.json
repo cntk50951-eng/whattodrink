@@ -520,7 +520,9 @@
     "ageNoteFix": "如果你已满 18 岁，去个人资料改生日即恢复",
     "inviteBillHost": "我请",
     "inviteBillAa": "AA",
-    "inviteBillFlexible": "随意"
+    "inviteBillFlexible": "随意",
+    "inviteCompleted": "已完成",
+    "inviteComplete": "标为完成"
   },
   "gatherings": {
     "newTitle": "发起组局",

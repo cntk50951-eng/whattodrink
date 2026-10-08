@@ -27,6 +27,8 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR E.16 round-5 邀約完成態（v2-only，[WIP]，待 0031＋iOS 联调）**
+  - 0031（status 放行 completed）；`PATCH :id` 加 complete（僅發方 403＋非 accepted 400＋過期 410＋重複冪等 200）；web 送出箱標為完成＋收件已完成態＋`inviteCompleted/Complete`×3；GET 零改动；openapi 1.12.0
 - **UR E.16 round-4 iOS 邀約增強（v2-only，[✓]，0030 已跑，用戶確認，待其驗證）**
   - 0030（bill_intent＋check＋custom_time＋poi_id；舊行 backfill flexible）；POST 接 bill 必填＋custom 檔（未來 14 天）＋poi；GET 回顯 bill；web composer 補買單三段（默認隨意，custom 檔暫不跟）；openapi 1.11.0
 - **UR E.14 round-5 取消碰杯＋防重刷（v2-only，[✓]，0028 已跑＋iOS 联调通过，隨本車合入）**
