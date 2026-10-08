@@ -3826,3 +3826,26 @@ UR E.25　测试清数端点（iOS 联调专用，prod 默认关）[WIP]
 
 *改動記錄*
 - 2026-10-08：建檔置 [WIP]（WEB_API_TEST_ENDPOINTS 输入；酒局＋邀约同车；直做）
+
+---
+
+UR E.26　打卡收藏 save（v2-only，iOS-0.62 输入）[WIP]
+
+> iOS 详情收藏钮已在（toast 占位）；契约零收藏口。语义（用户定）：登录用户可收藏所能看到的快贴和帖子。
+
+### 範圍（v2-only；純 API，web 無 UI）
+1. **數據**：0034（`checkin_saves` 聯合主鍵＋user/created 索引＋RLS 本人读写三条；FK 用 `users(id)`（全仓惯例，不用交接的 `auth.users`）；policy 拆 insert/with-check＋delete/using＋select（沿 0018，交接单条 FOR ALL 无 WITH CHECK 会堵 INSERT）。
+2. **端點**：`POST /checkins/{id}/save` toggle（401／400／404 可见门沿 E.7；无未成年门（E.19 私人书签不触发）／无 stealth 门（无公开计数不泄）；回 `{saved}` 无 count）＋`GET /me/saves`（本人、收藏时间倒序、limit 复用 parseMineParams 30/50、cursor 沿 save created_at、inner＋可见过滤、行 toMineRow＋`saved_by_me:true` 恒真）。
+3. **详情**：`saved_by_me`（沿 liked_by_me；匿名／归档恒 false；pins/mine 行不加；iOS 只用详情＋收藏列表）。
+4. openapi 1.17.0＋`buildSaveJson` 純函數＋單測。
+
+### 非目標
+- save_count／被收数（交接明说另开字段口）、web UI、v1 任何文件。
+
+### AC（交接 §6）
+- A 收公开帖→`{saved:true}`；再点→`{saved:false}`；未登录 401
+- B 收不可见帖（他人私密）→404，且列表永不出现
+- C 列表倒序＋limit 上限 50 生效；删帖后列表自动消失
+
+*改動記錄*
+- 2026-10-08：建檔置 [WIP]（WEB_HANDOFF_SAVES 输入；直做）

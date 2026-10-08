@@ -27,6 +27,10 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR E.26 打卡收藏 save（v2-only，[WIP]，待 0034＋iOS 联调）**
+  - 0034（`checkin_saves` 联合主键＋user/created 索引＋RLS 本人读写三条；FK 用 `users(id)`；policy 拆三条沿 0018）
+  - `POST /checkins/{id}/save` toggle（401／400／404 可见门沿 E.7；无未成年／stealth 门；回 `{saved}` 无 count）＋`GET /me/saves`（本人收藏时间倒序；limit 30/50；cursor；删帖／不可见自动消失；行 `saved_by_me:true`）＋详情 `saved_by_me`（匿名／归档 false；pins/mine 行不加）
+  - openapi 1.17.0＋`buildSaveJson` 纯函数＋单测
 - **UR E.25 测试清数端点（v2-only，[WIP]，iOS 联调专用，prod 默认关）**
   - `DELETE /parties/mine/today`（HK 同窗删我今天所有局，joins 级联）＋`DELETE /invites/mine/today`（HK 同窗删今天发出的邀约，不碰好友）；回 `{deleted: n}`
   - 门：`TEST_ENDPOINTS_ENABLED=1` 才开，未设 404“端点未上线”；写走 service-role＋userId 限域（不新开 DELETE policy）；openapi 1.16.0 双 `x-test-only`

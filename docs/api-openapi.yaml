@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.16.0
+  version: 1.17.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -548,6 +548,42 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "404":
           description: 帖子不存在或無可見權限（不泄归属）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/checkins/{id}/save:
+    post:
+      operationId: toggleCheckinSave
+      summary: 打卡收藏切换（需登录；有行删无行插；仅所见可收；无计数，UR E.26）
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 切换成功（saved 本次后状态）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [saved]
+                properties:
+                  saved:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 帖子不存在或無可見權限（沿 E.7 不泄归属；public 直过，friends 走互好友，其余 404）
           content:
             application/json:
               schema:
@@ -1369,6 +1405,42 @@ paths:
                 properties:
                   me:
                     $ref: "#/components/schemas/Me"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/me/saves:
+    get:
+      operationId: listMySaves
+      summary: 我的收藏列表（需登录；本人、收藏时间倒序；删帖／不可见自动消失，UR E.26）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: 1–50，默认 30（沿 /mine）
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          description: 收藏 created_at ISO（keyset 下一页）
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 打卡公开列＋saved_by_me 恒 true
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [checkins]
+                properties:
+                  checkins:
+                    type: array
+                    items:
+                      type: object
         "400":
           $ref: "#/components/responses/InvalidParams"
         "401":

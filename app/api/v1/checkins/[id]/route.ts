@@ -104,6 +104,7 @@ async function readArchived(
       recent_cheers: [],
       like_count: count(arow.like_count),
       liked_by_me: false,
+      saved_by_me: false,
       want_count: count(arow.want_count),
       wanted_by_me: false,
       comment_count: count(arow.comment_count),
@@ -187,7 +188,7 @@ export async function GET(
   const postId = row.id as string;
   const beerId = (row.beer_id as string | null) ?? null;
   const service = await createServiceClient();
-  const [{ count: likeCount }, { data: likedRow }, { count: wantCount }, { data: wantedRow }, { count: commentCount }, { data: beerRow }, { data: ratingRows }] =
+  const [{ count: likeCount }, { data: likedRow }, { count: wantCount }, { data: wantedRow }, { count: commentCount }, { data: beerRow }, { data: ratingRows }, { data: savedRow }] =
     await Promise.all([
       supabase.from("post_likes").select("post_id", { count: "exact", head: true }).eq("post_id", postId),
       supabase.from("post_likes").select("post_id").eq("post_id", postId).eq("user_id", userId).maybeSingle(),
@@ -198,6 +199,8 @@ export async function GET(
         ? Promise.resolve({ data: null })
         : supabase.from("beers").select("name").eq("id", beerId).maybeSingle(),
       service.from("checkin_ratings").select("user_id,rating").eq("checkin_id", postId),
+      // UR E.26 收藏态（本人行；匿名无此分支，归档分支恒 false）。
+      supabase.from("checkin_saves").select("checkin_id").eq("checkin_id", postId).eq("user_id", userId).maybeSingle(),
     ]);
   const clamp = (n: number | null): number =>
     typeof n === "number" && Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
@@ -277,6 +280,7 @@ export async function GET(
       recent_cheers: recentCheers,
       like_count: clamp(likeCount),
       liked_by_me: likedRow !== null,
+      saved_by_me: savedRow !== null,
       want_count: clamp(wantCount),
       wanted_by_me: wantedRow !== null,
       comment_count: clamp(commentCount),
