@@ -3764,3 +3764,34 @@ UR E.23　公開攢局看板 API（v2-only，iOS-0.57 输入）[WIP]
 - 2026-10-08：同事中断接手续做：host 去掉自動占席（joined_count 從 0 起，用戶定案）＋列表補 `male/female_count`（spec §2）＋0032 加 3 索引／`min_members` CHECK 對齊路由（2..总量）＋openapi 去重 `500`＋revert package-lock 誤刪
 - 2026-10-08 round-2 撤销保留（iOS 追单，只做第 1 件 API；第 2 件 loading 归 iOS，web 零酒局 UI 不动）：`GET /parties?box=mine`（我发起＋我参加，含 cancelled／过期，需登录匿名 401；`.or` 单查询，空参加不拼 `in.()`）＋列表行加 `status`（详情早有）＋`mineOrCondition` 纯函数＋单测＋openapi 1.14.0；不建新表（审计视图如要沿 0027 另开）
 - 2026-10-08 可见性定案（用户）：valid 局所有人可见（缺省列表匿名无门，现状已满足）＋参加需登录＋非隐身（401／403 现状已有）；parties 无检举字段，检举隐藏二期等用户需求另开
+
+---
+
+UR E.24　酒闻 batch＋API（v2-only，iOS-0.59 输入）[WIP]
+
+> iOS mock 先行（HK／大陆两 tab＋原文外链）；新闻流首期，活动流二期；web 零 UI。
+
+### 背景（2026-10-08 問答定案）
+- `UNIQUE(source_url, region)`（交接单列会撞双 region 行，改复合）：H1 双 category 展两行；
+  H1 无 category 默认 hk（HK 本地刊）；H2 双关键词两行、都不含→both。
+- region 严格相等（hk 只回 hk，both 另查 `region=both`）；API 缺省 hk；实时感入库延迟 ≤2h（每 2h 跑批）。
+- 载体沿交接：Supabase Edge Function＋Cron（Vercel 免费 cron 一天一次不够；pg_net SQL 解析不可维护）。
+  本仓零先例：部署＋挂 cron＋首次触发均为用户 Dashboard 动作；本地只验纯函数＋API 空表。
+
+### 範圍（v2-only；純後端）
+1. **數據**：0033（`booze_news`＋去重复合键＋region/pub 索引＋RLS 公开读；写走 service-role）。
+2. **采集**：`functions/fetch-news`（H1/H2 RSS＋G1 GDELT＋G2 Google News 降级；单源挂不堵批；
+   upsert 冲突跳过＋30 天 prune，皆幂等；归一与 `lib/api/news.ts` 同口径双份注明）。
+3. **端點**：`GET /news`（匿名；region hk|cn|both 400 非法；limit 默认 20 上限 50；published_at 倒序＋cursor）。
+4. openapi 1.15.0（`NewsItem` 与 iOS 1:1）＋單測（归一／映射／GDELT 日期／limit）。
+
+### 非目標
+- 活动流、G2 以外新源、web UI、检举／审核、F 線、v1 任何文件。
+
+### AC
+- AC1：三源归一入库（双 region 展行、坏行丢、snippet/image 口径对）＋去重＋prune＋单源故障隔离
+- AC2：API 两 tab 参数对、行数与库对上、cursor 翻页不断链；iOS 换源直通
+- AC3：单测绿＋iOS 联调＋`git status` 無 v1
+
+*改動記錄*
+- 2026-10-08：建檔置 [WIP]（iOS-0.59 输入 WEB_HANDOFF_NEWS＋两问答；直做）

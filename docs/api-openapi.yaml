@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.14.0
+  version: 1.15.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1898,6 +1898,42 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/news:
+    get:
+      operationId: listNews
+      summary: 酒闻列表（匿名可看；region 缺省 hk 严格相等；published_at 倒序，UR E.24）
+      parameters:
+        - name: region
+          in: query
+          schema:
+            type: string
+            enum: [hk, cn, both]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          description: published_at ISO（keyset 下一页）
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 酒闻行（iOS NewsItem 1:1）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NewsItem"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "500":
+          $ref: "#/components/responses/Internal"
 components:
   schemas:
     WallAuthor:
@@ -2444,6 +2480,31 @@ components:
               type: string
             message:
               type: string
+    NewsItem:
+      type: object
+      description: 酒闻行（iOS NewsModels.swift 1:1，UR E.24）
+      required: [id, title, source, source_url, published_at, region]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        snippet:
+          type: string
+        source:
+          type: string
+        source_url:
+          type: string
+        image_url:
+          type: string
+          nullable: true
+        published_at:
+          type: string
+          format: date-time
+        region:
+          type: string
+          enum: [hk, cn, both]
   securitySchemes:
     bearerAuth:
       type: http

@@ -27,6 +27,11 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR E.24 酒闻 batch＋API（v2-only，[WIP]，待 0033＋Edge 部署＋iOS 换源）**
+  - 0033（`booze_news`＋UNIQUE(source_url,region)＋region/pub 索引＋RLS 公开读；写走 service-role）
+  - `functions/fetch-news`（H1/H2 RSS＋G1 GDELT＋G2 降级；单源挂不堵批；upsert＋30 天 prune 幂等；归一与 `lib/api/news.ts` 同口径）
+  - `GET /news`（匿名；region 缺省 hk 严格相等；limit 20/50；published_at 倒序＋cursor）；openapi 1.15.0（`NewsItem` 与 iOS 1:1）
+  - 部署为用户动作（Dashboard 建 Function 粘贴＋secrets＋挂每 2h cron＋0033 贴跑＋首次触发）；Edge Function 本地不可验（无 deno CLI）
 - **UR E.23 公開攢局看板 API（v2-only，[WIP]，待 0032＋iOS 联调）**
   - 0032（`parties`＋`joins`＋RLS 全公開讀／host 撤／本人退＋3 索引；`expires_at`＝`start_at`＋3h；host 不占席，joined_count 從 0 起）
   - 6 端點：`POST /parties`（總量 2–12、名額和≤總量、門檻 2..總量、14 天窗；隱身／未成年 403；3／天 429；201 `{id, expires_at}`）＋`GET /parties`（匿名可看，未过期非 cancelled；`joined/male/female_count`＋host＋本人旗＋distance_m）＋`GET /parties/{id}`（members 含性別＋is_host）＋`POST :joins`（409 party_full／gender_full；幂等 200；secret 占开放席；过期 410）＋`DELETE :joins`（幂等）＋`PATCH :{action:cancel}`（仅 host）
