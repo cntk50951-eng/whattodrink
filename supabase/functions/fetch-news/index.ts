@@ -164,9 +164,15 @@ async function fetchRss(url: string): Promise<RssItem[]> {
 
 type GdeltQuery = { q: string; region?: NewsRegion; keyword?: boolean };
 
-async function fetchGdelt(queries: GdeltQuery[]): Promise<NormRow[]> {
+async function fetchGdelt(queries: GdeltQuery[], deadlineMs: number): Promise<NormRow[]> {
   const rows: NormRow[] = [];
-  for (const entry of queries) {
+  for (let i = 0; i < queries.length; i++) {
+    const entry = queries[i];
+    // 软时间预算：超了剩下的跳过（保整批按时落袋，不被平台超时杀）。
+    if (Date.now() > deadlineMs) {
+      console.error(`[fetch-news] time budget exceeded, skipped ${queries.length - i} gdelt queries`);
+      break;
+    }
     try {
       const url =
         "https://api.gdeltproject.org/api/v2/doc/doc?query=" +
@@ -205,7 +211,7 @@ async function fetchGdelt(queries: GdeltQuery[]): Promise<NormRow[]> {
       console.error(`[fetch-news] gdelt query failed (${entry.q}): ${(e as Error).message}`);
     }
     // 条间隔开：免费额度对连打敏感（实测连打吃 429）。
-    await new Promise((r) => setTimeout(r, 800));
+    await new Promise((r) => setTimeout(r, 1500));
   }
   return rows;
 }
@@ -222,6 +228,12 @@ const GDELT_QUERIES: GdeltQuery[] = [
   { q: "wine domain:wbo529.com", region: "cn" },
   { q: "wine domain:thedrinksbusiness.com", keyword: true },
 ];
+// 与 lib/api/news.ts::gdeltQueryRotation 同口径（偶 UTC 小时前半，奇数后半＋首条保底）。
+function gdeltRotation(hourUtc: number, all: GdeltQuery[]): GdeltQuery[] {
+  const half = Math.ceil(all.length / 2);
+  if (hourUtc % 2 === 0) return all.slice(0, half);
+  return [all[0], ...all.slice(half)];
+}
 // G2 降级：仅 G1 抛错／空时启用（同查询分 region）。
 const GOOGLE_QUERIES: GdeltQuery[] = [
   { q: "wine Hong Kong", region: "hk" },
@@ -236,51 +248,59 @@ function googleRssUrl(query: string, hl: string, gl: string): string {
 }
 
 Deno.serve(async (): Promise<Response> => {
+  console.log("[fetch-news] run r4-budget");
   if (SUPABASE_URL === "" || SERVICE_KEY === "") {
     return new Response(JSON.stringify({ ok: false, error: "missing secrets" }), { status: 500 });
   }
   const supa = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
   const counts: Record<string, number> = {};
   let rows: NormRow[] = [];
+  // 软时间预算（平台单次执行有时长上限：RSS 并行＋GDELT 轮换＋超预算跳过，保整批按时落袋）。
+  const deadlineMs = Date.now() + 45000;
+  const hourUtc = new Date().getUTCHours();
 
-  try {
-    const h1 = await fetchRss("https://vino-joy.com/feed/");
-    const h1rows = h1.flatMap((it) => normRssItem(it, "Vino Joy", mapH1(it.categories)));
-    counts["H1"] = h1rows.length;
-    rows = rows.concat(h1rows);
-  } catch (e) {
-    console.error(`[fetch-news] H1 failed: ${(e as Error).message}`);
-    counts["H1"] = -1;
+  // RSS 三源并行（不同 host，互不阻塞；单源挂记 -1）。
+  const rssDefs = [
+    { key: "H1", url: "https://vino-joy.com/feed/", source: "Vino Joy", kind: "h1" },
+    { key: "H2", url: "https://www.scmp.com/rss/94/feed", source: "SCMP", kind: "h2" },
+    { key: "VP", url: "https://vinepair.com/feed/", source: "VinePair", kind: "h2" },
+  ] as const;
+  const rssResults = await Promise.allSettled(
+    rssDefs.map(async (d) => {
+      const items = await fetchRss(d.url);
+      return {
+        key: d.key,
+        rows: items.flatMap((it) =>
+          normRssItem(it, d.source, d.kind === "h1" ? mapH1(it.categories) : mapH2(it.title)),
+        ),
+      };
+    }),
+  );
+  for (let i = 0; i < rssResults.length; i++) {
+    const r = rssResults[i];
+    if (r.status === "fulfilled") {
+      counts[r.value.key] = r.value.rows.length;
+      rows = rows.concat(r.value.rows);
+    } else {
+      console.error(`[fetch-news] ${rssDefs[i].key} failed: ${(r.reason as Error)?.message ?? r.reason}`);
+      counts[rssDefs[i].key] = -1;
+    }
   }
 
   try {
-    const h2 = await fetchRss("https://www.scmp.com/rss/94/feed");
-    const h2rows = h2.flatMap((it) => normRssItem(it, "SCMP", mapH2(it.title)));
-    counts["H2"] = h2rows.length;
-    rows = rows.concat(h2rows);
-  } catch (e) {
-    console.error(`[fetch-news] H2 failed: ${(e as Error).message}`);
-    counts["H2"] = -1;
-  }
-
-  try {
-    // VinePair（WordPress /feed/，已验活 2026-10-08，hourly 高频；美国刊，标题关键词归属）。
-    const vp = await fetchRss("https://vinepair.com/feed/");
-    const vprows = vp.flatMap((it) => normRssItem(it, "VinePair", mapH2(it.title)));
-    counts["VP"] = vprows.length;
-    rows = rows.concat(vprows);
-  } catch (e) {
-    console.error(`[fetch-news] VP failed: ${(e as Error).message}`);
-    counts["VP"] = -1;
-  }
-
-  try {
-    const g1 = await fetchGdelt(GDELT_QUERIES);
+    // GDELT 按 UTC 小时轮换（半量／轮＋首条保底，单条最长 4h 一次）。
+    const rotated = gdeltRotation(hourUtc, GDELT_QUERIES);
+    console.log(`[fetch-news] gdelt rotation hour=${hourUtc} n=${rotated.length}`);
+    const g1 = await fetchGdelt(rotated, deadlineMs);
     if (g1.length === 0) throw new Error("gdelt empty");
     counts["G1"] = g1.length;
     rows = rows.concat(g1);
   } catch (e) {
     console.error(`[fetch-news] G1 failed, fallback G2: ${(e as Error).message}`);
+    if (Date.now() > deadlineMs) {
+      console.error("[fetch-news] over budget, G2 skipped");
+      counts["G2"] = -1;
+    } else {
     try {
       const g2hk = await fetchRss(googleRssUrl(GOOGLE_QUERIES[0].q, "en-HK", "HK"));
       const g2cn = await fetchRss(googleRssUrl(GOOGLE_QUERIES[1].q, "zh-CN", "CN"));
@@ -295,22 +315,39 @@ Deno.serve(async (): Promise<Response> => {
       console.error(`[fetch-news] G2 failed: ${(e2 as Error).message}`);
       counts["G2"] = -1;
     }
+    }
   }
 
   let upserted = 0;
+  console.log(`[fetch-news] collected rows=${rows.length} counts=${JSON.stringify(counts)}`);
   if (rows.length > 0) {
-    const { error } = await supa
-      .from("booze_news")
-      .upsert(rows, { onConflict: "source_url,region", ignoreDuplicates: true });
-    if (error !== null) {
-      console.error(`[fetch-news] upsert error: ${error.message}`);
-      return new Response(JSON.stringify({ ok: false, error: "upsert failed" }), { status: 500 });
+    try {
+      const res = await supa
+        .from("booze_news")
+        .upsert(rows, { onConflict: "source_url,region", ignoreDuplicates: true });
+      console.log(`[fetch-news] upsert raw keys=${res === undefined || res === null ? String(res) : Object.keys(res).join(",")}`);
+      const { error } = res ?? {};
+      if (error !== null && error !== undefined) {
+        console.error(`[fetch-news] upsert error: ${(error as { message?: unknown }).message}`);
+        return new Response(JSON.stringify({ ok: false, error: "upsert failed" }), { status: 500 });
+      }
+      upserted = rows.length;
+    } catch (e) {
+      console.error(`[fetch-news] upsert threw: ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`);
+      return new Response(JSON.stringify({ ok: false, error: "upsert threw" }), { status: 500 });
     }
-    upserted = rows.length;
   }
   const pruneBefore = new Date(Date.now() - 30 * 24 * 3600_000).toISOString();
-  const { error: pErr } = await supa.from("booze_news").delete().lt("published_at", pruneBefore);
-  if (pErr !== null) console.error(`[fetch-news] prune error: ${pErr.message}`);
+  try {
+    const pres = await supa.from("booze_news").delete().lt("published_at", pruneBefore);
+    console.log(`[fetch-news] prune raw keys=${pres === undefined || pres === null ? String(pres) : Object.keys(pres).join(",")}`);
+    const { error: pErr } = pres ?? {};
+    if (pErr !== null && pErr !== undefined) {
+      console.error(`[fetch-news] prune error: ${(pErr as { message?: unknown }).message}`);
+    }
+  } catch (e) {
+    console.error(`[fetch-news] prune threw: ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`);
+  }
 
   return new Response(JSON.stringify({ ok: true, counts, normalized: upserted }), {
     headers: { "Content-Type": "application/json" },

@@ -154,3 +154,13 @@ export function gdeltQueries(): GdeltFetchQuery[] {
     { q: "wine domain:thedrinksbusiness.com", keyword: true },
   ];
 }
+
+/** GDELT 轮换（Edge 单次时长有限：偶数 UTC 小时跑前半，奇数跑后半＋首条保底；
+ * 单条 query 最长 4h 一次，联集覆盖全清单）。 */
+export function gdeltQueryRotation(hourUtc: number): GdeltFetchQuery[] {
+  const all = gdeltQueries();
+  const half = Math.ceil(all.length / 2);
+  const second = all.slice(half);
+  if (hourUtc % 2 === 0) return all.slice(0, half);
+  return [all[0], ...second];
+}

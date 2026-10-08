@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   gdeltQueries,
+  gdeltQueryRotation,
   mapH1Regions,
   mapH2Regions,
   newsLimit,
@@ -123,5 +124,16 @@ describe("gdeltQueries", () => {
     }
     expect(qs.some((e) => e.q.includes("domain:winesinfo.com"))).toBe(true);
     expect(qs.some((e) => e.q.includes("domain:wbo529.com"))).toBe(true);
+  });
+});
+
+describe("gdeltQueryRotation", () => {
+  it("偶奇联集覆盖全清单；奇数轮含首条保底", () => {
+    const all = gdeltQueries();
+    const even = gdeltQueryRotation(2);
+    const odd = gdeltQueryRotation(3);
+    expect(new Set([...even, ...odd].map((e) => e.q)).size).toBe(all.length);
+    expect(odd[0]).toEqual(all[0]);
+    expect(even.length + odd.length).toBe(all.length + 1);
   });
 });
