@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.15.0
+  version: 1.16.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1932,6 +1932,54 @@ paths:
                       $ref: "#/components/schemas/NewsItem"
         "400":
           $ref: "#/components/responses/InvalidParams"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/parties/mine/today:
+    delete:
+      operationId: purgeMyPartiesToday
+      summary: 测试清数（iOS 联调专用；删我今天 HK 窗内所有局，joins 级联；上线前 prod 关闭，UR E.25）
+      x-test-only: true
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: "{deleted: n}"
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 端点未上线（env 未开，iOS toast 即走）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/invites/mine/today:
+    delete:
+      operationId: purgeMyInvitesToday
+      summary: 测试清数（iOS 联调专用；删我今天 HK 窗内发出的邀约，不碰好友；上线前 prod 关闭，UR E.25）
+      x-test-only: true
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: "{deleted: n}"
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 端点未上线（env 未开，iOS toast 即走）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
 components:

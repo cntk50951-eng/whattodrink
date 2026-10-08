@@ -3795,3 +3795,32 @@ UR E.24　酒闻 batch＋API（v2-only，iOS-0.59 输入）[WIP]
 
 *改動記錄*
 - 2026-10-08：建檔置 [WIP]（iOS-0.59 输入 WEB_HANDOFF_NEWS＋两问答；直做）
+
+---
+
+UR E.25　测试清数端点（iOS 联调专用，prod 默认关）[WIP]
+
+> iOS 邀约／酒局 3／天 server 计数（含已取消／已结束）无法自清；测试期给清数端点，上线前按本 UR 关闭项处理。
+
+### 範圍（v2-only；純 API，web 無 UI）
+1. **端點**：`DELETE /parties/mine/today`（删我今天 HK 窗内所有局，joins 随 FK CASCADE；
+   窗口与发局计数同一公式）＋`DELETE /invites/mine/today`（删我今天 HK 窗内发出的邀约，
+   不碰 friendships；窗口与邀约计数同一公式）＋回 `{deleted: n}`。
+2. **门**：`TEST_ENDPOINTS_ENABLED=1` 才开（staging／preview／本地按需设）；
+   未设即 404“端点未上线”（iOS 404 toast，无崩无假成功）；匿名 401。
+3. **写**：service-role＋服务端 userId 限域（两表无 DELETE RLS，不新开 policy）。
+4. openapi 1.16.0（双 `x-test-only: true`）＋`isTestEndpointsEnabled` 純函數＋單測。
+
+### 非目標
+- 改限额逻辑、动 friendships、检举／审核、web UI、v1 任何文件。
+
+### 上线前关闭项（硬性，iOS §4）
+- Vercel prod 永不设 `TEST_ENDPOINTS_ENABLED`（默认即关）；iOS 按钮点按即 404 toast，无需发版配合。
+
+### AC
+- AC1：HK 同窗（跨天界前后各调一次，昨天的不动、今天的全清）＋级联 joins／不动好友
+- AC2：env 未设 404、匿名 401、回 `{deleted: n}` 对数；iOS 两按钮直通
+- AC3：单测绿＋`git status` 無 v1
+
+*改動記錄*
+- 2026-10-08：建檔置 [WIP]（WEB_API_TEST_ENDPOINTS 输入；酒局＋邀约同车；直做）

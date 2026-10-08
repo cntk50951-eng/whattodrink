@@ -27,6 +27,10 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR E.25 测试清数端点（v2-only，[WIP]，iOS 联调专用，prod 默认关）**
+  - `DELETE /parties/mine/today`（HK 同窗删我今天所有局，joins 级联）＋`DELETE /invites/mine/today`（HK 同窗删今天发出的邀约，不碰好友）；回 `{deleted: n}`
+  - 门：`TEST_ENDPOINTS_ENABLED=1` 才开，未设 404“端点未上线”；写走 service-role＋userId 限域（不新开 DELETE policy）；openapi 1.16.0 双 `x-test-only`
+  - 上线前关闭项：Vercel prod 永不设该变量；iOS 404 toast 无需发版配合
 - **UR E.24 酒闻 batch＋API（v2-only，[WIP]，待 0033＋Edge 部署＋iOS 换源）**
   - 0033（`booze_news`＋UNIQUE(source_url,region)＋region/pub 索引＋RLS 公开读；写走 service-role）
   - `functions/fetch-news`（H1/H2 RSS＋G1 GDELT＋G2 降级；单源挂不堵批；upsert＋30 天 prune 幂等；归一与 `lib/api/news.ts` 同口径）
