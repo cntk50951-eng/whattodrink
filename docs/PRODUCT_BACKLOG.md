@@ -3748,7 +3748,7 @@ UR E.23　公開攢局看板 API（v2-only，iOS-0.57 输入）[WIP]
 
 ### 範圍（v2-only；純 API，web 無 UI）
 1. **數據**：0032（`parties`＋`joins`＋RLS：parties 全公開讀／登入非隱身建／host 撤；joins 公開讀／本人删；min_members 2..seats）。
-2. **端點**：`POST /parties`（總量 2–12、男女和≤總量、門檻 2..總量、`start_at` 未来 14 天；隱身／未成年 403；3／天 429；201 `{id, expires_at}`）＋`GET /parties`（匿名可看，未过期非 cancelled；計數＋host＋joined_by_me＋is_mine＋distance_m）＋`GET /parties/{id}`（members 含性別＋is_host）＋`POST :joins`（事務判满 409 party_full／gender_full；已参加幂等 200；secret 占开放席；过期 410）＋`DELETE :joins`（到期前退，幂等）＋`PATCH :{action:cancel}`（仅 host）。
+2. **端點**：`POST /parties`（總量 2–12、男女和≤總量、門檻 2..總量、`start_at` 未来 14 天；隱身／未成年 403；3／天 429；201 `{id, expires_at}`）＋`GET /parties`（匿名可看，未过期非 cancelled；計數＋host＋joined_by_me＋is_mine＋distance_m；round-2 加 `box=mine` 回我发起＋我参加含 cancelled／过期需登录，行加 `status`）＋`GET /parties/{id}`（members 含性別＋is_host）＋`POST :joins`（事務判满 409 party_full／gender_full；已参加幂等 200；secret 占开放席；过期 410）＋`DELETE :joins`（到期前退，幂等）＋`PATCH :{action:cancel}`（仅 host，只翻 status 不真删）。
 3. openapi 1.13.0＋單測（纯函数：名额分配／窗口／校验）。
 
 ### 非目標
@@ -3762,3 +3762,5 @@ UR E.23　公開攢局看板 API（v2-only，iOS-0.57 输入）[WIP]
 *改動記錄*
 - 2026-10-08：建檔置 [WIP]（iOS-0.57 输入＋成局门槛问答；直做）
 - 2026-10-08：同事中断接手续做：host 去掉自動占席（joined_count 從 0 起，用戶定案）＋列表補 `male/female_count`（spec §2）＋0032 加 3 索引／`min_members` CHECK 對齊路由（2..总量）＋openapi 去重 `500`＋revert package-lock 誤刪
+- 2026-10-08 round-2 撤销保留（iOS 追单，只做第 1 件 API；第 2 件 loading 归 iOS，web 零酒局 UI 不动）：`GET /parties?box=mine`（我发起＋我参加，含 cancelled／过期，需登录匿名 401；`.or` 单查询，空参加不拼 `in.()`）＋列表行加 `status`（详情早有）＋`mineOrCondition` 纯函数＋单测＋openapi 1.14.0；不建新表（审计视图如要沿 0027 另开）
+- 2026-10-08 可见性定案（用户）：valid 局所有人可见（缺省列表匿名无门，现状已满足）＋参加需登录＋非隐身（401／403 现状已有）；parties 无检举字段，检举隐藏二期等用户需求另开

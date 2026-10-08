@@ -1,7 +1,7 @@
-import { getAuthedClient, getUserId } from "@/lib/supabase/server";
+import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { isMinorDob } from "@/lib/api/cheers";
-import { countGenders, hkDayStartISO, parsePartyBody, partyExpiresAt } from "@/lib/api/party";
+import { countGenders, hkDayStartISO, mineOrCondition, parsePartyBody, partyExpiresAt } from "@/lib/api/party";
 import { haversineMeters } from "@/lib/geo";
 
 /**
@@ -96,9 +96,11 @@ type PartyListRow = {
 };
 
 /**
- * UR E.23 看板列表（🌐匿名可看；iOS-0.57 联调）。
- * `GET /api/v1/parties?city=&bbox=&near=lat,lng&limit=&cursor=` —— 只回
- * 未过期非 cancelled；行含計數＋host＋本人旗＋距離（`near` 一次性查询用，不存储）。
+ * UR E.23 看板列表（🌐匿名可看；iOS-0.57 联调；round-2 加 box=mine 撤销保留）。
+ * `GET /api/v1/parties?box=&city=&bbox=&near=lat,lng&limit=&cursor=` —— 缺省
+ * 只回未过期非 cancelled；`box=mine` 回我发起＋我参加（含 cancelled／过期，
+ * 需登录，匿名 401）；行含 status＋計數＋host＋本人旗＋距離
+ * （`near` 一次性查询用，不存储）。
  * cursor＝created_at ISO（keyset 下一页；仍按 created 倒序）。
  */
 export async function GET(req: Request): Promise<Response> {
@@ -126,19 +128,33 @@ export async function GET(req: Request): Promise<Response> {
   const cursor = q.get("cursor");
   const cursorMs = cursor !== null ? Date.parse(cursor) : NaN;
 
-  const { supabase } = await getAuthedClient(req);
-  const viewerId = await getUserId().catch(() => null);
+  const { supabase, userId: viewerId } = await getAuthedClient(req);
   const nowIso = new Date(Date.now()).toISOString();
+  // round-2 撤销保留：box=mine 回我发起＋我参加（含 cancelled／过期，需登录）。
+  const box = q.get("box") === "mine" ? "mine" : "all";
 
   let query = supabase
     .from("parties")
     .select(
       "id,host_user_id,place,city,lat,lng,start_at,expires_at,seats_total,seats_male,seats_female,min_members,bill_intent,status,created_at",
     )
-    .eq("status", "open")
-    .gt("expires_at", nowIso)
     .order("created_at", { ascending: false })
     .limit(limit);
+  if (box === "mine") {
+    if (viewerId === null) {
+      return apiError("unauthorized", "未登录", 401);
+    }
+    const { data: myJoins } = await supabase
+      .from("joins")
+      .select("party_id")
+      .eq("user_id", viewerId);
+    const joinedIds = ((myJoins ?? []) as { party_id: unknown }[])
+      .map((j) => j.party_id)
+      .filter((id): id is string => typeof id === "string" && id !== "");
+    query = query.or(mineOrCondition(viewerId, joinedIds));
+  } else {
+    query = query.eq("status", "open").gt("expires_at", nowIso);
+  }
   if (city !== "") query = query.eq("city", city);
   if (bbox !== null) {
     query = query
@@ -217,6 +233,7 @@ export async function GET(req: Request): Promise<Response> {
       seats_female: r.seats_female,
       min_members: r.min_members,
       bill_intent: r.bill_intent,
+      status: r.status,
       joined_count: joinCounts.get(r.id) ?? 0,
       male_count: gc.male,
       female_count: gc.female,

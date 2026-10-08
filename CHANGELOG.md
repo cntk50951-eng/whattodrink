@@ -31,6 +31,7 @@
   - 0032（`parties`＋`joins`＋RLS 全公開讀／host 撤／本人退＋3 索引；`expires_at`＝`start_at`＋3h；host 不占席，joined_count 從 0 起）
   - 6 端點：`POST /parties`（總量 2–12、名額和≤總量、門檻 2..總量、14 天窗；隱身／未成年 403；3／天 429；201 `{id, expires_at}`）＋`GET /parties`（匿名可看，未过期非 cancelled；`joined/male/female_count`＋host＋本人旗＋distance_m）＋`GET /parties/{id}`（members 含性別＋is_host）＋`POST :joins`（409 party_full／gender_full；幂等 200；secret 占开放席；过期 410）＋`DELETE :joins`（幂等）＋`PATCH :{action:cancel}`（仅 host）
   - 純函數＋單測（parse／expires／hkDayStart／seatFor／countGenders）；openapi 1.13.0；併發超賣已知局限（唯一鍵只防同人重入，不同人超賣待二期 DB 約束）
+  - round-2 撤销保留（只做第 1 件 API；第 2 件 loading 归 iOS）：`GET /parties?box=mine`（我发起＋我参加，含 cancelled／过期，需登录；缺省行为不变）＋列表行加 `status`＋`mineOrCondition` 纯函数＋单测；openapi 1.14.0；不建新表
 - **UR E.16 round-5 邀約完成態（v2-only，[WIP]，待 0031＋iOS 联调）**
   - 0031（status 放行 completed）；`PATCH :id` 加 complete（僅發方 403＋非 accepted 400＋過期 410＋重複冪等 200）；web 送出箱標為完成＋收件已完成態＋`inviteCompleted/Complete`×3；GET 零改动；openapi 1.12.0
 - **UR E.16 round-4 iOS 邀約增強（v2-only，[✓]，0030 已跑，用戶確認，待其驗證）**

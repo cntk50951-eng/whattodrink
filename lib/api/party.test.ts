@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { countGenders, hkDayStartISO, parsePartyBody, partyExpiresAt, seatFor } from "./party";
+import { countGenders, hkDayStartISO, mineOrCondition, parsePartyBody, partyExpiresAt, seatFor } from "./party";
 
 describe("parsePartyBody", () => {
   const NOW = Date.parse("2026-10-08T00:00:00Z");
@@ -85,5 +85,12 @@ describe("countGenders", () => {
     expect(countGenders(["male", "female", "male"])).toEqual({ male: 2, female: 1 });
     expect(countGenders(["secret", null, "other", ""])).toEqual({ male: 0, female: 0 });
     expect(countGenders([])).toEqual({ male: 0, female: 0 });
+  });
+});
+
+describe("mineOrCondition", () => {
+  it("空参加只查发起；去重＋剔空串", () => {
+    expect(mineOrCondition("u1", [])).toBe("host_user_id.eq.u1");
+    expect(mineOrCondition("u1", ["a", "a", "", "b"])).toBe("host_user_id.eq.u1,id.in.(a,b)");
   });
 });

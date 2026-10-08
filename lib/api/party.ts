@@ -120,3 +120,11 @@ export function countGenders(genders: (string | null)[]): { male: number; female
   }
   return { male, female };
 }
+
+/** mine 档 PostgREST `or` 条件（我发起＋我参加；空参加即只查发起，避免 `in.()` 空集语法错）。 */
+export function mineOrCondition(userId: string, joinedIds: string[]): string {
+  const parts = [`host_user_id.eq.${userId}`];
+  const ids = [...new Set(joinedIds.filter((id) => typeof id === "string" && id !== ""))];
+  if (ids.length > 0) parts.push(`id.in.(${ids.join(",")})`);
+  return parts.join(",");
+}

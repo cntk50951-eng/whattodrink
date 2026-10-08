@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.13.0
+  version: 1.14.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1080,8 +1080,13 @@ paths:
           $ref: "#/components/responses/Internal"
     get:
       operationId: listParties
-      summary: 看板列表（匿名可看；未过期非 cancelled；計數＋host＋本人旗＋距離，UR E.23）
+      summary: 看板列表（匿名可看；缺省未过期非 cancelled；box=mine 回我发起＋我参加含 cancelled／过期需登录；行含 status，UR E.23 round-2）
       parameters:
+        - name: box
+          in: query
+          schema:
+            type: string
+            enum: [mine]
         - name: city
           in: query
           schema:
@@ -1104,11 +1109,19 @@ paths:
             type: string
       responses:
         "200":
-          description: 酒局行（含 joined_count／host／joined_by_me／is_mine／distance_m）
+          description: 酒局行（含 status／joined_count／male_count／female_count／host／joined_by_me／is_mine／distance_m）
           content:
             application/json:
               schema:
                 type: object
+        "401":
+          description: box=mine 需登录
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
   /api/v1/parties/{id}:
     get:
       operationId: getParty
