@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  gdeltQueries,
   mapH1Regions,
   mapH2Regions,
   newsLimit,
@@ -44,6 +45,9 @@ describe("mapH2Regions", () => {
     expect(mapH2Regions("中国葡萄酒市场")).toEqual(["cn"]);
     expect(mapH2Regions("Hong Kong and China wine")).toEqual(["hk", "cn"]);
     expect(mapH2Regions("Bordeaux tasting notes")).toEqual(["both"]);
+    // 国际源实形（VinePair／DB）：含香港即 hk，否则 both
+    expect(mapH2Regions("Hong Kong's Bar Leone defends crown")).toEqual(["hk"]);
+    expect(mapH2Regions("Why Marlborough whites are bucking China's import declines")).toEqual(["cn"]);
   });
 });
 
@@ -106,5 +110,18 @@ describe("newsLimit", () => {
     expect(newsLimit("10")).toBe(10);
     expect(newsLimit("99")).toBe(20);
     expect(newsLimit("abc")).toBe(20);
+  });
+});
+
+describe("gdeltQueries", () => {
+  it("清单非空；query 非空；region 合法；含 C2/C3 domain 查询", () => {
+    const qs = gdeltQueries();
+    expect(qs.length).toBeGreaterThan(0);
+    for (const e of qs) {
+      expect(e.q.trim()).not.toBe("");
+      if ("region" in e) expect(["hk", "cn", "both"]).toContain(e.region);
+    }
+    expect(qs.some((e) => e.q.includes("domain:winesinfo.com"))).toBe(true);
+    expect(qs.some((e) => e.q.includes("domain:wbo529.com"))).toBe(true);
   });
 });

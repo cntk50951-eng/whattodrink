@@ -3795,6 +3795,7 @@ UR E.24　酒闻 batch＋API（v2-only，iOS-0.59 输入）[WIP]
 
 *改動記錄*
 - 2026-10-08：建檔置 [WIP]（iOS-0.59 输入 WEB_HANDOFF_NEWS＋两问答；直做）
+- 2026-10-08 round-2 数据源增强（用户 concern 源不够）：＋VinePair RSS 直连（已验活 hourly；美国刊标题关键词归属）＋GDELT 扩到 7 条（`葡萄酒 香港`／`葡萄酒 展会`＋C2/C3 `domain:winesinfo.com／wbo529.com`＋DB `domain:thedrinksbusiness.com` 标题归属；DB 直接 RSS 无 feed 改走 GDELT）；fetchGdelt 逐条隔离＋800ms 间隔（连打吃 429 实测）；`gdeltQueries()` 归 lib＋单测。注意：国际源多进 both，按严格相等在 hk/cn tab 不可见（iOS 侧待定）。
 
 ---
 

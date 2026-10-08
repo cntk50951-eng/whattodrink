@@ -162,48 +162,65 @@ async function fetchRss(url: string): Promise<RssItem[]> {
 
 // ---- GDELT DOC 2.0（免费免 key） ----
 
-type GdeltQuery = { q: string; region: NewsRegion };
+type GdeltQuery = { q: string; region?: NewsRegion; keyword?: boolean };
 
 async function fetchGdelt(queries: GdeltQuery[]): Promise<NormRow[]> {
   const rows: NormRow[] = [];
-  for (const { q, region } of queries) {
-    const url =
-      "https://api.gdeltproject.org/api/v2/doc/doc?query=" +
-      encodeURIComponent(q) +
-      "&mode=artlist&maxrecords=50&sort=datedesc&format=json";
-    const res = await fetch(url, { headers: UA, signal: AbortSignal.timeout(20000) });
-    if (!res.ok) throw new Error(`gdelt http ${res.status}`);
-    const body = (await res.json()) as {
-      articles?: { title?: unknown; url?: unknown; seendate?: unknown; socialimage?: unknown; domain?: unknown }[];
-    };
-    for (const a of body.articles ?? []) {
-      const title = typeof a.title === "string" ? a.title.trim() : "";
-      const link = typeof a.url === "string" ? a.url.trim() : "";
-      const pubMs = gdeltMs(a.seendate);
-      if (title === "" || link === "" || !/^https?:\/\//.test(link) || !Number.isFinite(pubMs)) continue;
-      const domain =
-        typeof a.domain === "string" && a.domain.trim() !== "" ? a.domain.trim() : "GDELT";
-      const img = typeof a.socialimage === "string" ? a.socialimage.trim() : "";
-      rows.push({
-        title,
-        snippet: snippetOf("", title),
-        source: domain,
-        source_url: link,
-        image_url: /^https?:\/\//.test(img) ? img : null,
-        published_at: new Date(pubMs).toISOString(),
-        region,
-      });
+  for (const entry of queries) {
+    try {
+      const url =
+        "https://api.gdeltproject.org/api/v2/doc/doc?query=" +
+        encodeURIComponent(entry.q) +
+        "&mode=artlist&maxrecords=50&sort=datedesc&format=json";
+      const res = await fetch(url, { headers: UA, signal: AbortSignal.timeout(20000) });
+      if (!res.ok) throw new Error(`gdelt http ${res.status}`);
+      const body = (await res.json()) as {
+        articles?: { title?: unknown; url?: unknown; seendate?: unknown; socialimage?: unknown; domain?: unknown }[];
+      };
+      for (const a of body.articles ?? []) {
+        const title = typeof a.title === "string" ? a.title.trim() : "";
+        const link = typeof a.url === "string" ? a.url.trim() : "";
+        const pubMs = gdeltMs(a.seendate);
+        if (title === "" || link === "" || !/^https?:\/\//.test(link) || !Number.isFinite(pubMs)) continue;
+        const domain =
+          typeof a.domain === "string" && a.domain.trim() !== "" ? a.domain.trim() : "GDELT";
+        const img = typeof a.socialimage === "string" ? a.socialimage.trim() : "";
+        // 固定 region（地域查询／domain 查询）或标题关键词归属（国际源，沿 mapH2）。
+        const regions: NewsRegion[] =
+          entry.keyword === true ? mapH2(title) : [entry.region ?? "both"];
+        for (const region of regions) {
+          rows.push({
+            title,
+            snippet: snippetOf("", title),
+            source: domain,
+            source_url: link,
+            image_url: /^https?:\/\//.test(img) ? img : null,
+            published_at: new Date(pubMs).toISOString(),
+            region,
+          });
+        }
+      }
+    } catch (e) {
+      // 单查询挂不堵批（429／空源常见），记 log 继续下一条。
+      console.error(`[fetch-news] gdelt query failed (${entry.q}): ${(e as Error).message}`);
     }
-    if (rows.length === 0) throw new Error("gdelt empty");
+    // 条间隔开：免费额度对连打敏感（实测连打吃 429）。
+    await new Promise((r) => setTimeout(r, 800));
   }
   return rows;
 }
 
 // ---- 主流程 ----
 
+// 与 lib/api/news.ts::gdeltQueries 同清单（Edge 内联，改一处同步另一处）。
 const GDELT_QUERIES: GdeltQuery[] = [
   { q: "wine Hong Kong sourcecountry:HK", region: "hk" },
   { q: "葡萄酒 sourcecountry:CN", region: "cn" },
+  { q: "葡萄酒 香港", region: "hk" },
+  { q: "葡萄酒 展会", region: "cn" },
+  { q: "wine domain:winesinfo.com", region: "cn" },
+  { q: "wine domain:wbo529.com", region: "cn" },
+  { q: "wine domain:thedrinksbusiness.com", keyword: true },
 ];
 // G2 降级：仅 G1 抛错／空时启用（同查询分 region）。
 const GOOGLE_QUERIES: GdeltQuery[] = [
@@ -247,7 +264,19 @@ Deno.serve(async (): Promise<Response> => {
   }
 
   try {
+    // VinePair（WordPress /feed/，已验活 2026-10-08，hourly 高频；美国刊，标题关键词归属）。
+    const vp = await fetchRss("https://vinepair.com/feed/");
+    const vprows = vp.flatMap((it) => normRssItem(it, "VinePair", mapH2(it.title)));
+    counts["VP"] = vprows.length;
+    rows = rows.concat(vprows);
+  } catch (e) {
+    console.error(`[fetch-news] VP failed: ${(e as Error).message}`);
+    counts["VP"] = -1;
+  }
+
+  try {
     const g1 = await fetchGdelt(GDELT_QUERIES);
+    if (g1.length === 0) throw new Error("gdelt empty");
     counts["G1"] = g1.length;
     rows = rows.concat(g1);
   } catch (e) {

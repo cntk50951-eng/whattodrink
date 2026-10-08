@@ -137,3 +137,20 @@ export function newsLimit(raw: unknown, def = 20, max = 50): number {
   const n = typeof raw === "string" ? Number(raw) : NaN;
   return Number.isInteger(n) && n >= 1 && n <= max ? n : def;
 }
+
+/** GDELT 抓取项：固定 region，或按标题关键词归属（国际源如 DB，沿 mapH2Regions）。 */
+export type GdeltFetchQuery = { q: string; region: NewsRegion } | { q: string; keyword: true };
+
+/** GDELT 查询清单（Edge Function 逐条跑，单条挂不堵批，条间隔开防 429；
+ * Edge 内联同清单，改一处同步另一处）。 */
+export function gdeltQueries(): GdeltFetchQuery[] {
+  return [
+    { q: "wine Hong Kong sourcecountry:HK", region: "hk" },
+    { q: "葡萄酒 sourcecountry:CN", region: "cn" },
+    { q: "葡萄酒 香港", region: "hk" },
+    { q: "葡萄酒 展会", region: "cn" },
+    { q: "wine domain:winesinfo.com", region: "cn" },
+    { q: "wine domain:wbo529.com", region: "cn" },
+    { q: "wine domain:thedrinksbusiness.com", keyword: true },
+  ];
+}

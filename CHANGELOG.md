@@ -36,6 +36,7 @@
   - `functions/fetch-news`（H1/H2 RSS＋G1 GDELT＋G2 降级；单源挂不堵批；upsert＋30 天 prune 幂等；归一与 `lib/api/news.ts` 同口径）
   - `GET /news`（匿名；region 缺省 hk 严格相等；limit 20/50；published_at 倒序＋cursor）；openapi 1.15.0（`NewsItem` 与 iOS 1:1）
   - 部署为用户动作（Dashboard 建 Function 粘贴＋secrets＋挂每 2h cron＋0033 贴跑＋首次触发）；Edge Function 本地不可验（无 deno CLI）
+  - round-2 数据源增强：＋VinePair RSS（已验活）＋GDELT 7 条（C2/C3 domain 查询＋DB 改走 GDELT＋2 中文 topical）；逐条隔离＋800ms 防 429；国际源多进 both（tab 不可见，iOS 待定）
 - **UR E.23 公開攢局看板 API（v2-only，[WIP]，待 0032＋iOS 联调）**
   - 0032（`parties`＋`joins`＋RLS 全公開讀／host 撤／本人退＋3 索引；`expires_at`＝`start_at`＋3h；host 不占席，joined_count 從 0 起）
   - 6 端點：`POST /parties`（總量 2–12、名額和≤總量、門檻 2..總量、14 天窗；隱身／未成年 403；3／天 429；201 `{id, expires_at}`）＋`GET /parties`（匿名可看，未过期非 cancelled；`joined/male/female_count`＋host＋本人旗＋distance_m）＋`GET /parties/{id}`（members 含性別＋is_host）＋`POST :joins`（409 party_full／gender_full；幂等 200；secret 占开放席；过期 410）＋`DELETE :joins`（幂等）＋`PATCH :{action:cancel}`（仅 host）
