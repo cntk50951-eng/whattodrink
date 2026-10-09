@@ -26,6 +26,7 @@ import {
   MapPin,
   Martini,
   MoreHorizontal,
+  Newspaper,
   Radar,
   RefreshCw,
   Share2,
@@ -54,6 +55,7 @@ import { V2Comments } from "@/components/v2/V2Comments";
 import { FriendPicker, ShareDoneDialog } from "@/components/v2/FriendPicker";
 import { CheersMailbox } from "@/components/v2/CheersMailbox";
 import { V2SavesSheet } from "@/components/v2/V2SavesSheet";
+import { V2NewsSheet } from "@/components/v2/V2NewsSheet";
 import { OnboardingSheet } from "@/components/v2/OnboardingSheet";
 import { ageOf, shouldOnboard } from "@/lib/api/profile";
 import type { MeJson } from "@/lib/mode";
@@ -362,6 +364,8 @@ export function V2Home() {
   const [mailOpen, setMailOpen] = useState(false);
   // UR G.1 收藏列表开关（地图右缘入口，登入才挂，沿信箱口径）。
   const [savesOpen, setSavesOpen] = useState(false);
+  // UR G.2 酒闻列表开关（pills 酒闻 pill＋底部 Sheet，不新开路由）。
+  const [newsOpen, setNewsOpen] = useState(false);
   // UR G.1 收藏行点开详情（他人钉 openPin／自家 wantSheet，沿 E.13 深链口径）。
   function openSaved(id: string): void {
     if (apiPins.some((p) => p.id === id)) {
@@ -1865,6 +1869,17 @@ export function V2Home() {
           <Radar aria-hidden />
           {t2("hotspot")}
         </Button>
+        {/* UR G.2 酒闻 pill（匿名可看，API 匿名；底部 Sheet 双籤）。 */}
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0 rounded-full bg-card shadow-md ring-1 ring-foreground/10"
+          onClick={() => setNewsOpen(true)}
+          aria-label={t2("newsTitle")}
+        >
+          <Newspaper aria-hidden />
+          {t2("newsTitle")}
+        </Button>
       </div>
       {/* 足跡浮條（頂部容器內流式排布，永不與 pills 重疊） */}
       {trailOn && (
@@ -3118,6 +3133,8 @@ export function V2Home() {
           onOpen={(id) => openSaved(id)}
         />
       )}
+      {/* UR G.2 酒闻列表。 */}
+      {newsOpen && <V2NewsSheet open onClose={() => setNewsOpen(false)} />}
       {/* UR E.18 首登＋個人表單（条件挂载，初值新鲜；保存即刷 me）。 */}
       {showOnboard && meJson !== null && (
         <OnboardingSheet

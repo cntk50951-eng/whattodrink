@@ -27,9 +27,10 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
-- **UR G.1 我的收藏（v2-only，[WIP]，待亲验）**
-  - 详情 ★ 键（乐观翻＋回滚，沿赞口径；匿名 401 行内出登录口，OAuth 落 /v2）＋`V2SavesSheet`（摘要行＋行内取收＋空态＋骨架）＋右缘入口（登入才挂）＋点行开卡（他人 openPin／自家 wantSheet）
-  - hook `saved_by_me`（开页即定，沿 API）；v2 三语 key×4；API／migration／yaml 零改动（E.26 现成）
+- **UR G.2 酒闻列表（v2-only，[WIP]，待亲验）**
+  - pills 酒闻 pill（匿名可看）＋`V2NewsSheet`（HK／大陆双籤＋失败留旧＋toast＋刷新键＋原文外链＋缺图 fail-soft＋骨架空态）＋v2 三语 key×6；API／migration／yaml 零改动（E.24 现成）
+- **UR G.1 我的收藏（v2-only，[✓]，用户亲验通过，已合入）**
+  - 详情 ★ 键（乐观翻＋回滚；匿名行内登录口）＋`V2SavesSheet`＋右缘入口（登录前后常驻；匿名点 OAuth＋`?saves=1` 續开）＋点行开卡；hook `saved_by_me`；v2 三语 key×4；API／migration／yaml 零改动
 - **UR D.8 聊天附件 V2（v2-only，[WIP]，待 0013/0014＋双号联验）**
   - sign：`sha256` 可选确定性 path＋`expires_at`（签名固定 2h，SDK 无 expiresIn 参数）＋bytes 超限 413；形状冻结（不断 web）
   - sendMessage：image caption 存 body＋audio 带正文 400＋客户端 kind/bucket 一致性＋文件存在性＋±10% 大小验真（service；缺档 400；谎报 400＋删档）＋bytes 超限 413

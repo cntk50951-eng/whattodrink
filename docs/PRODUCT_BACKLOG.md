@@ -3894,7 +3894,7 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - AC：★态与库一致（开页即定）；列表倒序＋删帖消失；入口登录前后常驻（匿名点即登录，登后 `?saves=1` 續开，沿 C.11；详情需登录故 ★ 只在登录后可见）。
 - 非目标：被收数、pins/mine 行、v1 任何文件。
 
-### UR G.2　酒闻列表（v2）[]
+### UR G.2　酒闻列表（v2）[WIP]
 - iOS 对标：HK／大陆两 tab＋列表＋in-app Safari＋下拉重拉（iOS-0.59）。
 - web 范围：v2 酒闻页（两 tab＋列表＋原文外链＋失败留旧＋toast）；API 现成（E.24 `GET /news`）。
 - 非目标：订阅／推送、v1。
@@ -3918,3 +3918,5 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - 2026-10-09：立项（双审计＋用户定单 G.1 先行、v2-only）；G.1 置 [WIP] 开工
 - 2026-10-09：G.1 实作：hook `saved_by_me`＋`toggleSave`（乐观翻＋401 举登录旗＋回滚，沿赞口径）＋详情 ★ 键＋行内登录口（Google OAuth 落 /v2）＋`V2SavesSheet`（摘要行＋行内取收＋空态＋骨架）＋右缘入口（登入才挂，沿信箱）＋点行开卡（他人 openPin／自家 wantSheet，沿 E.13）；v2 三语 key×4；`loginCta` 在 v2 无此键，改用新 key（教训：跨命名空间 key 先验存在）。
 - 2026-10-09：返工入口常驻（匿名可见，点即登录＋`?saves=1` 續开，沿 C.11）；用户亲验通过置 [✓]。
+- 2026-10-09：G.2 置 [WIP] 开工（酒闻列表；iOS-0.59 对标；入口定 pills 酒闻 pill＋底部 Sheet，不新开路由）。
+- 2026-10-09：G.2 实作：`V2NewsSheet`（HK／大陆双籤＋失败留旧＋toast＋刷新键＋原文外链＋缺图 fail-soft＋骨架空态）＋pills 酒闻 pill（匿名可看）＋v2 三语 key×6；API／migration／yaml 零改动（E.24 现成）。
