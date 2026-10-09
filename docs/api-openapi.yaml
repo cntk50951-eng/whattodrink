@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.18.0
+  version: 1.19.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1447,6 +1447,47 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/users/{id}/profile:
+    get:
+      operationId: getUserProfile
+      summary: 个人主页（需登录；id 或 me；stealth／拉黑／不存在 404；stats 全服务端算，UR E.27）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: recent 条数，默认 30，最大 50
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          description: created_at ISO（keyset 下一页）
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 主页包（user＋relationship＋stats＋recent＋locked；iOS 对表解）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 不存在／拉黑／对方隐身（不泄存在性）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
   /api/v1/friends:
     post:
       operationId: addFriend
@@ -2767,6 +2808,80 @@ components:
         region:
           type: string
           enum: [hk, cn, both]
+    UserProfile:
+      type: object
+      description: 个人主页包（iOS 对 WEB_HANDOFF_PROFILE 表解，UR E.27）
+      required: [user, relationship, locked]
+      properties:
+        user:
+          type: object
+          required: [id, nickname, gender, created_at]
+          properties:
+            id:
+              type: string
+              format: uuid
+            nickname:
+              type: string
+            avatar_url:
+              type: string
+              nullable: true
+            gender:
+              type: string
+            age:
+              type: integer
+              nullable: true
+            bio:
+              type: string
+              nullable: true
+            created_at:
+              type: string
+              format: date-time
+            mode:
+              type: string
+              description: 仅自己视角
+            dob:
+              type: string
+              description: 仅自己视角
+        relationship:
+          type: string
+          enum: [self, friend, pending_out, pending_in, none]
+        mutual_friends_count:
+          type: integer
+          nullable: true
+        can_add_friend:
+          type: boolean
+        stats:
+          type: object
+          nullable: true
+          description: nights_total／places_total／checkins_total／friends_total／saves_total／cheers_total／week_streak／nights_this_week
+        level:
+          type: object
+          nullable: true
+        badges:
+          type: array
+          items:
+            type: object
+        badges_total:
+          type: integer
+          nullable: true
+        top_percent:
+          type: integer
+          nullable: true
+        location:
+          type: object
+          nullable: true
+        recent_checkins:
+          type: array
+          items:
+            type: object
+        recent_cursor:
+          type: string
+          nullable: true
+        friends_only_count:
+          type: integer
+          nullable: true
+        locked:
+          type: boolean
   securitySchemes:
     bearerAuth:
       type: http

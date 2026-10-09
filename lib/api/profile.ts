@@ -97,3 +97,84 @@ export function shouldOnboard(onboardedAt: unknown, createdAt: unknown, nowMs: n
   if (!Number.isFinite(c)) return true;
   return nowMs - c < 7 * 24 * 3600_000;
 }
+
+/** HK 日期分量（UTC+8 纯算，不依赖 Intl locale，沿 partySlotStartAt 口径）。 */
+function hkParts(ms: number): { y: number; m: number; d: number; h: number } {
+  const t = new Date(ms + 8 * 3600_000);
+  return { y: t.getUTCFullYear(), m: t.getUTCMonth(), d: t.getUTCDate(), h: t.getUTCHours() };
+}
+
+const pad2 = (n: number): string => String(n).padStart(2, "0");
+
+/**
+ * UR E.27 微醺夜键（HK 时间归夜，06:00 为界：06:00 前算前一晚；含归档，调用方并集合）。
+ * 非法回 null（调用方丢行，不炸统计）。
+ */
+export function nightKeyHK(createdAtMs: number): string | null {
+  if (!Number.isFinite(createdAtMs)) return null;
+  let p = hkParts(createdAtMs);
+  if (p.h < 6) {
+    p = hkParts(createdAtMs - 24 * 3600_000);
+  }
+  return `${p.y}-${pad2(p.m + 1)}-${pad2(p.d)}`;
+}
+
+/** 生日→足歲（HK 日历比较；未来／非法回 null，沿 ageOf 口径）。 */
+export function hkAge(dob: unknown, nowMs: number): number | null {
+  if (typeof dob !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dob)) return null;
+  if (dob < DOB_MIN) return null;
+  const [ys, ms, ds] = dob.split("-").map(Number);
+  const n = hkParts(nowMs);
+  if (!Number.isFinite(nowMs)) return null;
+  let age = n.y - ys;
+  if (n.m * 100 + n.d < (ms - 1) * 100 + ds) age -= 1;
+  if (ys > n.y || (ys === n.y && ((ms - 1) * 100 + ds > n.m * 100 + n.d))) return null;
+  return age >= 0 && age <= 150 ? age : null;
+}
+
+/** HK 自然周一起点 ms（周一 00:00 HKT；range 归周用）。 */
+export function weekStartHK(ms: number): number {
+  const dayMs = 24 * 3600_000;
+  const days = Math.floor((ms + 8 * 3600_000) / dayMs);
+  // 1970-01-01 是周四（getUTCDay 4）；周一起点偏移：(days + 3) % 7 即周内第几天（周一=0）。
+  const dowMon0 = (((days % 7) + 7) % 7 + 3) % 7;
+  return (days - dowMon0) * dayMs - 8 * 3600_000;
+}
+
+/** 本周（自然周，HK）夜数（调用方传夜键集；起止 str 比，起＝周一，止＝今天）。 */
+export function weekNights(nights: Set<string> | string[], nowMs: number): number {
+  const s = hkParts(weekStartHK(nowMs));
+  const startKey = `${s.y}-${pad2(s.m + 1)}-${pad2(s.d)}`;
+  const n = hkParts(nowMs);
+  const todayKey = `${n.y}-${pad2(n.m + 1)}-${pad2(n.d)}`;
+  let c = 0;
+  for (const k of nights) {
+    if (typeof k === "string" && k >= startKey && k <= todayKey) c += 1;
+  }
+  return c;
+}
+
+/**
+ * 连续周数（周一起；本周无则从上周起算；断一周即停，沿交接口径）。
+ * 调用方传夜键集（`nightKeyHK` 产）。
+ */
+export function weekStreak(nights: Set<string> | string[], nowMs: number): number {
+  const has = new Set(nights);
+  const hasNightInWeek = (weekStart: number): boolean => {
+    for (const k of has) {
+      const ms = Date.parse(`${k}T12:00:00+08:00`);
+      if (Number.isFinite(ms) && ms >= weekStart && ms < weekStart + 7 * 24 * 3600_000) {
+        return true;
+      }
+    }
+    return false;
+  };
+  let start = weekStartHK(nowMs);
+  if (!hasNightInWeek(start)) start -= 7 * 24 * 3600_000;
+  let streak = 0;
+  while (hasNightInWeek(start)) {
+    streak += 1;
+    start -= 7 * 24 * 3600_000;
+  }
+  return streak;
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ageOf, avatarPublicUrl, parseProfileBody, shouldOnboard } from "./profile";
+import { ageOf, avatarPublicUrl, hkAge, nightKeyHK, parseProfileBody, shouldOnboard, weekNights, weekStartHK, weekStreak } from "./profile";
 
 describe("ageOf", () => {
   // 2026-10-04（UTC）为锚。
@@ -57,5 +57,45 @@ describe("avatarPublicUrl", () => {
     expect(avatarPublicUrl("https://x.supabase.co/", "avatars", "u/a.jpg")).toBe(
       "https://x.supabase.co/storage/v1/object/public/avatars/u/a.jpg",
     );
+  });
+});
+
+describe("nightKeyHK", () => {
+  it("06:00 为界（前算前一晚；后算当天）", () => {
+    // 2026-10-09T02:00Z ＝ HK 10:00 → 当天。
+    expect(nightKeyHK(Date.parse("2026-10-09T02:00:00Z"))).toBe("2026-10-09");
+    // 2026-10-08T21:00Z ＝ HK 10-09 05:00 → 前一晚 10-08。
+    expect(nightKeyHK(Date.parse("2026-10-08T21:00:00Z"))).toBe("2026-10-08");
+    // 整界 06:00 → 当天。
+    expect(nightKeyHK(Date.parse("2026-10-08T22:00:00Z"))).toBe("2026-10-09");
+    expect(nightKeyHK(NaN)).toBeNull();
+  });
+});
+
+describe("hkAge", () => {
+  it("HK 日历足岁；非法 null", () => {
+    const NOW = Date.parse("2026-10-09T00:00:00Z"); // HK 10-09 08:00
+    expect(hkAge("2000-10-09", NOW)).toBe(26);
+    expect(hkAge("2000-10-10", NOW)).toBe(25);
+    expect(hkAge("not-a-date", NOW)).toBeNull();
+    expect(hkAge(null, NOW)).toBeNull();
+  });
+});
+
+describe("weekStartHK／weekStreak／weekNights", () => {
+  // 2026-10-09 是周五（HK）。
+  const FRI = Date.parse("2026-10-09T04:00:00Z"); // HK 12:00
+  it("周一起点", () => {
+    // 本周一 HK 10-05 00:00 ＝ 10-04T16:00Z。
+    expect(weekStartHK(FRI)).toBe(Date.parse("2026-10-04T16:00:00Z"));
+  });
+  it("连周＋本周无从上周起", () => {
+    expect(weekStreak(["2026-10-07", "2026-09-30", "2026-09-24"], FRI)).toBe(3);
+    expect(weekStreak(["2026-09-30", "2026-09-24"], FRI)).toBe(2);
+    expect(weekStreak(["2026-09-24"], FRI)).toBe(0);
+    expect(weekStreak([], FRI)).toBe(0);
+  });
+  it("本周夜数", () => {
+    expect(weekNights(["2026-10-07", "2026-10-09", "2026-09-30"], FRI)).toBe(2);
   });
 });
