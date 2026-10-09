@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.17.0
+  version: 1.18.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1894,7 +1894,7 @@ paths:
           $ref: "#/components/responses/Internal"
     post:
       operationId: sendMessage
-      summary: 發送（首期只收 text，需登录，D.3：隱身任一端 403＋限流＋冪等；E.13 text 可帶分享附件一枚）
+      summary: 發送（text／image／audio；需登录；隱身任一端 403＋限流＋冪等；E.13 text 可帶分享附件一枚；D.8 image caption＋文件存在性＋413，UR D.8）
       security:
         - bearerAuth: []
       parameters:
@@ -1909,31 +1909,54 @@ paths:
           application/json:
             schema:
               type: object
-              required: [kind, body, client_msg_id]
+              required: [kind, client_msg_id]
               properties:
                 kind:
                   type: string
-                  enum: [text]
+                  enum: [text, image, audio]
                 body:
                   type: string
                   maxLength: 2000
+                  description: text 正文必填；image 選填 caption；audio 不带（帶即 400）
                 client_msg_id:
                   type: string
                   description: 冪等鍵（同會話同鍵重發回既有行，不 double）
                 attachments:
                   type: array
                   maxItems: 1
-                  description: E.13 站内分享（僅 [{checkin_id}]；僅自家帖＋對方須可見，作者／隱身 403；place 為可選地點展示文本，非坐標）
+                  description: text 可填分享一枚；image／audio 必填文件一枚（path 須自己首段；大小申报±10% 验真）
                   items:
-                    type: object
-                    required: [checkin_id]
-                    properties:
-                      checkin_id:
-                        type: string
-                        format: uuid
-                      place:
-                        type: string
-                        maxLength: 120
+                    oneOf:
+                      - title: 打卡分享
+                        type: object
+                        required: [checkin_id]
+                        properties:
+                          checkin_id:
+                            type: string
+                            format: uuid
+                          place:
+                            type: string
+                            maxLength: 120
+                      - title: 上傳文件
+                        type: object
+                        required: [path, mime, bytes]
+                        properties:
+                          kind:
+                            type: string
+                            enum: [file]
+                          bucket:
+                            type: string
+                            enum: [chat-images, chat-voice]
+                          path:
+                            type: string
+                            description: sign 回的 path（首段須是自己）
+                          mime:
+                            type: string
+                          bytes:
+                            type: integer
+                          secs:
+                            type: integer
+                            description: audio 專用（1–60s）
       responses:
         "201":
           description: 發送成功（duplicate=true 即冪等命中回既有行）
@@ -1962,8 +1985,111 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+        "413":
+          description: bytes 超桶上限（sign／send 附件；web 只判 ok 不分码）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "429":
           description: 限流（30/min 或 200/day）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/uploads/sign:
+    post:
+      operationId: signUpload
+      summary: 簽名上傳 URL（chat-images／chat-voice／avatars；直傳前置，D.6；D.8 加 sha256＋expires_at，UR D.8）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [purpose, ext, bytes]
+              properties:
+                purpose:
+                  type: string
+                  enum: [image, voice, avatar]
+                ext:
+                  type: string
+                bytes:
+                  type: integer
+                sha256:
+                  type: string
+                  description: 可選 hex64；有即確定性 path，同值重簽同址
+      responses:
+        "200":
+          description: 簽名成功（path server 生成；uploadUrl 直傳；expires_at 毫秒 epoch，簽名固定 2h 有效）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bucket, path, uploadUrl, expires_at]
+                properties:
+                  bucket:
+                    type: string
+                  path:
+                    type: string
+                  uploadUrl:
+                    type: string
+                    format: uri
+                  expires_at:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          description: bytes 超桶上限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/uploads/view:
+    post:
+      operationId: signViewUrl
+      summary: 播時簽名下載 URL（私有桶；自己或互好友可簽，陌生人 404，D.6）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bucket, path]
+              properties:
+                bucket:
+                  type: string
+                  enum: [chat-images, chat-voice]
+                path:
+                  type: string
+      responses:
+        "200":
+          description: 簽名成功（url 120s 有效）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 文件不存在或無權（不泄存在性）
           content:
             application/json:
               schema:
@@ -2197,7 +2323,7 @@ components:
     ChatMessage:
       type: object
       required: [id, sender_id, kind, body, created_at]
-      description: 單條消息（created_at 為毫秒 epoch；D.2）
+      description: 單條消息（created_at 為毫秒 epoch；D.2；D.8 加 attachments 回显＋mime／bytes／secs 顶层）
       properties:
         id:
           type: string
@@ -2213,6 +2339,22 @@ components:
           nullable: true
         created_at:
           type: integer
+        attachments:
+          type: array
+          description: 文件／分享附件（server 寫入已驗；讀端只渲染）
+          items:
+            type: object
+        mime:
+          type: string
+          nullable: true
+          description: 首个文件附件 mime；文本／分享即 null
+        bytes:
+          type: integer
+          nullable: true
+        secs:
+          type: integer
+          nullable: true
+          description: audio 專用秒數
     Conversation:
       type: object
       required: [id, peer, last_message, unread, muted, updated_at]

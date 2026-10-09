@@ -11,6 +11,7 @@ export type ApiErrorCode =
   | "rejected"
   | "party_full"
   | "gender_full"
+  | "payload_too_large"
   | "internal";
 
 export function apiError(

@@ -27,6 +27,11 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR D.8 聊天附件 V2（v2-only，[WIP]，待 0013/0014＋双号联验）**
+  - sign：`sha256` 可选确定性 path＋`expires_at`（签名固定 2h，SDK 无 expiresIn 参数）＋bytes 超限 413；形状冻结（不断 web）
+  - sendMessage：image caption 存 body＋audio 带正文 400＋客户端 kind/bucket 一致性＋文件存在性＋±10% 大小验真（service；缺档 400；谎报 400＋删档）＋bytes 超限 413
+  - 读：`ChatMessage` 顶层 `mime/bytes/secs`（取首个文件附件；列表同享）；yaml 追 reality（sendMessage 三 kind＋oneOf＋413；补 sign/view 入 yaml；ChatMessage 补字段）；openapi 1.18.0
+  - `payload_too_large` 包络＋`isSizeWithin` 纯函数＋单测；桶已建（私有＋限额）；0013/0014 待贴跑
 - **UR E.26 打卡收藏 save（v2-only，[WIP]，待 0034＋iOS 联调）**
   - 0034（`checkin_saves` 联合主键＋user/created 索引＋RLS 本人读写三条；FK 用 `users(id)`；policy 拆三条沿 0018）
   - `POST /checkins/{id}/save` toggle（401／400／404 可见门沿 E.7；无未成年／stealth 门；回 `{saved}` 无 count）＋`GET /me/saves`（本人收藏时间倒序；limit 30/50；cursor；删帖／不可见自动消失；行 `saved_by_me:true`）＋详情 `saved_by_me`（匿名／归档 false；pins/mine 行不加）

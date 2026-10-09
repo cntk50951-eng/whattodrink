@@ -1,4 +1,4 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { canViewCheckin } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
@@ -10,6 +10,7 @@ import {
   parseCreateMessageBody,
   encodeChatCursor,
   toChatMessage,
+  isSizeWithin,
 } from "@/lib/api/chat";
 
 /**
@@ -83,7 +84,8 @@ export async function GET(
 
 /**
  * `POST /api/v1/conversations/:id/messages {kind, body, client_msg_id}` —— 發送
- * （首期只收 text；隱身任一端 403；限流 30/min＋200/day；冪等重放回既有行 200；
+ * （text 必正文；image caption 可选；audio 不带正文；隱身任一端 403；
+ * 限流 30/min＋200/day；冪等重放回既有行 200；文件附件驗存在＋±10% 大小；
  * 寫後刷會話 `expires_at`＝now＋90d）。
  */
 export async function POST(
@@ -107,6 +109,9 @@ export async function POST(
   }
   const parsed = parseCreateMessageBody(raw);
   if ("error" in parsed) {
+    if (parsed.status === 413) {
+      return apiError("payload_too_large", parsed.error, 413);
+    }
     return apiError("invalid_params", parsed.error, 400);
   }
   // 成員＋隱身雙驗（非成員 404；任一端隱身 403，沿 live 三刀口徑）
@@ -191,6 +196,25 @@ export async function POST(
       }
     }
     const bucket = parsed.kind === "image" ? "chat-images" : "chat-voice";
+    // D.8 文件存在性＋真实大小（service 查桶；缺档 400；超申报 ±10%→400＋删档）。
+    // RLS 不拦 service；path 归属上已验首段是自己。
+    const svc = await createServiceClient();
+    for (const a of parsed.attachments) {
+      const slash = a.path.indexOf("/");
+      const found = await svc.storage
+        .from(bucket)
+        .list(a.path.slice(0, slash), { search: a.path.slice(slash + 1) });
+      const hit = (found.data ?? []).find((f) => f.name === a.path.slice(slash + 1));
+      const realSize =
+        hit !== undefined && typeof hit.metadata?.size === "number" ? hit.metadata.size : NaN;
+      if (!Number.isFinite(realSize)) {
+        return apiError("invalid_params", "文件不存在或已删除", 400);
+      }
+      if (!isSizeWithin(realSize, a.bytes)) {
+        await svc.storage.from(bucket).remove([a.path]);
+        return apiError("invalid_params", "文件大小与申报不符", 400);
+      }
+    }
     attachments = parsed.attachments.map((a) => ({ ...a, bucket }));
   }
   // 限流（兩檔計數；POC 直查，上量後換計數列，見 UR）
@@ -228,7 +252,8 @@ export async function POST(
       conversation_id: parsedId.id,
       sender_id: userId,
       kind: parsed.kind,
-      body: parsed.kind === "text" ? parsed.body : null,
+      // D.8 image caption 存 body；audio 恒 null；text 正文。
+      body: parsed.kind === "text" ? parsed.body : parsed.kind === "image" ? parsed.body : null,
       attachments,
       client_msg_id: parsed.client_msg_id,
     })

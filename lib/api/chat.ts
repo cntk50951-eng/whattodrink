@@ -114,8 +114,10 @@ export function parseConversationId(raw: string): { id: string } | { error: stri
 }
 
 /**
- * `POST /:id/messages`：text 必 body；image／audio 必 attachments[0]；
- * text 可带分享附件 `attachments:[{checkin_id}]`（UR E.13 站内分享打卡，零新 kind）。
+ * `POST /:id/messages`：text 必 body；image caption 可选（body ≤2000，无即 null 存）；
+ * audio 不带正文（带即 400）；text 可带分享附件 `attachments:[{checkin_id}]`（UR E.13）。
+ * 文件附件兼容交接 discriminated 形：客户端可带 `kind:"file"`＋`bucket`，有即校验一致
+ * （无即沿 D.6 旧兼容，由 kind 定桶）；share 形只许 text。
  * （D.6 開閘；`client_msg_id` 必填（冪等唯一，弱網重發不 double）。
  */
 export type ChatAttachment = {
@@ -124,6 +126,9 @@ export type ChatAttachment = {
   bytes: number;
   secs?: number;
 };
+
+/** 超限错误码（413；调用方据此置状态，普通校验仍 400）。 */
+export type ChatParseError = { error: string; status?: 413 };
 
 /** 站内打卡分享附件（非文件，无 path／bucket；可见性由路由验）。 */
 export type CheckinShareAttachment = {
@@ -136,8 +141,9 @@ export function parseCreateMessageBody(
   raw: unknown,
 ):
   | { kind: "text"; body: string; share?: CheckinShareAttachment; client_msg_id: string }
-  | { kind: "image" | "audio"; attachments: ChatAttachment[]; client_msg_id: string }
-  | { error: string } {
+  | { kind: "image"; body: string | null; attachments: ChatAttachment[]; client_msg_id: string }
+  | { kind: "audio"; attachments: ChatAttachment[]; client_msg_id: string }
+  | ChatParseError {
   if (!isRecord(raw)) return { error: "body 需为对象" };
   const client_msg_id = asNonEmptyString(raw.client_msg_id);
   if (client_msg_id === null) return { error: "client_msg_id 必填（冪等鍵）" };
@@ -172,6 +178,21 @@ export function parseCreateMessageBody(
   if (raw.kind === "image" || raw.kind === "audio") {
     const atts = parseAttachments(raw.attachments, raw.kind);
     if ("error" in atts) return atts;
+    if (raw.kind === "image") {
+      // D.8 caption 可选存 body（缺席／null／空串即无；超长 400）。
+      let cap: string | null = null;
+      if (raw.body !== undefined && raw.body !== null) {
+        if (typeof raw.body !== "string") return { error: "caption 非法" };
+        const t = raw.body.trim();
+        if (t.length > CHAT_TEXT_MAX) return { error: `caption 只要 ≤${CHAT_TEXT_MAX} 字` };
+        cap = t === "" ? null : t;
+      }
+      return { kind: raw.kind, body: cap, attachments: atts.attachments, client_msg_id };
+    }
+    // D.8 audio 不带正文（带即 400；读端 body 恒 null）。
+    if (raw.body !== undefined && raw.body !== null) {
+      return { error: "audio 不带正文" };
+    }
     return { kind: raw.kind, attachments: atts.attachments, client_msg_id };
   }
   return { error: "kind 非法（只要 text|image|audio）" };
@@ -180,12 +201,20 @@ export function parseCreateMessageBody(
 function parseAttachments(
   raw: unknown,
   kind: "image" | "audio",
-): { attachments: ChatAttachment[] } | { error: string } {
+): { attachments: ChatAttachment[] } | ChatParseError {
   if (!Array.isArray(raw) || raw.length !== 1) {
     return { error: "attachments 只要 1 個（首期單附件）" };
   }
   const r = raw[0] as Record<string, unknown>;
   if (typeof r !== "object" || r === null) return { error: "attachment 需为对象" };
+  // D.8 交接 discriminated 形兼容：kind:"file"＋bucket 可带，有即校验（无即沿旧）。
+  if (r.kind !== undefined && r.kind !== "file") {
+    return { error: "文件附件 kind 只要 file" };
+  }
+  const bucket = kind === "image" ? "chat-images" : "chat-voice";
+  if (r.bucket !== undefined && r.bucket !== bucket) {
+    return { error: "bucket 与 kind 不一致" };
+  }
   const path = asNonEmptyString(r.path);
   // 路徑約定 `<uid>/<uuid>.<ext>`（首段歸屬 route 層驗，這裡只驗形狀防遍歷）
   if (path === null || path.includes("..") || path.split("/").length !== 2) {
@@ -197,7 +226,9 @@ function parseAttachments(
     if (!(CHAT_IMAGE_EXTS as readonly string[]).includes(ext)) {
       return { error: `圖片只要 ${CHAT_IMAGE_EXTS.join("/")}` };
     }
-    if (bytes < 0 || bytes > CHAT_IMAGE_MAX_BYTES) return { error: "圖片超 10MB" };
+    if (bytes < 0 || bytes > CHAT_IMAGE_MAX_BYTES) {
+      return { error: "圖片超 10MB", status: 413 };
+    }
     if (typeof r.mime !== "string" || !r.mime.startsWith("image/")) {
       return { error: "mime 非圖片" };
     }
@@ -206,7 +237,9 @@ function parseAttachments(
   if (!(CHAT_VOICE_EXTS as readonly string[]).includes(ext)) {
     return { error: `語音只要 ${CHAT_VOICE_EXTS.join("/")}` };
   }
-  if (bytes < 0 || bytes > CHAT_VOICE_MAX_BYTES) return { error: "語音超 2MB" };
+  if (bytes < 0 || bytes > CHAT_VOICE_MAX_BYTES) {
+    return { error: "語音超 2MB", status: 413 };
+  }
   const secs = typeof r.secs === "number" && Number.isFinite(r.secs) ? r.secs : -1;
   if (secs <= 0 || secs > CHAT_VOICE_MAX_SECS) return { error: "語音超 60s" };
   return { attachments: [{ path, mime: "audio", bytes, secs }] };
@@ -218,7 +251,7 @@ export const AVATAR_EXTS = ["jpg", "jpeg", "png", "webp"] as const;
 
 export function parseSignBody(
   raw: unknown,
-): { purpose: "image" | "voice" | "avatar"; ext: string; bytes: number } | { error: string } {
+): { purpose: "image" | "voice" | "avatar"; ext: string; bytes: number; sha256: string | null } | { error: string; status?: 413 } {
   if (!isRecord(raw)) return { error: "body 需为对象" };
   const purpose = raw.purpose;
   if (purpose !== "image" && purpose !== "voice" && purpose !== "avatar") {
@@ -231,8 +264,24 @@ export function parseSignBody(
   }
   const bytes = typeof raw.bytes === "number" && Number.isFinite(raw.bytes) ? raw.bytes : -1;
   const cap = purpose === "image" ? CHAT_IMAGE_MAX_BYTES : purpose === "voice" ? CHAT_VOICE_MAX_BYTES : AVATAR_MAX_BYTES;
-  if (bytes <= 0 || bytes > cap) return { error: "bytes 非法" };
-  return { purpose, ext, bytes };
+  if (bytes <= 0 || bytes > cap) return { error: "bytes 非法", status: 413 as const };
+  // D.8 sha256 可选（hex64；有即确定性 path，同值重签同址，零新表）。
+  let sha256: string | null = null;
+  if (raw.sha256 !== undefined && raw.sha256 !== null) {
+    if (typeof raw.sha256 !== "string" || !/^[0-9a-fA-F]{64}$/.test(raw.sha256)) {
+      return { error: "sha256 非法（hex64）" };
+    }
+    sha256 = raw.sha256.toLowerCase();
+  }
+  return { purpose, ext, bytes, sha256 };
+}
+
+/** 申报大小 vs storage 真实大小（±10% 容差；超差即谎报，调用方 400＋删档）。 */
+export function isSizeWithin(actual: number, declared: number, tol = 0.1): boolean {
+  if (!Number.isFinite(actual) || !Number.isFinite(declared) || declared <= 0 || actual < 0) {
+    return false;
+  }
+  return Math.abs(actual - declared) <= declared * tol;
 }
 
 /** `POST /uploads/view {bucket, path}`（D.6 播時簽名；歸屬 route 層驗）。 */
@@ -264,6 +313,10 @@ export type ChatMessageJson = {
   body: string | null;
   /** D.6 附件直傳（server 寫入時已驗歸屬＋大小；讀端只渲染不信任執行）。 */
   attachments: unknown[];
+  /** D.8 顶层回显（取 attachments[0] 文件型；文本／分享即 null，省客户端下钻）。 */
+  mime: string | null;
+  bytes: number | null;
+  secs: number | null;
   /** Epoch ms（DB 是 ISO，mapper 轉；轉不過＝壞行）。 */
   created_at: number;
   mine: boolean;
@@ -294,7 +347,18 @@ export function toChatMessage(raw: unknown, me: string): ChatMessageJson | null 
   const created_at = Date.parse(createdRaw);
   if (!Number.isFinite(created_at)) return null;
   const attachments = Array.isArray(raw.attachments) ? raw.attachments : [];
-  return { id, sender_id, kind: raw.kind, body: body ?? null, attachments, created_at, mine: sender_id === me };
+  // D.8 顶层回显：首个文件型附件的 mime/bytes/secs（文本／分享即 null）。
+  let mime: string | null = null;
+  let bytes: number | null = null;
+  let secs: number | null = null;
+  const first = attachments.length > 0 ? attachments[0] : null;
+  if (typeof first === "object" && first !== null && typeof (first as Record<string, unknown>).path === "string") {
+    const f = first as Record<string, unknown>;
+    mime = typeof f.mime === "string" ? f.mime : null;
+    bytes = typeof f.bytes === "number" && Number.isFinite(f.bytes) ? f.bytes : null;
+    secs = typeof f.secs === "number" && Number.isFinite(f.secs) ? f.secs : null;
+  }
+  return { id, sender_id, kind: raw.kind, body: body ?? null, attachments, mime, bytes, secs, created_at, mine: sender_id === me };
 }
 
 /** 對方簡檔映射：只吐公開三列（精確坐標／email 永不回，沿架構隱私線）。 */

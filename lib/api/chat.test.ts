@@ -5,6 +5,7 @@ import {
   directKey,
   encodeChatCursor,
   isConversationExpired,
+  isSizeWithin,
   parseChatListParams,
   parseConversationId,
   parseCreateConversationBody,
@@ -141,6 +142,7 @@ describe("parseCreateMessageBody", () => {
     };
     expect(parseCreateMessageBody(img)).toEqual({
       kind: "image",
+      body: null,
       attachments: [{ path: "u1/a.jpg", mime: "image/jpeg", bytes: 100 }],
       client_msg_id: "c-2",
     });
@@ -171,6 +173,56 @@ describe("parseCreateMessageBody", () => {
       client_msg_id: "c-3",
     });
   });
+  it("D.8：image caption 可选（缺席／空即 null；超长拒）；audio 带正文拒", () => {
+    const base = {
+      kind: "image",
+      client_msg_id: "c-20",
+      attachments: [{ path: "u1/a.jpg", mime: "image/jpeg", bytes: 100 }],
+    };
+    expect(parseCreateMessageBody({ ...base, body: "好靚" })).toEqual({ ...base, body: "好靚" });
+    expect(parseCreateMessageBody({ ...base, body: "" })).toEqual({ ...base, body: null });
+    expect(parseCreateMessageBody({ ...base, body: "x".repeat(2001) })).toHaveProperty("error");
+    expect(
+      parseCreateMessageBody({
+        kind: "audio",
+        body: "顺带一句话",
+        client_msg_id: "c-21",
+        attachments: [{ path: "u1/a.webm", mime: "audio", bytes: 10, secs: 5 }],
+      }),
+    ).toHaveProperty("error");
+  });
+  it("D.8：附件 kind/bucket 一致性（有即验；超限 413）", () => {
+    const file = {
+      kind: "image",
+      client_msg_id: "c-22",
+      attachments: [{ kind: "file", bucket: "chat-images", path: "u1/a.jpg", mime: "image/jpeg", bytes: 100 }],
+    };
+    const r = parseCreateMessageBody(file);
+    expect(r).toEqual({
+      kind: "image",
+      body: null,
+      attachments: [{ path: "u1/a.jpg", mime: "image/jpeg", bytes: 100 }],
+      client_msg_id: "c-22",
+    });
+    expect(
+      parseCreateMessageBody({
+        ...file,
+        attachments: [{ kind: "file", bucket: "chat-voice", path: "u1/a.jpg", mime: "image/jpeg", bytes: 100 }],
+      }),
+    ).toHaveProperty("error");
+    expect(
+      parseCreateMessageBody({
+        ...file,
+        attachments: [{ kind: "share", path: "u1/a.jpg", mime: "image/jpeg", bytes: 100 }],
+      }),
+    ).toHaveProperty("error");
+    const over = parseCreateMessageBody({
+      ...file,
+      attachments: [{ path: "u1/a.jpg", mime: "image/jpeg", bytes: 11 * 1024 * 1024 }],
+    });
+    expect(over).toHaveProperty("error");
+    expect((over as { status?: number }).status).toBe(413);
+  });
 });
 
 describe("parseSignBody／parseViewBody", () => {
@@ -179,9 +231,23 @@ describe("parseSignBody／parseViewBody", () => {
       purpose: "image",
       ext: "png",
       bytes: 10,
+      sha256: null,
     });
     expect(parseSignBody({ purpose: "image", ext: "exe", bytes: 10 })).toHaveProperty("error");
     expect(parseSignBody({ purpose: "voice", ext: "webm", bytes: 3 * 1024 * 1024 })).toHaveProperty("error");
+  });
+  it("D.8：sha256 可选（hex64 收；非法拒；超限 413）", () => {
+    const sha = "a".repeat(64);
+    expect(parseSignBody({ purpose: "image", ext: "png", bytes: 10, sha256: sha })).toEqual({
+      purpose: "image",
+      ext: "png",
+      bytes: 10,
+      sha256: sha,
+    });
+    expect(parseSignBody({ purpose: "image", ext: "png", bytes: 10, sha256: "xyz" })).toHaveProperty("error");
+    const over = parseSignBody({ purpose: "image", ext: "png", bytes: 11 * 1024 * 1024 });
+    expect(over).toHaveProperty("error");
+    expect((over as { status?: number }).status).toBe(413);
   });
   it("view 收合法 bucket＋path", () => {
     expect(parseViewBody({ bucket: "chat-images", path: "u1/a.png" })).toEqual({
@@ -209,6 +275,28 @@ describe("toChatMessage", () => {
     expect(toChatMessage({ ...row, created_at: "nope" }, "u1")).toBeNull();
     expect(toChatMessage(null, "u1")).toBeNull();
   });
+  it("D.8：顶层 mime/bytes/secs 取首个文件附件；文本即 null", () => {
+    expect(toChatMessage(row, "u1")).toMatchObject({ mime: null, bytes: null, secs: null });
+    const img = toChatMessage(
+      {
+        ...row,
+        kind: "image",
+        body: null,
+        attachments: [{ path: "u1/a.jpg", mime: "image/jpeg", bytes: 100 }],
+      },
+      "u2",
+    );
+    expect(img).toMatchObject({ mime: "image/jpeg", bytes: 100, secs: null });
+    const aud = toChatMessage(
+      {
+        ...row,
+        kind: "audio",
+        attachments: [{ path: "u1/a.m4a", mime: "audio", bytes: 50, secs: 7 }],
+      },
+      "u2",
+    );
+    expect(aud).toMatchObject({ mime: "audio", bytes: 50, secs: 7 });
+  });
 });
 
 describe("toChatPeer", () => {
@@ -217,6 +305,18 @@ describe("toChatPeer", () => {
       toChatPeer({ id: "u2", nickname: "N", avatar_url: null, lat: 1, email: "x" }),
     ).toEqual({ user_id: "u2", nickname: "N", avatar_url: null });
     expect(toChatPeer({ id: "u2" })).toBeNull();
+  });
+});
+
+describe("isSizeWithin", () => {
+  it("±10% 容差；非法输入 false", () => {
+    expect(isSizeWithin(100, 100)).toBe(true);
+    expect(isSizeWithin(109, 100)).toBe(true);
+    expect(isSizeWithin(111, 100)).toBe(false);
+    expect(isSizeWithin(50, 100)).toBe(false);
+    expect(isSizeWithin(NaN, 100)).toBe(false);
+    expect(isSizeWithin(100, 0)).toBe(false);
+    expect(isSizeWithin(-5, 100)).toBe(false);
   });
 });
 

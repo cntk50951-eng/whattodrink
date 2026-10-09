@@ -3849,3 +3849,32 @@ UR E.26　打卡收藏 save（v2-only，iOS-0.62 输入）[WIP]
 
 *改動記錄*
 - 2026-10-08：建檔置 [WIP]（WEB_HANDOFF_SAVES 输入；直做）
+
+---
+
+UR D.8　聊天附件 V2（iOS API_CHAT_V2 输入）[WIP]
+
+> iOS 按交接写了 client；web（ChatRoomLive＋Onboarding）已依赖 D.6 形状。用户定案：保留现有 sign 形状做加法，不断 web。
+
+### 背景（2026-10-08 問答定案）
+- 交接三处"缺口"实为过期描述（D.6 已做：sign/view 端点、kind image/audio 开闸、path 归属＋bucket 落库、0013 RLS、读端 attachments）；真缺口见范围。
+- sign 形状冻结 `purpose/ext/bytes`（web 两处依赖），加法：可选 `sha256`（hex64，有即确定性 path 同值重签同址，零新表）＋回 `expires_at`（显式 300s）。
+- 桶是新建的（查 API 实测旧库无两桶，已建私有＋限额；0013/0014 待用户贴跑）。
+- §9 代答：voice 上限保持 2MB（60s m4a 约 1MB 够用）；`audio/m4a|mp4` 接受（ext 白名单有，不动存储归一）；`secs` 采客户端声明（range 校验；storage 读不到时长）；EXIF 不做（server 不碰字节，iOS 不传 GPS 即可）。
+- 簽名 TTL 偏差（实测 SDK）：`createSignedUploadUrl` 无 expiresIn 參數，签名固定 2h 有效（交接 5min 不可配）；回 `expires_at`＝now＋2h，客户端拿到立即上传。
+
+### 範圍（v2-only；純 API）
+1. **sign**：`expiresIn: 300` 显式＋回 `expires_at`（ms epoch）；`sha256` 可选→`uid/YYYY-MM/sha256[0:32].ext`；bytes 超限 400→413（web 只判 ok，不 break）。
+2. **sendMessage**：image caption 可选存 body（≤2000；audio 带正文 400）；附件接受客户端 `kind: share/file`＋`bucket`（有即校验一致，无即沿旧兼容）；文件存在性＋真实 size（service 查 bucket；缺档 400；超申报 ±10%→400＋删档）；bytes 超限 400→413。
+3. **读**：`ChatMessage` 加顶层 `mime/bytes/secs`（取 attachments[0] 文件型；文本／分享即 null；沿 toChatMessage，会话列表同享）。
+4. openapi 1.18.0（sendMessage 追 reality：三 kind＋caption＋oneOf 附件＋413；ChatMessage 补 attachments/mime/bytes/secs；sign 补 sha256/expires_at）＋單測（caption／audio 正文拒／kind-bucket 不一致／isSizeWithin／sha256／轮换无）。
+
+### 非目標
+- 撤回（V2）、E2E、改 RLS、动 web UI、v1 任何文件。
+
+### AC（交接 §4＋D.6 AC）
+- caption 图对端可见；删档后发送 400；超限 413；谎报大小 400＋档被删；同 key 重发 `duplicate:true`
+- 陌生人拿 path 签不出（沿 D.6 view）；三閘綠；双号联验（前置：0013/0014 已跑）
+
+*改動記錄*
+- 2026-10-08：建檔置 [WIP]（API_CHAT_V2 输入＋sign 形状问答；直做）
