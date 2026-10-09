@@ -12,7 +12,7 @@ import { summarizeRatings } from "@/lib/api/rating";
  */
 
 const DETAIL_COLUMNS =
-  "id,user_id,visibility,photo_url,note,audio_url,audio_seconds,transcript,created_at,place_name,lat,lng,beer_id,rating";
+  "id,user_id,visibility,photo_url,note,audio_url,audio_seconds,transcript,created_at,place_name,lat,lng,beer_id,rating,tags";
 
 /**
  * UR E.22 歸檔回退（舊分享鏈／深鏈不斷；只讀快照，主缺才查）。
@@ -89,6 +89,7 @@ async function readArchived(
       audio_url: (arow.audio_url as string | null) ?? null,
       audio_seconds: (arow.audio_seconds as number | null) ?? null,
       transcript: (arow.transcript as string | null) ?? null,
+      tags: Array.isArray(arow.tags) ? (arow.tags as unknown[]).filter((x): x is string => typeof x === "string") : [],
       created_at: arow.created_at as string,
       place_name: (arow.place_name as string | null) ?? null,
       lat: (arow.lat as number | null) ?? null,
@@ -262,6 +263,7 @@ export async function GET(
       audio_url: (row.audio_url as string | null) ?? null,
       audio_seconds: (row.audio_seconds as number | null) ?? null,
       transcript: (row.transcript as string | null) ?? null,
+      tags: Array.isArray(row.tags) ? (row.tags as unknown[]).filter((x): x is string => typeof x === "string") : [],
       created_at: row.created_at as string,
       place_name: (row.place_name as string | null) ?? null,
       lat: (row.lat as number | null) ?? null,

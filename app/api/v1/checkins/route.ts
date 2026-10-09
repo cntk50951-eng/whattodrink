@@ -9,7 +9,7 @@ import { moderateCheckin, moderationAction } from "@/lib/moderation";
  * 隱身模式直接 403，前端引導切換；未傳 kind 兼容為 flash。
  */
 
-const CHECKIN_SELECT = "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript";
+const CHECKIN_SELECT = "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript,tags";
 
 /** key 缺席只 warn 一次（開發態容許跳過；生產必須配 key，見 UR E.2）。 */
 let warnedNoModerationKey = false;
@@ -32,13 +32,13 @@ export async function POST(req: Request): Promise<Response> {
     return apiError("invalid_params", parsed.error, 400);
   }
   const { beer_id, lat, lng, place_name, kind } = parsed.body;
-  const photoUrl = parsed.body.photo_url ?? null;
-  // UR E.20 縮圖隨單（缺即 null；42703 老庫回退鏈不碰此列，見下）。
+  const photoUrl = parsed.body.photo_url ?? null;  // UR E.20 縮圖隨單（缺即 null；42703 老庫回退鏈不碰此列，見下）。
   const photoThumb = parsed.body.photo_thumb ?? null;
   const noteText = parsed.body.note ?? null;
   const audioUrl = parsed.body.audio_url ?? null;
   const audioSeconds = parsed.body.audio_seconds ?? null;
   const transcriptText = parsed.body.transcript ?? null;
+  const tags = parsed.body.tags ?? [];
 
   try {
     // 防御：若 public.users 缺行（0006 触发器未执行或旧库），先补行再落库，避免 FK 23503
@@ -182,6 +182,7 @@ export async function POST(req: Request): Promise<Response> {
           audio_url: audioUrl,
           audio_seconds: audioSeconds,
           transcript: transcriptText ?? "",
+          tags,
         })
         .select(CHECKIN_SELECT)
         .single();
@@ -262,6 +263,7 @@ export async function POST(req: Request): Promise<Response> {
           audio_url: (row.audio_url as string | null) ?? null,
           audio_seconds: (row.audio_seconds as number | null) ?? null,
           transcript: (row.transcript as string | null) ?? null,
+          tags: Array.isArray(row.tags) ? (row.tags as unknown[]).filter((x): x is string => typeof x === "string") : [],
         },
       },
       201,

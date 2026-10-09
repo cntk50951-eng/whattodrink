@@ -3,6 +3,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { canViewCheckin, parseCheckinIdParam, parseMineParams } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
 import { hkAge, nightKeyHK, weekNights, weekStreak } from "@/lib/api/profile";
+import { aggregateTaste } from "@/lib/api/taste";
 
 type UserRow = {
   id: string;
@@ -13,7 +14,126 @@ type UserRow = {
   bio: string | null;
   mode: string;
   created_at: string;
+  preferences: unknown;
 };
+
+/** preferences 读端窄化（写时已验；坏形回 null 不炸包）。 */
+function narrowPreferences(
+  raw: unknown,
+): { favorites: string[]; likes: string[]; dislikes: string[] } | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const arr = (v: unknown): string[] | null =>
+    Array.isArray(v) && v.every((x): x is string => typeof x === "string") ? [...v] : null;
+  const f = arr(r.favorites);
+  const l = arr(r.likes);
+  const d = arr(r.dislikes);
+  if (f === null || l === null || d === null) return null;
+  return { favorites: f, likes: l, dislikes: d };
+}
+
+const TASTE_STALE_MS = 10 * 60_000;
+
+/**
+ * UR E.28 口味推测（读时懒算：无缓存／超 10min／有新打卡即全量重算写回；
+ * 确定性聚合 v1，不调 AI；iOS 文案须称"根據打卡推測"）。
+ * 表未迁移（0036 未跑）即回 null（与"从没算过"同形，不炸包）。
+ */
+async function tasteInference(
+  supa: Awaited<ReturnType<typeof createServiceClient>>,
+  targetId: string,
+  nowMs: number,
+): Promise<{ sample_count: number; computed_at: string; groups: unknown[] } | null> {
+  try {
+    const { data: cacheRaw, error: cErr } = await supa
+      .from("user_taste_inference")
+      .select("payload,sample_count,computed_at,checkin_watermark")
+      .eq("user_id", targetId)
+      .maybeSingle();
+    if (cErr !== null) return null;
+    const cache = cacheRaw as {
+      payload: unknown;
+      sample_count: number;
+      computed_at: string;
+      checkin_watermark: string | null;
+    } | null;
+    const [{ data: nMain }, { data: nArch }] = await Promise.all([
+      supa.from("checkins").select("created_at").eq("user_id", targetId).order("created_at", { ascending: false }).limit(1),
+      supa.from("checkins_archive").select("created_at").eq("user_id", targetId).order("created_at", { ascending: false }).limit(1),
+    ]);
+    const newest = [nMain, nArch]
+      .flat()
+      .map((r) => (r as { created_at?: unknown } | null)?.created_at)
+      .filter((v): v is string => typeof v === "string")
+      .sort()
+      .pop() ?? null;
+    const stale =
+      cache === null ||
+      !Number.isFinite(Date.parse(cache.computed_at)) ||
+      nowMs - Date.parse(cache.computed_at) > TASTE_STALE_MS ||
+      (newest !== null &&
+        (cache.checkin_watermark === null || newest > cache.checkin_watermark));
+    if (!stale && cache !== null) {
+      const groups =
+        cache.sample_count < 5
+          ? []
+          : Array.isArray((cache.payload as Record<string, unknown>)?.groups)
+            ? ((cache.payload as Record<string, unknown>).groups as unknown[])
+            : [];
+      return { sample_count: cache.sample_count, computed_at: cache.computed_at, groups };
+    }
+    // 全量信号（tags＋酒款分类；主＋归档）。
+    const [{ data: mainRows }, { data: archRows }] = await Promise.all([
+      supa.from("checkins").select("tags,beer_id").eq("user_id", targetId),
+      supa.from("checkins_archive").select("tags,beer_id").eq("user_id", targetId),
+    ]);
+    const all = [...((mainRows ?? []) as unknown[]), ...((archRows ?? []) as unknown[])];
+    const beerIds = [
+      ...new Set(
+        all
+          .map((r) => (r as Record<string, unknown>)?.beer_id)
+          .filter((id): id is string => typeof id === "string" && id !== ""),
+      ),
+    ];
+    const catByBeer = new Map<string, string>();
+    if (beerIds.length > 0) {
+      const { data: beers } = await supa.from("beers").select("id,category").in("id", beerIds);
+      for (const b of ((beers ?? []) as unknown[]) as Record<string, unknown>[]) {
+        if (typeof b.id === "string" && typeof b.category === "string") {
+          catByBeer.set(b.id, b.category);
+        }
+      }
+    }
+    const { groups, sample_count } = aggregateTaste(
+      all.map((r) => {
+        const rec = (r ?? {}) as Record<string, unknown>;
+        return {
+          tags: Array.isArray(rec.tags)
+            ? (rec.tags as unknown[]).filter((x): x is string => typeof x === "string")
+            : [],
+          beerCategory:
+            typeof rec.beer_id === "string" ? (catByBeer.get(rec.beer_id) ?? null) : null,
+        };
+      }),
+    );
+    const computedIso = new Date(nowMs).toISOString();
+    const outGroups = sample_count < 5 ? [] : groups;
+    await supa.from("user_taste_inference").upsert(
+      {
+        user_id: targetId,
+        payload: { groups },
+        sample_count,
+        computed_at: computedIso,
+        checkin_watermark: newest,
+      },
+      { onConflict: "user_id" },
+    );
+    return { sample_count, computed_at: computedIso, groups: outGroups };
+  } catch (e) {
+    console.warn(`[api/v1/users/profile] taste skipped: ${e instanceof Error ? e.message : "unknown"}`);
+    return null;
+  }
+}
 
 type FsRow = { user_id: unknown; friend_id: unknown; status: unknown };
 
@@ -47,7 +167,7 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
   const nowMs = Date.now();
   const { data: userRaw } = await supa
     .from("users")
-    .select("id,nickname,avatar_url,gender,dob,bio,mode,created_at")
+    .select("id,nickname,avatar_url,gender,dob,bio,mode,created_at,preferences")
     .eq("id", targetId)
     .maybeSingle();
   const u = userRaw as UserRow | null;
@@ -203,13 +323,13 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
   if (!locked) {
     const { data: mainRows } = await supa
       .from("checkins")
-      .select("id,kind,visibility,place_name,lat,lng,created_at,expires_at,note,photo_thumb,beer_id")
+      .select("id,kind,visibility,place_name,lat,lng,created_at,expires_at,note,photo_thumb,beer_id,tags")
       .eq("user_id", targetId)
       .order("created_at", { ascending: false })
       .limit(200);
     const { data: archRows } = await supa
       .from("checkins_archive")
-      .select("id,kind,visibility,place_name,lat,lng,created_at,expires_at,note,photo_thumb,beer_id")
+      .select("id,kind,visibility,place_name,lat,lng,created_at,expires_at,note,photo_thumb,beer_id,tags")
       .eq("user_id", targetId)
       .order("created_at", { ascending: false })
       .limit(200);
@@ -289,6 +409,9 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
         thumb_url: typeof r.photo_thumb === "string" ? r.photo_thumb : null,
         beer: bid !== null ? (beerById.get(bid) ?? null) : null,
         like_count: likeById.get(r.id as string) ?? 0,
+        tags: Array.isArray(r.tags)
+          ? (r.tags as unknown[]).filter((x): x is string => typeof x === "string")
+          : [],
       };
       if (self) {
         item.lat = typeof r.lat === "number" ? r.lat : null;
@@ -304,6 +427,9 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
     mutual_friends_count: mutualCount,
     can_add_friend: !self && relationship === "none",
     stats,
+    // UR E.28 口味（preferences 与 stats 同门；taste 只给自己）。
+    preferences: statsVisible ? narrowPreferences(u.preferences) : null,
+    taste_inference: self ? await tasteInference(supa, targetId, nowMs) : null,
     level: null,
     badges: [],
     badges_total: null,

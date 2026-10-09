@@ -14,6 +14,12 @@ export function parseMode(raw: unknown): UserMode | null {
     : null;
 }
 
+/** 字符串数组窄化（读端透传用；非数组即 []，坏项丢弃）。 */
+function strArr(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter((x): x is string => typeof x === "string");
+}
+
 export function parsePatchModeBody(
   raw: unknown,
 ): { body: { mode: UserMode } } | { error: string } {
@@ -45,6 +51,8 @@ export type MeJson = {
   onboarded_at?: string | null;
   /** UR E.19 舊號未成年旗（缺席即未知不扰；true 即弹过一次即忘）。 */
   birthRestricted?: boolean;
+  /** UR E.28 口味偏好（自设；无则 null；校验在 taste.ts，读端只透传形状）。 */
+  preferences?: { favorites: string[]; likes: string[]; dislikes: string[] } | null;
   created_at?: string;
 };
 
@@ -99,6 +107,19 @@ export function toMeJson(raw: unknown): MeJson | null {
       ? {}
       : { onboarded_at: typeof r.onboarded_at === "string" ? r.onboarded_at : null }),
     ...(typeof r.created_at === "string" ? { created_at: r.created_at } : {}),
+    // UR E.28 口味偏好透传（对象即收三数组，非对象即 null；校验只在写入做）。
+    ...(r.preferences === undefined
+      ? {}
+      : {
+          preferences:
+            typeof r.preferences === "object" && r.preferences !== null
+              ? {
+                  favorites: strArr((r.preferences as Record<string, unknown>).favorites),
+                  likes: strArr((r.preferences as Record<string, unknown>).likes),
+                  dislikes: strArr((r.preferences as Record<string, unknown>).dislikes),
+                }
+              : null,
+        }),
     // UR E.19：旧号未成年一次性提示（birthRestricted；缺席即未知不扰；ageOf 内联防循环 import）。
     ...(() => {
       if (r.dob === undefined) return {};

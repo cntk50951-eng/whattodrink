@@ -8,7 +8,7 @@ import { parseMineParams, toMineRow } from "@/lib/api/checkins";
  * RLS 靠 0006 `checkins owner read`（`auth.uid()=user_id`），此口不额外加 visibility 过滤（private 也回，自己看）。
  */
 
-const MINE_COLUMNS = "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript,beers(id,name,emoji,category,tagline,icon_url)";
+const MINE_COLUMNS = "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript,tags,beers(id,name,emoji,category,tagline,icon_url)";
 
 export async function GET(req: Request): Promise<Response> {
   const { supabase, userId } = await getAuthedClient(req);
@@ -64,7 +64,7 @@ export async function GET(req: Request): Promise<Response> {
     // PostgREST 内嵌 beers(...) 无关系可走即 PGRST200 整查失败——故归档只选平列，
     // beer 另查一次手动拼（形状与主表行一致）；出错 warn 不静默。
     const ARCHIVE_COLUMNS =
-      "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript";
+      "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript,tags";
     try {
       const { data: archived, error: archErr } = await supabase
         .from("checkins_archive")

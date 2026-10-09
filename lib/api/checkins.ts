@@ -7,6 +7,7 @@
 import type { Beer } from "../beers";
 import type { LatLng } from "../geo";
 import type { WantRecord } from "../wantRecord";
+import { parseTags } from "./taste";
 
 export const CHECKINS_MINE_LIMIT = 30;
 export const CHECKINS_MINE_MAX_LIMIT = 50;
@@ -26,6 +27,8 @@ export type CreateCheckinBody = {
   audio_url?: string | null;
   audio_seconds?: number | null;
   transcript?: string | null;
+  /** UR E.28 打卡标签（taxonomy key，≤5；缺席即无）。 */
+  tags?: string[];
 };
 
 /** E.2 上限（body 肥大即 400；抓幀 ≤1024 jpeg 約 200–400k，60s 語音約 1M 內）。 */
@@ -66,6 +69,8 @@ export type MineRowJson = {
   audio_url: string | null;
   audio_seconds: number | null;
   transcript: string | null;
+  /** UR E.28 打卡标签（taxonomy key 数组；无即 []，旧行缺列回 []）。 */
+  tags: string[];
   beers: {
     id: string;
     name: string;
@@ -209,6 +214,10 @@ export function parseCreateCheckinBody(
       transcript = t;
     }
   }
+  // UR E.28 打卡标签（≤5／已知／去重；缺席即无，兼容旧版）。
+  // （parseTags 在 taste.ts；checkins.ts 引 taste，taste 零本地 import，无循环。）
+  const tagParsed = parseTags(r.tags);
+  if (tagParsed !== null && "error" in tagParsed) return tagParsed;
   return {
     body: {
       beer_id,
@@ -222,6 +231,7 @@ export function parseCreateCheckinBody(
       ...(audioUrl !== null ? { audio_url: audioUrl } : {}),
       ...(audioSeconds !== null ? { audio_seconds: audioSeconds } : {}),
       ...(transcript !== null ? { transcript } : {}),
+      ...(tagParsed !== null ? { tags: tagParsed.tags } : {}),
     },
   };
 }
@@ -321,6 +331,10 @@ export function toMineRow(raw: unknown): MineRowJson | null {
       : raw.transcript === null || raw.transcript === undefined
         ? null
         : null;
+  // UR E.28 打卡标签（数组即收窄去重；缺席／非数组回 []，旧行兼容）。
+  const tags = Array.isArray(raw.tags)
+    ? (raw.tags as unknown[]).filter((x): x is string => typeof x === "string")
+    : [];
   if (
     photoUrl === undefined ||
     note === undefined ||
@@ -345,6 +359,7 @@ export function toMineRow(raw: unknown): MineRowJson | null {
     audio_url: audioUrl,
     audio_seconds: audioSeconds,
     transcript,
+    tags,
     beers,
   };
 }

@@ -71,7 +71,8 @@ BEGIN
       id, user_id, beer_id, lat, lng, place_name, photo_url, audio_url,
       audio_seconds, note, transcript, type, visibility, created_at, kind,
       expires_at, rating, photo_thumb, archived_at,
-      like_count, want_count, rating_avg, rating_count, comment_count, cheers_count
+      like_count, want_count, rating_avg, rating_count, comment_count, cheers_count,
+      tags
     )
     SELECT
       c.id, c.user_id, c.beer_id, c.lat, c.lng, c.place_name, c.photo_url, c.audio_url,

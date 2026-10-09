@@ -2,16 +2,18 @@ import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parsePatchModeBody, toMeJson } from "@/lib/mode";
 import { parseProfileBody } from "@/lib/api/profile";
+import { parsePreferences } from "@/lib/api/taste";
 
 /**
  * UR A.16 隱身模式（A.4-6 子集先行，一次一個端點）。
  * `GET /api/v1/me`（🔒）：回自己 profile＋mode（0007 未遷移時 mode 按 public 回退）。
  * `PATCH /api/v1/me {mode}`（🔒）：白名單三檔，寫 `mode＋mode_updated_at`。
+ * UR E.18 首登四段＋E.28 preferences 同口径（全可选；有任一有效字段即写）。
  * 缺行自建沿 DEF-20250925-001（POST /checkins 同配方）；RLS 沿 0006 users self read/update。
  */
 
 const ME_SELECT =
-  "id,nickname,avatar_url,gender,mode,mode_updated_at,dob,bio,onboarded_at,created_at";
+  "id,nickname,avatar_url,gender,mode,mode_updated_at,dob,bio,onboarded_at,created_at,preferences";
 const ME_SELECT_LEGACY = "id,nickname,avatar_url,gender,created_at";
 
 async function ensureUserRow(
@@ -115,6 +117,21 @@ export async function PATCH(req: Request): Promise<Response> {
   if (!hasMode && "error" in profile) {
     return apiError("invalid_params", profile.error, profile.error === "AGE_RESTRICTED" ? 422 : 400);
   }
+  // UR E.28 口味偏好（整体替换；null 清空；对象走 parsePreferences；非法 400）。
+  const prefRaw = (raw as Record<string, unknown>).preferences;
+  const hasPref = prefRaw !== undefined;
+  let prefBody: { favorites: string[]; likes: string[]; dislikes: string[] } | null | undefined;
+  if (hasPref) {
+    if (prefRaw === null) {
+      prefBody = null;
+    } else {
+      const pp = parsePreferences(prefRaw);
+      if ("error" in pp) {
+        return apiError("invalid_params", pp.error, 400);
+      }
+      prefBody = pp.body;
+    }
+  }
   try {
     await ensureUserRow(supabase, userId);
     const nowIso = new Date().toISOString();
@@ -132,6 +149,10 @@ export async function PATCH(req: Request): Promise<Response> {
       if ((raw as Record<string, unknown>).onboarded === true) {
         update.onboarded_at = nowIso;
       }
+    }
+    // UR E.28 口味偏好（对象替换／null 清空；计有效字段，沿"至少一个有效"）。
+    if (hasPref) {
+      update.preferences = prefBody;
     }
     if (Object.keys(update).length === 0) {
       return apiError("invalid_params", "body 無有效字段", 400);

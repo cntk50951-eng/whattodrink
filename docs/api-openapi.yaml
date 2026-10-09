@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.19.0
+  version: 1.20.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -189,6 +189,12 @@ paths:
                   nullable: true
                   maxLength: 2000
                   description: UR E.2 三件套——語音轉錄文本（同審）
+                tags:
+                  type: array
+                  maxItems: 5
+                  description: UR E.28 打卡标签（taxonomy key；非法 400；缺席即无）
+                  items:
+                    type: string
       responses:
         "201":
           description: 落库成功（含三件套回顯，E.2）
@@ -1368,7 +1374,7 @@ paths:
           $ref: "#/components/responses/Internal"
     patch:
       operationId: patchMeMode
-      summary: 切換可見模式＋個人資料（需登录；A.16 三檔＋E.18 四字段＋打戳，字段全可选但至少一有效）
+      summary: 切換可見模式＋個人資料（需登录；A.16 三檔＋E.18 四字段＋打戳＋E.28 preferences，字段全可选但至少一有效）
       security:
         - bearerAuth: []
       requestBody:
@@ -1394,6 +1400,8 @@ paths:
                   type: string
                 onboarded:
                   type: boolean
+                preferences:
+                  $ref: "#/components/schemas/TastePreferences"
       responses:
         "200":
           description: 切換成功，回最新 me
@@ -2316,6 +2324,8 @@ components:
         mode_updated_at:
           type: string
           format: date-time
+        preferences:
+          $ref: "#/components/schemas/TastePreferences"
     CheckResult:
       type: object
       required: [is_friend]
@@ -2581,6 +2591,11 @@ components:
           type: string
           nullable: true
           description: UR E.2 三件套回顯
+        tags:
+          type: array
+          description: UR E.28 打卡标签（无即 []）
+          items:
+            type: string
     MineRow:
       type: object
       required: [id, beer_id, lat, lng, place_name, kind, visibility, expires_at, created_at, beers]
@@ -2631,6 +2646,11 @@ components:
             icon_url:
               type: string
               nullable: true
+        tags:
+          type: array
+          description: UR E.28 打卡标签（无即 []）
+          items:
+            type: string
     MinePage:
       type: object
       required: [checkins]
@@ -2850,6 +2870,10 @@ components:
           nullable: true
         can_add_friend:
           type: boolean
+        preferences:
+          $ref: "#/components/schemas/TastePreferences"
+        taste_inference:
+          $ref: "#/components/schemas/TasteInference"
         stats:
           type: object
           nullable: true
@@ -2872,8 +2896,50 @@ components:
           nullable: true
         recent_checkins:
           type: array
+          description: 默认 30（max 50）；lat/lng 仅自己；无坐标陌生人只 public＋friends_only_count
           items:
             type: object
+            required: [id, kind, visibility, created_at]
+            properties:
+              id:
+                type: string
+                format: uuid
+              kind:
+                type: string
+                enum: [post, flash]
+              visibility:
+                type: string
+              place_name:
+                type: string
+                nullable: true
+              lat:
+                type: number
+                nullable: true
+              lng:
+                type: number
+                nullable: true
+              created_at:
+                type: string
+                format: date-time
+              expires_at:
+                type: string
+                format: date-time
+                nullable: true
+              note:
+                type: string
+                nullable: true
+              thumb_url:
+                type: string
+                nullable: true
+              beer:
+                type: object
+                nullable: true
+              like_count:
+                type: integer
+              tags:
+                type: array
+                items:
+                  type: string
         recent_cursor:
           type: string
           nullable: true
@@ -2882,6 +2948,57 @@ components:
           nullable: true
         locked:
           type: boolean
+    TasteKey:
+      type: string
+      description: 口味 taxonomy key（大类或子类，全局唯一，UR E.28）
+      enum: [spirits, cocktail, beer, wine, sake, other, whisky, gin, rum, tequila, vodka, soju, brandy, baijiu, classic, signature, highball, mocktail, lager, ipa, craft, stout, wheat, red, white, sparkling, rose, junmai, daiginjo, umeshu, shochu]
+    TastePreferences:
+      type: object
+      description: 用户自设偏好（整体替换；favorites 最爱≤3＋likes≤8＋dislikes≤8；互斥；UR E.28）
+      required: [favorites, likes, dislikes]
+      properties:
+        favorites:
+          type: array
+          items:
+            $ref: "#/components/schemas/TasteKey"
+        likes:
+          type: array
+          items:
+            $ref: "#/components/schemas/TasteKey"
+        dislikes:
+          type: array
+          items:
+            $ref: "#/components/schemas/TasteKey"
+    TasteInference:
+      type: object
+      description: 口味推测（确定性聚合 v1，非 AI；groups 归一 max=1.0；sample<5 groups []，UR E.28）
+      required: [sample_count, computed_at, groups]
+      properties:
+        sample_count:
+          type: integer
+        computed_at:
+          type: string
+          format: date-time
+        groups:
+          type: array
+          items:
+            type: object
+            required: [key, strength, items]
+            properties:
+              key:
+                type: string
+              strength:
+                type: number
+              items:
+                type: array
+                items:
+                  type: object
+                  required: [key, strength]
+                  properties:
+                    key:
+                      type: string
+                    strength:
+                      type: number
   securitySchemes:
     bearerAuth:
       type: http
