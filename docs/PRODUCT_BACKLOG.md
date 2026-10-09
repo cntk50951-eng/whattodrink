@@ -3878,3 +3878,43 @@ UR D.8　聊天附件 V2（iOS API_CHAT_V2 输入）[WIP]
 
 *改動記錄*
 - 2026-10-08：建檔置 [WIP]（API_CHAT_V2 输入＋sign 形状问答；直做）
+
+---
+
+EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
+
+> 起源：iOS 功能超前 web，用户指令 web 功能同步（UI 保持 web 设计，只对功能）。
+> 审计：iOS 9 Feature（Map/Share/Bar/Invite/Party/Chat/Friends/NearbyBars/News）vs web v1＋v2（2026-10-09 双 subagent 只读审计）。
+> 铁律：只动 v2 作用域（沿 EPIC C）；共用层只做加法；一次一单（G.1→G.5 顺序做，单完再排下单）。
+
+### UR G.1　我的收藏（v2）[✓]
+- iOS 对标：详情 bookmark 乐观翻＋`SavesView`＋右缘入口（iOS-0.63）。
+- web 范围：v2 打卡详情 ★ 键（toggle 乐观＋回滚，沿 E.10 赞口径）＋收藏列表 UI（`GET /me/saves`＋空态"还没有收藏"）＋v2 右缘入口。
+- API 现成（E.26：toggle＋列表＋`saved_by_me`）；零 migration；零 yaml。
+- AC：★态与库一致（开页即定）；列表倒序＋删帖消失；入口登录前后常驻（匿名点即登录，登后 `?saves=1` 續开，沿 C.11；详情需登录故 ★ 只在登录后可见）。
+- 非目标：被收数、pins/mine 行、v1 任何文件。
+
+### UR G.2　酒闻列表（v2）[]
+- iOS 对标：HK／大陆两 tab＋列表＋in-app Safari＋下拉重拉（iOS-0.59）。
+- web 范围：v2 酒闻页（两 tab＋列表＋原文外链＋失败留旧＋toast）；API 现成（E.24 `GET /news`）。
+- 非目标：订阅／推送、v1。
+
+### UR G.3　酒局看板（v2）[]
+- iOS 对标：距离序＋席位条＋探索／我的双签＋发局＋详情＋参加（iOS-0.57/0.65）。
+- web 范围：v2 看板页（列表＋发局表单＋详情＋参加／退出／撤局）；API 现成（E.23 全套）。
+- 非目标：F 线审批制（不动）、群聊／推送、v1。
+
+### UR G.4　附近酒吧（v2）[]
+- iOS 对标：3km POI（酒吧琥珀钉＋便利店天蓝钉）＋peek 卡＋站内步行导航（iOS-0.42）。
+- web 范围：v2 附近页（高德 Web JS 直调 POI＋列表＋peek 卡＋外跳导航；站内步行导航二期）。
+- 非目标：新后端表（POI 不入库）、v1。
+
+### UR G.5　好友雷达＋搜索（v2）[]
+- iOS 对标：雷达小地图（方位距离落点）＋昵称即滤＋recents（FriendListView／FriendSearchView）。
+- web 范围：v2 聊天页增强（雷达条＋搜索框，本地过滤零新端点，沿 iOS `sortFriends/filterFriends` 口径）。
+- 非目标：新端点、v1。
+
+*改動記錄*
+- 2026-10-09：立项（双审计＋用户定单 G.1 先行、v2-only）；G.1 置 [WIP] 开工
+- 2026-10-09：G.1 实作：hook `saved_by_me`＋`toggleSave`（乐观翻＋401 举登录旗＋回滚，沿赞口径）＋详情 ★ 键＋行内登录口（Google OAuth 落 /v2）＋`V2SavesSheet`（摘要行＋行内取收＋空态＋骨架）＋右缘入口（登入才挂，沿信箱）＋点行开卡（他人 openPin／自家 wantSheet，沿 E.13）；v2 三语 key×4；`loginCta` 在 v2 无此键，改用新 key（教训：跨命名空间 key 先验存在）。
+- 2026-10-09：返工入口常驻（匿名可见，点即登录＋`?saves=1` 續开，沿 C.11）；用户亲验通过置 [✓]。

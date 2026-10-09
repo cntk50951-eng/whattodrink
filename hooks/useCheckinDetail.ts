@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * UR E.12 打卡面板数据钩（v2-only；读口 GET 扩展，写口 like／want／ratings）。
+ * UR E.12 打卡面板数据钩（v2-only；读口 GET 扩展，写口 like／want／ratings／save）。
  * - detail 为空即加载中／失败（调用方骨架或藏行，不另起文案）。
  * - toggle 乐观 ±1，失败回滚＋重拉对账；评分走 POST ratings（他人制），作者端只读。
  * - 全程 credentials 同源。
@@ -35,6 +35,8 @@ export type CheckinDetail = {
   lng: number | null;
   like_count: number;
   liked_by_me: boolean;
+  /** UR G.1 收藏态（详情开页即定；匿名恒 false，沿 API）。 */
+  saved_by_me: boolean;
   want_count: number;
   wanted_by_me: boolean;
   comment_count: number;
@@ -79,6 +81,7 @@ function toDetail(row: DetailRow, id: string): CheckinDetail {
     lng: num(row.lng),
     like_count: count(row.like_count),
     liked_by_me: row.liked_by_me === true,
+    saved_by_me: row.saved_by_me === true,
     want_count: count(row.want_count),
     wanted_by_me: row.wanted_by_me === true,
     comment_count: count(row.comment_count),
@@ -93,6 +96,10 @@ export function useCheckinDetail(checkinId: string | null): {
   failed: boolean;
   toggleLike: () => void;
   toggleWant: () => void;
+  /** UR G.1 收藏翻（乐观翻＋失败回滚；401 即匿名，置 loginNeeded 由调用方出登录口）。 */
+  toggleSave: () => void;
+  /** 匿名点★标记（下次 toggle／切帖清；成功即清）。 */
+  saveLoginNeeded: boolean;
   rate: (rating: number | null) => void;
   /** 重拉对账（敬酒 POST 后刷权威计数用；切帖竞态守卫沿首拉口径）。 */
   refresh: () => void;
@@ -100,12 +107,14 @@ export function useCheckinDetail(checkinId: string | null): {
   const [detail, setDetail] = useState<CheckinDetail | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [saveLoginNeeded, setSaveLoginNeeded] = useState(false);
   const seq = useRef(0);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- checkinId 切换清旧帖属 props-sync（沿 ChatRoomLive 开房重置豁免口径）
     setDetail(null);
     setFailed(false);
+    setSaveLoginNeeded(false);
     if (checkinId === null) return;
     const my = ++seq.current;
     let cancelled = false;
@@ -188,8 +197,7 @@ export function useCheckinDetail(checkinId: string | null): {
     })();
   }, [checkinId]);
 
-  const toggleWant = useCallback(() => {
-    if (checkinId === null) return;
+  const toggleWant = useCallback(() => {    if (checkinId === null) return;
     setBusy(true);
     setDetail((prev) =>
       prev === null
@@ -224,6 +232,47 @@ export function useCheckinDetail(checkinId: string | null): {
               },
         );
       } catch {
+        try {
+          const res = await fetch(`/api/v1/checkins/${encodeURIComponent(checkinId)}`, {
+            credentials: "include",
+          });
+          const j = (await res.json()) as { checkin?: DetailRow };
+          if (typeof j.checkin === "object" && j.checkin !== null) {
+            setDetail(toDetail(j.checkin, checkinId));
+          }
+        } catch {}
+      } finally {
+        setBusy(false);
+      }
+    })();
+  }, [checkinId]);
+
+  const toggleSave = useCallback(() => {
+    if (checkinId === null) return;
+    setBusy(true);
+    setSaveLoginNeeded(false);
+    setDetail((prev) =>
+      prev === null ? prev : { ...prev, saved_by_me: !prev.saved_by_me },
+    );
+    void (async () => {
+      try {
+        const res = await fetch(`/api/v1/checkins/${encodeURIComponent(checkinId)}/save`, {
+          method: "POST",
+          credentials: "include",
+        });
+        if (res.status === 401) {
+          // 匿名：回滚＋举登录旗（调用方出登录口，沿 C.11 口径）。
+          setDetail((prev) => (prev === null ? prev : { ...prev, saved_by_me: false }));
+          setSaveLoginNeeded(true);
+          return;
+        }
+        const j = (await res.json().catch(() => null)) as { saved?: unknown } | null;
+        if (!res.ok || typeof j?.saved !== "boolean") throw new Error("bad");
+        setDetail((prev) =>
+          prev === null ? prev : { ...prev, saved_by_me: j.saved as boolean },
+        );
+      } catch {
+        // 回滚：重拉对账（单次，不循环，沿 toggleLike 口径）。
         try {
           const res = await fetch(`/api/v1/checkins/${encodeURIComponent(checkinId)}`, {
             credentials: "include",
@@ -334,5 +383,5 @@ export function useCheckinDetail(checkinId: string | null): {
     })();
   }, [checkinId]);
 
-  return { detail, busy, failed, toggleLike, toggleWant, rate, refresh };
+  return { detail, busy, failed, toggleLike, toggleWant, toggleSave, saveLoginNeeded, rate, refresh };
 }

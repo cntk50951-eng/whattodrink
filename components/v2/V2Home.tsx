@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import {
   Beer as BeerIcon,
+  Bookmark,
   Camera,
   ChevronLeft,
   ChevronRight,
@@ -52,6 +53,7 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTi
 import { V2Comments } from "@/components/v2/V2Comments";
 import { FriendPicker, ShareDoneDialog } from "@/components/v2/FriendPicker";
 import { CheersMailbox } from "@/components/v2/CheersMailbox";
+import { V2SavesSheet } from "@/components/v2/V2SavesSheet";
 import { OnboardingSheet } from "@/components/v2/OnboardingSheet";
 import { ageOf, shouldOnboard } from "@/lib/api/profile";
 import type { MeJson } from "@/lib/mode";
@@ -358,6 +360,20 @@ export function V2Home() {
   );
   // UR E.15 信箱开关（地图右缘入口＋未读点，沿 C.11 工具列口径）。
   const [mailOpen, setMailOpen] = useState(false);
+  // UR G.1 收藏列表开关（地图右缘入口，登入才挂，沿信箱口径）。
+  const [savesOpen, setSavesOpen] = useState(false);
+  // UR G.1 收藏行点开详情（他人钉 openPin／自家 wantSheet，沿 E.13 深链口径）。
+  function openSaved(id: string): void {
+    if (apiPins.some((p) => p.id === id)) {
+      openPin(id);
+      return;
+    }
+    const rec = wantHistory.find((w) => w.id === id);
+    if (rec !== undefined) {
+      setSavesOpen(false);
+      setWantSheetAt(rec.at);
+    }
+  }
   // UR E.18：服务端我（首登閘＋面板徽章＋表單初值；auth 態驱动，沿 Bell 口径）。
   const [meJson, setMeJson] = useState<MeJson | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -686,6 +702,19 @@ export function V2Home() {
     window.history.replaceState(null, "", window.location.pathname);
     resumeTrailRef.current = true;
   }, []);
+  // UR G.1：登入續開——mount 讀 ?saves=1 記 intent 即清參數（防重觸，沿 C.11 口径）。
+  const resumeSavesRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("saves") !== "1") return;
+    window.history.replaceState(null, "", window.location.pathname);
+    resumeSavesRef.current = true;
+  }, []);
+  useEffect(() => {
+    if (isAuthed !== true || !resumeSavesRef.current) return;
+    resumeSavesRef.current = false;
+    setSavesOpen(true);
+  }, [isAuthed]);
   // UR D.4：一鍵定位——mount 讀 ?friend=<id> 記 intent 即清參數（列表定位鈕深鏈）。
   // 消費等 liveFriends 首批非空（空即無人在線，不消費不打擾；參數已清不重觸）。
   const locateFriendRef = useRef<string | null>(null);
@@ -1911,6 +1940,33 @@ export function V2Home() {
             )}
           </span>
         )}
+        {/* UR G.1 收藏入口（登录前后常驻；匿名点即登录，登后 ?saves=1 續开，沿 C.11 口径）。 */}
+        <Button
+          size="icon"
+          variant="outline"
+          aria-label={t2("savesTitle")}
+          className="rounded-full bg-card shadow-md ring-1 ring-foreground/10"
+          onClick={() => {
+            if (isAuthed === true) {
+              setSavesOpen(true);
+              return;
+            }
+            void (async () => {
+              try {
+                const { createClient } = await import("@/lib/supabase/client");
+                const supabase = createClient();
+                await supabase.auth.signInWithOAuth({
+                  provider: "google",
+                  options: {
+                    redirectTo: `${window.location.origin}/auth/callback?next=/v2?saves=1`,
+                  },
+                });
+              } catch {}
+            })();
+          }}
+        >
+          <Bookmark aria-hidden />
+        </Button>
         <Button
           size="icon"
           variant="outline"
@@ -3052,6 +3108,14 @@ export function V2Home() {
           stealth={mode === "stealth"}
           onClose={() => setMailOpen(false)}
           onRead={() => refreshCheers()}
+        />
+      )}
+      {/* UR G.1 收藏列表（点行开详情，他人／自家沿现有开卡）。 */}
+      {savesOpen && (
+        <V2SavesSheet
+          open
+          onClose={() => setSavesOpen(false)}
+          onOpen={(id) => openSaved(id)}
         />
       )}
       {/* UR E.18 首登＋個人表單（条件挂载，初值新鲜；保存即刷 me）。 */}

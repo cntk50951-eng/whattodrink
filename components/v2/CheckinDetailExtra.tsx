@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Beer, Check, Heart, MapPin, MessageCircle, Share2, Star } from "lucide-react";
+import { Beer, Bookmark, Check, Heart, MapPin, MessageCircle, Share2, Star } from "lucide-react";
 
 import { formatAvgRating } from "@/lib/api/rating";
 import { useCheckinDetail } from "@/hooks/useCheckinDetail";
+import { createClient } from "@/lib/supabase/client";
 import { formatWantTime } from "@/lib/wantRecord";
 
 /**
@@ -36,7 +37,7 @@ export function CheckinDetailExtra({
 }) {
   const t = useTranslations("v2");
   const locale = useLocale();
-  const { detail, busy, failed, toggleLike, toggleWant, rate, refresh } = useCheckinDetail(checkinId);
+  const { detail, busy, failed, toggleLike, toggleWant, toggleSave, saveLoginNeeded, rate, refresh } = useCheckinDetail(checkinId);
   const [toasting, setToasting] = useState<string | null>(null);
   const [toastErr, setToastErr] = useState(false);
   // 外部敬酒对账（refreshTick 翻即重拉；首挂不拉，沿首拉 effect 口径）。
@@ -345,6 +346,19 @@ export function CheckinDetailExtra({
           {t("checkinWant")}
         </button>
         <span className="flex-1" />
+        {/* UR G.1 收藏键（乐观翻＋回滚沿赞口径；匿名举登录旗，行内出登录口）。 */}
+        <button
+          type="button"
+          onClick={toggleSave}
+          disabled={busy || detail.archived}
+          aria-label={t("savesTitle")}
+          aria-pressed={detail.saved_by_me}
+          className={`rounded-full p-2 disabled:opacity-50 ${
+            detail.saved_by_me ? "text-primary" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Bookmark size={18} aria-hidden className={detail.saved_by_me ? "fill-current" : ""} />
+        </button>
         <button
           type="button"
           onClick={share}
@@ -354,6 +368,29 @@ export function CheckinDetailExtra({
           {copied ? <Check size={18} aria-hidden /> : <Share2 size={18} aria-hidden />}
         </button>
       </div>
+      {saveLoginNeeded && (
+        <div className="flex items-center gap-2 pt-1 text-sm">
+          <span className="text-muted-foreground">{t("saveLoginHint")}</span>          <button
+            type="button"
+            className="font-bold text-primary"
+            onClick={() => {
+              void (async () => {
+                try {
+                  const supabase = createClient();
+                  await supabase.auth.signInWithOAuth({
+                    provider: "google",
+                    options: {
+                      redirectTo: `${window.location.origin}/auth/callback?next=/v2`,
+                    },
+                  });
+                } catch {}
+              })();
+            }}
+          >
+            {t("savesLoginCta")}
+          </button>
+        </div>
+      )}
     </>
   );
 }
