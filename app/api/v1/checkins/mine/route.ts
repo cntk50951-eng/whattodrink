@@ -58,25 +58,59 @@ export async function GET(req: Request): Promise<Response> {
       }
     }
     if (rows === null) rows = [];
-    // UR E.22 歸檔聯查（足跡回看不斷；歸檔行同列＋beers join 照走；同 id 去重主表优先；
+    // UR E.22 歸檔聯查（足跡回看不斷；歸檔行同列＋beers 手拼；同 id 去重主表优先；
     // 歸檔表未遷移即靜默跳過，主表照回，沿 42703 回退口徑）。
+    // iOS-0.68 定案（主嫌实锤）：checkins_archive 零 FK（0026 刻意审计不断链），
+    // PostgREST 内嵌 beers(...) 无关系可走即 PGRST200 整查失败——故归档只选平列，
+    // beer 另查一次手动拼（形状与主表行一致）；出错 warn 不静默。
+    const ARCHIVE_COLUMNS =
+      "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript";
     try {
       const { data: archived, error: archErr } = await supabase
         .from("checkins_archive")
-        .select(MINE_COLUMNS)
+        .select(ARCHIVE_COLUMNS)
         .eq("user_id", userId)
         .eq("type", "want")
         .order("created_at", { ascending: false })
         .limit(limit);
-      if (archErr === null && Array.isArray(archived)) {
+      if (archErr !== null) {
+        console.warn(`[api/v1/checkins/mine] archive skipped: code=${archErr.code} message=${archErr.message}`);
+      } else if (Array.isArray(archived)) {
+        const archRows = (archived as unknown[]).filter(
+          (r): r is Record<string, unknown> => typeof r === "object" && r !== null,
+        );
+        // beers 手拼（归档无 FK 不可 embed；id 集合一次查，坏酒行留 null 沿 toMineRow 容错）。
+        const beerIds = [
+          ...new Set(
+            archRows.map((r) => r.beer_id).filter((id): id is string => typeof id === "string" && id !== ""),
+          ),
+        ];
+        const beerById = new Map<string, Record<string, unknown>>();
+        if (beerIds.length > 0) {
+          const { data: beerRows } = await supabase
+            .from("beers")
+            .select("id,name,emoji,category,tagline,icon_url")
+            .in("id", beerIds);
+          for (const b of ((beerRows ?? []) as unknown[])) {
+            if (typeof b !== "object" || b === null) continue;
+            const rec = b as Record<string, unknown>;
+            if (typeof rec.id === "string") beerById.set(rec.id, rec);
+          }
+        }
         const seen = new Set(
           rows.map((r) => (r as Record<string, unknown>).id).filter((id) => typeof id === "string"));
         const merged = [...rows];
-        for (const r of archived as unknown[]) {
-          const id = (r as Record<string, unknown>).id;
+        for (const r of archRows) {
+          const id = r.id;
           if (typeof id === "string" && !seen.has(id)) {
             seen.add(id);
-            merged.push(r);
+            const bid = typeof r.beer_id === "string" ? r.beer_id : null;
+            merged.push({
+              ...r,
+              kind: r.kind ?? "flash",
+              visibility: r.visibility ?? "private",
+              beers: bid !== null ? (beerById.get(bid) ?? null) : null,
+            });
           }
         }
         merged.sort((a, b) => {
@@ -85,10 +119,12 @@ export async function GET(req: Request): Promise<Response> {
           if (typeof ca !== "string" || typeof cb !== "string") return 0;
           return cb < ca ? -1 : cb > ca ? 1 : 0;
         });
-        rows = merged.slice(0, limit);
+        // iOS-0.68 切片定案：双段全返（主表 ≤limit＋归档 ≤limit，不再 slice(0, limit) 切旧行；
+        // 同形状， bounded 2*limit，iOS 照单吃）。
+        rows = merged;
       }
-    } catch {
-      /* 歸檔表未遷移（0026 未跑）即跳過 */
+    } catch (err) {
+      console.warn(`[api/v1/checkins/mine] archive threw: ${err instanceof Error ? err.message : "unknown"}`);
     }
 
     let skipped = 0;

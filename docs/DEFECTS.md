@@ -22,6 +22,7 @@
 ---
 
 | ID | 标题 | 状态 | 严重度 | 发现日期 / 报告人 | 关联 UR | 确诊根因 |
+| DEF-20261009-001 | /mine 看不到已归档旧快贴（足迹断代） | Fixing | P1 | 2026-10-09 / @iOS(0.68) | UR E.22 | 归档 embed beers 无 FK 即 PGRST200 整段静默跳过＋slice 切旧行，见详情 |
 |---|---|---|---|---|---|---|
 | DEF-20250925-001 | 登出→重登录后打卡酒类消失，不再显示 | Closed | P0 | 2026-09-25 / @yuki | UR A.10 / fix/defect-20250925-001 | DB FK 缺 public.users 行 + 前端回显缺 INITIAL_SESSION（见详情，已验证） |
 | DEF-20260926-001 | 模式切换按钮在页面上不可见 | Closed | P1 | 2026-09-26 / @yuki | UR A.16 | 按設計收合＋收合態零提示；常駐pill＋用戶驗收通過，已合入 main |
@@ -857,3 +858,19 @@
 - **关联 UR**：UR E.20（复用，对标 photoThumb 做法；改動記錄回链）
 - **修复验证**：`pins.test.ts` 新用例（原文透传＋空／空白／非串／缺席即 null）＋`v2Pins.test.ts` 三处补 `note` 键；`vitest` 23 绿＋`tsc` 零错；待 iOS 端亲验走马灯
 - **回归范围**：pins 列表（web 双端读同一包，忽略新字段即兼容）、openapi
+
+### DEF-20261009-001 /mine 看不到已归档旧快贴（足迹断代）
+
+- **状态**：Fixing（2026-10-09：修法已写，待用户按交接 SQL a–d 确认数据侧＋`GET /mine` 验收）
+- **严重度**：P1（足迹页旧快贴永不可见；iOS-0.68 上报，已自证非 iOS 侧）
+- **发现日期 / 报告人**：2026-10-09 / @iOS
+- **复现步骤**：
+  1. 用户有已归档旧 flash（`checkins_archive` 有行）＋主表行较多
+  2. `GET /api/v1/checkins/mine?limit=50` 回包无旧行（`created_at` 早于 24h 的 flash 缺席）
+- **期望 vs 实际**：期望含旧行；实际只有主表 live 行
+- **初判根因**：交接主嫌——归档查 `beers(...)` 内嵌联查，但 `checkins_archive` 零 FK（0026 刻意），PostgREST 无关系即 PGRST200 整查失败，代码静默跳过
+- **确诊根因**：与初判一致（代码＋migration 双实证，未跑 SQL 也成立）：① `0026` 全文件零 REFERENCES（`grep REFERENCES` 空）；② `mine/route.ts` 归档段共用 `MINE_COLUMNS` 含 `beers(...)` embed；③ 失败分支 `archErr !== null` 与 `catch {}` 双静默零日志；④ 另有切片帮凶：`slice(0, limit)` 主表满额即挤掉旧行。佐证：详情口只选平列故读得到归档行（交接佐证成立）
+- **关联 UR**：UR E.22（复用；改動記錄回链）
+- **修复**：归档只选平列（`ARCHIVE_COLUMNS`，无 embed）＋`beer_id` 集一次查 `beers` 手拼（形状与主表行一致；缺酒留 null 沿 toMineRow 容错）＋失败 `console.warn` 带 code/message＋合并双段全返（主表 ≤limit＋归档 ≤limit，不再 slice，保证旧行有位，bounded 2*limit）；**不要给归档表加 FK**（0026 审计不断链本意）
+- **修复验证**：`tsc` 零错；待用户：①交接 SQL a–d 确认数据侧（a 有行＋d 无行即主嫌数据侧成立；a 零行查 b／0026；c 大即搬运没跑）②验收构造（≥50 主表行＋旧 flash → 回包含旧行）
+- **回归范围**：`/mine`（web／iOS 同形状多行，忽略即兼容）；详情口不动
