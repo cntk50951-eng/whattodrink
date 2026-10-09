@@ -53,6 +53,8 @@ export type MeJson = {
   birthRestricted?: boolean;
   /** UR E.28 口味偏好（自设；无则 null；校验在 taste.ts，读端只透传形状）。 */
   preferences?: { favorites: string[]; likes: string[]; dislikes: string[] } | null;
+  /** UR D.9 推送偏好（缺键读端默认，见 pushPrefsOf；写端整体替换严格校验）。 */
+  push_prefs?: Record<string, boolean> | null;
   created_at?: string;
 };
 
@@ -107,6 +109,15 @@ export function toMeJson(raw: unknown): MeJson | null {
       ? {}
       : { onboarded_at: typeof r.onboarded_at === "string" ? r.onboarded_at : null }),
     ...(typeof r.created_at === "string" ? { created_at: r.created_at } : {}),
+    // UR D.9 推送偏好透传（对象即收，坏形回 null；默认由 pushPrefsOf 在读端补）。
+    ...(r.push_prefs === undefined
+      ? {}
+      : {
+          push_prefs:
+            typeof r.push_prefs === "object" && r.push_prefs !== null
+              ? (r.push_prefs as Record<string, boolean>)
+              : null,
+        }),
     // UR E.28 口味偏好透传（对象即收三数组，非对象即 null；校验只在写入做）。
     ...(r.preferences === undefined
       ? {}

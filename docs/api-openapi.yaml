@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.21.0
+  version: 1.22.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1400,6 +1400,181 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/devices:
+    post:
+      operationId: registerDevice
+      summary: 設備登記（需登录；upsert＋re-bind＋10 台顶旧；只回 id，UR D.9）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [platform, push_token]
+              properties:
+                platform:
+                  type: string
+                  enum: [web, ios, aos]
+                push_token:
+                  type: string
+                  description: APNs 十六进制 64–200 字符
+                environment:
+                  type: string
+                  enum: [sandbox, production]
+                app_version:
+                  type: string
+                locale:
+                  type: string
+      responses:
+        "200":
+          description: 登記成功（{id}）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+    delete:
+      operationId: unregisterDevice
+      summary: 解绑（需登录；删行幂等，UR D.9）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [platform, push_token]
+              properties:
+                platform:
+                  type: string
+                  enum: [web, ios, aos]
+                push_token:
+                  type: string
+      responses:
+        "200":
+          description: 已解绑
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+    patch:
+      operationId: patchDevice
+      summary: 设备更新（需登录；enabled／locale 本人行，UR D.9）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [platform, push_token]
+              properties:
+                platform:
+                  type: string
+                  enum: [web, ios, aos]
+                push_token:
+                  type: string
+                enabled:
+                  type: boolean
+                locale:
+                  type: string
+      responses:
+        "200":
+          description: 已更新
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/devices/test-push:
+    post:
+      operationId: testPush
+      summary: 推送联调（测试专用，生产 404；给自己设备发一条，UR D.9）
+      x-test-only: true
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event]
+              properties:
+                event:
+                  type: string
+                  enum: [cheers, invite, chat]
+      responses:
+        "200":
+          description: 已发送（{sent, devices}）
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 端点未上线或无可用设备
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/me/counters:
+    get:
+      operationId: getMyCounters
+      summary: 轻量计数（需登录；三数＋badge 同推送口径，UR D.9）
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 计数（badge＝三数和）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cheers_unread, invites_pending, chat_unread, badge]
+                properties:
+                  cheers_unread:
+                    type: integer
+                  invites_pending:
+                    type: integer
+                  chat_unread:
+                    type: integer
+                  badge:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
   /api/v1/me:
     get:
       operationId: getMe
@@ -1423,7 +1598,7 @@ paths:
           $ref: "#/components/responses/Internal"
     patch:
       operationId: patchMeMode
-      summary: 切換可見模式＋個人資料（需登录；A.16 三檔＋E.18 四字段＋打戳＋E.28 preferences，字段全可选但至少一有效）
+      summary: 切換可見模式＋個人資料（需登录；A.16 三檔＋E.18 四字段＋打戳＋E.28 preferences＋D.9 push_prefs，字段全可选但至少一有效）
       security:
         - bearerAuth: []
       requestBody:
@@ -1451,6 +1626,9 @@ paths:
                   type: boolean
                 preferences:
                   $ref: "#/components/schemas/TastePreferences"
+                push_prefs:
+                  type: object
+                  description: 推送偏好整体替换（6 已知键＋boolean，未知 400，UR D.9）
       responses:
         "200":
           description: 切換成功，回最新 me
@@ -2375,6 +2553,9 @@ components:
           format: date-time
         preferences:
           $ref: "#/components/schemas/TastePreferences"
+        push_prefs:
+          type: object
+          description: 推送偏好（缺键读端默认全开唯 stranger_invites 关，UR D.9）
     CheckResult:
       type: object
       required: [is_friend]

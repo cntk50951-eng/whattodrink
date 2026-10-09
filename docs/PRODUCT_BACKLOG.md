@@ -4039,3 +4039,33 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - 2026-10-09：用户亲验通过置 [✓]。
 - 2026-10-09：G.2 实作：`V2NewsSheet`（HK／大陆双籤＋失败留旧＋toast＋刷新键＋原文外链＋缺图 fail-soft＋骨架空态）＋pills 酒闻 pill（匿名可看）＋v2 三语 key×6；API／migration／yaml 零改动（E.24 现成）。
 - 2026-10-09：用户亲验通过置 [✓]。
+
+---
+
+UR D.9　iOS 真推送 P1（E1 碰杯＋APNs 通道）[WIP]
+
+> iOS 后台／关 App 提醒必须 web 先发（App 自己轮询不了）。P1 只做 E1＋通道；E2/E3 下一单。
+
+### 背景（问答定案）
+- `PATCH /me` 收 push_prefs（沿 preferences 口径；已知 6 键＋boolean，未知 400，整体替换；读缺键默认全 true 唯 stranger_invites false）。
+- 发送 `after()`（Next 16；失败不影响主流程；重试 2 次内联；QStash 以后）。
+- `/me/counters` 同单（badge 同口径＋iOS 轮询省流）。
+- 缺 APNs key 时发送器静默跳过＋warn（用户 Apple 后台并行办，不 block 落地）。
+- 读走 service（跨表＋badge，门全代码判）；devices 行永不回客户端（沿 §143）。
+
+### 範圍
+1. **數據**：0038（devices 加 6 列＋users.push_prefs＋push_log＋user 索引＋devices 本人四 policy；push_log RLS 零 policy 锁死）。
+2. **端點**：`POST /devices`（upsert／re-bind／10 台顶旧，回 id）＋`DELETE /devices`（删行幂等）＋`PATCH /devices`（enabled／locale 本人行）＋`POST /devices/test-push`（testOnly 门，404 prod）＋`GET /me/counters`（三数＋badge＋cache 头）。
+3. **发送器**：`lib/push/apns.ts`（node:http2 双 host＋ES256 JWT 缓存 50min＋collapse＋重试）＋`sendCheersPush`（三刀＋60s 合并＋小时 20＋同对 10min＋badge＋410 删行＋日志无 token 正文）。
+4. **触发**：cheers POST 成功后 `after()`（E1；Dup 200 幂等不重推——沿防重刷口径，已敬过不再发）。
+5. 三语文案进 messages（pushCheers＊×3）＋openapi 1.22.0＋單測（prefs／JWT 往返／payload／collapse／badge 口径）。
+
+### 非目標
+- E2/E3/E5、Web Push、FCM、富媒体、营销推送、v1 任何文件。
+
+### AC（交接 §五 P1 子集）
+- AC1：upsert／re-bind 转移／11 台顶旧；AC2 解绑幂等；AC3 真收到＋test-push＋响应不慢；AC4 屏蔽不发；AC7 410 删行；AC8 60s 合并一条；AC9 无正文坐标 token；AC10 yaml 先＋单测。
+
+*改動記錄*
+- 2026-10-10：建檔置 [WIP]（WEB_HANDOFF_PUSH 输入＋三问答；直做）
+- 2026-10-10：实作 P1：0038＋devices 三端点（service 写）＋test-push（testOnly）＋PATCH /me push_prefs＋GET /me 回显＋counters（同口径）＋APNs 发送器（http2＋ES256 缓存＋collapse＋重试＋410 删行）＋E1 after() 触发＋三语文案＋openapi 1.22.0＋单测；缺 key 静默跳过。

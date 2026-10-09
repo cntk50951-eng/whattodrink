@@ -3,6 +3,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { parsePatchModeBody, toMeJson } from "@/lib/mode";
 import { parseProfileBody } from "@/lib/api/profile";
 import { parsePreferences } from "@/lib/api/taste";
+import { parsePushPrefs } from "@/lib/push/prefs";
 
 /**
  * UR A.16 隱身模式（A.4-6 子集先行，一次一個端點）。
@@ -13,7 +14,7 @@ import { parsePreferences } from "@/lib/api/taste";
  */
 
 const ME_SELECT =
-  "id,nickname,avatar_url,gender,mode,mode_updated_at,dob,bio,onboarded_at,created_at,preferences";
+  "id,nickname,avatar_url,gender,mode,mode_updated_at,dob,bio,onboarded_at,created_at,preferences,push_prefs";
 const ME_SELECT_LEGACY = "id,nickname,avatar_url,gender,created_at";
 
 async function ensureUserRow(
@@ -153,6 +154,15 @@ export async function PATCH(req: Request): Promise<Response> {
     // UR E.28 口味偏好（对象替换／null 清空；计有效字段，沿"至少一个有效"）。
     if (hasPref) {
       update.preferences = prefBody;
+    }
+    // UR D.9 推送偏好（整体替换；非法 400；计有效字段）。
+    const pushPrefRaw = (raw as Record<string, unknown>).push_prefs;
+    if (pushPrefRaw !== undefined) {
+      const pp = parsePushPrefs(pushPrefRaw);
+      if ("error" in pp) {
+        return apiError("invalid_params", pp.error, 400);
+      }
+      update.push_prefs = pp.body;
     }
     if (Object.keys(update).length === 0) {
       return apiError("invalid_params", "body 無有效字段", 400);

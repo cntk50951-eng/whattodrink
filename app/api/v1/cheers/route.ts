@@ -1,8 +1,10 @@
 import { getAuthedClient } from "@/lib/supabase/server";
+import { after } from "next/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { canViewCheckin } from "@/lib/api/checkins";
 import { type FriendshipRow, friendIdsOf } from "@/lib/friends";
 import { cheersQuota, isMinorDob, parseCheersBody, parseCheersMessage } from "@/lib/api/cheers";
+import { sendCheersPush } from "@/lib/push/send";
 
 type CheckinRow = {
   id: string;
@@ -169,6 +171,10 @@ export async function POST(req: Request): Promise<Response> {
     .from("cheers")
     .select("id", { count: "exact", head: true })
     .eq("checkin_id", targetPost.id);
+  // UR D.9 E1 碰杯推送（响应后异步，失败绝不影响主流程；dup 幂等路径不重推）。
+  after(() => {
+    void sendCheersPush({ fromUserId: userId, toUserId, checkinId: targetPost.id });
+  });
   return apiOk({
     cheered: true,
     remaining: quota.remaining - 1,
