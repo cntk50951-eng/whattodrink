@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  capCount,
   fuzzCoordinate,
   isBboxOverlapsHK,
   parseBbox,
   parsePinsParams,
   parseRange,
+  parseSince,
   PINS_RANGE_DEFAULT,
   toPinJson,
 } from "./pins";
@@ -212,5 +214,23 @@ describe("isBboxOverlapsHK", () => {
   it("detects overlap and disjoint", () => {
     expect(isBboxOverlapsHK({ west: 113.8, south: 22.15, east: 114.44, north: 22.58 })).toBe(true);
     expect(isBboxOverlapsHK({ west: 0, south: 0, east: 1, north: 1 })).toBe(false);
+  });
+});
+
+describe("parseSince／capCount", () => {
+  it("缺席／非法拒；过老钳窗；future 透传", () => {
+    const NOW = 1_000_000_000;
+    const RANGE = 7 * 24 * 3600_000;
+    expect(parseSince(null, NOW, RANGE)).toHaveProperty("error");
+    expect(parseSince("abc", NOW, RANGE)).toHaveProperty("error");
+    expect(parseSince("-5", NOW, RANGE)).toHaveProperty("error");
+    expect(parseSince(String(NOW - RANGE - 1), NOW, RANGE)).toEqual({ sinceMs: NOW - RANGE });
+    expect(parseSince(String(NOW - 1000), NOW, RANGE)).toEqual({ sinceMs: NOW - 1000 });
+    expect(parseSince(String(NOW + 9999), NOW, RANGE)).toEqual({ sinceMs: NOW + 9999 });
+  });
+  it("99 封顶（100 行即 capped）", () => {
+    expect(capCount(3)).toEqual({ count: 3, capped: false });
+    expect(capCount(99)).toEqual({ count: 99, capped: false });
+    expect(capCount(100)).toEqual({ count: 99, capped: true });
   });
 });

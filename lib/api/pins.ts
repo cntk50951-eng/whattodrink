@@ -221,3 +221,30 @@ export function isBboxOverlapsHK(bbox: BBox): boolean {
     bbox.south > HK_BOUNDS.north
   );
 }
+
+/** UR E.29 变化游标上限（各 capped 到 99，iOS 显示 99+）。 */
+export const PINS_CHANGES_CAP = 99;
+/** 上限探测行数（取 CAP+1，满即截断，bounded 不全表 COUNT）。 */
+export const PINS_CHANGES_PROBE = PINS_CHANGES_CAP + 1;
+
+/**
+ * UR E.29 since 解析＋钳制（必填 Epoch ms；过老钳到 range 窗起点；
+ * future 不报错（自然 0 行）；非法 400 由调用方判）。
+ */
+export function parseSince(
+  raw: string | null,
+  nowMs: number,
+  rangeMs: number,
+): { sinceMs: number } | { error: string } {
+  if (raw === null || raw.trim() === "") return { error: "since 必填（Epoch ms）" };
+  const ms = Number(raw.trim());
+  if (!Number.isFinite(ms) || ms < 0) return { error: "since 非法（Epoch ms）" };
+  const floor = nowMs - rangeMs;
+  return { sinceMs: ms < floor ? floor : Math.floor(ms) };
+}
+
+/** UR E.29 计数封顶（probe 行数→{count, capped}）。 */
+export function capCount(rowCount: number): { count: number; capped: boolean } {
+  if (rowCount >= PINS_CHANGES_PROBE) return { count: PINS_CHANGES_CAP, capped: true };
+  return { count: Math.max(0, rowCount), capped: false };
+}

@@ -3885,6 +3885,7 @@ UR E.27　个人主页 API（v2-only，iOS profile 输入）[WIP]
 
 *改動記錄*
 - 2026-10-09：建檔置 [WIP]（WEB_HANDOFF_PROFILE 输入＋两问答；直做）
+- 2026-10-09：实作：`lib/api/profile.ts`（nightKeyHK／hkAge／weekStartHK／weekStreak／weekNights＋单测）＋`GET /users/{id}/profile`（401／400／404 矩阵；service 读＋代码判门；stats 全算；recent 30＋cursor＋可见过滤＋批量 beer/like；level 等五项 null）＋0035 user 索引＋openapi 1.19.0；thumb/photo 见 thumb 文档。
 - 2026-10-09：DEF-20261009-002（nights/places 恒 0）：扫描漏解构 data＋1000 行截断；修法解构补 data＋warn＋分页拉全＋`eat` 提纯 `collectNightStats`＋单测（mock 行锁接线）。
 - 2026-10-09：实作：`lib/api/profile.ts`（nightKeyHK／hkAge／weekStartHK／weekStreak／weekNights＋单测）＋`GET /users/{id}/profile`（401／400／404 矩阵；service 读＋代码判门；stats 全算；recent 30＋cursor＋可见过滤＋批量 beer/like；level 等五项 null）＋0035 user 索引＋openapi 1.19.0；thumb/photo 见 thumb 文档。
 
@@ -3918,6 +3919,42 @@ UR E.28　口味偏好＋打卡标签＋口味推测（v2-only，iOS-0.70 输入
 *改動記錄*
 - 2026-10-09：建檔置 [WIP]（WEB_HANDOFF_TASTE 输入＋三问答；直做）
 - 2026-10-09：实作：`lib/api/taste.ts`（taxonomy／parse／aggregate＋单测 7）＋0036（preferences＋tags 双表＋inference 缓存表）＋0026 搬运带 tags（重贴）＋`PATCH /me` preferences＋`GET /me` 回显＋`POST /checkins` tags＋mine／详情／recent 回显（pins 免）＋profile preferences（stats 门）＋taste_inference（self only＋读时懒算）＋openapi 1.20.0（enum＋三处字段＋recent 子字段）；AI／cron／回填／引导 UI 皆不做（问答定案）。
+- 2026-10-09：§十二 taxonomy 208 key 落地（17 大类＋191 子类，逐字搬；9 键搬家＋beer 映射同步＋缓存 v2 强制重算）＋yaml enum 同步（脚本数过 208 唯一）。
+
+---
+
+UR E.29　地图新内容轻量提示（v2-only，iOS-0.71 输入）[WIP]
+
+> iOS 前台 45s 整包轮询顶着太贵；本单后换轻量检查＋提示条＋手动刷新。
+
+### 背景（问答定案，无阻塞项）
+- `GET /map/pins/changes`（bbox 必填沿用 parseBbox／since 必填 ms／near 可选／scope／range）回两类计数（各上限 99＋capped）＋服务端 `cursor`（ms 数字）。
+- 可见性与 pins 逐字一致（private 不算／flash 过期不算／friends  scope／range 窗）；登录排除自己（作者／host）；匿名不排除。
+- 时间基准 `created_at`（入库时间）；since 过老钳到 range 窗；future since 自然 0 行。
+- parties 缺省走 bbox（near 显示用，过滤仍 bbox，偏差已告知 iOS）；酒局口径沿缺省看板（open＋未过期）。
+- 两列表回包加 `sync_cursor`（ms 数字；parties 避翻页 cursor 混淆，pins 同名统一）。
+- 计数 bounded（range 100 行代码数，不全表 COUNT）；`Cache-Control`（匿名 public／登录 private，max-age=10，经 envelope 加法参数）。
+- 0037 补 parties created_at 索引；checkins 侧索引现成（kind/created）。
+- 03 不做：删帖／人数变化通知、WS／SSE、具体内容、单独限流（读便宜，暂不加）。
+
+### 範圍
+1. openapi 1.21.0（新 path＋PinsChanges schema＋两列表 sync_cursor）——契约先行。
+2. `lib/api/pins.ts`：`clampSince`／`capCount` 纯函数＋单测。
+3. envelope `apiOk` 加可选 headers（向后兼容）。
+4. 0037 migration（parties created_at idx）。
+5. `GET /map/pins/changes`＋两列表 `sync_cursor`。
+
+### 非目標
+- WebSocket／推送、内容回传、v1 任何文件。
+
+### AC（交接 §七）
+- A 发帖→B 新游标 count 1；A 自己 0；private／过期／非好友／bbox 外不计数。
+- 120 条→99＋capped；匿名 all 通／friends 401；远古 since 不报错。
+- 开局→B parties 1／A 自己 0；撤销／过期剔除；双列表 sync_cursor 回填无重复无漏。
+
+*改動記錄*
+- 2026-10-09：建檔置 [WIP]（WEB_HANDOFF_PINS_CHANGES 输入；直做）
+- 2026-10-09：实作：openapi 1.21.0 契约先行＋`clampSince`／`capCount`＋单测＋envelope `apiOk` headers 加法＋0037 parties created 索引＋`GET /map/pins/changes`（可见性逐字对 pins／排除自己／bounded range＋capped／Cache-Control）＋双列表 `sync_cursor`（ms 数字）。
 
 ---
 

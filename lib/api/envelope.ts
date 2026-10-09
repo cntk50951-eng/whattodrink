@@ -22,6 +22,7 @@ export function apiError(
   return Response.json({ error: { code, message } }, { status });
 }
 
-export function apiOk<T>(data: T, status = 200): Response {
-  return Response.json(data, { status });
+export function apiOk<T>(data: T, status = 200, headers?: Record<string, string>): Response {
+  if (headers === undefined) return Response.json(data, { status });
+  return Response.json(data, { status, headers });
 }

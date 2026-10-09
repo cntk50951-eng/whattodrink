@@ -110,7 +110,7 @@ export async function GET(req: Request): Promise<Response> {
         }
         const rows = (fbData ?? []) as unknown[];
         const pins = rows.map((r) => toPinJson(r)).filter((p): p is NonNullable<typeof p> => p !== null);
-        return apiOk({ pins });
+        return apiOk({ pins, sync_cursor: Date.now() });
       }
       const err = flashErr ?? postErr;
       console.error(`[api/v1/map/pins] supabase error: code=${err?.code} message=${err?.message} details=${(err as unknown as {details?:string})?.details ?? ""} hint=${(err as unknown as {hint?:string})?.hint ?? ""}`);
@@ -180,7 +180,7 @@ export async function GET(req: Request): Promise<Response> {
       console.warn(`[api/v1/map/pins] skipped ${skipped} malformed rows`);
     }
 
-    return apiOk({ pins });
+    return apiOk({ pins, sync_cursor: Date.now() });
   } catch (err) {
     return apiError("internal", err instanceof Error ? err.message : "unknown", 500);
   }
@@ -215,7 +215,7 @@ async function friendsScopePins(
     );
     // 無好友即空牆：不下 `.in([])`（PostgREST 空集語義不定），直接回 []
     if (friendIds.length === 0) {
-      return apiOk({ pins: [] });
+      return apiOk({ pins: [], sync_cursor: Date.now() });
     }
     const vis = ["friends", "public"];
     const [flashRes, postRes] = await Promise.all([
@@ -266,7 +266,7 @@ async function friendsScopePins(
       const pin = toPinJson(row);
       if (pin !== null) pins.push(pin);
     }
-    return apiOk({ pins });
+    return apiOk({ pins, sync_cursor: Date.now() });
   } catch (err) {
     return apiError("internal", err instanceof Error ? err.message : "unknown", 500);
   }

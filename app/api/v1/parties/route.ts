@@ -246,5 +246,6 @@ export async function GET(req: Request): Promise<Response> {
           : Math.round(haversineMeters(near, { lat: r.lat, lng: r.lng })),
     };
   });
-  return apiOk({ items });
+  // UR E.29 同步游标（服务端 ms；changes 的 since 原样回传，与翻页 cursor 区分命名）。
+  return apiOk({ items, sync_cursor: Date.now() });
 }

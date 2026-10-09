@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.20.0
+  version: 1.21.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -120,6 +120,55 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MapPinsPage"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/map/pins/changes:
+    get:
+      operationId: getMapPinsChanges
+      summary: 地图新内容轻量计数（打卡＋酒局两类；免登入；scope=friends 需登入，UR E.29）
+      parameters:
+        - name: bbox
+          in: query
+          required: true
+          description: 同 /map/pins（面积≤2deg² 同样校验）
+          schema:
+            type: string
+        - name: since
+          in: query
+          required: true
+          description: 游标 Epoch ms（取自上次列表的 sync_cursor；过老钳到 range 窗）
+          schema:
+            type: integer
+        - name: near
+          in: query
+          description: 同 GET /parties（lat,lng；显示用，过滤仍走 bbox）
+          schema:
+            type: string
+        - name: scope
+          in: query
+          description: all（默认）／friends（需登入），语义同 /map/pins
+          schema:
+            type: string
+            enum: [all, friends]
+            default: all
+        - name: range
+          in: query
+          description: 7d（默认）／90d，同 /map/pins
+          schema:
+            type: string
+            enum: [7d, 90d]
+            default: 7d
+      responses:
+        "200":
+          description: 两类计数（各上限 99＋capped）＋服务端 cursor（ms 数字）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PinsChanges"
         "400":
           $ref: "#/components/responses/InvalidParams"
         "401":
@@ -1151,7 +1200,7 @@ paths:
             type: string
       responses:
         "200":
-          description: 酒局行（含 status／joined_count／male_count／female_count／host／joined_by_me／is_mine／distance_m）
+          description: 酒局行（含 status／joined_count／male_count／female_count／host／joined_by_me／is_mine／distance_m；sync_cursor 服务端 ms，UR E.29）
           content:
             application/json:
               schema:
@@ -2541,6 +2590,33 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MapPin"
+        sync_cursor:
+          type: integer
+          description: 服务端当前时间 Epoch ms（UR E.29；下次 changes 的 since 原样回传）
+    PinsChanges:
+      type: object
+      description: 新内容计数（打卡＋酒局；各上限 99，UR E.29）
+      required: [checkins, parties, cursor]
+      properties:
+        checkins:
+          type: object
+          required: [count, capped]
+          properties:
+            count:
+              type: integer
+            capped:
+              type: boolean
+        parties:
+          type: object
+          required: [count, capped]
+          properties:
+            count:
+              type: integer
+            capped:
+              type: boolean
+        cursor:
+          type: integer
+          description: 服务端当前时间 Epoch ms
     Checkin:
       type: object
       required: [id, beer_id, lat, lng, place_name, kind, visibility, expires_at, created_at]

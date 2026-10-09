@@ -27,6 +27,8 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR E.29 地图新内容轻量提示（v2-only，[WIP]，待 iOS 联调）**
+  - `GET /map/pins/changes`（两类计数各 99＋capped＋服务端 cursor；可见性逐字对 pins；登录排除自己；bounded＋Cache-Control）＋双列表 `sync_cursor`（ms 数字）＋`clampSince`／`capCount` 单测＋envelope headers 加法＋0037 parties created 索引；openapi 1.21.0 契约先行
 - **UR E.28 口味偏好＋标签＋推测（v2-only，[WIP]，待 0036a-d＋0026 重贴＋iOS 联调）**
   - `lib/api/taste.ts`（taxonomy／parse／aggregate＋单测）＋0036（4 文件拆分避死锁）＋`PATCH /me` preferences＋`GET /me` 回显＋`POST /checkins` tags＋mine／详情／recent 回显＋profile preferences/taste_inference（读时懒算）＋openapi 1.20.0；AI／cron／回填／引导 UI 不做
 - **DEF-20261009-001 /mine 归档行修复（随本车）**：归档平列＋beers 手拼＋warn＋双段全返；**DEF-20261009-002 主页统计修复（随本车）**：扫描解构补 data＋分页拉全＋`collectNightStats`＋单测
