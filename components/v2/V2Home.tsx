@@ -28,6 +28,7 @@ import {
   MoreHorizontal,
   Newspaper,
   Radar,
+  Store,
   RefreshCw,
   Share2,
   Sparkles,
@@ -1893,6 +1894,17 @@ export function V2Home() {
         >
           <Martini aria-hidden />
           {t2("partyTitle")}
+        </Button>
+        {/* UR G.4 附近酒吧 pill（独立页，真高德底图＋双色钉，匿名可看）。 */}
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0 rounded-full bg-card shadow-md ring-1 ring-foreground/10"
+          onClick={() => router.push(`/${locale}/v2/nearby`)}
+          aria-label={t2("nearbyTitle")}
+        >
+          <Store aria-hidden />
+          {t2("nearbyTitle")}
         </Button>
       </div>
       {/* 足跡浮條（頂部容器內流式排布，永不與 pills 重疊） */}

@@ -27,6 +27,8 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR G.4 附近酒吧（v2-only，[WIP]，待亲验；线上需 Vercel 配 AMAP_KEY）**
+  - `GET /places/around`（高德 place/around 代理，keywords 避分类码；3km 空扩 5km；GCJ→WGS；无 Key 503）＋`/v2/nearby` 独立页（Leaflet＋provider 瓦片＋双色钉＋peek 卡＋Apple/Google 外跳＋tel:＋图心重搜＋chips）＋pills 酒吧 pill＋三语 key×8；`gcj02ToWgs84`＋单测；站内步行导航＋营业中筛选二期
 - **UR G.3 酒局看板（v2-only，[✓]，用户亲验通过）**
   - `V2PartySheet`（85svh；行卡对标 iOS：店名＋城市·距离＋时间·买单＋席位条＋构成 capsule＋发起人＋行内四态；详情：成局 badge＋发起人卡＋地点／时间买单盒＋席位＋成员＋撤局两段确认＋安全盒；测试重置行）＋`V2PartyForm`（4 时段＋去门槛 stepper＋安全盒常显）＋pills 酒局 pill＋v2 三语 key×51；发局地点文本＋当前位置坐标（POI 限定二期）
   - 纯函数 `partyMixLine/Remain/JoinState/Progress/SlotStartAt`＋单测（iOS 口径）；API／migration／yaml 零改动

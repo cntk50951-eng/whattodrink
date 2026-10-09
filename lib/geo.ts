@@ -102,7 +102,6 @@ export function haversineMeters(a: LatLng, b: LatLng): number {
 
 /** At/above this the card shows kilometres, below it metres. */
 export const KM_THRESHOLD_M = 1000;
-
 /**
  * Human distance for the cheers card: "350 m" / "2.3 km".
  * Units (m/km) travel unchanged across locales, so no i18n needed here.
@@ -111,4 +110,59 @@ export function formatDistance(meters: number): string {
   if (!Number.isFinite(meters) || meters < 0) return "—";
   if (meters < KM_THRESHOLD_M) return `${Math.round(meters)} m`;
   return `${(meters / KM_THRESHOLD_M).toFixed(1)} km`;
+}
+
+/**
+ * GCJ-02（高德）→ WGS-84（Leaflet／GPS）公开算法（UR G.4 附近页；高德 POI 全是 GCJ，
+ * 直接画 OSM 上会偏；中国境外点原样回）。
+ * 引用：标准 Krasovsky 椭球偏移式（eviltransform 同族）；单测锁往返＋境外恒等。
+ */
+const GCJ_A = 6_378_245;
+const GCJ_EE = 0.00669342162296594323;
+
+function gcjDelta(lat: number, lng: number): { dLat: number; dLng: number } {
+  const rad = Math.PI / 180;
+  const x = lng - 105;
+  const y = lat - 35;
+  let dLng =
+    300 + x + 2 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+  dLng +=
+    ((20 * Math.sin(6 * x * rad) + 20 * Math.sin(2 * x * rad)) * 2) / 3;
+  dLng +=
+    ((20 * Math.sin(x * rad) + 40 * Math.sin((x / 3) * rad)) * 2) / 3;
+  dLng +=
+    ((150 * Math.sin((x / 12) * rad) + 300 * Math.sin((x / 37) * rad)) * 2) / 3;
+  let dLat =
+    -100 + 2 * x + 3 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+  dLat +=
+    ((20 * Math.sin(6 * x * rad) + 20 * Math.sin(2 * x * rad)) * 2) / 3;
+  dLat +=
+    ((20 * Math.sin(y * rad) + 40 * Math.sin((y / 3) * rad)) * 2) / 3;
+  dLat +=
+    ((160 * Math.sin((y / 12) * rad) + 320 * Math.sin((y / 37) * rad)) * 2) / 3;
+  const radLat = (lat / 180) * Math.PI;
+  let magic = Math.sin(radLat);
+  magic = 1 - GCJ_EE * magic * magic;
+  const sqrtMagic = Math.sqrt(magic);
+  dLat = (dLat * 180) / ((GCJ_A * (1 - GCJ_EE)) / (magic * sqrtMagic) * Math.PI);
+  dLng = (dLng * 180) / ((GCJ_A / sqrtMagic) * Math.cos(radLat) * Math.PI);
+  return { dLat, dLng };
+}
+
+function outOfChina(lat: number, lng: number): boolean {
+  return lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271;
+}
+
+/** GCJ-02 → WGS-84（一次迭代，米级精度，附近页够用）。 */
+export function gcj02ToWgs84(point: LatLng): LatLng {
+  if (outOfChina(point.lat, point.lng)) return { ...point };
+  const { dLat, dLng } = gcjDelta(point.lat, point.lng);
+  return { lat: point.lat - dLat, lng: point.lng - dLng };
+}
+
+/** WGS-84 → GCJ-02（仅单测往返用；生产只用上行）。 */
+export function wgs84ToGcj02(point: LatLng): LatLng {
+  if (outOfChina(point.lat, point.lng)) return { ...point };
+  const { dLat, dLng } = gcjDelta(point.lat, point.lng);
+  return { lat: point.lat + dLat, lng: point.lng + dLng };
 }

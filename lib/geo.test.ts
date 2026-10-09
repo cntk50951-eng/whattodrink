@@ -10,6 +10,8 @@ import {
   ZOOM_HK_WIDE,
   ZOOM_MAX,
   ZOOM_MIN,
+  gcj02ToWgs84,
+  wgs84ToGcj02,
   formatDistance,
   haversineMeters,
   isWithinHongKong,
@@ -103,5 +105,23 @@ describe("tile providers", () => {
     expect(OSM_ATTRIBUTION).toContain("OpenStreetMap");
     expect(STADIA_ATTRIBUTION).toContain("Stadia Maps");
     expect(STADIA_ATTRIBUTION).toContain("Stamen Design");
+  });
+});
+
+describe("gcj02ToWgs84", () => {
+  it("往返误差米级（中环点）", () => {
+    const wgs = { lat: 22.2819, lng: 114.1577 };
+    const back = gcj02ToWgs84(wgs84ToGcj02(wgs));
+    expect(haversineMeters(back, wgs)).toBeLessThan(5);
+  });
+  it("境外点恒等（零偏移）", () => {
+    const p = { lat: 35.68, lng: 139.69 };
+    expect(gcj02ToWgs84(p)).toEqual(p);
+  });
+  it("香港偏移量级合理（数十至数百米，非零非离谱）", () => {
+    const wgs = { lat: 22.2819, lng: 114.1577 };
+    const d = haversineMeters(gcj02ToWgs84(wgs), wgs);
+    expect(d).toBeGreaterThan(0);
+    expect(d).toBeLessThan(2000);
   });
 });
