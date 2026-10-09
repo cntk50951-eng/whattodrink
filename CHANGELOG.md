@@ -27,6 +27,13 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR E.28 口味偏好＋标签＋推测（v2-only，[WIP]，待 0036a-d＋0026 重贴＋iOS 联调）**
+  - `lib/api/taste.ts`（taxonomy／parse／aggregate＋单测）＋0036（4 文件拆分避死锁）＋`PATCH /me` preferences＋`GET /me` 回显＋`POST /checkins` tags＋mine／详情／recent 回显＋profile preferences/taste_inference（读时懒算）＋openapi 1.20.0；AI／cron／回填／引导 UI 不做
+- **DEF-20261009-001 /mine 归档行修复（随本车）**：归档平列＋beers 手拼＋warn＋双段全返；**DEF-20261009-002 主页统计修复（随本车）**：扫描解构补 data＋分页拉全＋`collectNightStats`＋单测
+- **UR E.27 个人主页 API（v2-only，[WIP]，待 0035＋iOS 联调）**
+  - `GET /users/{id}/profile`（me＝自己；401／400／404 矩阵；service 读＋代码判门；stats 全算；recent 30＋cursor＋可见过滤；level 等五项 null；thumb 见 thumb 文档）＋纯函数（nightKeyHK／hkAge／weekStartHK／weekStreak／weekNights）＋单测＋0035 user 索引＋openapi 1.19.0
+- **UR G.5 好友雷达＋搜索（v2-only，[✓]，用户亲验通过）**
+  - 聊天页搜索框（本地过滤＋无匹配态）＋最近 8 chips＋雷达条（本人居中＋方位距离＋点点进房）＋`initialBearing`／`filterFriends` 纯函数＋单测＋v2 三语 key×4；零新端点
 - **UR G.4 附近酒吧（v2-only，[✓]，用户指令结单；线上需 Vercel 配 AMAP_KEY）**
   - `GET /places/around`（高德 place/around 代理，keywords 避分类码；3km 空扩 5km；GCJ→WGS；无 Key 503）＋`/v2/nearby` 独立页（Leaflet＋provider 瓦片＋双色钉＋peek 卡＋Apple/Google 外跳＋tel:＋图心重搜＋chips）＋pills 酒吧 pill＋三语 key×8；`gcj02ToWgs84`＋单测；站内步行导航＋营业中筛选二期
 - **UR G.3 酒局看板（v2-only，[✓]，用户亲验通过）**

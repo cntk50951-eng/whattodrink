@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { appendLocalEcho, formatChatTime, formatListTime, formatSeenAgo, mergeFriendList, mockThread, remainParts, sumUnread, toChatAttachments } from "./chat";
+import { appendLocalEcho, filterFriends, formatChatTime, formatListTime, formatSeenAgo, mergeFriendList, mockThread, remainParts, sumUnread, toChatAttachments } from "./chat";
 
 const NOW = 1_757_000_000_000;
 
@@ -77,6 +77,22 @@ describe("mergeFriendList", () => {
       ]),
     );
     expect(rows.map((r) => r.user_id)).toEqual(["on-new", "on-old", "off-new", "off-none"]);
+  });
+});
+
+describe("filterFriends", () => {
+  const rows = [
+    { user_id: "1", nickname: "Marcus V." },
+    { user_id: "2", nickname: "chloe l." },
+    { user_id: "3", nickname: "酒友阿強" },
+  ];
+  it("子串不分大小写；空回全量；无匹配回空", () => {
+    expect(filterFriends(rows, "")).toHaveLength(3);
+    expect(filterFriends(rows, "  ")).toHaveLength(3);
+    expect(filterFriends(rows, "marcus")).toEqual([rows[0]]);
+    expect(filterFriends(rows, "CHLOE")).toEqual([rows[1]]);
+    expect(filterFriends(rows, "酒友")).toEqual([rows[2]]);
+    expect(filterFriends(rows, "zzz")).toEqual([]);
   });
 });
 

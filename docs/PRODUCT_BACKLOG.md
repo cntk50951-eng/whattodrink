@@ -3312,6 +3312,7 @@ UR E.22　過期快貼歸檔備查（v2-only）[WIP]
 
 *改動記錄*
 - 2026-10-07：建檔置 []（用戶指令歸檔備查不刪數；待開工指令）
+- 2026-10-09：DEF-20261009-001（iOS-0.68 足迹断代）：归档 embed beers 无 FK 即整段静默跳过＋slice 切旧行；修法归档平列＋beers 手拼＋warn＋双段全返（bounded 2*limit）；不建 FK；待交接 SQL a–d＋验收。
 ---
 
 > 生产线 F 新开，主力承载“组局”功能。总体定位：以“每人带一支酒的品酒会”为原型，扩展为主题化小聚引擎（B 主题开放 + C 熟人基座），初期纯信息撮合 + 免责声明 + 公开场所引导（用户自选公开场所，平台建议清单，不指定），后期叠加认证合作场地。MVP 闭环：发布 → 发现（地图+列表）→ 申请 → 审批 → 行前提醒 → 签到 → 互评。法务待复核，PDPO/年龄/免责按 §3 风险矩阵落地。详见 `docs/EPIC_F_GROUP_GATHERING.md` v0.1 与 `docs/F_BACKLOG_DRAFT.md` 草案。
@@ -3853,6 +3854,73 @@ UR E.26　打卡收藏 save（v2-only，iOS-0.62 输入）[WIP]
 
 ---
 
+UR E.27　个人主页 API（v2-only，iOS profile 输入）[WIP]
+
+> iOS UI 已做完（占位数据）；只做主页这一个接口（分享／设置／编辑资料后续）。
+
+### 背景（2026-10-09 問答定案）
+- `GET /users/{id}/profile`（`me`＝自己视角）；401／400／404 矩阵（不存在／拉黑／对方隐身统一 404）。
+- stats 全服务端算（nights HK 06:00 为界含归档；places 去空白重；checkins 主＋归档 COUNT 不截断；
+  friends accepted 双向；saves 同口径；**cheers 取收到的**；week streak 周一起，本周无从上周起）。
+- thumb 现实：库里全 dataURL，无 300px URL 管线 → v1 回 `photo_thumb`（96px）顶替，
+  问题另记 `docs/thumb-pipeline-issue.md`，管线另立 UR；`photo_url` v1 **不回**（可选＋包爆炸）。
+- 可见规则沿现有（`canViewCheckin` 逐行；friends_only_count 只计数；lat/lng 仅自己；mode/dob 仅自己，
+  age 人人有；level/badges/top_percent/location 无规则回 null／[]，等产品后补）。
+- 读走 service（跨表聚合 RLS 表述不了，可见门全代码判，沿 ratings 聚合口径）。
+- recent 30 默认（max 50）＋cursor；note 截 200；like_count 批量一次查（post_likes in 30 id 代码计数）；
+  beer 一次查；ETag／60s 缓存 v1 不做（正确优先，慢了再加）；`/mine` dataURL 不动（web 足迹要离线用）。
+
+### 範圍
+1. `lib/api/profile.ts`：`nightKeyHK`／`hkAge`／`weekStartHK`／`weekStreak` 纯函数＋单测。
+2. `GET /users/{id}/profile`＋openapi 1.19.0（UserProfile schema 主要字段）。
+3. CHANGELOG＋单测；零 migration。
+
+### 非目標
+- level／badges 规则、top_percent、location 来源（等产品；v1 null）、分享／设置／编辑接口、v1 任何文件。
+
+### AC（交接 §二～四）
+- 自己（me）：全字段（mode/dob/lat-lng 含）＋stats 全＋recent 30＋cursor。
+- 别人：stealth／拉黑 404；friends→全（私密帖除外，沿现有门）；public陌生人→基本＋relationship＋stats＋无坐标＋public帖＋friends_only_count＋locked。
+- friends陌生→基本＋relationship＋null stats＋[]＋locked；计数未知回 null 不冒 0。
+
+*改動記錄*
+- 2026-10-09：建檔置 [WIP]（WEB_HANDOFF_PROFILE 输入＋两问答；直做）
+- 2026-10-09：DEF-20261009-002（nights/places 恒 0）：扫描漏解构 data＋1000 行截断；修法解构补 data＋warn＋分页拉全＋`eat` 提纯 `collectNightStats`＋单测（mock 行锁接线）。
+- 2026-10-09：实作：`lib/api/profile.ts`（nightKeyHK／hkAge／weekStartHK／weekStreak／weekNights＋单测）＋`GET /users/{id}/profile`（401／400／404 矩阵；service 读＋代码判门；stats 全算；recent 30＋cursor＋可见过滤＋批量 beer/like；level 等五项 null）＋0035 user 索引＋openapi 1.19.0；thumb/photo 见 thumb 文档。
+
+---
+
+UR E.28　口味偏好＋打卡标签＋口味推测（v2-only，iOS-0.70 输入）[WIP]
+
+> iOS mock UI 已完（主页两张卡）；不新增接口，只在 3 处加字段；转告 iOS：v1 无 AI，文案改"根據打卡推測"。
+
+### 背景（2026-10-09 三問答定案）
+- v1 纯确定性聚合（tags 计数＋酒款映射兜底），不调 MiniMax；重算读时懒算（过期 10min 或有新打卡就地重算，无 cron 无异步）。
+- taxonomy 照收（交接第三节，大类＋子类全局唯一；未知写入 400，读取原样回）。
+- preferences 与 stats 同门；taste_inference 只给自己；sample<5 groups []；level 等仍 null。
+- Q4 好友不开放／Q5 不回填（beer 兜底）／Q6 0036 先跑再部署；web 引导／编辑 UI 不动（API 单）。
+
+### 範圍
+1. **數據**：0036（users.preferences jsonb＋checkins.tags＋archive.tags＋user_taste_inference 表）；0026 搬运加 tags 列（重贴）。
+2. **寫**：`PATCH /me` preferences（整体替换；互斥／caps／fav-likes 非空／null 清／计有效）＋`GET /me` 回显＋`POST /checkins` tags（≤5／已知／去重；入库＋mine／详情／recent 回显，pins 免）。
+3. **讀**：profile 加 `preferences`＋`taste_inference`（self only；lazy 缓存；groups 归一 max=1.0；零值不回）。
+4. `lib/api/taste.ts`（taxonomy／parse／aggregate 纯函数＋单测）＋openapi 1.20.0（enum＋三处字段＋recent 子字段补全）。
+
+### 非目標
+- AI 调用、cron／异步重算、level／badges 规则、web 引导 UI、pins tags、v1 任何文件。
+
+### AC（交接 §4.4＋§二）
+- preferences 互斥／caps／清空语义全拒全过；GET /me 回显一致。
+- tags 非法 400；mine／详情／recent 全带 tags（无即 []）。
+- taste：sample<5 groups []（<5 打卡 vs 有打卡无标签两空态可分）；零值不回；dislikes 不影响计算。
+- 三閘綠＋iOS 联调＋`git status` 無 v1。
+
+*改動記錄*
+- 2026-10-09：建檔置 [WIP]（WEB_HANDOFF_TASTE 输入＋三问答；直做）
+- 2026-10-09：实作：`lib/api/taste.ts`（taxonomy／parse／aggregate＋单测 7）＋0036（preferences＋tags 双表＋inference 缓存表）＋0026 搬运带 tags（重贴）＋`PATCH /me` preferences＋`GET /me` 回显＋`POST /checkins` tags＋mine／详情／recent 回显（pins 免）＋profile preferences（stats 门）＋taste_inference（self only＋读时懒算）＋openapi 1.20.0（enum＋三处字段＋recent 子字段）；AI／cron／回填／引导 UI 皆不做（问答定案）。
+
+---
+
 UR D.8　聊天附件 V2（iOS API_CHAT_V2 输入）[WIP]
 
 > iOS 按交接写了 client；web（ChatRoomLive＋Onboarding）已依赖 D.6 形状。用户定案：保留现有 sign 形状做加法，不断 web。
@@ -3910,7 +3978,7 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - web 范围：v2 附近页（高德 Web JS 直调 POI＋列表＋peek 卡＋外跳导航；站内步行导航二期）。
 - 非目标：新后端表（POI 不入库）、v1。
 
-### UR G.5　好友雷达＋搜索（v2）[WIP]
+### UR G.5　好友雷达＋搜索（v2）[✓]
 - iOS 对标：雷达小地图（方位距离落点）＋昵称即滤＋recents（FriendListView／FriendSearchView）。
 - web 范围：v2 聊天页增强（雷达条＋搜索框，本地过滤零新端点，沿 iOS `sortFriends/filterFriends` 口径）。
 - 非目标：新端点、v1。
@@ -3923,6 +3991,7 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - 2026-10-09：G.3 置 [WIP] 开工（酒局看板；iOS-0.57/0.65 对标；pills 入口＋Sheet 内列表／详情／发局三态；发局地点文本＋当前位置坐标，POI 限定二期）。
 - 2026-10-09：G.4 置 [WIP] 开工（附近酒吧；iOS-0.42 对标）。家底：C.8 只换了瓦片（官方 JS API 另开即本单）；POI 走服务端 `/places/search`（高德优先＋Nominatim 回退）；库里无 AMAP_KEY，用户新申 Web 服务 key（iOS 的 Bundle 绑定 key 调不通 restapi，账号重用另建；白名单空着，Vercel 出口动态）。key 实测通（place/around 回 397 条＋typecode 080304）。
 - 2026-10-09：G.5 置 [WIP] 开工（好友雷达＋搜索；iOS FriendList/Radar 对标）。家底：列表 `mergeFriendList` 已是在线组＋末信序（≈iOS sortFriends）；entries 无坐标，雷达另拉 `/friends/live`（live_lat/lng）＋本机定位；无 bearing helper，现加。
+- 2026-10-09：E.27 置 [WIP] 开工（个人主页 API；iOS profile 输入；两问答定案，见 UR）。
 - 2026-10-09：G.5 实作：聊天页搜索框（本地子串＋无匹配态）＋最近 8 chips（localStorage）＋雷达条（本人居中＋方位距离落点 SVG＋点点进房；无坐标整条不挂）＋`initialBearing`／`filterFriends` 纯函数＋单测（iOS 口径）；v2 三语 key×4；零新端点。
 - 2026-10-09：G.4 实作：`GET /places/around`（高德 place/around 代理，keywords 避分类码猜测；3km 空扩 5km；GCJ→WGS 落 Leaflet；无 Key 503）＋`/v2/nearby` 独立页（imperative Leaflet＋provider 瓦片＋双色钉＋peek 卡＋Apple/Google 外跳＋tel:＋图心重搜＋chips 过滤）＋pills 酒吧 pill＋三语 key×8；`gcj02ToWgs84`＋往返单测；站内步行导航＋营业中筛选二期。
 - 2026-10-09：用户指令置 [✓]（本地 around 500 系本机 VPN 拦 Node 出站，非代码问题，见 memory；高德直连 200 正常；Vercel 记得配 AMAP_KEY）。

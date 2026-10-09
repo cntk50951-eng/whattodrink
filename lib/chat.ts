@@ -203,3 +203,13 @@ export function mergeFriendList(
   });
   return rows;
 }
+
+/**
+ * UR G.5 本地过滤（昵称子串，不分大小写；空 query 回全量，沿 iOS filterFriends）。
+ * 纯函数；排序不动（调用方先 merge 后 filter）。
+ */
+export function filterFriends<T extends { nickname: string }>(rows: T[], query: string): T[] {
+  const q = query.trim().toLowerCase();
+  if (q === "") return rows;
+  return rows.filter((r) => r.nickname.toLowerCase().includes(q));
+}

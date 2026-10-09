@@ -178,3 +178,23 @@ export function weekStreak(nights: Set<string> | string[], nowMs: number): numbe
   }
   return streak;
 }
+
+/**
+ * UR E.27 打卡行→夜／地点集合（扫描纯段；route 只负责分页拉，统计只吃这里）。
+ * 非数组／坏行丢弃（调用方传什么形状都不炸，沿 toMineRow 容错口径）。
+ */
+export function collectNightStats(rows: unknown): { nights: Set<string>; places: Set<string> } {
+  const nights = new Set<string>();
+  const places = new Set<string>();
+  if (!Array.isArray(rows)) return { nights, places };
+  for (const r of rows) {
+    if (typeof r !== "object" || r === null) continue;
+    const rec = r as Record<string, unknown>;
+    const ca = typeof rec.created_at === "string" ? Date.parse(rec.created_at) : NaN;
+    const k = Number.isFinite(ca) ? nightKeyHK(ca) : null;
+    if (k !== null) nights.add(k);
+    const p = typeof rec.place_name === "string" ? rec.place_name.trim() : "";
+    if (p !== "") places.add(p);
+  }
+  return { nights, places };
+}

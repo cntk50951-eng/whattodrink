@@ -166,3 +166,18 @@ export function wgs84ToGcj02(point: LatLng): LatLng {
   const { dLat, dLng } = gcjDelta(point.lat, point.lng);
   return { lat: point.lat + dLat, lng: point.lng + dLng };
 }
+
+/**
+ * 初始方位角（正北顺时针度数；雷达落点用，沿 iOS 方位距离口径）。
+ * 同点回 0；纯数学（atan2），与 haversine 同椭球假设。
+ */
+export function initialBearing(a: LatLng, b: LatLng): number {
+  const toRad = (deg: number): number => (deg * Math.PI) / 180;
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  const brg = (Math.atan2(y, x) * 180) / Math.PI;
+  return (brg + 360) % 360;
+}

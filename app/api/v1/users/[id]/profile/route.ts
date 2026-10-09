@@ -2,7 +2,7 @@ import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { canViewCheckin, parseCheckinIdParam, parseMineParams } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
-import { hkAge, nightKeyHK, weekNights, weekStreak } from "@/lib/api/profile";
+import { hkAge, collectNightStats, weekNights, weekStreak } from "@/lib/api/profile";
 import { aggregateTaste } from "@/lib/api/taste";
 
 type UserRow = {
@@ -267,34 +267,41 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
   let stats: Record<string, number | null> | null = null;
   let nights: Set<string> | null = null;
   if (statsVisible) {
-    const [
-      { count: mainCount },
-      { count: archCount },
-      mainScan,
-      archScan,
-      { count: savesCount },
-      { count: cheersCount },
-    ] = await Promise.all([
-      supa.from("checkins").select("id", { count: "exact", head: true }).eq("user_id", targetId),
-      supa.from("checkins_archive").select("id", { count: "exact", head: true }).eq("user_id", targetId),
-      supa.from("checkins").select("created_at,place_name").eq("user_id", targetId).order("created_at", { ascending: false }),
-      supa.from("checkins_archive").select("created_at,place_name").eq("user_id", targetId).order("created_at", { ascending: false }),
-      supa.from("checkin_saves").select("checkin_id", { count: "exact", head: true }).eq("user_id", targetId),
-      supa.from("cheers").select("id", { count: "exact", head: true }).eq("to_user_id", targetId),
-    ]);
-    nights = new Set<string>();
-    const places = new Set<string>();
-    const eat = (rows: unknown): void => {
-      for (const r of (Array.isArray(rows) ? rows : []) as Record<string, unknown>[]) {
-        const ca = typeof r.created_at === "string" ? Date.parse(r.created_at) : NaN;
-        const k = Number.isFinite(ca) ? nightKeyHK(ca) : null;
-        if (k !== null) (nights as Set<string>).add(k);
-        const p = typeof r.place_name === "string" ? r.place_name.trim() : "";
-        if (p !== "") places.add(p);
+    const [{ count: mainCount }, { count: archCount }, { count: savesCount }, { count: cheersCount }] =
+      await Promise.all([
+        supa.from("checkins").select("id", { count: "exact", head: true }).eq("user_id", targetId),
+        supa.from("checkins_archive").select("id", { count: "exact", head: true }).eq("user_id", targetId),
+        supa.from("checkin_saves").select("checkin_id", { count: "exact", head: true }).eq("user_id", targetId),
+        supa.from("cheers").select("id", { count: "exact", head: true }).eq("to_user_id", targetId),
+      ]);
+    // DEF-20261009-002：扫描分页拉全（PostgREST 单次 1000 上限；有错即停记 warn，不静默）。
+    const scanAll = async (table: "checkins" | "checkins_archive"): Promise<unknown[]> => {
+      const out: unknown[] = [];
+      const PAGE = 1000;
+      for (let page = 0; ; page += 1) {
+        const { data, error } = await supa
+          .from(table)
+          .select("created_at,place_name")
+          .eq("user_id", targetId)
+          .order("created_at", { ascending: false })
+          .range(page * PAGE, page * PAGE + PAGE - 1);
+        if (error !== null) {
+          console.warn(`[api/v1/users/profile] scan ${table} error: code=${error.code} message=${error.message}`);
+          break;
+        }
+        const rows = (data ?? []) as unknown[];
+        out.push(...rows);
+        if (rows.length < PAGE) break;
       }
+      return out;
     };
-    eat(mainScan);
-    eat(archScan);
+    const [mainScan, archScan] = await Promise.all([
+      scanAll("checkins"),
+      scanAll("checkins_archive"),
+    ]);
+    const collected = collectNightStats([...mainScan, ...archScan]);
+    nights = collected.nights;
+    const places = collected.places;
     stats = {
       nights_total: nights.size,
       places_total: places.size,

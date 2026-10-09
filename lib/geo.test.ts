@@ -14,6 +14,7 @@ import {
   wgs84ToGcj02,
   formatDistance,
   haversineMeters,
+  initialBearing,
   isWithinHongKong,
   stadiaTileUrl,
 } from "./geo";
@@ -123,5 +124,15 @@ describe("gcj02ToWgs84", () => {
     const d = haversineMeters(gcj02ToWgs84(wgs), wgs);
     expect(d).toBeGreaterThan(0);
     expect(d).toBeLessThan(2000);
+  });
+});
+
+describe("initialBearing", () => {
+  it("正北 0／正东 90／正南 180／正西 270", () => {
+    const o = { lat: 22.28, lng: 114.15 };
+    expect(initialBearing(o, { lat: 22.29, lng: 114.15 })).toBeCloseTo(0, 0);
+    expect(initialBearing(o, { lat: 22.28, lng: 114.16 })).toBeCloseTo(90, 0);
+    expect(initialBearing(o, { lat: 22.27, lng: 114.15 })).toBeCloseTo(180, 0);
+    expect(initialBearing(o, { lat: 22.28, lng: 114.14 })).toBeCloseTo(270, 0);
   });
 });

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, LocateFixed, MapPin, MessageCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, LocateFixed, MapPin, MessageCircle, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,9 @@ import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/u
 import { setActivePeer } from "@/lib/chatPeer";
 import { createClient } from "@/lib/supabase/client";
 import { InviteList } from "@/components/v2/InviteList";
-import { formatListTime, mergeFriendList, type FriendListEntry } from "@/lib/chat";
+import { filterFriends, formatListTime, mergeFriendList, type FriendListEntry } from "@/lib/chat";
+import { formatDistance, haversineMeters, initialBearing } from "@/lib/geo";
+import { useGeolocation } from "@/hooks/useGeolocation";
 import styles from "@/components/v2/v2.module.css";
 
 type ConvoRow = {
@@ -56,6 +58,33 @@ export default function V2ChatListPage() {
   // UR E.16：好友／邀請雙籤（邀請紅點＋倒計時＋陌生人折叠；默認好友籤）。
   const [chatTab, setChatTab] = useState<"friends" | "invites">("friends");
   const [invitePending, setInvitePending] = useState(0);
+  // UR G.5：昵称即滤（本地子串，零新端点，沿 iOS filterFriends）。
+  const [query, setQuery] = useState("");
+  // UR G.5：最近 8（点行即记，localStorage；空 query 才露 chips）。
+  const [recents, setRecents] = useState<{ user_id: string; nickname: string }[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem("wtd-chat-recents");
+      const arr = raw === null ? [] : (JSON.parse(raw) as unknown);
+      if (!Array.isArray(arr)) return [];
+      return arr
+        .filter(
+          (r): r is { user_id: string; nickname: string } =>
+            typeof r === "object" &&
+            r !== null &&
+            typeof (r as Record<string, unknown>).user_id === "string" &&
+            typeof (r as Record<string, unknown>).nickname === "string",
+        )
+        .slice(0, 8);
+    } catch {
+      return [];
+    }
+  });
+  // UR G.5：雷达活坐标（GET /friends/live；本人居中＋酒友方位距离落点）。
+  const [liveById, setLiveById] = useState(
+    new Map<string, { lat: number; lng: number; nickname: string }>(),
+  );
+  const { position: selfPos } = useGeolocation();
 
   // DEF-20261003-002：好友缓存（首载后留存，供新消息到达时重排，不重拉好友）。
   const friendsRef = useRef<
@@ -165,10 +194,56 @@ export default function V2ChatListPage() {
     };
   }, [refreshConvos]);
 
-  const online = entries.filter((e) => e.online);
-  const offline = entries.filter((e) => !e.online);
+  // UR G.5：活坐标单拉（mount 一次；失败静默无雷达，列表不受影响）。
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/v1/friends/live", { credentials: "include" });
+        if (!res.ok || cancelled) return;
+        const j = (await res.json().catch(() => null)) as {
+          friends?: { user_id: string; nickname: string; lat: number; lng: number }[];
+        } | null;
+        const rows = Array.isArray(j?.friends) ? (j as { friends: never[] }).friends : [];
+        const map = new Map<string, { lat: number; lng: number; nickname: string }>();
+        for (const r of rows as { user_id: unknown; nickname: unknown; lat: unknown; lng: unknown }[]) {
+          if (
+            typeof r.user_id !== "string" ||
+            typeof r.nickname !== "string" ||
+            typeof r.lat !== "number" ||
+            typeof r.lng !== "number" ||
+            !Number.isFinite(r.lat) ||
+            !Number.isFinite(r.lng)
+          ) {
+            continue;
+          }
+          map.set(r.user_id, { lat: r.lat, lng: r.lng, nickname: r.nickname });
+        }
+        if (!cancelled) setLiveById(map);
+      } catch {
+        // 靜默：無雷达，列表照走
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const online = filterFriends(entries.filter((e) => e.online), query);
+  const offline = filterFriends(entries.filter((e) => !e.online), query);
 
   function openRow(peerId: string): void {
+    const hit = entries.find((e) => e.user_id === peerId) ?? null;
+    // Recents：点行即记（去重＋ cap 8，沿 iOS 口径）。
+    setRecents((prev) => {
+      const nickname = hit?.nickname ?? "";
+      if (nickname === "") return prev;
+      const next = [{ user_id: peerId, nickname }, ...prev.filter((r) => r.user_id !== peerId)].slice(0, 8);
+      try {
+        window.localStorage.setItem("wtd-chat-recents", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
     setActivePeer(peerId);
     router.push(roomHref);
   }
@@ -299,7 +374,52 @@ export default function V2ChatListPage() {
 
       {chatTab === "invites" ? (
         <InviteList onPending={setInvitePending} />
-      ) : !loaded ? (
+      ) : (
+        <>
+          {/* UR G.5：搜索框（昵称即滤，本地零新端点）。 */}
+          <div className="flex shrink-0 items-center gap-2 rounded-full border border-border bg-muted px-3 py-1.5">
+            <Search size={15} aria-hidden className="shrink-0 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("chatSearch")}
+              aria-label={t("chatSearch")}
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+            {query !== "" && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label={t("cancel")}
+                className="shrink-0 rounded-full p-0.5 text-muted-foreground"
+              >
+                <X size={14} aria-hidden />
+              </button>
+            )}
+          </div>
+          {/* UR G.5：最近 8（空 query 才露，点即填搜）。 */}
+          {query === "" && recents.length > 0 && (
+            <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto" aria-label={t("chatRecents")}>
+              <span className="shrink-0 text-xs text-muted-foreground">{t("chatRecents")}</span>
+              {recents.map((r) => (
+                <button
+                  key={r.user_id}
+                  type="button"
+                  onClick={() => setQuery(r.nickname)}
+                  className="shrink-0 rounded-full border border-border px-2.5 py-1 text-xs font-bold"
+                >
+                  {r.nickname}
+                </button>
+              ))}
+            </div>
+          )}
+          <RadarStrip
+            selfPos={selfPos}
+            liveById={liveById}
+            onOpen={openRow}
+            label={t("chatRadarLabel")}
+          />
+          {!loaded ? (
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden" aria-hidden>
           {[0, 1, 2].map((i) => (
             <div key={i} className="flex items-center gap-3 rounded-2xl p-2">
@@ -311,7 +431,12 @@ export default function V2ChatListPage() {
             </div>
           ))}
         </div>
-      ) : entries.length === 0 ? (
+      ) : online.length + offline.length === 0 ? (
+        query !== "" ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+            <p className="max-w-60 text-sm text-muted-foreground">{t("chatNoMatch")}</p>
+          </div>
+        ) : entries.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
           <MessageCircle size={40} aria-hidden className="size-10 text-muted-foreground" />
           <p className="max-w-60 text-sm text-muted-foreground">{t("chatListEmpty")}</p>
@@ -319,6 +444,7 @@ export default function V2ChatListPage() {
             {t("back")}
           </Button>
         </div>
+        ) : null
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
           {online.length > 0 && (
@@ -340,7 +466,71 @@ export default function V2ChatListPage() {
           )}
         </div>
       )
+          }
+        </>
+      )
       }
+    </div>
+  );
+}
+
+/**
+ * UR G.5 好友雷达（本人居中＋酒友方位距离落点；点点进房，沿 iOS RadarMiniMap）。
+ * 纯渲染数学（bearing＋haversine），无 state；无坐标即整条不挂。
+ */
+function RadarStrip({
+  selfPos,
+  liveById,
+  onOpen,
+  label,
+}: {
+  selfPos: { lat: number; lng: number } | null;
+  liveById: Map<string, { lat: number; lng: number; nickname: string }>;
+  onOpen: (userId: string) => void;
+  label: string;
+}): React.ReactElement | null {
+  if (selfPos === null || liveById.size === 0) return null;
+  const dots: { id: string; nickname: string; x: number; y: number; dist: number }[] = [];
+  let maxD = 500;
+  const rows = [...liveById.entries()];
+  for (const [id, f] of rows) {
+    const dist = haversineMeters(selfPos, { lat: f.lat, lng: f.lng });
+    if (dist > maxD) maxD = dist;
+    dots.push({ id, nickname: f.nickname, x: 0, y: 0, dist });
+  }
+  const R = 52;
+  const CX = 66;
+  const CY = 66;
+  for (const d of dots) {
+    const f = liveById.get(d.id);
+    if (f === undefined) continue;
+    const brg = (initialBearing(selfPos, { lat: f.lat, lng: f.lng }) * Math.PI) / 180;
+    const r = (Math.min(d.dist, maxD) / maxD) * R;
+    d.x = CX + Math.sin(brg) * r;
+    d.y = CY - Math.cos(brg) * r;
+  }
+  return (
+    <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-border p-2" role="img" aria-label={label}>
+      <svg viewBox="0 0 132 132" className="h-[104px] w-[104px] shrink-0" aria-hidden={false}>
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke="currentColor" strokeOpacity={0.2} />
+        <circle cx={CX} cy={CY} r={R / 2} fill="none" stroke="currentColor" strokeOpacity={0.15} />
+        <circle cx={CX} cy={CY} r={5} className="fill-blue-600" />
+        {dots.map((d) => (
+          <g key={d.id} onClick={() => onOpen(d.id)} className="cursor-pointer">
+            <title>{`${d.nickname} · ${formatDistance(d.dist)}`}</title>
+            <circle cx={d.x} cy={d.y} r={7} className="fill-primary" />
+            <text x={d.x} y={d.y + 3} textAnchor="middle" fontSize={8} className="fill-white font-bold">
+              {d.nickname.slice(0, 1)}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <div className="min-w-0 flex-1 text-xs text-muted-foreground">
+        <p className="truncate font-bold text-foreground">
+          {dots.length} · {formatDistance(Math.min(...dots.map((d) => d.dist)))}
+        </p>
+        <p className="truncate">{dots.slice(0, 3).map((d) => d.nickname).join(" · ")}</p>
+      </div>
     </div>
   );
 }

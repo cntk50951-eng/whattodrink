@@ -23,6 +23,7 @@
 
 | ID | 标题 | 状态 | 严重度 | 发现日期 / 报告人 | 关联 UR | 确诊根因 |
 | DEF-20261009-001 | /mine 看不到已归档旧快贴（足迹断代） | Fixing | P1 | 2026-10-09 / @iOS(0.68) | UR E.22 | 归档 embed beers 无 FK 即 PGRST200 整段静默跳过＋slice 切旧行，见详情 |
+| DEF-20261009-002 | 主页 nights/places 恒 0（week 连带） | Fixing | P1 | 2026-10-09 / @iOS | UR E.27 | 扫描查询漏解构 data＋1000 行静默截断，见详情 |
 |---|---|---|---|---|---|---|
 | DEF-20250925-001 | 登出→重登录后打卡酒类消失，不再显示 | Closed | P0 | 2026-09-25 / @yuki | UR A.10 / fix/defect-20250925-001 | DB FK 缺 public.users 行 + 前端回显缺 INITIAL_SESSION（见详情，已验证） |
 | DEF-20260926-001 | 模式切换按钮在页面上不可见 | Closed | P1 | 2026-09-26 / @yuki | UR A.16 | 按設計收合＋收合態零提示；常駐pill＋用戶驗收通過，已合入 main |
@@ -874,3 +875,16 @@
 - **修复**：归档只选平列（`ARCHIVE_COLUMNS`，无 embed）＋`beer_id` 集一次查 `beers` 手拼（形状与主表行一致；缺酒留 null 沿 toMineRow 容错）＋失败 `console.warn` 带 code/message＋合并双段全返（主表 ≤limit＋归档 ≤limit，不再 slice，保证旧行有位，bounded 2*limit）；**不要给归档表加 FK**（0026 审计不断链本意）
 - **修复验证**：`tsc` 零错；待用户：①交接 SQL a–d 确认数据侧（a 有行＋d 无行即主嫌数据侧成立；a 零行查 b／0026；c 大即搬运没跑）②验收构造（≥50 主表行＋旧 flash → 回包含旧行）
 - **回归范围**：`/mine`（web／iOS 同形状多行，忽略即兼容）；详情口不动
+
+### DEF-20261009-002 主页 nights/places 恒 0（week 连带）
+
+- **状态**：Fixing（2026-10-09：修法已写，待联调转 Verified）
+- **严重度**：P1（主页身份数据错；checkins/friends/saves 正常，iOS 照实显示，iOS 零改动）
+- **发现日期 / 报告人**：2026-10-09 / @iOS
+- **复现步骤**：`GET /api/v1/users/me/profile`（有打卡的号）→ `stats.nights_total`、`places_total` 恒 0
+- **期望 vs 实际**：期望与足迹夜数一致；实际两项＋week 两项全 0
+- **确诊根因**：`profile/route.ts` 扫描查询漏解构 `{ data }`（`mainScan/archScan` 拿到回应对象，`eat()` 判数组失败恒空）；另 PostgREST 单次 1000 行上限会静默截断重度用户。iOS 交接行号与修复一致
+- **关联 UR**：UR E.27
+- **修复**：解构补 `data`＋失败 warn；扫描改分页拉全（1000 页循环，有错即停）；`eat` 提纯 `collectNightStats`＋单测（mock 行断言 nights/places>0）
+- **修复验证**：`vitest` profile 全绿；待联调（有打卡号 `nights_total` 对足迹夜数）
+- **回归范围**：profile stats；recent／relationship 不动

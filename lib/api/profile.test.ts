@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ageOf, avatarPublicUrl, hkAge, nightKeyHK, parseProfileBody, shouldOnboard, weekNights, weekStartHK, weekStreak } from "./profile";
+import { ageOf, avatarPublicUrl, collectNightStats, hkAge, nightKeyHK, parseProfileBody, shouldOnboard, weekNights, weekStartHK, weekStreak } from "./profile";
 
 describe("ageOf", () => {
   // 2026-10-04（UTC）为锚。
@@ -97,5 +97,24 @@ describe("weekStartHK／weekStreak／weekNights", () => {
   });
   it("本周夜数", () => {
     expect(weekNights(["2026-10-07", "2026-10-09", "2026-09-30"], FRI)).toBe(2);
+  });
+});
+
+describe("collectNightStats", () => {
+  it("夜键＋地点去重；坏输入空集（路由接线回归锁）", () => {
+    const rows = [
+      { created_at: "2026-10-09T02:00:00Z", place_name: " 中環 " },
+      { created_at: "2026-10-09T03:00:00Z", place_name: "中環" },
+      { created_at: "2026-10-08T21:00:00Z", place_name: "" },
+      { created_at: "乱码", place_name: "x" },
+      null,
+      { nope: 1 },
+    ];
+    const { nights, places } = collectNightStats(rows);
+    // 10-09T02/03Z＝HK 同一晚；10-08T21Z＝HK 10-09 05:00 算前一晚 10-08。
+    expect(nights).toEqual(new Set(["2026-10-09", "2026-10-08"]));
+    expect(places).toEqual(new Set(["中環", "x"]));
+    expect(collectNightStats({ data: rows })).toEqual({ nights: new Set(), places: new Set() });
+    expect(collectNightStats(null)).toEqual({ nights: new Set(), places: new Set() });
   });
 });
