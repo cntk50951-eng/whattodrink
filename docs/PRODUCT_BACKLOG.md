@@ -3904,7 +3904,7 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - web 范围：v2 看板页（列表＋发局表单＋详情＋参加／退出／撤局）；API 现成（E.23 全套）。
 - 非目标：F 线审批制（不动）、群聊／推送、v1。
 
-### UR G.4　附近酒吧（v2）[WIP]
+### UR G.4　附近酒吧（v2）[✓]
 - iOS 对标：3km POI（酒吧琥珀钉＋便利店天蓝钉）＋peek 卡＋站内步行导航（iOS-0.42）。
 - web 范围：v2 附近页（高德 Web JS 直调 POI＋列表＋peek 卡＋外跳导航；站内步行导航二期）。
 - 非目标：新后端表（POI 不入库）、v1。
@@ -3922,6 +3922,7 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - 2026-10-09：G.3 置 [WIP] 开工（酒局看板；iOS-0.57/0.65 对标；pills 入口＋Sheet 内列表／详情／发局三态；发局地点文本＋当前位置坐标，POI 限定二期）。
 - 2026-10-09：G.4 置 [WIP] 开工（附近酒吧；iOS-0.42 对标）。家底：C.8 只换了瓦片（官方 JS API 另开即本单）；POI 走服务端 `/places/search`（高德优先＋Nominatim 回退）；库里无 AMAP_KEY，用户新申 Web 服务 key（iOS 的 Bundle 绑定 key 调不通 restapi，账号重用另建；白名单空着，Vercel 出口动态）。key 实测通（place/around 回 397 条＋typecode 080304）。
 - 2026-10-09：G.4 实作：`GET /places/around`（高德 place/around 代理，keywords 避分类码猜测；3km 空扩 5km；GCJ→WGS 落 Leaflet；无 Key 503）＋`/v2/nearby` 独立页（imperative Leaflet＋provider 瓦片＋双色钉＋peek 卡＋Apple/Google 外跳＋tel:＋图心重搜＋chips 过滤）＋pills 酒吧 pill＋三语 key×8；`gcj02ToWgs84`＋往返单测；站内步行导航＋营业中筛选二期。
+- 2026-10-09：用户指令置 [✓]（本地 around 500 系本机 VPN 拦 Node 出站，非代码问题，见 memory；高德直连 200 正常；Vercel 记得配 AMAP_KEY）。
 - 2026-10-09：G.3 实作：`V2PartySheet`（探索／我的双籤＋席位条＋详情＋参加／退出／撤局＋409/410 人话）＋`V2PartyForm`（地点／城市／时间 14d／总量男女互锁／成局人数／买单三段）＋pills 酒局 pill（匿名可看）＋v2 三语 key×27；API／migration／yaml 零改动（E.23 现成）。
 - 2026-10-09：G.3 返工对标 iOS（Sheet 85svh＋行卡：店名＋城市·距离＋时间·买单＋席位条＋构成 capsule＋发起人＋行内四态动作；详情：成局 badge＋发起人卡＋地点盒＋时间买单盒＋席位＋成员皇冠♂♀＋撤局两段确认＋安全盒；发局 4 时段＋去门槛 stepper＋安全盒常显；测试重置行）；纯函数 `partyMixLine/Remain/JoinState/Progress/SlotStartAt`＋单测（iOS 口径逐字对）。
 - 2026-10-09：用户亲验通过置 [✓]。
