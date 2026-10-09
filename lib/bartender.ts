@@ -20,6 +20,20 @@ export const IVY_SYSTEM_PROMPT = [
   "Remember what the guest just said, respond naturally, and tease them now and then.",
 ].join("\n");
 
+/** 酒保回复语言（iOS 本机存用户选择；缺省 en，非法回落 en，沿交接）。 */
+export type BarLang = "en" | "yue" | "zh";
+
+export function parseBarLang(raw: unknown): BarLang {
+  return raw === "yue" ? "yue" : raw === "zh" ? "zh" : "en";
+}
+
+/** 语言覆盖行（追加到 system 末尾，覆盖"unless the guest clearly writes" 那条）。 */
+export const BAR_LANG_LINES: Record<BarLang, string> = {
+  en: "Reply only in English.",
+  zh: "只用普通话（繁体字）回复。",
+  yue: "Reply only in Hong Kong Cantonese written with Traditional Chinese characters（唔、咗、嘅、啲、係）。",
+};
+
 /** 非输入类事件：转成一条临时 user 指令（不进可见历史，只给模型看）。 */
 export const IVY_EVENT_INSTRUCTIONS = {
   greet: "(A guest just walked up to the bar. Greet them warmly and ask what they'd like tonight, in a line or two)",
@@ -34,12 +48,15 @@ export type IvyHistoryItem = {
   text: string;
 };
 
-/** 组装模型消息（历史只取最后 10 条，防止爆 token）。 */
+/** 组装模型消息（历史只取最后 10 条，防止爆 token；lang 缺省 en）。 */
 export function toMinimaxMessages(
   history: IvyHistoryItem[],
-  input: { message?: string; event?: IvyEvent },
+  input: { message?: string; event?: IvyEvent; lang?: BarLang },
 ): MinimaxChatMessage[] {
-  const msgs: MinimaxChatMessage[] = [{ role: "system", content: IVY_SYSTEM_PROMPT }];
+  const lang: BarLang = input.lang ?? "en";
+  const msgs: MinimaxChatMessage[] = [
+    { role: "system", content: `${IVY_SYSTEM_PROMPT}\n${BAR_LANG_LINES[lang]}` },
+  ];
   for (const h of history.slice(-10)) {
     const text = h.text.trim().slice(0, 500);
     if (text.length === 0) continue;

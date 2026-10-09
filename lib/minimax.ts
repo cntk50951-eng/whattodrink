@@ -83,10 +83,10 @@ export async function minimaxChat(
   return text;
 }
 
-/** 文字转语音（MP3 二进制；emotion 快乐；语种按文字自动切：含 CJK 走中文否则英文）。 */
+/** 文字转语音（MP3 二进制；emotion 快乐；languageBoost 显式优先，否则按文字自动切）。 */
 export async function minimaxTts(
   text: string,
-  opts: { apiKey: string; fetchFn?: FetchFn },
+  opts: { apiKey: string; fetchFn?: FetchFn; languageBoost?: "English" | "Chinese" | "Chinese,Yue" },
 ): Promise<Buffer> {
   const doFetch = opts.fetchFn ?? fetch;
   const hasCjk = /[㐀-䶿一-鿿豈-﫿]/.test(text);
@@ -100,7 +100,7 @@ export async function minimaxTts(
       model: MINIMAX_TTS_MODEL,
       text,
       stream: false,
-      language_boost: hasCjk ? "Chinese" : "English",
+      language_boost: opts.languageBoost ?? (hasCjk ? "Chinese" : "English"),
       output_format: "hex",
       voice_setting: {
         voice_id: MINIMAX_TTS_VOICE,

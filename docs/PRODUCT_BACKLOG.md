@@ -4069,3 +4069,34 @@ UR D.9　iOS 真推送 P1（E1 碰杯＋APNs 通道）[WIP]
 *改動記錄*
 - 2026-10-10：建檔置 [WIP]（WEB_HANDOFF_PUSH 输入＋三问答；直做）
 - 2026-10-10：实作 P1：0038＋devices 三端点（service 写）＋test-push（testOnly）＋PATCH /me push_prefs＋GET /me 回显＋counters（同口径）＋APNs 发送器（http2＋ES256 缓存＋collapse＋重试＋410 删行）＋E1 after() 触发＋三语文案＋openapi 1.22.0＋单测；缺 key 静默跳过。
+
+---
+
+UR F.11　酒保多语言＋线上稳定（v2-only，iOS-0.73 输入）[WIP]
+
+> iOS 实测线上连续 429＋人设英文写死；本单只改回复语言与稳定性，不新增接口。
+
+### 背景（问答定案，无阻塞项）
+- 429 定案：路由零限流，直透 MiniMax；直探测 200（key 有效、模型活），属上游短时限速。
+  修法：上游 429 透传＋`Retry-After: 30`，502 区分；`apiError` 加可选 headers（沿 apiOk）。
+- `lang` 缺省 en、非法回落 en（不 400，向后兼容）；system 末尾追加覆盖行。
+- TTS：显式 `languageBoost` 优先（en→English／zh→Chinese／yue→`Chinese,Yue`，fal 文档 enum 合法）；
+  缺省沿旧自动；音色沿用 female-shaonv（粤语自然度无法程序验，iOS 收听验收）。
+- 按 IP 60s 30 次（公开零写库口防刷额度；进程级尽力，真全局另上 infra）；chat＋voice 同限。
+- openapi 之前缺两条 bar 路径，本单顺手补上（契约先行）。
+
+### 範圍
+1. `lib/bartender.ts`（BarLang／覆盖行／组装）＋`lib/minimax.ts`（boost 覆写）＋`lib/rateLimit.ts`＋单测。
+2. 两路由（lang＋限频＋Retry-After＋chat 回 `lang`）＋openapi 1.23.0。
+3. CHANGELOG＋单测；零 migration。
+
+### 非目標
+- 流式、transcribe 改造、人设尺度、18+ 服务端、v1 任何文件。
+
+### AC（交接 §五）
+- 缺省／en 与现状一致；yue 繁体粤语用字；zh 普通话繁体；非法 lang 不报错按 en。
+- voice 三档读音对，粤语不用普通话读（收听验）。
+- 正常用量 20 连击无 429（自家限频 30/min 不误杀＋上游恢复）。
+
+*改動記錄*
+- 2026-10-10：建檔置 [WIP]（WEB_HANDOFF_BAR_CHAT 输入；直做）

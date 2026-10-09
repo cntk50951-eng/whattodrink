@@ -27,6 +27,8 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR F.11 酒保多语言＋线上稳定（v2-only，[WIP]，待联调）**
+  - `lang`（en 缺省／yue／zh，非法回落；system 追加覆盖行；voice boost 覆写，yue 用 Chinese,Yue）＋按 IP 60s 30 次＋上游 429 透传 Retry-After／502 区分＋`apiError` headers 加法＋openapi 补两条 bar 路径 1.23.0＋单测；429 定案为上游短时限速（直探 200）
 - **UR D.9 iOS 真推送 P1（v2-only，[WIP]，待 0038＋APNs key＋联调）**
   - 0038（devices 加 6 列＋users.push_prefs＋push_log＋索引＋本人 policy；push_log 零 policy 锁死）＋devices 三端点（service 写；upsert／re-bind／顶旧／解绑／更新）＋test-push（testOnly）＋PATCH /me push_prefs＋GET /me 回显＋counters（同口径＋cache 头）
   - APNs 发送器（http2 双 host＋ES256 JWT 缓存＋collapse＋重试＋410 删行）＋E1 after() 触发（dup 不重推）＋三语文案＋openapi 1.22.0＋单测；缺 key 静默跳过

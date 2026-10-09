@@ -88,3 +88,19 @@ describe("minimaxTts", () => {
     });
   });
 });
+
+describe("minimaxTts languageBoost", () => {
+  it("显式优先于自动判断", async () => {
+    const seen: string[] = [];
+    const fn = (async (_url: unknown, init?: { body?: unknown }) => {
+      seen.push(String(init?.body ?? ""));
+      return new Response(
+        JSON.stringify({ base_resp: { status_code: 0 }, data: { audio: "494433040000", status: 2 } }),
+        { status: 200 },
+      );
+    }) as unknown as typeof fetch;
+    await minimaxTts("有咩推介", { apiKey: "k", fetchFn: fn, languageBoost: "Chinese,Yue" });
+    const boosts = seen.map((b) => (JSON.parse(b) as { language_boost?: string }).language_boost);
+    expect(boosts).toEqual(["Chinese,Yue"]);
+  });
+});

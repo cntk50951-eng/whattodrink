@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   BARTENDER_NAME,
+  BAR_LANG_LINES,
   IVY_EVENT_INSTRUCTIONS,
   IVY_SYSTEM_PROMPT,
+  parseBarLang,
   toMinimaxMessages,
 } from "./bartender";
 
@@ -53,5 +55,28 @@ describe("toMinimaxMessages", () => {
 
   it("空历史空输入只有 system（路由层拦，组装不炸）", () => {
     expect(toMinimaxMessages([], {})).toHaveLength(1);
+  });
+});
+
+describe("parseBarLang", () => {
+  it("en 缺省；非法回落 en", () => {
+    expect(parseBarLang("yue")).toBe("yue");
+    expect(parseBarLang("zh")).toBe("zh");
+    expect(parseBarLang("en")).toBe("en");
+    expect(parseBarLang(undefined)).toBe("en");
+    expect(parseBarLang("jp")).toBe("en");
+    expect(parseBarLang(null)).toBe("en");
+  });
+});
+
+describe("toMinimaxMessages lang", () => {
+  it("system 末尾追加语言覆盖行（yue／zh／缺省 en）", () => {
+    const yue = toMinimaxMessages([], { message: "有咩推介", lang: "yue" });
+    expect(yue[0]?.content).toContain(BAR_LANG_LINES.yue);
+    expect(yue[0]?.content).toContain("Always reply in English");
+    const zh = toMinimaxMessages([], { message: "推荐", lang: "zh" });
+    expect(zh[0]?.content).toContain(BAR_LANG_LINES.zh);
+    const def = toMinimaxMessages([], { message: "hi" });
+    expect(def[0]?.content).toContain(BAR_LANG_LINES.en);
   });
 });

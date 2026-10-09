@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.22.0
+  version: 1.23.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -79,6 +79,98 @@ paths:
           $ref: "#/components/responses/InvalidParams"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/bar/chat:
+    post:
+      operationId: barChat
+      summary: 酒保对话（公开零写库；lang 可选 en 缺省／yue／zh，非法回落 en；按 IP 60s 30 次；上游 429 透传＋Retry-After，UR F.11）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  maxLength: 500
+                event:
+                  type: string
+                  enum: [greet, pat, cheers]
+                history:
+                  type: array
+                  maxItems: 10
+                  items:
+                    type: object
+                lang:
+                  type: string
+                  enum: [en, yue, zh]
+                  description: 回复语言（缺省 en；yue 繁体粤语用字；zh 普通话繁体）
+      responses:
+        "200":
+          description: 台词＋生效语言
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [text, lang]
+                properties:
+                  text:
+                    type: string
+                  lang:
+                    type: string
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "429":
+          description: 本机限频或上游限流（Retry-After 秒）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "502":
+          description: 上游故障
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/bar/voice:
+    post:
+      operationId: barVoice
+      summary: 酒保语音（公开；MP3 二进制；lang 可选，缺省按文字自动；yue 用 Chinese,Yue，UR F.11）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  maxLength: 500
+                lang:
+                  type: string
+                  enum: [en, yue, zh]
+      responses:
+        "200":
+          description: MP3（content-type audio/mpeg）
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "429":
+          description: 本机限频或上游限流（Retry-After 秒）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "502":
+          description: 上游故障
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/map/pins:

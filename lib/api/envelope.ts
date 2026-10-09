@@ -18,8 +18,10 @@ export function apiError(
   code: ApiErrorCode,
   message: string,
   status: number,
+  headers?: Record<string, string>,
 ): Response {
-  return Response.json({ error: { code, message } }, { status });
+  if (headers === undefined) return Response.json({ error: { code, message } }, { status });
+  return Response.json({ error: { code, message } }, { status, headers });
 }
 
 export function apiOk<T>(data: T, status = 200, headers?: Record<string, string>): Response {
