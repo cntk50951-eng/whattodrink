@@ -2677,6 +2677,8 @@ UR C.22　v2 霓虹點開黑底隨機照片 overlay [✓]
 - 2026-10-01：建檔置 [WIP]（問答定案取代 Sheet＋三路關閉＋components/drinks 交接；直接開工）
 - 2026-10-01：實作完待驗（`gallery.ts` 1 筆 GIF＋`V2RevealOverlay` 黑底 dialog＋`openReveal` 改道（pills／2189 沿舊）；`pickRandomIndex`＋5 單測；`revealTitle/Again/Close/PhotoAlt1`×3；build／lint／5 測綠；待親驗，未提交）
 - 2026-10-01：照片 3 張到齊（＋Budweiser／青島 GIF＋`revealPhotoAlt2/3`×3；池架構零改碼）；build／lint／5 測綠；待隨機親驗，未提交）
+- 2026-10-09：照片池換 6 張 6s 酒款（舊 commercial×3 退役；Sapporo／cocktail／香檳／紅酒／威士忌／白酒＋`revealPhotoAlt1-6`×3；架構零改）；build／lint／5 測綠；未提交）
+- 2026-10-09：6 張轉播一次即停（去 NETSCAPE 循環塊，像素零改；帧数／尺寸與源一致；build 綠；未提交）
 
 ---
 

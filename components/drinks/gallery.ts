@@ -1,8 +1,11 @@
 import type { StaticImageData } from "next/image";
 
-import splash1 from "./sapporo_commercial_9x16_no_loop.gif";
-import splash2 from "./budweiser_commercial_9x16_no_loop.gif";
-import splash3 from "./tsingtao_commercial_9x16_no_loop.gif";
+import sapporoBeer from "./Sapporo_beer_6s.gif";
+import cocktail from "./Cocktail2_6s.gif";
+import champagne from "./champagne_non_loop-2.gif";
+import redWine from "./red_wine_6s.gif";
+import whisky from "./whisky_6s.gif";
+import whiteWine from "./white_wine_6s.gif";
 
 export type RevealPhoto = {
   src: StaticImageData;
@@ -12,12 +15,15 @@ export type RevealPhoto = {
 
 /**
  * UR C.22 揭曉照片池——加照片只 append 此陣列（`{src, altKey}`＋v2 三語 key），零改碼。
- * 現 1 筆（驗證用）；照片多了之後的真抽籤另開 UR。
+ * 2026-10-09：舊 3 張 commercial GIF 退役，換 6 張 6s 酒款（Sapporo／cocktail／香檳／紅酒／威士忌／白酒）。
  */
 const PHOTOS: RevealPhoto[] = [
-  { src: splash1, altKey: "revealPhotoAlt1" },
-  { src: splash2, altKey: "revealPhotoAlt2" },
-  { src: splash3, altKey: "revealPhotoAlt3" },
+  { src: sapporoBeer, altKey: "revealPhotoAlt1" },
+  { src: cocktail, altKey: "revealPhotoAlt2" },
+  { src: champagne, altKey: "revealPhotoAlt3" },
+  { src: redWine, altKey: "revealPhotoAlt4" },
+  { src: whisky, altKey: "revealPhotoAlt5" },
+  { src: whiteWine, altKey: "revealPhotoAlt6" },
 ];
 
 export function revealPhotoCount(): number {
