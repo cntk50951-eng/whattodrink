@@ -1,7 +1,10 @@
 -- UR D.6＋列表提速：會話列表單 RPC（N+1 收斂到 1 roundtrip）。
 -- `SECURITY DEFINER`＋首行 `auth.uid() = p_uid` 硬校驗（對不上直接拋，不回空，fail-closed）；
--- 匿名／非本人調用即錯；表 RLS 不動。Dashboard 貼上執行（可重放：OR REPLACE）。
+-- 匿名／非本人調用即錯；表 RLS 不動。Dashboard 貼上執行（可重放：先卸後掛；
+-- OR REPLACE 改不了返回類型，舊函數在庫即 42P13，故先 DROP）。
 -- 畢業線：上量後把未讀計數列物化，本函數簽名不變（route 零改）。
+
+DROP FUNCTION IF EXISTS get_conversations(uuid, int);
 
 CREATE OR REPLACE FUNCTION get_conversations(p_uid uuid, p_limit int)
 RETURNS TABLE (
@@ -43,7 +46,10 @@ BEGIN
   )
   SELECT
     c.id, u.id, u.nickname, u.avatar_url,
-    lm.id, lm.sender_id, lm.kind, lm.body, lm.created_at, lm.secs,
+    lm.id, lm.sender_id,
+    -- DEF-20261003-003 回归合并（0016 同款）：enum 必须显式转 text；
+    -- 此前 0014 无此 cast，重贴即覆盖掉 0016 的修复致 42804 复发，故合入本文件为唯一真相。
+    lm.kind::text, lm.body, lm.created_at, lm.secs,
     (
       SELECT count(*)
       FROM messages um

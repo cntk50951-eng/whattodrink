@@ -2570,6 +2570,7 @@ UR D.6　圖片＋語音附件 [WIP]
 *改動記錄*
 - 2026-09-27：開工置 [WIP]；實作完待驗（0013 RLS＋0014 RPC＋sign/view 雙端點＋發送附件校验＋列表單 RPC＋composer 圖／音＋氣泡＋snippet 章＋7 組 key；`VoicePlayer` 牆耦合另起小件；轉寫另議；tsc 我方淨（同伴 V2Home/moderation 施工中紅＋刪頁 artifact，不碰）／lint 0 error（同伴 gathering 1 error 不碰）／單測綠；待用戶 Dashboard 三動作＋雙號聯驗＋合入）
 - 2026-10-03：DEF-20261003-003 定罪＋修复（`kind` enum→text 缺显式转换致 42804；其余列已对版）——`0016_conversations_kind_text.sql`（`lm.kind::text`，可重放）已写＋用户 Dashboard 跑通＋`GET /conversations` 回 200 已验，随本车合入
+- 2026-10-09：DEF-20261003-003 复发转回 Fixing：0014 文件无 cast，重贴覆盖致复发；cast 已合入 0014 为唯一真相（0016 留档），用户重贴 0014 整份＋刷新正常转 Verified
 
 ---
 
@@ -3909,7 +3910,7 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - web 范围：v2 附近页（高德 Web JS 直调 POI＋列表＋peek 卡＋外跳导航；站内步行导航二期）。
 - 非目标：新后端表（POI 不入库）、v1。
 
-### UR G.5　好友雷达＋搜索（v2）[]
+### UR G.5　好友雷达＋搜索（v2）[WIP]
 - iOS 对标：雷达小地图（方位距离落点）＋昵称即滤＋recents（FriendListView／FriendSearchView）。
 - web 范围：v2 聊天页增强（雷达条＋搜索框，本地过滤零新端点，沿 iOS `sortFriends/filterFriends` 口径）。
 - 非目标：新端点、v1。
@@ -3921,6 +3922,8 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - 2026-10-09：G.2 置 [WIP] 开工（酒闻列表；iOS-0.59 对标；入口定 pills 酒闻 pill＋底部 Sheet，不新开路由）。
 - 2026-10-09：G.3 置 [WIP] 开工（酒局看板；iOS-0.57/0.65 对标；pills 入口＋Sheet 内列表／详情／发局三态；发局地点文本＋当前位置坐标，POI 限定二期）。
 - 2026-10-09：G.4 置 [WIP] 开工（附近酒吧；iOS-0.42 对标）。家底：C.8 只换了瓦片（官方 JS API 另开即本单）；POI 走服务端 `/places/search`（高德优先＋Nominatim 回退）；库里无 AMAP_KEY，用户新申 Web 服务 key（iOS 的 Bundle 绑定 key 调不通 restapi，账号重用另建；白名单空着，Vercel 出口动态）。key 实测通（place/around 回 397 条＋typecode 080304）。
+- 2026-10-09：G.5 置 [WIP] 开工（好友雷达＋搜索；iOS FriendList/Radar 对标）。家底：列表 `mergeFriendList` 已是在线组＋末信序（≈iOS sortFriends）；entries 无坐标，雷达另拉 `/friends/live`（live_lat/lng）＋本机定位；无 bearing helper，现加。
+- 2026-10-09：G.5 实作：聊天页搜索框（本地子串＋无匹配态）＋最近 8 chips（localStorage）＋雷达条（本人居中＋方位距离落点 SVG＋点点进房；无坐标整条不挂）＋`initialBearing`／`filterFriends` 纯函数＋单测（iOS 口径）；v2 三语 key×4；零新端点。
 - 2026-10-09：G.4 实作：`GET /places/around`（高德 place/around 代理，keywords 避分类码猜测；3km 空扩 5km；GCJ→WGS 落 Leaflet；无 Key 503）＋`/v2/nearby` 独立页（imperative Leaflet＋provider 瓦片＋双色钉＋peek 卡＋Apple/Google 外跳＋tel:＋图心重搜＋chips 过滤）＋pills 酒吧 pill＋三语 key×8；`gcj02ToWgs84`＋往返单测；站内步行导航＋营业中筛选二期。
 - 2026-10-09：用户指令置 [✓]（本地 around 500 系本机 VPN 拦 Node 出站，非代码问题，见 memory；高德直连 200 正常；Vercel 记得配 AMAP_KEY）。
 - 2026-10-09：G.3 实作：`V2PartySheet`（探索／我的双籤＋席位条＋详情＋参加／退出／撤局＋409/410 人话）＋`V2PartyForm`（地点／城市／时间 14d／总量男女互锁／成局人数／买单三段）＋pills 酒局 pill（匿名可看）＋v2 三语 key×27；API／migration／yaml 零改动（E.23 现成）。
