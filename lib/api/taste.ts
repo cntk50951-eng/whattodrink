@@ -5,13 +5,27 @@
  */
 
 export const TASTE_GROUPS = {
-  spirits: ["whisky", "gin", "rum", "tequila", "vodka", "soju", "brandy", "baijiu"],
-  cocktail: ["classic", "signature", "highball", "mocktail"],
-  beer: ["lager", "ipa", "craft", "stout", "wheat"],
-  wine: ["red", "white", "sparkling", "rose"],
-  sake: ["junmai", "daiginjo", "umeshu", "shochu"],
-  other: ["other"],
+  beer: ["lager", "craft", "ipa", "hazy_ipa", "pale_ale", "pilsner", "wheat", "stout", "porter", "sour", "gose", "saison", "belgian_ale", "fruit_beer", "radler", "bock", "dark_lager"],
+  whisky: ["japanese_whisky", "scotch", "single_malt", "blended_scotch", "bourbon", "irish_whiskey", "peated", "islay", "speyside", "highland", "lowland", "campbeltown", "islands", "rye", "tennessee", "taiwan_whisky", "canadian_whisky", "world_whisky"],
+  cocktail: ["highball", "classic", "signature", "spritz", "tiki", "mocktail", "old_fashioned", "negroni", "martini", "espresso_martini", "margarita", "mojito", "whisky_sour", "gin_tonic", "moscow_mule", "daiquiri", "manhattan", "cosmopolitan", "paper_plane", "penicillin", "mai_tai", "pina_colada", "long_island", "bloody_mary", "tom_collins", "sidecar", "french_75", "boulevardier", "caipirinha", "white_russian", "pisco_sour", "singapore_sling"],
+  wine: ["red", "white", "rose", "orange_wine", "natural", "dessert", "icewine", "port", "sherry", "madeira", "bordeaux", "burgundy", "cabernet_sauvignon", "merlot", "pinot_noir", "syrah", "malbec", "tempranillo", "nebbiolo", "sangiovese", "chardonnay", "sauvignon_blanc", "riesling", "pinot_grigio", "chenin_blanc", "moscato"],
+  sparkling: ["champagne", "prosecco", "cava", "cremant", "lambrusco", "asti", "sparkling_rose"],
+  sake: ["junmai_daiginjo", "junmai_ginjo", "junmai", "daiginjo", "ginjo", "honjozo", "tokubetsu", "nigori", "namazake", "sparkling_sake", "umeshu", "yuzushu", "genshu", "koshu"],
+  korean: ["soju", "fruit_soju", "somaek", "makgeolli", "bokbunja", "cheongju"],
+  chinese: ["meiguilu", "shaoxing", "huadiao", "huangjiu", "kaoliang", "baijiu", "jiangxiang_baijiu", "nongxiang_baijiu", "qingxiang_baijiu", "mixiang_baijiu", "fengxiang_baijiu", "wujiapi", "yaojiu", "mijiu", "osmanthus_wine"],
+  gin: ["london_dry_gin", "old_tom_gin", "plymouth_gin", "genever", "sloe_gin", "flavoured_gin"],
+  rum: ["white_rum", "gold_rum", "dark_rum", "spiced_rum", "aged_rum", "rhum_agricole", "cachaca"],
+  tequila: ["tequila_blanco", "tequila_reposado", "tequila_anejo", "tequila_extra_anejo", "mezcal"],
+  brandy: ["cognac", "xo_cognac", "armagnac", "calvados", "pisco", "grappa", "kirsch", "spanish_brandy"],
+  shochu: ["imo_shochu", "mugi_shochu", "kome_shochu", "awamori", "kokuto_shochu", "soba_shochu"],
+  liqueur: ["amaro", "vermouth", "aperitivo", "coffee_liqueur", "cream_liqueur", "orange_liqueur", "herbal_liqueur", "nut_liqueur", "bitters"],
+  spirits: ["vodka", "flavored_vodka", "absinthe", "aquavit", "anise_spirit"],
+  other: ["fruit_wine", "cider", "perry", "mead", "chuhai", "rtd", "hard_seltzer"],
+  zero: ["zero_beer", "zero_spirit", "zero_wine"],
 } as const;
+
+/** Taxonomy 版本（大类归属变更即 bump；缓存 payload 带 v，旧版强制重算，零迁移）。 */
+export const TAXONOMY_VERSION = 2;
 
 export type TasteGroupKey = keyof typeof TASTE_GROUPS;
 
@@ -46,10 +60,9 @@ const BEER_CATEGORY_MAP: Record<string, { group: TasteGroupKey; sub: string | nu
   wheat: { group: "beer", sub: "wheat" },
   "red wine": { group: "wine", sub: "red" },
   "white wine": { group: "wine", sub: "white" },
-  sparkling: { group: "wine", sub: "sparkling" },
   rose: { group: "wine", sub: "rose" },
-  whisky: { group: "spirits", sub: "whisky" },
-  whiskey: { group: "spirits", sub: "whisky" },
+  whisky: { group: "whisky", sub: null },
+  whiskey: { group: "whisky", sub: null },
   cocktail: { group: "cocktail", sub: null },
   highball: { group: "cocktail", sub: "highball" },
   mocktail: { group: "cocktail", sub: "mocktail" },
@@ -57,14 +70,19 @@ const BEER_CATEGORY_MAP: Record<string, { group: TasteGroupKey; sub: string | nu
   junmai: { group: "sake", sub: "junmai" },
   daiginjo: { group: "sake", sub: "daiginjo" },
   umeshu: { group: "sake", sub: "umeshu" },
-  shochu: { group: "sake", sub: "shochu" },
-  soju: { group: "spirits", sub: "soju" },
-  gin: { group: "spirits", sub: "gin" },
-  rum: { group: "spirits", sub: "rum" },
+  shochu: { group: "shochu", sub: null },
+  soju: { group: "korean", sub: "soju" },
+  gin: { group: "gin", sub: null },
+  rum: { group: "rum", sub: null },
   vodka: { group: "spirits", sub: "vodka" },
-  brandy: { group: "spirits", sub: "brandy" },
-  baijiu: { group: "spirits", sub: "baijiu" },
-  tequila: { group: "spirits", sub: "tequila" },
+  brandy: { group: "brandy", sub: null },
+  baijiu: { group: "chinese", sub: "baijiu" },
+  tequila: { group: "tequila", sub: null },
+  cider: { group: "other", sub: "cider" },
+  makgeolli: { group: "korean", sub: "makgeolli" },
+  "pale ale": { group: "beer", sub: "pale_ale" },
+  "hazy ipa": { group: "beer", sub: "hazy_ipa" },
+  sparkling: { group: "sparkling", sub: null },
 };
 
 export function beerCategorySignal(

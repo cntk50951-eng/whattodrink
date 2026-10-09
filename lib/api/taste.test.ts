@@ -7,14 +7,15 @@ import {
   isTasteKey,
   parsePreferences,
   parseTags,
+  TAXONOMY_VERSION,
 } from "./taste";
 
 describe("isTasteKey／groupOfKey", () => {
   it("大小类合法；未知拒；子类反推大类", () => {
-    expect(isTasteKey("whisky")).toBe(true);
+    expect(isTasteKey("japanese_whisky")).toBe(true);
     expect(isTasteKey("spirits")).toBe(true);
     expect(isTasteKey("可乐")).toBe(false);
-    expect(groupOfKey("whisky")).toBe("spirits");
+    expect(groupOfKey("japanese_whisky")).toBe("whisky");
     expect(groupOfKey("sake")).toBe("sake");
     expect(groupOfKey("可乐")).toBeNull();
   });
@@ -22,13 +23,25 @@ describe("isTasteKey／groupOfKey", () => {
 
 describe("beerCategorySignal", () => {
   it("精确命中＋显式映射＋无信号 null", () => {
-    expect(beerCategorySignal("whisky")).toEqual({ group: "spirits", sub: "whisky" });
+    expect(beerCategorySignal("whisky")).toEqual({ group: "whisky", sub: null });
     expect(beerCategorySignal("lager")).toEqual({ group: "beer", sub: "lager" });
     expect(beerCategorySignal("craft beer")).toEqual({ group: "beer", sub: "craft" });
     expect(beerCategorySignal("red wine")).toEqual({ group: "wine", sub: "red" });
     expect(beerCategorySignal("cocktail")).toEqual({ group: "cocktail", sub: null });
+    expect(beerCategorySignal("cider")).toEqual({ group: "other", sub: "cider" });
+    expect(beerCategorySignal("pale ale")).toEqual({ group: "beer", sub: "pale_ale" });
+    expect(beerCategorySignal("hazy ipa")).toEqual({ group: "beer", sub: "hazy_ipa" });
+    expect(beerCategorySignal("makgeolli")).toEqual({ group: "korean", sub: "makgeolli" });
     expect(beerCategorySignal("精酿之光")).toBeNull();
     expect(beerCategorySignal(null)).toBeNull();
+  });
+  it("§十二搬家：soju→korean，baijiu→chinese，shochu/gin/rum/tequila/brandy/sparkling 自立大类", () => {
+    expect(groupOfKey("soju")).toBe("korean");
+    expect(groupOfKey("baijiu")).toBe("chinese");
+    expect(groupOfKey("gin")).toBe("gin");
+    expect(groupOfKey("sparkling")).toBe("sparkling");
+    expect(groupOfKey("shochu")).toBe("shochu");
+    expect(TAXONOMY_VERSION).toBe(2);
   });
 });
 
@@ -65,11 +78,11 @@ describe("aggregateTaste", () => {
       { tags: ["sake"], beerCategory: null },
     ]);
     expect(r.sample_count).toBe(3);
-    const spirits = r.groups.find((g) => g.key === "spirits");
+    const whisky = r.groups.find((g) => g.key === "whisky");
     const cocktail = r.groups.find((g) => g.key === "cocktail");
     const beer = r.groups.find((g) => g.key === "beer");
-    expect(spirits?.strength).toBe(1);
-    expect(spirits?.items).toEqual([{ key: "whisky", strength: 1 }]);
+    expect(whisky?.strength).toBe(1);
+    expect(whisky?.items).toEqual([]);
     expect(cocktail?.items).toEqual([{ key: "highball", strength: 1 }]);
     expect(beer?.items).toEqual([{ key: "lager", strength: 1 }]);
     expect(r.groups.find((g) => g.key === "sake")?.strength).toBe(1);

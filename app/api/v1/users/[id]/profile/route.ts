@@ -3,7 +3,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { canViewCheckin, parseCheckinIdParam, parseMineParams } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
 import { hkAge, collectNightStats, weekNights, weekStreak } from "@/lib/api/profile";
-import { aggregateTaste } from "@/lib/api/taste";
+import { aggregateTaste, TAXONOMY_VERSION } from "@/lib/api/taste";
 
 type UserRow = {
   id: string;
@@ -71,6 +71,7 @@ async function tasteInference(
       cache === null ||
       !Number.isFinite(Date.parse(cache.computed_at)) ||
       nowMs - Date.parse(cache.computed_at) > TASTE_STALE_MS ||
+      (cache.payload as Record<string, unknown> | null)?.v !== TAXONOMY_VERSION ||
       (newest !== null &&
         (cache.checkin_watermark === null || newest > cache.checkin_watermark));
     if (!stale && cache !== null) {
@@ -121,7 +122,7 @@ async function tasteInference(
     await supa.from("user_taste_inference").upsert(
       {
         user_id: targetId,
-        payload: { groups },
+        payload: { groups, v: TAXONOMY_VERSION },
         sample_count,
         computed_at: computedIso,
         checkin_watermark: newest,

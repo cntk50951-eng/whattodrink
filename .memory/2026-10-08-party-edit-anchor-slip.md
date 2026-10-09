@@ -23,3 +23,7 @@
 - 症狀相同：`oldString` 只取目标行（如 `- **UR E.25...`），`newString` 以新块开头但漏了目标行——顶掉旧条。
 - 硬化解法：列表头插入时，`oldString` 必须连带**下一行**（要活下来的行）一起取，
   `newString`＝新块＋原两行。锚定"结束边界"而非只锚"开始行"。
+
+## 同类追記2（2026-10-09，taste 映射搬家漏删旧行）
+- 症状：`sparkling` 从 wine 搬到自立大类，新行加了，旧 `{wine, sparkling}` 行没删 → tsc TS1117 重键。
+- 解法：搬 key 时用 grep 确认旧键全清（`grep -n "sparkling" file` 只剩一处）；测试先改期望再跑。
