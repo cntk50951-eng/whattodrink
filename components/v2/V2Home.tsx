@@ -56,6 +56,7 @@ import { FriendPicker, ShareDoneDialog } from "@/components/v2/FriendPicker";
 import { CheersMailbox } from "@/components/v2/CheersMailbox";
 import { V2SavesSheet } from "@/components/v2/V2SavesSheet";
 import { V2NewsSheet } from "@/components/v2/V2NewsSheet";
+import { V2PartySheet } from "@/components/v2/V2PartySheet";
 import { OnboardingSheet } from "@/components/v2/OnboardingSheet";
 import { ageOf, shouldOnboard } from "@/lib/api/profile";
 import type { MeJson } from "@/lib/mode";
@@ -366,6 +367,8 @@ export function V2Home() {
   const [savesOpen, setSavesOpen] = useState(false);
   // UR G.2 酒闻列表开关（pills 酒闻 pill＋底部 Sheet，不新开路由）。
   const [newsOpen, setNewsOpen] = useState(false);
+  // UR G.3 酒局看板开关（pills 酒局 pill＋Sheet 内列表／详情／发局三态）。
+  const [partyOpen, setPartyOpen] = useState(false);
   // UR G.1 收藏行点开详情（他人钉 openPin／自家 wantSheet，沿 E.13 深链口径）。
   function openSaved(id: string): void {
     if (apiPins.some((p) => p.id === id)) {
@@ -1880,6 +1883,17 @@ export function V2Home() {
           <Newspaper aria-hidden />
           {t2("newsTitle")}
         </Button>
+        {/* UR G.3 酒局 pill（匿名可看探索；我的籤举登录，沿收藏口径）。 */}
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0 rounded-full bg-card shadow-md ring-1 ring-foreground/10"
+          onClick={() => setPartyOpen(true)}
+          aria-label={t2("partyTitle")}
+        >
+          <Martini aria-hidden />
+          {t2("partyTitle")}
+        </Button>
       </div>
       {/* 足跡浮條（頂部容器內流式排布，永不與 pills 重疊） */}
       {trailOn && (
@@ -3135,6 +3149,8 @@ export function V2Home() {
       )}
       {/* UR G.2 酒闻列表。 */}
       {newsOpen && <V2NewsSheet open onClose={() => setNewsOpen(false)} />}
+      {/* UR G.3 酒局看板。 */}
+      {partyOpen && <V2PartySheet open onClose={() => setPartyOpen(false)} />}
       {/* UR E.18 首登＋個人表單（条件挂载，初值新鲜；保存即刷 me）。 */}
       {showOnboard && meJson !== null && (
         <OnboardingSheet

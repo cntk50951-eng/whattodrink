@@ -27,6 +27,9 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
+- **UR G.3 酒局看板（v2-only，[✓]，用户亲验通过）**
+  - `V2PartySheet`（85svh；行卡对标 iOS：店名＋城市·距离＋时间·买单＋席位条＋构成 capsule＋发起人＋行内四态；详情：成局 badge＋发起人卡＋地点／时间买单盒＋席位＋成员＋撤局两段确认＋安全盒；测试重置行）＋`V2PartyForm`（4 时段＋去门槛 stepper＋安全盒常显）＋pills 酒局 pill＋v2 三语 key×51；发局地点文本＋当前位置坐标（POI 限定二期）
+  - 纯函数 `partyMixLine/Remain/JoinState/Progress/SlotStartAt`＋单测（iOS 口径）；API／migration／yaml 零改动
 - **UR G.2 酒闻列表（v2-only，[✓]，用户亲验通过）**
   - pills 酒闻 pill（匿名可看）＋`V2NewsSheet`（HK／大陆双籤＋失败留旧＋toast＋刷新键＋原文外链＋缺图 fail-soft＋骨架空态）＋v2 三语 key×6；API／migration／yaml 零改动（E.24 现成）
 - **UR G.1 我的收藏（v2-only，[✓]，用户亲验通过，已合入）**

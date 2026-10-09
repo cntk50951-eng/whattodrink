@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { countGenders, hkDayStartISO, mineOrCondition, parsePartyBody, partyExpiresAt, seatFor } from "./party";
+import { countGenders, hkDayStartISO, mineOrCondition, parsePartyBody, partyExpiresAt, partyJoinState, partyMixLine, partyMixText, partyProgress, partyRemainText, partySlotStartAt, seatFor } from "./party";
 
 describe("parsePartyBody", () => {
   const NOW = Date.parse("2026-10-08T00:00:00Z");
@@ -85,6 +85,51 @@ describe("countGenders", () => {
     expect(countGenders(["male", "female", "male"])).toEqual({ male: 2, female: 1 });
     expect(countGenders(["secret", null, "other", ""])).toEqual({ male: 0, female: 0 });
     expect(countGenders([])).toEqual({ male: 0, female: 0 });
+  });
+});
+
+describe("partyProgress", () => {
+  it("0–1 钳制；非法回 0", () => {
+    expect(partyProgress(3, 6)).toBe(0.5);
+    expect(partyProgress(9, 6)).toBe(1);
+    expect(partyProgress(0, 0)).toBe(0);
+    expect(partyProgress(-1, 6)).toBe(0);
+  });
+});
+
+describe("partyMixLine", () => {  it("构成＋余量；零值省略；無配額沿舊", () => {
+    expect(partyMixText(3, 2)).toBe("3男 2女");
+    expect(partyMixText(0, 0)).toBe("");
+    expect(partyRemainText(2, 2, 2, 2)).toBeNull();
+    expect(partyRemainText(0, 0, 0, 0)).toBeNull();
+    expect(partyMixLine(3, 2, 2, 2)).toBe("3男 2女");
+    expect(partyMixLine(1, 0, 2, 2)).toBe("1男 · 還差1男 還差2女");
+    expect(partyMixLine(0, 0, 2, 0)).toBe("還差2男");
+  });
+});
+
+describe("partyJoinState", () => {
+  it("cancelled＞host＞joined＞full＞joinable", () => {
+    expect(partyJoinState("cancelled", true, true, 9, 9)).toBe("cancelled");
+    expect(partyJoinState("open", true, false, 0, 6)).toBe("host");
+    expect(partyJoinState("open", false, true, 3, 6)).toBe("joined");
+    expect(partyJoinState("open", false, false, 6, 6)).toBe("full");
+    expect(partyJoinState("open", false, false, 2, 6)).toBe("joinable");
+  });
+});
+
+describe("partySlotStartAt", () => {
+  // 2026-10-09T10:00Z ＝ HK 18:00（未过 21:00，tonight 取当天）。
+  const NOW = Date.parse("2026-10-09T10:00:00Z");
+  it("now／half／custom 直给；tonight 取 HK 21:00", () => {
+    expect(partySlotStartAt("now", 0, NOW)).toBe(NOW);
+    expect(partySlotStartAt("half", 0, NOW)).toBe(NOW + 30 * 60_000);
+    expect(partySlotStartAt("custom", NOW + 3600_000, NOW)).toBe(NOW + 3600_000);
+    expect(partySlotStartAt("tonight", 0, NOW)).toBe(Date.parse("2026-10-09T13:00:00Z"));
+  });
+  it("过 21:00 即次日", () => {
+    const late = Date.parse("2026-10-09T14:00:00Z"); // HK 22:00
+    expect(partySlotStartAt("tonight", 0, late)).toBe(Date.parse("2026-10-10T13:00:00Z"));
   });
 });
 

@@ -121,6 +121,84 @@ export function countGenders(genders: (string | null)[]): { male: number; female
   return { male, female };
 }
 
+/** 席位进度（0–1 钳制；进度条用，沿 iOS partyProgress）。 */
+export function partyProgress(joined: number, total: number): number {
+  if (!Number.isFinite(joined) || !Number.isFinite(total) || total <= 0) return 0;
+  return Math.min(1, Math.max(0, joined / total));
+}
+
+/** 构成文案（"3男2女"；零值省略段，沿 iOS partyMixText）。 */
+export function partyMixText(male: number, female: number): string {
+  const parts: string[] = [];
+  if (male > 0) parts.push(`${male}男`);
+  if (female > 0) parts.push(`${female}女`);
+  return parts.join(" ");
+}
+
+/** 性别余量文案（"還差1男2女"；無配額／已滿回 null，沿 iOS partyRemainText）。 */
+export function partyRemainText(
+  seatsMale: number,
+  seatsFemale: number,
+  maleCount: number,
+  femaleCount: number,
+): string | null {
+  if (seatsMale <= 0 && seatsFemale <= 0) return null;
+  const parts: string[] = [];
+  const rm = seatsMale - maleCount;
+  const rf = seatsFemale - femaleCount;
+  if (rm > 0) parts.push(`還差${rm}男`);
+  if (rf > 0) parts.push(`還差${rf}女`);
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
+/** 混合行（构成＋余量；無余量沿舊構成，沿 iOS partyMixLine）。 */
+export function partyMixLine(
+  maleCount: number,
+  femaleCount: number,
+  seatsMale: number,
+  seatsFemale: number,
+): string {
+  const base = partyMixText(maleCount, femaleCount);
+  const r = partyRemainText(seatsMale, seatsFemale, maleCount, femaleCount);
+  if (r === null) return base;
+  return base === "" ? r : `${base} · ${r}`;
+}
+
+export type PartyJoinState = "host" | "joined" | "joinable" | "full" | "cancelled";
+
+/** 参加位判定（cancelled 优先终态；isMine 优先 host；joined 次之；满员锁，沿 iOS）。 */
+export function partyJoinState(
+  status: string,
+  isMine: boolean,
+  joinedByMe: boolean,
+  joinedCount: number,
+  seatsTotal: number,
+): PartyJoinState {
+  if (status === "cancelled") return "cancelled";
+  if (isMine) return "host";
+  if (joinedByMe) return "joined";
+  if (joinedCount >= seatsTotal) return "full";
+  return "joinable";
+}
+
+/** 发局时段（now 即时／half＋30分／tonight 当天香港 21:00 过即次日／custom 直给，沿 iOS）。 */
+export type PartySlot = "now" | "half" | "tonight" | "custom";
+
+export function partySlotStartAt(
+  slot: PartySlot,
+  customMs: number,
+  nowMs: number,
+): number {
+  if (slot === "now") return nowMs;
+  if (slot === "half") return nowMs + 30 * 60_000;
+  if (slot === "custom") return customMs;
+  // tonight：当天 Asia/Hong_Kong 21:00，过了即次日（不用 Intl，纯算避 locale 坑）。
+  const hk = nowMs + 8 * 3600_000;
+  const day = Math.floor(hk / 86_400_000);
+  const t = day * 86_400_000 + 21 * 3600_000 - 8 * 3600_000;
+  return t <= nowMs ? t + 86_400_000 : t;
+}
+
 /** mine 档 PostgREST `or` 条件（我发起＋我参加；空参加即只查发起，避免 `in.()` 空集语法错）。 */
 export function mineOrCondition(userId: string, joinedIds: string[]): string {
   const parts = [`host_user_id.eq.${userId}`];
