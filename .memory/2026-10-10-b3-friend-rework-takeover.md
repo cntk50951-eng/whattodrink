@@ -26,3 +26,6 @@
 - 接手驗（2026-10-10 晚）：逐条按 §六重走验出两缺口——POST 互发翻转不清 mute
   （成好友仍永久禁言，已补；已好友分支顺手自愈）＋DELETE 非好友调用误写禁言
   （已改为删行零条直接回）；tsc 零错复验通过。
+- 推送：inline token（GITHUB_TOKEN）本仓 `.env` 无且猜错 org 失败；
+  `git push origin main` 走本机存根一次成功。判例：先看 `git remote -v`＋本机存根，
+  不硬拼 inline URL。
