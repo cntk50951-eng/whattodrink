@@ -43,11 +43,51 @@ function asFiniteMs(v: unknown): number | null {
 /** `POST /conversations {user_id}`：只收對方 id，其餘 server 派生。 */
 export function parseCreateConversationBody(
   raw: unknown,
-): { user_id: string } | { error: string } {
+): { user_id: string; origin: ConversationOrigin } | { error: string } {
   if (!isRecord(raw)) return { error: "body 需为对象" };
   const user_id = asNonEmptyString(raw.user_id);
   if (user_id === null) return { error: "user_id 必填（1–128 字）" };
-  return { user_id };
+  return { user_id, origin: parseConversationOrigin((raw as Record<string, unknown>).origin) };
+}
+
+/** UR D.10 会话来源（建会话依据；好友建即 friend；非法回落 direct，不 400）。 */
+export type ConversationOrigin = "friend" | "cheers" | "party" | "profile" | "direct";
+
+export function parseConversationOrigin(raw: unknown): ConversationOrigin {
+  if (
+    raw === "friend" ||
+    raw === "cheers" ||
+    raw === "party" ||
+    raw === "profile" ||
+    raw === "direct"
+  ) {
+    return raw;
+  }
+  return "direct";
+}
+
+/** UR D.10 陌生人配额（对方最新消息后我的连续数；3 达线拒，沿交接 §3.2）。 */
+export const STRANGER_MSG_LIMIT = 3;
+
+export type ChatLiteMsg = { sender_id: string; created_at: string };
+
+/**
+ * 配额计算（消息按 created_at 升序传入；返回我方连续数 used＋剩 remaining）。
+ * 对方任意一条即清零（其后只数我的）；空列 used 0。
+ */
+export function strangerQuota(
+  ordered: ChatLiteMsg[],
+  myId: string,
+): { used: number; remaining: number } {
+  let used = 0;
+  for (const m of ordered) {
+    if (m.sender_id === myId) {
+      used += 1;
+    } else {
+      used = 0;
+    }
+  }
+  return { used, remaining: Math.max(0, STRANGER_MSG_LIMIT - used) };
 }
 
 /* ---- 不透明 cursor（base64url JSON；壞了＝400，不猜，沿 wall 口徑） ---- */
@@ -330,6 +370,10 @@ export type ConversationJson = {
   muted: boolean;
   /** 末動 Epoch ms（末條時間，無條則建會時間；列表排序鍵）。 */
   updated_at: number;
+  /** UR D.10 行三字段（好友分区＋建会话依据＋陌生人配额，好友行 quota null）。 */
+  is_friend: boolean;
+  origin: string;
+  quota: { limit: number; used: number; remaining: number } | null;
 };
 
 /** 消息行映射：壞行回 null（呼叫方跳過）；`mine` 由呼叫方傳 me 派生。 */

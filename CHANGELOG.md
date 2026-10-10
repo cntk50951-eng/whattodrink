@@ -27,7 +27,8 @@
   - 验收返工 round-5：杯子精修（玻璃高光＋酒体上浅下深＋扇形泡沫边＋内外阴影立体＋把手加粗＋数字字體高光，杯 22×26 落点不变；纯 CSS，零 DOM 改动，未跑 gate）
 
 ### Added
-- **UR F.11 酒保多语言＋线上稳定（v2-only，[WIP]，待联调）**
+- **UR D.10 陌生人消息（v2-only，[WIP]，待 0039＋联调）**
+  - 0039 origin 列；建会话重写（去 areFriends 门＋拉黑 404＋未成年＋日 10＋is_friend/origin）；发消息配额（stranger_quota 429＋kind 门＋quota 回显）＋分享放宽（碰过帖）；列表三字段；counters 拆分 badge 四数相加；prefs stranger_chat；openapi 1.24.0＋单测
   - `lang`（en 缺省／yue／zh，非法回落；system 追加覆盖行；voice boost 覆写，yue 用 Chinese,Yue）＋按 IP 60s 30 次＋上游 429 透传 Retry-After／502 区分＋`apiError` headers 加法＋openapi 补两条 bar 路径 1.23.0＋单测；429 定案为上游短时限速（直探 200）
 - **UR D.9 iOS 真推送 P1（v2-only，[WIP]，待 0038＋APNs key＋联调）**
   - 0038（devices 加 6 列＋users.push_prefs＋push_log＋索引＋本人 policy；push_log 零 policy 锁死）＋devices 三端点（service 写；upsert／re-bind／顶旧／解绑／更新）＋test-push（testOnly）＋PATCH /me push_prefs＋GET /me 回显＋counters（同口径＋cache 头）

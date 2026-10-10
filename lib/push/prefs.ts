@@ -9,6 +9,7 @@ export const PUSH_PREF_KEYS = [
   "invite_replies",
   "chat",
   "stranger_invites",
+  "stranger_chat",
   "party",
 ] as const;
 
@@ -22,6 +23,7 @@ const DEFAULTS: PushPrefs = {
   invite_replies: true,
   chat: true,
   stranger_invites: false,
+  stranger_chat: false,
   party: true,
 };
 

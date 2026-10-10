@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.23.0
+  version: 1.24.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1643,23 +1643,25 @@ paths:
   /api/v1/me/counters:
     get:
       operationId: getMyCounters
-      summary: 轻量计数（需登录；三数＋badge 同推送口径，UR D.9）
+      summary: 轻量计数（需登录；四数＋badge 同推送口径；陌生人单计，UR D.10）
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: 计数（badge＝三数和）
+          description: 计数（badge＝四数和）
           content:
             application/json:
               schema:
                 type: object
-                required: [cheers_unread, invites_pending, chat_unread, badge]
+                required: [cheers_unread, invites_pending, chat_unread, stranger_unread, badge]
                 properties:
                   cheers_unread:
                     type: integer
                   invites_pending:
                     type: integer
                   chat_unread:
+                    type: integer
+                  stranger_unread:
                     type: integer
                   badge:
                     type: integer
@@ -2068,7 +2070,7 @@ paths:
   /api/v1/conversations:
     post:
       operationId: createConversation
-      summary: 建會話（find-or-create；需登录，D.2）
+      summary: 建會話（find-or-create；需登录；好友陌生人均可建，D.10）
       security:
         - bearerAuth: []
       requestBody:
@@ -2081,10 +2083,20 @@ paths:
               properties:
                 user_id:
                   type: string
-                  description: 對方 user id（須 accepted 互好友＋雙非隱身，否則 403）
+                  description: 對方 user id（雙非隱身；拉黑 404；未成年 403；每日新建陌生人会话 10 个）
+                origin:
+                  type: string
+                  enum: [friend, cheers, party, profile, direct]
+                  description: 建会话依据（好友建即 friend；非法回落 direct，UR D.10）
       responses:
         "201":
-          description: 建會話成功（created=false 即既有會話去重命中）
+          description: 建會話成功（created=false 即既有會話去重命中；is_friend＋origin 回显）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationRef"
+        "200":
+          description: 既有會話（is_friend＋origin 回显）
           content:
             application/json:
               schema:
@@ -2094,13 +2106,19 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: 非好友／隱身（陌生人永不）
+          description: 隱身／未成年
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
         "404":
-          description: 找不到该用户
+          description: 找不到该用户／拉黑（不泄存在性）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 每日新建陌生人会话超限（10 个）
           content:
             application/json:
               schema:
@@ -2109,7 +2127,7 @@ paths:
           $ref: "#/components/responses/Internal"
     get:
       operationId: listConversations
-      summary: 消息列表（需登录，D.2：對方簡檔＋末條＋未讀數）
+      summary: 消息列表（需登录，D.2：對方簡檔＋末條＋未讀數；D.10 行加 is_friend＋origin＋quota）
       security:
         - bearerAuth: []
       parameters:
@@ -2262,7 +2280,7 @@ paths:
           $ref: "#/components/responses/Internal"
     post:
       operationId: sendMessage
-      summary: 發送（text／image／audio；需登录；隱身任一端 403＋限流＋冪等；E.13 text 可帶分享附件一枚；D.8 image caption＋文件存在性＋413，UR D.8）
+      summary: 發送（text／image／audio；需登录；隱身任一端 403＋限流＋冪等；E.13 text 可帶分享附件一枚；D.8 image caption＋文件存在性＋413；D.10 陌生人配额＋kind 门＋quota，UR D.10）
       security:
         - bearerAuth: []
       parameters:
@@ -2327,7 +2345,7 @@ paths:
                             description: audio 專用（1–60s）
       responses:
         "201":
-          description: 發送成功（duplicate=true 即冪等命中回既有行）
+          description: 發送成功（duplicate=true 即冪等命中回既有行；陌生人行 quota 非 null）
           content:
             application/json:
               schema:
@@ -2337,6 +2355,10 @@ paths:
                     $ref: "#/components/schemas/ChatMessage"
                   duplicate:
                     type: boolean
+                  quota:
+                    type: object
+                    nullable: true
+                    description: 陌生人配额 {limit, used, remaining}；好友行 null
         "400":
           $ref: "#/components/responses/InvalidParams"
         "401":
@@ -2360,7 +2382,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
         "429":
-          description: 限流（30/min 或 200/day）
+          description: 限流（30/min 或 200/day；陌生人配额用尽 code=stranger_quota）
           content:
             application/json:
               schema:
@@ -2658,13 +2680,17 @@ components:
     ConversationRef:
       type: object
       required: [id, created]
-      description: 會話引用（D.2 find-or-create；created=false 即去重命中既有）
+      description: 會話引用（D.2 find-or-create；created=false 即去重命中既有；D.10 加 is_friend＋origin）
       properties:
         id:
           type: string
           format: uuid
         created:
           type: boolean
+        is_friend:
+          type: boolean
+        origin:
+          type: string
     ChatPeer:
       type: object
       required: [user_id, nickname, avatar_url]
@@ -2731,7 +2757,7 @@ components:
     Conversation:
       type: object
       required: [id, peer, last_message, unread, muted, updated_at]
-      description: 會話行（未讀由水位現算；updated_at＝末動毫秒 epoch，排序鍵，D.2）
+      description: 會話行（未讀由水位現算；updated_at＝末動毫秒 epoch，排序鍵，D.2；D.10 加 is_friend＋origin＋quota）
       properties:
         id:
           type: string
@@ -2748,6 +2774,14 @@ components:
           type: boolean
         updated_at:
           type: integer
+        is_friend:
+          type: boolean
+        origin:
+          type: string
+        quota:
+          type: object
+          nullable: true
+          description: 陌生人配额 {limit, used, remaining}；好友行 null
     ConversationPage:
       type: object
       required: [conversations, nextCursor]

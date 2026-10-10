@@ -17,6 +17,7 @@ describe("pushPrefsOf", () => {
       invite_replies: true,
       chat: true,
       stranger_invites: false,
+      stranger_chat: false,
       party: true,
     });
     expect(pushPrefsOf({ cheers: false, stranger_invites: true })).toEqual({
@@ -25,6 +26,7 @@ describe("pushPrefsOf", () => {
       invite_replies: true,
       chat: true,
       stranger_invites: true,
+      stranger_chat: false,
       party: true,
     });
   });
@@ -39,6 +41,7 @@ describe("parsePushPrefs", () => {
         invite_replies: true,
         chat: true,
         stranger_invites: false,
+        stranger_chat: false,
         party: true,
       },
     });
@@ -60,17 +63,26 @@ describe("fillPushTemplate／collapse／merge", () => {
 });
 
 describe("sumBadge", () => {
-  it("三数相加；非法钳零", () => {
+  it("四数相加；非法钳零", () => {
     expect(sumBadge(3, 2, 7)).toEqual({
       cheers_unread: 3,
       invites_pending: 2,
       chat_unread: 7,
+      stranger_unread: 0,
       badge: 12,
+    });
+    expect(sumBadge(3, 2, 7, 1)).toEqual({
+      cheers_unread: 3,
+      invites_pending: 2,
+      chat_unread: 7,
+      stranger_unread: 1,
+      badge: 13,
     });
     expect(sumBadge(-1, NaN, 2.7)).toEqual({
       cheers_unread: 0,
       invites_pending: 0,
       chat_unread: 2,
+      stranger_unread: 0,
       badge: 2,
     });
   });

@@ -4100,3 +4100,39 @@ UR F.11　酒保多语言＋线上稳定（v2-only，iOS-0.73 输入）[WIP]
 
 *改動記錄*
 - 2026-10-10：建檔置 [WIP]（WEB_HANDOFF_BAR_CHAT 输入；直做）
+
+---
+
+UR D.10　陌生人消息（碰杯快捷回复＋3 条机制）[WIP]
+
+> iOS 碰杯行快捷回复＋好友页陌生人分区；产品定案：触发不限碰杯（酒局／主页均可），
+> 统一"对方未回前最多 3 条"；badge 含陌生人（相加）。
+
+### 背景（问答定案）
+- `POST /conversations {user_id, origin?}`：去 areFriends 门；stealth 双端留；拉黑（cheers_blocks 任一方向）404；
+  未成年沿 cheers（发送方）；每日新建陌生人会话 10 个（origin!=friend 当日计，429）。
+- `origin` 存列（friend｜cheers｜party｜profile｜direct；好友建即 friend；回显列表）。
+- 发消息：陌生人会话只许 text＋share（image/audio 400）；3 条配额（对方最新消息后我的连续数；
+  对方回过即清零；成好友即豁免；计四种和；429 `stranger_quota`＋文案；成功回 quota，好友 null）。
+- 分享放开：对方帖＋我碰过它＋我可见（其余他人帖仍 403）。
+- 列表行加 `is_friend`／`origin`／`quota`（RPC 不动，路由拼：好友集一次＋陌生人行逐查＋conversations 批量取 origin）。
+- counters 拆 `chat_unread`／`stranger_unread`，badge 四数相加；push_prefs 加 `stranger_chat`（默认 false，E5 用）。
+- RLS：conversations 新列零 policy 变更（service 读写沿旧）。
+
+### 範圍
+1. 0039 migration（conversations.origin）。
+2. 建会话重写＋发消息配额／kind 门＋分享放宽＋列表三字段＋counters 拆分＋prefs 键。
+3. envelope `stranger_quota`＋openapi 1.24.0＋單測（配额纯函数／origin／caps）。
+4. CHANGELOG；零动 RLS。
+
+### 非目標
+- E5 陌生人推送（P3，用到 stranger_chat 键）、撤回、WebSocket、v1 任何文件。
+
+### AC（交接 §四全八条）
+- AC1 建会话（碰杯／酒局／主页／无关系均可建；拉黑 404；is_friend＋origin 回显）
+- AC2 3＋1 拒（stranger_quota）＋对方回复清零；AC3 成好友豁免历史保留
+- AC4 碰过帖可 share 他人帖＋未碰 403；AC5 列表三字段＋remaining；AC6 隐身拉黑拒；AC7 日 10 429
+
+*改動記錄*
+- 2026-10-10：建檔置 [WIP]（WEB_HANDOFF_STRANGER_CHAT 输入＋产品两答；直做）
+- 2026-10-10：实作：0039 origin 列＋建会话重写（去 areFriends 门＋拉黑 404＋未成年＋日 10＋is_friend/origin 回显）＋发消息配额（stranger_quota 429＋kind 门＋quota 回显）＋分享放宽（碰过帖）＋列表三字段（RPC 不动）＋counters 拆分（badge 四数相加）＋prefs stranger_chat＋envelope 码＋openapi 1.24.0＋单测。

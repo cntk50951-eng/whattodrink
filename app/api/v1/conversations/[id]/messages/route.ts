@@ -11,6 +11,8 @@ import {
   encodeChatCursor,
   toChatMessage,
   isSizeWithin,
+  strangerQuota,
+  STRANGER_MSG_LIMIT,
 } from "@/lib/api/chat";
 
 /**
@@ -123,7 +125,27 @@ export async function POST(
   if (!memberIds.some((m) => m.user_id === userId)) {
     return apiError("not_found", "找不到该会话", 404);
   }
-  const { data: modes } = await supabase
+  // UR D.10 好友判定（陌生人配额／kind 门／分享放宽用；好友免检）。
+  const peerIds = memberIds.map((m) => m.user_id).filter((mid) => mid !== userId);
+  let isFriend = true;
+  {
+    const { data: fsRows } = await supabase
+      .from("friendships")
+      .select("user_id,friend_id,status")
+      .eq("status", "accepted")
+      .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+      .limit(200);
+    const myFids = friendIdsOf(
+      userId,
+      ((fsRows ?? []) as unknown[]) as {
+        user_id: unknown;
+        friend_id: unknown;
+        status: unknown;
+      }[],
+    );
+    // direct 1v1：除自己外唯一成员即对方；群预留（多人即按"有陌生人"从严）。
+    isFriend = peerIds.length > 0 && peerIds.every((pid) => myFids.includes(pid));
+  }  const { data: modes } = await supabase
     .from("users")
     .select("id,mode")
     .in(
@@ -154,7 +176,36 @@ export async function POST(
     }
     // 仅自家可分享（UR 范围；他人帖分享另议）。
     if (post.user_id === null || post.user_id !== userId) {
-      return apiError("forbidden", "只能分享自己的打卡", 403);
+      // UR D.10 他人帖放宽：我碰过该帖＋我本来可见（陌生人快捷回复带被碰卡片）。
+      if (post.user_id === null) {
+        return apiError("forbidden", "只能分享自己的打卡", 403);
+      }
+      const { data: cheered } = await supabase
+        .from("cheers")
+        .select("id")
+        .eq("from_user_id", userId)
+        .eq("checkin_id", post.id)
+        .limit(1);
+      if (!Array.isArray(cheered) || cheered.length === 0) {
+        return apiError("forbidden", "只能分享自己的打卡", 403);
+      }
+      const { data: myFs } = await supabase
+        .from("friendships")
+        .select("user_id,friend_id,status")
+        .eq("status", "accepted")
+        .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+        .limit(200);
+      const myFids = friendIdsOf(
+        userId,
+        ((myFs ?? []) as unknown[]) as {
+          user_id: unknown;
+          friend_id: unknown;
+          status: unknown;
+        }[],
+      );
+      if (!canViewCheckin(userId, post.user_id, post.visibility, myFids)) {
+        return apiError("forbidden", "對方無權查看這條打卡", 403);
+      }
     }
     // 对方须可见（direct 1v1：除自己的另一成员；不可见 403 明拒）。
     const peerIds = memberIds.map((m) => m.user_id).filter((mid) => mid !== userId);
@@ -190,6 +241,10 @@ export async function POST(
         : { checkin_id: parsed.share.checkin_id, place: parsed.share.place },
     ];
   } else if (parsed.kind !== "text") {
+    // UR D.10 陌生人会话只许 text＋share（image／audio 先关，降骚扰面）。
+    if (!isFriend) {
+      return apiError("invalid_params", "陌生会话只支持文字与打卡卡片", 400);
+    }
     for (const a of parsed.attachments) {
       if (!a.path.startsWith(`${userId}/`)) {
         return apiError("invalid_params", "附件不屬於你", 400);
@@ -216,6 +271,27 @@ export async function POST(
       }
     }
     attachments = parsed.attachments.map((a) => ({ ...a, bucket }));
+  }
+  // UR D.10 陌生人配额（对方最新消息后我的连续数；3 达线 429 stranger_quota；
+  // 好友免检；四种全计，沿交接 §3.2）。
+  let quotaUsed = 0;
+  if (!isFriend) {
+    const { data: recent } = await supabase
+      .from("messages")
+      .select("sender_id,created_at")
+      .eq("conversation_id", parsedId.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    const asc = (((recent ?? []) as unknown[]) as { sender_id: unknown; created_at: unknown }[])
+      .filter(
+        (m): m is { sender_id: string; created_at: string } =>
+          typeof m.sender_id === "string" && typeof m.created_at === "string",
+      )
+      .reverse();
+    quotaUsed = strangerQuota(asc, userId).used;
+    if (quotaUsed >= STRANGER_MSG_LIMIT) {
+      return apiError("stranger_quota", "對方未回覆前，你最多可以發 3 條", 429);
+    }
   }
   // 限流（兩檔計數；POC 直查，上量後換計數列，見 UR）
   const nowMs = Date.now();
@@ -244,7 +320,19 @@ export async function POST(
     .maybeSingle();
   if (dup !== null) {
     const m = toChatMessage(dup, userId);
-    if (m !== null) return apiOk({ message: m, duplicate: true });
+    if (m !== null) {
+      return apiOk({
+        message: m,
+        duplicate: true,
+        quota: isFriend
+          ? null
+          : {
+              limit: STRANGER_MSG_LIMIT,
+              used: quotaUsed,
+              remaining: Math.max(0, STRANGER_MSG_LIMIT - quotaUsed),
+            },
+      });
+    }
   }
   const { data: inserted, error: iErr } = await supabase
     .from("messages")
@@ -269,7 +357,19 @@ export async function POST(
         .eq("client_msg_id", parsed.client_msg_id)
         .maybeSingle();
       const m = toChatMessage(raced, userId);
-      if (m !== null) return apiOk({ message: m, duplicate: true });
+      if (m !== null) {
+        return apiOk({
+          message: m,
+          duplicate: true,
+          quota: isFriend
+            ? null
+            : {
+                limit: STRANGER_MSG_LIMIT,
+                used: quotaUsed,
+                remaining: Math.max(0, STRANGER_MSG_LIMIT - quotaUsed),
+              },
+        });
+      }
     }
     console.error(`[api/v1/conversations/messages] insert error: code=${iErr?.code} message=${iErr?.message}`);
     return apiError("internal", "发送失败", 500);
@@ -283,5 +383,19 @@ export async function POST(
   if (message === null) {
     return apiError("internal", "发送失败", 500);
   }
-  return apiOk({ message, duplicate: false }, 201);
+  const usedAfter = isFriend ? 0 : quotaUsed + 1;
+  return apiOk(
+    {
+      message,
+      duplicate: false,
+      quota: isFriend
+        ? null
+        : {
+            limit: STRANGER_MSG_LIMIT,
+            used: usedAfter,
+            remaining: Math.max(0, STRANGER_MSG_LIMIT - usedAfter),
+          },
+    },
+    201,
+  );
 }

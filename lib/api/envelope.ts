@@ -12,6 +12,7 @@ export type ApiErrorCode =
   | "party_full"
   | "gender_full"
   | "payload_too_large"
+  | "stranger_quota"
   | "internal";
 
 export function apiError(

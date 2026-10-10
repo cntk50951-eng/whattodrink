@@ -8,11 +8,13 @@ import {
   isSizeWithin,
   parseChatListParams,
   parseConversationId,
+  parseConversationOrigin,
   parseCreateConversationBody,
   parseCreateMessageBody,
   parseReadBody,
   parseSignBody,
   parseViewBody,
+  strangerQuota,
   toChatMessage,
   toChatPeer,
 } from "./chat";
@@ -25,13 +27,43 @@ describe("directKey", () => {
 });
 
 describe("parseCreateConversationBody", () => {
-  it("收 user_id", () => {
-    expect(parseCreateConversationBody({ user_id: "u1" })).toEqual({ user_id: "u1" });
+  it("收 user_id（origin 缺省 direct）", () => {
+    expect(parseCreateConversationBody({ user_id: "u1" })).toEqual({ user_id: "u1", origin: "direct" });
   });
   it("空／非對象拒", () => {
     expect(parseCreateConversationBody({})).toHaveProperty("error");
     expect(parseCreateConversationBody(null)).toHaveProperty("error");
     expect(parseCreateConversationBody({ user_id: "  " })).toHaveProperty("error");
+  });
+  it("D.10 origin 白名单＋非法回落", () => {
+    expect(parseCreateConversationBody({ user_id: "u1", origin: "cheers" })).toEqual({
+      user_id: "u1",
+      origin: "cheers",
+    });
+    expect(parseCreateConversationBody({ user_id: "u1", origin: "party" })).toEqual({
+      user_id: "u1",
+      origin: "party",
+    });
+    expect(parseCreateConversationBody({ user_id: "u1", origin: "nope" })).toEqual({
+      user_id: "u1",
+      origin: "direct",
+    });
+    expect(parseConversationOrigin("profile")).toBe("profile");
+    expect(parseConversationOrigin(42)).toBe("direct");
+  });
+});
+
+describe("strangerQuota", () => {
+  const m = (sender_id: string, i: number): { sender_id: string; created_at: string } => ({
+    sender_id,
+    created_at: `2026-10-10T00:00:0${i}Z`,
+  });
+  it("对方一回即清零；空列 0；连续累计", () => {
+    expect(strangerQuota([], "me")).toEqual({ used: 0, remaining: 3 });
+    expect(strangerQuota([m("me", 1), m("me", 2)], "me")).toEqual({ used: 2, remaining: 1 });
+    expect(strangerQuota([m("me", 1), m("me", 2), m("me", 3)], "me")).toEqual({ used: 3, remaining: 0 });
+    expect(strangerQuota([m("me", 1), m("you", 2), m("me", 3)], "me")).toEqual({ used: 1, remaining: 2 });
+    expect(strangerQuota([m("you", 1)], "me")).toEqual({ used: 0, remaining: 3 });
   });
 });
 
