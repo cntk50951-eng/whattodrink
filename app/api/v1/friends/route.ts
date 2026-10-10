@@ -82,6 +82,8 @@ export async function POST(req: Request): Promise<Response> {
     return apiError("invalid_params", "不可加自己為好友", 400);
   }
   // UR B.3 拉黑任一方不可发（404 不泄；走 service，反向行 authed 不可见）。
+  // 只认 cheers_blocks（手动屏蔽）：chat_mutes（删好友自动行）有意不拦，
+  // 否则解除后重加死结（交接 §六-2）；mute 在 accept 成功时成对清除。
   {
     const blockSvc = await createServiceClient();
     const { data: blockRows } = await blockSvc
@@ -124,6 +126,13 @@ export async function POST(req: Request): Promise<Response> {
       }
       const rows = (data ?? []) as RawFriendship[];
       if (areFriends(userId, targetUserId, rows)) {
+        // 自愈：已是好友即不应留自动禁言（旧翻转分支未清 mute 的残留，本处顺手清）。
+        await (await createServiceClient())
+          .from("chat_mutes")
+          .delete()
+          .or(
+            `and(blocker_id.eq.${userId},blocked_id.eq.${targetUserId}),and(blocker_id.eq.${targetUserId},blocked_id.eq.${userId})`,
+          );
         return apiOk({ status: "accepted" as const });
       }
       const reversePending = rows.some(
@@ -145,6 +154,13 @@ export async function POST(req: Request): Promise<Response> {
           console.error(`[api/v1/friends] flip error: code=${flipErr.code} message=${flipErr.message}`);
           return apiError("internal", "好友接受失敗", 500);
         }
+        // 翻转成好友即成对清除自动禁言（与 PATCH accept 同语义；否则互发即成好友但永久禁言）。
+        await (await createServiceClient())
+          .from("chat_mutes")
+          .delete()
+          .or(
+            `and(blocker_id.eq.${userId},blocked_id.eq.${targetUserId}),and(blocker_id.eq.${targetUserId},blocked_id.eq.${userId})`,
+          );
         return apiOk({ status: "accepted" as const });
       }
       const myPending = rows.some(
@@ -225,8 +241,9 @@ export async function GET(req: Request): Promise<Response> {
 /**
  * UR B.3 解除好友（🔒，微信式）。
  * `DELETE /api/v1/friends {friend_id}` —— 删双向全部行（relationship 回 none；
- * 重加必须从零发请求经对方同意）＋双向 cheers_blocks 禁言（相互不可再发消息，
- * 聊天列表保留；重加须先 unblock，见 DELETE /cheers/blocks）。
+ * 重加必须从零发请求经对方同意）＋双向 chat_mutes 禁言（0041，删好友专用；
+ * 只禁聊天，碰杯／邀约不受影响；聊天列表保留；重加被接受时自动成对清除，
+ * 无需手动 unblock）。手动屏蔽仍走 cheers_blocks（见 DELETE /cheers/blocks）。
  * 幂等（无行也 200）。写走 service（friendships 无 DELETE policy；
  * 反向拉黑行 blocker 非本人，authed WITH CHECK 过不了；user 限域全代码判）。
  */
@@ -246,16 +263,21 @@ export async function DELETE(req: Request): Promise<Response> {
     return apiError("invalid_params", "friend_id 非法", 400);
   }
   const svc = await createServiceClient();
-  const { error } = await svc
+  const { data: removed, error } = await svc
     .from("friendships")
     .delete()
-    .or(`and(user_id.eq.${userId},friend_id.eq.${fid}),and(user_id.eq.${fid},friend_id.eq.${userId})`);
+    .or(`and(user_id.eq.${userId},friend_id.eq.${fid}),and(user_id.eq.${fid},friend_id.eq.${userId})`)
+    .select("user_id");
   if (error !== null) {
     console.error(`[api/v1/friends] remove error: code=${error.code} message=${error.message}`);
     return apiError("internal", "解除好友失败", 500);
   }
-  // 双向禁言（service 写，见上；失败记 log 不拦主流程）。
-  const { error: bErr } = await svc.from("cheers_blocks").upsert(
+  // 非好友调即幂等 200，不写禁言（无好友行即无"前好友"可禁；防陌生人被误禁言）。
+  if (!Array.isArray(removed) || removed.length === 0) {
+    return apiOk({ removed: true });
+  }
+  // 双向禁言（chat_mutes，删好友专用；碰杯／打卡不受影响，用户定案；service 写）。
+  const { error: bErr } = await svc.from("chat_mutes").upsert(
     [
       { blocker_id: userId, blocked_id: fid },
       { blocker_id: fid, blocked_id: userId },
@@ -263,7 +285,7 @@ export async function DELETE(req: Request): Promise<Response> {
     { onConflict: "blocker_id,blocked_id" },
   );
   if (bErr !== null) {
-    console.error(`[api/v1/friends] unblock-guard error: code=${bErr.code} message=${bErr.message}`);
+    console.error(`[api/v1/friends] mute error: code=${bErr.code} message=${bErr.message}`);
   }
   return apiOk({ removed: true });
 }

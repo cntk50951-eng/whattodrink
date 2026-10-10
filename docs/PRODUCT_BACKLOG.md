@@ -4168,3 +4168,4 @@ UR B.3　好友请求中心（v2-only，iOS 输入）[WIP]
 *改動記錄*
 - 2026-10-10：建檔置 [WIP]（WEB_HANDOFF_FRIEND_REQUESTS 输入＋四问答；直做）
 - 2026-10-10：实作：0040 origin 列＋requests 双端点（富行＋pending＋accept/decline/cancel＋拉黑门）＋DELETE 重写（删双行＋双拉黑）＋DELETE blocks＋POST 拉黑门＋日 20＋origin 落列＋messages 拉黑门＋counters/badge 含请求＋推送双事件＋prefs friends＋openapi 1.25.0＋单测。
+- 2026-10-10：联调返工（交接 §六全关）：badge 真正计入请求数（五数相加）＋禁言拆表 chat_mutes（0041；只禁聊天；POST 只认手动屏蔽；accept 成对清 mute）＋发消息 403 conversation_muted＋openapi 1.26.0；旧 cheers_blocks 自动行不迁移。

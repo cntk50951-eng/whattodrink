@@ -29,6 +29,8 @@
 ### Added
 - **UR B.3 好友请求中心（v2-only，[WIP]，待 0040＋联调）**
   - 0040 origin 列；requests 双端点（富行＋pending＋accept/decline/cancel＋拉黑门）＋DELETE 重写（微信式删双行＋双拉黑禁言，会话保留）＋DELETE blocks（重加回路）＋POST 拉黑门＋日 20＋origin 落列＋messages 拉黑门＋counters/badge 含请求＋推送双事件＋prefs friends＋openapi 1.25.0＋单测
+  - 联调返工（交接 §六全关，openapi 1.26.0）：① counters/badge 真正计入 `friend_requests_pending`（五数相加；`sumBadge` 第五参默认 0 向后兼容）；②③ 解除禁言改走新表 `chat_mutes`（0041 待贴跑；只禁聊天，碰杯／邀约不受影响；POST 拉黑门只认手动 `cheers_blocks`，重加不再死结）；④ 前好友发消息 403 `conversation_muted`（可与 404 区分）；accept 成功成对清 mute（重加被接受自动解禁）；旧 `cheers_blocks` 自动行不迁移（分不清手动，需双方各 unblock 一次）
+  - 接手驗補兩缺口：`POST /friends` 互發翻轉分支不清 mute（成好友仍永久禁言）＋已好友分支自愈清 mute；`DELETE` 非好友調不再誤寫禁言（删行零條直接回）
 - **UR D.10 陌生人消息（v2-only，[WIP]，待 0039＋联调）**
   - 0039 origin 列；建会话重写（去 areFriends 门＋拉黑 404＋未成年＋日 10＋is_friend/origin）；发消息配额（stranger_quota 429＋kind 门＋quota 回显）＋分享放宽（碰过帖）；列表三字段；counters 拆分 badge 四数相加；prefs stranger_chat；openapi 1.24.0＋单测
   - `lang`（en 缺省／yue／zh，非法回落；system 追加覆盖行；voice boost 覆写，yue 用 Chinese,Yue）＋按 IP 60s 30 次＋上游 429 透传 Retry-After／502 区分＋`apiError` headers 加法＋openapi 补两条 bar 路径 1.23.0＋单测；429 定案为上游短时限速（直探 200）

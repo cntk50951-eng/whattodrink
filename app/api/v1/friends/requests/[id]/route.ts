@@ -57,7 +57,8 @@ export async function PATCH(
   if (action === "cancel" && !isSender) {
     return apiError("not_found", "请求不存在", 404);
   }
-  // 拉黑任一方即 404（关系已变，不操作）。
+  // 拉黑任一方即 404（关系已变，不操作；只认 cheers_blocks 手动屏蔽，
+  // chat_mutes 自动行不拦 accept——重加接受时成对清除，否则死结，见下）。
   const other = isRecipient ? row.user_id : row.friend_id;
   const { data: blocks } = await svc
     .from("cheers_blocks")
@@ -96,6 +97,19 @@ export async function PATCH(
         .update({ status: "accepted" })
         .eq("user_id", row.friend_id)
         .eq("friend_id", row.user_id);
+    }
+    // UR B.3 联调返工（交接 §六-2）：成对清除删好友自动禁言。
+    // 重加流程不再需要双方手动 unblock——accept 成功即删双向 chat_mutes 行
+    // （只清自动行，无手动入口故成对删安全；失败记 log 不拦接受本身）。
+    // 注意：上方拉黑门只认 cheers_blocks（手动屏蔽），mute 不拦 accept，否则重加死结。
+    const { error: unmuteErr } = await svc
+      .from("chat_mutes")
+      .delete()
+      .or(
+        `and(blocker_id.eq.${row.user_id},blocked_id.eq.${row.friend_id}),and(blocker_id.eq.${row.friend_id},blocked_id.eq.${row.user_id})`,
+      );
+    if (unmuteErr !== null) {
+      console.error(`[api/v1/friends/requests] unmute error: code=${unmuteErr.code} message=${unmuteErr.message}`);
     }
     // 推送（after 语义：fire-and-forget，失败不影响接受本身）。
     after(() => {

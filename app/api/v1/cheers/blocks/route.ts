@@ -34,7 +34,8 @@ export async function POST(req: Request): Promise<Response> {
 /**
  * UR B.3 解除屏蔽（🔒，幂等）。
  * `DELETE /api/v1/cheers/blocks {blocked_id}` —— 删本人对该用户的屏蔽行；
- * 找不到也 200。删好友后重加的唯一回头路（先 unblock，再发请求对方同意）。
+ * 找不到也 200。只解手动屏蔽；新版解除好友的自动禁言（chat_mutes）
+ * 在重加被接受时自动成对清除，不走本口。
  */
 export async function DELETE(req: Request): Promise<Response> {
   const { supabase, userId } = await getAuthedClient(req);

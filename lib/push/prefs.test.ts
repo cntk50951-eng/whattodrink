@@ -72,6 +72,7 @@ describe("sumBadge", () => {
       invites_pending: 2,
       chat_unread: 7,
       stranger_unread: 0,
+      friend_requests_pending: 0,
       badge: 12,
     });
     expect(sumBadge(3, 2, 7, 1)).toEqual({
@@ -79,6 +80,7 @@ describe("sumBadge", () => {
       invites_pending: 2,
       chat_unread: 7,
       stranger_unread: 1,
+      friend_requests_pending: 0,
       badge: 13,
     });
     expect(sumBadge(-1, NaN, 2.7)).toEqual({
@@ -86,7 +88,26 @@ describe("sumBadge", () => {
       invites_pending: 0,
       chat_unread: 2,
       stranger_unread: 0,
+      friend_requests_pending: 0,
       badge: 2,
+    });
+  });
+  it("UR B.3 好友请求数相加（交接 §六-1；非法钳零）", () => {
+    expect(sumBadge(1, 1, 1, 1, 2)).toEqual({
+      cheers_unread: 1,
+      invites_pending: 1,
+      chat_unread: 1,
+      stranger_unread: 1,
+      friend_requests_pending: 2,
+      badge: 6,
+    });
+    expect(sumBadge(0, 0, 0, 0, NaN)).toEqual({
+      cheers_unread: 0,
+      invites_pending: 0,
+      chat_unread: 0,
+      stranger_unread: 0,
+      friend_requests_pending: 0,
+      badge: 0,
     });
   });
 });

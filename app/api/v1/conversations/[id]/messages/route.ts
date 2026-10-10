@@ -136,8 +136,12 @@ export async function POST(
     console.error(`[api/v1/conversations/messages] no peers for ${parsedId.id}`);
     return apiError("internal", "发送失败", 500);
   }
-  // UR B.3 拉黑门（删好友自动双拉黑后，会话保留但禁言；任一对端有行即 404 不泄）。
-  // 走 service：blocks RLS 只返 blocker=己的行，反向（对方拉黑我）authed 查不到。
+  // UR B.3 拉黑门（删好友自动双禁言后，会话保留但禁言；任一对端有行即禁言）。
+  // 双表：cheers_blocks（手动屏蔽）＋chat_mutes（删好友自动行，0041；碰杯／邀约不受影响，只禁聊天）。
+  // 交接 §六-4：禁言与"会话不存在"必须可区分，回 403 conversation_muted（不泄谁屏蔽谁；
+  // iOS 文案"你哋可能已經解除好友，或者對方已屏蔽聯繫"）。
+  // 走 service：两表 RLS 只返 blocker=己的行，反向（对方拉黑我）authed 查不到
+  // （沿 DEF-20261010-001 判例：推导"对方"走 service）。
   {
     const ors = peerIds
       .flatMap((pid) => [
@@ -145,13 +149,16 @@ export async function POST(
         `and(blocker_id.eq.${pid},blocked_id.eq.${userId})`,
       ])
       .join(",");
-    const { data: blockRows } = await svc
-      .from("cheers_blocks")
-      .select("blocker_id")
-      .or(ors)
-      .limit(1);
-    if (Array.isArray(blockRows) && blockRows.length > 0) {
-      return apiError("not_found", "找不到该会话", 404);
+    const [{ data: blockRows }, { data: muteRows }] = await Promise.all([
+      svc.from("cheers_blocks").select("blocker_id").or(ors).limit(1),
+      // chat_mutes 未迁移（0041 未跑）即 data null→不断链 fail-open，DELETE 侧同。
+      svc.from("chat_mutes").select("blocker_id").or(ors).limit(1),
+    ]);
+    if (
+      (Array.isArray(blockRows) && blockRows.length > 0) ||
+      (Array.isArray(muteRows) && muteRows.length > 0)
+    ) {
+      return apiError("conversation_muted", "你哋可能已經解除好友，或者對方已屏蔽聯繫", 403);
     }
   }
   let isFriend = true;

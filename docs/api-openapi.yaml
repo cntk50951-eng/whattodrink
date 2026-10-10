@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.25.0
+  version: 1.26.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1068,7 +1068,7 @@ paths:
           $ref: "#/components/responses/Internal"
     delete:
       operationId: cheersUnblock
-      summary: 解除屏蔽（需登录；删本人对该用户行，幂等；删好友后重加的回头路，UR B.3）
+      summary: 解除屏蔽（需登录；删本人对该用户行，幂等；只解手动屏蔽。新版解除好友的自动禁言在重加被接受时自动清除，不走本口，UR B.3）
       security:
         - cookieAuth: []
       requestBody:
@@ -1676,17 +1676,17 @@ paths:
   /api/v1/me/counters:
     get:
       operationId: getMyCounters
-      summary: 轻量计数（需登录；四数＋badge 同推送口径；陌生人单计，UR D.10）
+      summary: 轻量计数（需登录；五数＋badge 同推送口径；陌生人单计＋收到的好友请求，UR D.10／B.3）
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: 计数（badge＝四数和）
+          description: 计数（badge＝五数和）
           content:
             application/json:
               schema:
                 type: object
-                required: [cheers_unread, invites_pending, chat_unread, stranger_unread, badge]
+                required: [cheers_unread, invites_pending, chat_unread, stranger_unread, friend_requests_pending, badge]
                 properties:
                   cheers_unread:
                     type: integer
@@ -1696,6 +1696,9 @@ paths:
                     type: integer
                   stranger_unread:
                     type: integer
+                  friend_requests_pending:
+                    type: integer
+                    description: 收到的待处理好友请求（incoming pending；iOS 铃鐺＋角标，UR B.3）
                   badge:
                     type: integer
         "401":
@@ -1900,7 +1903,7 @@ paths:
           $ref: "#/components/responses/Internal"
     delete:
       operationId: removeFriend
-      summary: 解除好友（需登录；删双向行＋双向禁言，会话保留但禁言；重加须先 unblock，UR B.3）
+      summary: 解除好友（需登录；删双向行＋双向 chat_mutes 禁言，会话保留但禁言；重加被接受自动解禁，无需 unblock，UR B.3）
       security:
         - bearerAuth: []
       requestBody:
@@ -1989,7 +1992,7 @@ paths:
   /api/v1/friends/requests/{id}:
     patch:
       operationId: handleFriendRequest
-      summary: 请求动作（需登录；accept 仅收件人／decline 删入／cancel 删己方；越权 404，UR B.3）
+      summary: 请求动作（需登录；accept 仅收件人／decline 删入／cancel 删己方；越权 404；accept 自动成对清除删好友禁言，UR B.3）
       security:
         - bearerAuth: []
       parameters:
@@ -2483,7 +2486,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: 隱身任一端（不可收發）
+          description: 隱身任一端（不可收發）；禁言（删好友／屏蔽后，code=conversation_muted，可与 404 区分，UR B.3）
           content:
             application/json:
               schema:

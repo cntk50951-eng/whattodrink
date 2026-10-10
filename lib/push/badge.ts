@@ -1,17 +1,20 @@
 /**
  * UR D.9 角标口径（与 iOS 红点一致：碰杯未读＋待回应邀约＋聊天未读）。
+ * UR B.3 起加收到的好友请求数（incoming pending；交接 §六-1：原先声称含实际无，
+ * 本版真正计入，推送 payload 与 counters 同口径）。
  * counters 路由与推送 payload 共用同一函数，口径单点。
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** 三数相加（badge＝和；纯加法，单测锁口径）。 */
-export function sumBadge(cheers: number, invites: number, chat: number, stranger = 0): BadgeCounts {
+/** 五数相加（badge＝和；纯加法，单测锁口径；friendRequests 后加默认 0 向后兼容）。 */
+export function sumBadge(cheers: number, invites: number, chat: number, stranger = 0, friendRequests = 0): BadgeCounts {
   const c = Number.isFinite(cheers) && cheers > 0 ? Math.floor(cheers) : 0;
   const i = Number.isFinite(invites) && invites > 0 ? Math.floor(invites) : 0;
   const h = Number.isFinite(chat) && chat > 0 ? Math.floor(chat) : 0;
   const s = Number.isFinite(stranger) && stranger > 0 ? Math.floor(stranger) : 0;
-  return { cheers_unread: c, invites_pending: i, chat_unread: h, stranger_unread: s, badge: c + i + h + s };
+  const f = Number.isFinite(friendRequests) && friendRequests > 0 ? Math.floor(friendRequests) : 0;
+  return { cheers_unread: c, invites_pending: i, chat_unread: h, stranger_unread: s, friend_requests_pending: f, badge: c + i + h + s + f };
 }
 
 export type BadgeCounts = {
@@ -20,6 +23,8 @@ export type BadgeCounts = {
   chat_unread: number;
   /** UR D.10 陌生人未读（badge 含，相加，用户定案）。 */
   stranger_unread: number;
+  /** UR B.3 收到的好友请求（incoming pending；badge 含，相加）。 */
+  friend_requests_pending: number;
   badge: number;
 };
 
@@ -32,9 +37,11 @@ export async function computeBadge(
   supa: SupabaseClient,
   userId: string,
 ): Promise<BadgeCounts> {
-  const [{ count: cheers }, { count: invites }, { data: members }] = await Promise.all([
+  const [{ count: cheers }, { count: invites }, { count: friendRequests }, { data: members }] = await Promise.all([
     supa.from("cheers").select("id", { count: "exact", head: true }).eq("to_user_id", userId).is("seen_at", null),
     supa.from("drink_invites").select("id", { count: "exact", head: true }).eq("to_user_id", userId).eq("status", "sent"),
+    // UR B.3 收到的好友请求（incoming pending 全量计；表缺席即 fail-open 计 0，见下）。
+    supa.from("friendships").select("id", { count: "exact", head: true }).eq("friend_id", userId).eq("status", "pending"),
     supa.from("conversation_members").select("conversation_id,last_read_at").eq("user_id", userId).limit(200),
   ]);
   const { data: fsRows } = await supa
@@ -78,5 +85,5 @@ export async function computeBadge(
     if (isFriend) chat += count ?? 0;
     else stranger += count ?? 0;
   }
-  return sumBadge(cheers ?? 0, invites ?? 0, chat, stranger);
+  return sumBadge(cheers ?? 0, invites ?? 0, chat, stranger, friendRequests ?? 0);
 }

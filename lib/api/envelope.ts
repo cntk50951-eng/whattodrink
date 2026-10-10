@@ -13,6 +13,7 @@ export type ApiErrorCode =
   | "gender_full"
   | "payload_too_large"
   | "stranger_quota"
+  | "conversation_muted"
   | "internal";
 
 export function apiError(
