@@ -8,6 +8,8 @@
 import { randomInt } from "node:crypto";
 
 export type LiarsRules = {
+  /** 房間模式（standard＝线上叫骰；deal_only＝發骰器，见 §九）。 */
+  mode: "standard" | "deal_only";
   /** 每人骰数（POC 固定 5）。 */
   dice_per_player: number;
   /** 开局叫骰最小数量（房规，默认 2）。 */
@@ -23,6 +25,7 @@ export type LiarsRules = {
 };
 
 export const LIARS_RULES_DEFAULT: LiarsRules = {
+  mode: "standard",
   dice_per_player: 5,
   min_open_qty: 2,
   ones_wild: true,
@@ -49,6 +52,7 @@ export function parseRules(raw: unknown): LiarsRules {
       ? r.turn_seconds
       : LIARS_RULES_DEFAULT.turn_seconds;
   return {
+    mode: r.mode === "deal_only" ? "deal_only" : "standard",
     dice_per_player: clampInt(r.dice_per_player, 5, 1, 10),
     min_open_qty: clampInt(r.min_open_qty, 2, 1, 20),
     ones_wild: typeof r.ones_wild === "boolean" ? r.ones_wild : true,

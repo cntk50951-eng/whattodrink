@@ -46,15 +46,19 @@ export async function POST(
   for (const m of members) {
     dice[m.user_id] = rollDice(rules.dice_per_player);
   }
+  // §九：deal_only 房无轮次无倒计时（current_turn／deadline／last_bid 全 null）。
+  const dealOnly = rules.mode === "deal_only";
   const { error: rErr } = await svc.from("game_rounds").insert({
     room_id: room.id,
     no: 1,
     starter_id: starter,
     status: "bidding",
     dice,
-    current_turn_user: starter,
+    current_turn_user: dealOnly ? null : starter,
     turn_deadline:
-      rules.turn_seconds > 0 ? new Date(nowMs + rules.turn_seconds * 1000).toISOString() : null,
+      !dealOnly && rules.turn_seconds > 0
+        ? new Date(nowMs + rules.turn_seconds * 1000).toISOString()
+        : null,
     last_bid: null,
     bids: [],
   });

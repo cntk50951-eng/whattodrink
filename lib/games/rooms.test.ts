@@ -87,6 +87,12 @@ describe("房间请求体解析", () => {
     expect(
       parseActionBody({ type: "challenge", expected_version: 0, client_action_id: "c2" }),
     ).toEqual({ type: "challenge", expectedVersion: 0, clientActionId: "c2" });
+    expect(
+      parseActionBody({ type: "reveal", expected_version: 3, client_action_id: "r1" }),
+    ).toEqual({ type: "reveal", expectedVersion: 3, clientActionId: "r1" });
+    expect(parseActionBody({ type: "dance", expected_version: 0, client_action_id: "c" })).toEqual({
+      error: "type 只要 bid|challenge|next_round|reveal",
+    });
     expect("error" in parseActionBody({ type: "dance", expected_version: 0, client_action_id: "c" })).toBe(true);
     expect("error" in parseActionBody({ type: "bid", payload: {}, expected_version: 0, client_action_id: "c" })).toBe(true);
     expect("error" in parseActionBody({ type: "bid", payload: { qty: 1, face: 1 }, expected_version: -1, client_action_id: "c" })).toBe(true);

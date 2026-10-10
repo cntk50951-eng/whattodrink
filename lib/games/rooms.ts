@@ -525,10 +525,11 @@ export type RoundBid = {
 export type RoundResult = {
   dice: Record<string, number[]>;
   challenger_id: string;
-  bidder_id: string;
-  counted: number;
-  bid_met: boolean;
-  loser_id: string;
+  /** 标准房为叫骰人；deal_only 房 null（不判输赢，§九）。 */
+  bidder_id: string | null;
+  counted: number | null;
+  bid_met: boolean | null;
+  loser_id: string | null;
   revealed_at: string;
   confirmations: string[];
 };
@@ -635,15 +636,19 @@ export async function startNextRound(
   for (const uid of activeIds) {
     dice[uid] = rollDice(rules.dice_per_player);
   }
+  // §九：deal_only 房无轮次无倒计时（次局同）。
+  const dealOnly = rules.mode === "deal_only";
   const { error } = await svc.from("game_rounds").insert({
     room_id: roomId,
     no,
     starter_id: starterId,
     status: "bidding",
     dice,
-    current_turn_user: starterId,
+    current_turn_user: dealOnly ? null : starterId,
     turn_deadline:
-      rules.turn_seconds > 0 ? new Date(nowMs + rules.turn_seconds * 1000).toISOString() : null,
+      !dealOnly && rules.turn_seconds > 0
+        ? new Date(nowMs + rules.turn_seconds * 1000).toISOString()
+        : null,
     last_bid: null,
     bids: [],
   });
@@ -697,7 +702,9 @@ export async function settleRoom(
     const aged = nowMs - Date.parse(round.result.revealed_at) >= NEXT_ROUND_AUTO_MS;
     if (!allIn && !aged) return { room, fired: false };
     const starter =
-      round.result.loser_id !== "" && activeIds.includes(round.result.loser_id)
+      typeof round.result.loser_id === "string" &&
+      round.result.loser_id !== "" &&
+      activeIds.includes(round.result.loser_id)
         ? round.result.loser_id
         : [...members].sort((a, b) => a.seat - b.seat)[0].user_id;
     const created = await startNextRound(svc, room.id, round.no + 1, starter, activeIds, rules, nowMs);
@@ -859,11 +866,12 @@ export async function getEventsSince(
   return out;
 }
 
-export type GameActionType = "bid" | "challenge" | "next_round";
+export type GameActionType = "bid" | "challenge" | "next_round" | "reveal";
 
 export type ParsedAction =
   | { type: "bid"; bid: { qty: number; face: number; zhai: boolean }; expectedVersion: number; clientActionId: string }
   | { type: "challenge"; expectedVersion: number; clientActionId: string }
+  | { type: "reveal"; expectedVersion: number; clientActionId: string }
   | { type: "next_round"; expectedVersion: number; clientActionId: string };
 
 /** 动作包解析（形状错 400；语义错各 action 内 409/422）。 */
@@ -871,8 +879,8 @@ export function parseActionBody(raw: unknown): ParsedAction | { error: string } 
   if (typeof raw !== "object" || raw === null) return { error: "body 需为对象" };
   const r = raw as Record<string, unknown>;
   const type = r.type;
-  if (type !== "bid" && type !== "challenge" && type !== "next_round") {
-    return { error: "type 只要 bid|challenge|next_round" };
+  if (type !== "bid" && type !== "challenge" && type !== "next_round" && type !== "reveal") {
+    return { error: "type 只要 bid|challenge|next_round|reveal" };
   }
   if (typeof r.expected_version !== "number" || !Number.isInteger(r.expected_version) || r.expected_version < 0) {
     return { error: "expected_version 非法" };
@@ -908,4 +916,44 @@ export function parseInviteBody(
   if (seen.size === 0) return { error: "user_ids 非空数组" };
   if (seen.size > 7) return { error: "一次最多邀请 7 人" };
   return { userIds: [...seen] };
+}
+
+/**
+ * §九 reveal（deal_only 房專用：任一 active 在 bidding 中亮骰）。
+ * 不要求 last_bid／轮次；不判输赢（bidder／counted／bid_met／loser 全 null）。
+ * 调用方已验：deal_only 房＋bidding 中（revealed 重调由路由幂等 200）。
+ */
+export async function applyReveal(
+  svc: SupabaseClient,
+  room: RoomJson,
+  round: RoundRow,
+  revealerId: string,
+  nowMs: number,
+  clientActionId?: string,
+): Promise<{ version: number; revealed: RoundResult } | { response: Response }> {
+  const revealed: RoundResult = {
+    dice: round.dice,
+    challenger_id: revealerId,
+    bidder_id: null,
+    counted: null,
+    bid_met: null,
+    loser_id: null,
+    revealed_at: new Date(nowMs).toISOString(),
+    confirmations: [],
+  };
+  const { error } = await svc
+    .from("game_rounds")
+    .update({ status: "revealed", loser_id: null, result: revealed })
+    .eq("id", round.id);
+  if (error !== null) {
+    console.error(`[games] reveal error: code=${error.code} message=${error.message}`);
+    return { response: apiError("internal", "亮骰失敗", 500) };
+  }
+  const version = await bumpRoom(svc, room.id, room.version, nowMs);
+  if (version === null) return { response: apiError("internal", "亮骰失敗", 500) };
+  await appendEvent(svc, room.id, version, "action_reveal", revealerId, {
+    no: round.no,
+    challenger_id: revealerId,
+  }, clientActionId);
+  return { version, revealed };
 }

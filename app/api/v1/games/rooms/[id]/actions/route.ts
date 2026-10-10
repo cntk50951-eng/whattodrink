@@ -5,6 +5,7 @@ import { isValidBid, parseRules } from "@/lib/games/liars";
 import {
   applyBid,
   applyChallenge,
+  applyReveal,
   appendEvent,
   bumpRoom,
   getActiveMembers,
@@ -83,6 +84,30 @@ export async function POST(
   const members = await getActiveMembers(svc, room.id);
   const order = [...members].sort((a, b) => a.seat - b.seat).map((m) => m.user_id);
   const rules = parseRules(room.rules);
+  // §九：deal_only 房只有 reveal 能用；bid／challenge 一律 409。
+  const dealOnly = rules.mode === "deal_only";
+  if (dealOnly && (parsed.type === "bid" || parsed.type === "challenge")) {
+    return apiError("wrong_phase", "發骰器模式用 reveal 亮骰，不叫骰不開盅", 409);
+  }
+
+  // §九 reveal：任一 active 在 bidding 中可亮，不要求 last_bid／轮次；
+  // 已 revealed 重调幂等 200（不写新事件）。
+  if (parsed.type === "reveal") {
+    if (!dealOnly) {
+      return apiError("wrong_phase", "本房用 challenge 開盅，不用 reveal", 409);
+    }
+    if (round.status !== "bidding") {
+      const events = await getEventsSince(svc, room.id, parsed.expectedVersion);
+      return apiOk({ version: room.version, events });
+    }
+    if (parsed.expectedVersion !== room.version) {
+      return apiError("stale_version", "狀態已更新，請重拉", 409);
+    }
+    const done = await applyReveal(svc, room, round, userId, nowMs, parsed.clientActionId);
+    if ("response" in done) return done.response;
+    const events = await getEventsSince(svc, room.id, parsed.expectedVersion);
+    return apiOk({ version: done.version, events });
+  }
 
   if (parsed.type === "bid" || parsed.type === "challenge") {
     if (round.status !== "bidding") {
@@ -134,7 +159,9 @@ export async function POST(
   const allIn = order.every((uid) => confirmed.has(uid));
   if (allIn) {
     const starter =
-      round.result.loser_id !== "" && order.includes(round.result.loser_id)
+      typeof round.result.loser_id === "string" &&
+      round.result.loser_id !== "" &&
+      order.includes(round.result.loser_id)
         ? round.result.loser_id
         : order[0];
     const created = await startNextRound(svc, room.id, round.no + 1, starter, order, rules, nowMs);

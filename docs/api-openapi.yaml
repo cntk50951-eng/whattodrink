@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.29.0
+  version: 1.30.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -2059,7 +2059,7 @@ paths:
                   default: 6
                 rules:
                   type: object
-                  description: 房规（min_open_qty／ones_wild／ones_break／zhai_enabled／turn_seconds 15|30|60|0；非法回落默认）
+                  description: 房规（mode: standard|deal_only，非法回落 standard；min_open_qty／ones_wild／ones_break／zhai_enabled／turn_seconds 15|30|60|0；deal_only 房无轮次无倒计时）
       responses:
         "201":
           description: 建房成功（房主 seat 0，ready=false）
@@ -2284,7 +2284,7 @@ paths:
           $ref: "#/components/responses/Internal"
     post:
       operationId: postGameAction
-      summary: 动作（需登录；bid／challenge／next_round；幂等键＋expected_version 落后 409，UR H.1）
+      summary: 动作（需登录；bid／challenge／next_round／reveal；幂等键＋expected_version 落后 409，UR H.1）
       security:
         - bearerAuth: []
       parameters:
@@ -2304,10 +2304,10 @@ paths:
               properties:
                 type:
                   type: string
-                  enum: [bid, challenge, next_round]
+                  enum: [bid, challenge, next_round, reveal]
                 payload:
                   type: object
-                  description: bid 用 {qty, face, zhai?}；其余空
+                  description: bid 用 {qty, face, zhai?}；reveal／其余空（reveal 仅 deal_only 房，任一 active 在 bidding 中亮骰，不判输赢）
                 expected_version:
                   type: integer
                 client_action_id:
@@ -2511,7 +2511,7 @@ paths:
   /api/v1/games/rooms/{id}/start:
     post:
       operationId: startGameRoom
-      summary: 开始（需登录；仅房主；≥2 人全员 ready；开首局 service 摇骰，UR H.1）
+      summary: 开始（需登录；仅房主；≥2 人全员 ready；开首局 service 摇骰；deal_only 房无轮次无倒计时，UR H.1）
       security:
         - bearerAuth: []
       parameters:

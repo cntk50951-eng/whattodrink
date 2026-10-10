@@ -10,6 +10,7 @@
   - 第二批：房间 8 端点（建／码加入／active／准备／开始／离开／踢／改规／结束）＋门禁一体 helper（18+／拉黑双表／好友或 joins 交集／同时 1 房／满员／踢禁重进）＋懒过期（2h 续／ended 24h 删）＋openapi 1.27.0＋`GameRoom` schema＋5 单测；11 新错误码一次加齐（三批共用）
   - 第三批：`GET room?since=`（304＋按人裁剪＋online 15s＋懒超时）＋`POST actions`（bid／challenge／next_round；幂等键先行＋expected 409＋5/s；开盅／输家先叫／8s 自动进局）＋openapi 1.28.0＋3 单测
   - 第四批：邀请（房主 lobby 邀好友，逐人门＋去重＋`game_invite` 推送）＋`GET /games/invites`（lobby 行＋过期顺手清）＋counters 加数（badge 不含）＋prefs `game_invites` 键＋三语文案＋openapi 1.29.0＋3 单测；H.1 端点齐，待 iOS 联调
+  - §九發骰器：`rules.mode:deal_only`（非法回落 standard）＋`reveal` 动作（任一 active bidding 中亮骰，不判输赢，已亮重调幂等 200；bid／challenge 在此房 409）＋开局／次局无轮次无倒计时＋`next_round` 照旧（starter 座位最小）＋openapi 1.30.0＋2 单测
 
 ### Fixed
 - **DEF-20261006-002 iOS 好友釘 pill 无走马灯（v2-only，未提交；pins 补 note 读链）**

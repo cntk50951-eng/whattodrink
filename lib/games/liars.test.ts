@@ -30,6 +30,11 @@ describe("parseRules (UR H.1)", () => {
       parseRules({ min_open_qty: 4, ones_break: true, turn_seconds: 15 }),
     ).toEqual({ ...R, min_open_qty: 4, ones_break: true, turn_seconds: 15 });
   });
+  it("§九 mode：deal_only 透过，非法回落 standard", () => {
+    expect(parseRules({ mode: "deal_only" }).mode).toBe("deal_only");
+    expect(parseRules({ mode: "party" }).mode).toBe("standard");
+    expect(parseRules({}).mode).toBe("standard");
+  });
 });
 
 describe("isValidBid (UR H.1 交接 §五)", () => {
