@@ -154,6 +154,15 @@ export function minAutoBid(rules: LiarsRules): { qty: number; face: number; zhai
   return { qty: Math.max(1, rules.min_open_qty), face: 1, zhai: false };
 }
 
+/** 本局是否已触发"叫 1 破百搭"（bids 历史有人叫过 1 且房规开变体）。 */
+export function deriveOnesBroken(
+  bids: { face: number }[],
+  rules: LiarsRules,
+): boolean {
+  if (!rules.ones_break) return false;
+  return bids.some((b) => b.face === 1);
+}
+
 /** 座位次序下一家（只传 active 名单；空即 null）。 */
 export function nextTurn(activeUserIds: string[], currentUserId: string): string | null {
   if (activeUserIds.length === 0) return null;

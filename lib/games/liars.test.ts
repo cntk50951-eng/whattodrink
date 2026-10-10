@@ -4,6 +4,7 @@ import {
   LIARS_RULES_DEFAULT,
   ROOM_CODE_ALPHABET,
   countMatching,
+  deriveOnesBroken,
   generateRoomCode,
   isValidBid,
   minAutoBid,
@@ -76,6 +77,11 @@ describe("countMatching／resolveChallenge", () => {
   it("齋不吃 1", () => {
     const zhai = { ...R, zhai_enabled: true };
     expect(countMatching(dice, { qty: 1, face: 3, zhai: true }, zhai)).toBe(1);
+  });
+  it("deriveOnesBroken：变体关恒 false；开后有人叫 1 即 true", () => {
+    expect(deriveOnesBroken([{ face: 1 }], R)).toBe(false);
+    expect(deriveOnesBroken([{ face: 3 }], { ...R, ones_break: true })).toBe(false);
+    expect(deriveOnesBroken([{ face: 3 }, { face: 1 }], { ...R, ones_break: true })).toBe(true);
   });
   it("实际≥叫数则质疑者输", () => {
     expect(resolveChallenge(dice, { qty: 3, face: 3, zhai: false }, R)).toEqual({

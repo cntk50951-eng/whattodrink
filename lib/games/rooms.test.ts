@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   parseCreateBody,
+  parseActionBody,
   parseJoinCode,
   parseKickBody,
   parseReadyBody,
@@ -66,5 +67,22 @@ describe("房间请求体解析", () => {
     expect("error" in parseKickBody({})).toBe(true);
     expect(parseRoomId("r1")).toEqual({ id: "r1" });
     expect("error" in parseRoomId("")).toBe(true);
+  });
+  it("action：三 type＋version＋幂等键", () => {
+    expect(
+      parseActionBody({ type: "bid", payload: { qty: 3, face: 4 }, expected_version: 7, client_action_id: "c1" }),
+    ).toEqual({
+      type: "bid",
+      bid: { qty: 3, face: 4, zhai: false },
+      expectedVersion: 7,
+      clientActionId: "c1",
+    });
+    expect(
+      parseActionBody({ type: "challenge", expected_version: 0, client_action_id: "c2" }),
+    ).toEqual({ type: "challenge", expectedVersion: 0, clientActionId: "c2" });
+    expect("error" in parseActionBody({ type: "dance", expected_version: 0, client_action_id: "c" })).toBe(true);
+    expect("error" in parseActionBody({ type: "bid", payload: {}, expected_version: 0, client_action_id: "c" })).toBe(true);
+    expect("error" in parseActionBody({ type: "bid", payload: { qty: 1, face: 1 }, expected_version: -1, client_action_id: "c" })).toBe(true);
+    expect("error" in parseActionBody({ type: "bid", payload: { qty: 1, face: 1 }, expected_version: 0, client_action_id: "" })).toBe(true);
   });
 });

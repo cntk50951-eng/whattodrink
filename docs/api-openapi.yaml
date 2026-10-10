@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.27.0
+  version: 1.28.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -2172,6 +2172,190 @@ paths:
                     nullable: true
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/games/rooms/{id}:
+    get:
+      operationId: getGameRoomState
+      summary: 取状态（需登录；since 追平回 304；按人裁剪，my_dice 只给自己，开盅才有 revealed；懒超时先结算，UR H.1）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: since
+          in: query
+          description: 已知 version；与当前相同回 304 空体
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 全量状态（players 含 online 15s 窗＋dice_count；events 为 since 之后最多 50）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [room, players, events]
+                properties:
+                  room:
+                    $ref: "#/components/schemas/GameRoom"
+                  players:
+                    type: array
+                    items:
+                      type: object
+                      required: [user_id, nickname, avatar_url, seat, ready, status, online]
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                        nickname:
+                          type: string
+                        avatar_url:
+                          type: string
+                          nullable: true
+                        seat:
+                          type: integer
+                        ready:
+                          type: boolean
+                        status:
+                          type: string
+                          enum: [active, left, kicked]
+                        online:
+                          type: boolean
+                        dice_count:
+                          type: integer
+                          description: 局中每人骰数（公开信息；骰面只在 my_dice／revealed）
+                  round:
+                    type: object
+                    description: 仅 playing（lobby／ended 无本字段）
+                    required: [no, status, starter_id, current_turn_user, turn_deadline, last_bid, bids, my_dice]
+                    properties:
+                      no:
+                        type: integer
+                      status:
+                        type: string
+                        enum: [bidding, revealed]
+                      starter_id:
+                        type: string
+                        format: uuid
+                      current_turn_user:
+                        type: string
+                        format: uuid
+                        nullable: true
+                      turn_deadline:
+                        type: string
+                        nullable: true
+                      last_bid:
+                        type: object
+                        nullable: true
+                      bids:
+                        type: array
+                        items:
+                          type: object
+                      my_dice:
+                        type: array
+                        items:
+                          type: integer
+                      revealed:
+                        type: object
+                        description: 仅开盅后（含全场 dice＋challenger／bidder＋counted＋bid_met＋loser_id）
+                  events:
+                    type: array
+                    items:
+                      type: object
+        "304":
+          description: 状态未变（空体，继续轮询）
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 房間不存在／非成员（code=room_not_found）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+    post:
+      operationId: postGameAction
+      summary: 动作（需登录；bid／challenge／next_round；幂等键＋expected_version 落后 409，UR H.1）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, expected_version, client_action_id]
+              properties:
+                type:
+                  type: string
+                  enum: [bid, challenge, next_round]
+                payload:
+                  type: object
+                  description: bid 用 {qty, face, zhai?}；其余空
+                expected_version:
+                  type: integer
+                client_action_id:
+                  type: string
+                  maxLength: 64
+                  description: 幂等键（同房重发回首次结果 replayed:true）
+      responses:
+        "200":
+          description: 已执行（events＝expected 之后的新事件）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, events]
+                properties:
+                  version:
+                    type: integer
+                  events:
+                    type: array
+                    items:
+                      type: object
+                  replayed:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 房間不存在／非成员（code=room_not_found）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 版本落后／非你回合／阶段错（code=stale_version|not_your_turn|wrong_phase）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: 叫骰不合法（code=invalid_bid，reason 进 message）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 动作超限（5 次／秒）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/games/rooms/{id}/ready:

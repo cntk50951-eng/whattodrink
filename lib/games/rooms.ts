@@ -8,7 +8,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { apiError } from "../api/envelope";
-import { nextTurn, parseRules, type LiarsRules } from "./liars";
+import {
+  deriveOnesBroken,
+  minAutoBid,
+  nextTurn,
+  parseRules,
+  resolveChallenge,
+  rollDice,
+  type LiarsRules,
+} from "./liars";
 
 export const ROOM_TTL_MS = 2 * 3600_000;
 export const ROOM_DELETE_AFTER_END_MS = 24 * 3600_000;
@@ -290,7 +298,9 @@ export async function hasBlockOrMute(
   return (Array.isArray(blocks) && blocks.length > 0) || (Array.isArray(mutes) && mutes.length > 0);
 }
 
-/** 版本事件（失败只记 log，不拦主流程；version 由调用方定）。 */
+/**
+ * 版本事件（失败只记 log，不拦主流程；version 由调用方定）。
+ */
 export async function appendEvent(
   svc: SupabaseClient,
   roomId: string,
@@ -298,6 +308,7 @@ export async function appendEvent(
   type: string,
   actorId: string | null,
   payload: Record<string, unknown>,
+  clientActionId?: string,
 ): Promise<void> {
   const { error } = await svc.from("game_events").insert({
     room_id: roomId,
@@ -305,6 +316,7 @@ export async function appendEvent(
     type,
     actor_id: actorId,
     payload,
+    client_action_id: clientActionId ?? null,
   });
   if (error !== null) {
     console.error(`[games] event error: code=${error.code} message=${error.message}`);
@@ -498,4 +510,382 @@ export async function bumpRoom(
     return null;
   }
   return (data as { version: number }).version;
+}
+
+/* ---- 第三批：回合状态机（懒超时＋动作执行，路由共用） ---- */
+
+export type RoundBid = {
+  user_id: string;
+  qty: number;
+  face: number;
+  zhai: boolean;
+  at: string;
+};
+
+export type RoundResult = {
+  dice: Record<string, number[]>;
+  challenger_id: string;
+  bidder_id: string;
+  counted: number;
+  bid_met: boolean;
+  loser_id: string;
+  revealed_at: string;
+  confirmations: string[];
+};
+
+export type RoundRow = {
+  id: string;
+  room_id: string;
+  no: number;
+  starter_id: string;
+  status: string;
+  dice: Record<string, number[]>;
+  current_turn_user: string | null;
+  turn_deadline: string | null;
+  last_bid: { user_id: string; qty: number; face: number; zhai: boolean } | null;
+  bids: RoundBid[];
+  loser_id: string | null;
+  result: RoundResult | null;
+};
+
+function asDice(raw: unknown): Record<string, number[]> {
+  const out: Record<string, number[]> = {};
+  if (typeof raw !== "object" || raw === null) return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (Array.isArray(v) && v.every((n): n is number => typeof n === "number")) {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+function asBids(raw: unknown): RoundBid[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RoundBid[] = [];
+  for (const b of raw as Record<string, unknown>[]) {
+    if (
+      typeof b.user_id === "string" &&
+      typeof b.qty === "number" &&
+      typeof b.face === "number"
+    ) {
+      out.push({
+        user_id: b.user_id,
+        qty: b.qty,
+        face: b.face,
+        zhai: b.zhai === true,
+        at: typeof b.at === "string" ? b.at : "",
+      });
+    }
+  }
+  return out;
+}
+
+/** 最新局（no 倒序首行；无即 null）。 */
+export async function getLatestRound(
+  svc: SupabaseClient,
+  roomId: string,
+): Promise<RoundRow | null> {
+  const { data } = await svc
+    .from("game_rounds")
+    .select("id,room_id,no,starter_id,status,dice,current_turn_user,turn_deadline,last_bid,bids,loser_id,result")
+    .eq("room_id", roomId)
+    .order("no", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (data === null || typeof data !== "object") return null;
+  const r = data as Record<string, unknown>;
+  if (typeof r.id !== "string" || typeof r.room_id !== "string") return null;
+  const lastBid =
+    typeof r.last_bid === "object" && r.last_bid !== null
+      ? (r.last_bid as { user_id?: unknown; qty?: unknown; face?: unknown; zhai?: unknown })
+      : null;
+  return {
+    id: r.id,
+    room_id: r.room_id,
+    no: typeof r.no === "number" ? r.no : 1,
+    starter_id: typeof r.starter_id === "string" ? r.starter_id : "",
+    status: typeof r.status === "string" ? r.status : "bidding",
+    dice: asDice(r.dice),
+    current_turn_user: typeof r.current_turn_user === "string" ? r.current_turn_user : null,
+    turn_deadline: typeof r.turn_deadline === "string" ? r.turn_deadline : null,
+    last_bid:
+      lastBid !== null &&
+      typeof lastBid.user_id === "string" &&
+      typeof lastBid.qty === "number" &&
+      typeof lastBid.face === "number"
+        ? { user_id: lastBid.user_id, qty: lastBid.qty, face: lastBid.face, zhai: lastBid.zhai === true }
+        : null,
+    bids: asBids(r.bids),
+    loser_id: typeof r.loser_id === "string" ? r.loser_id : null,
+    result: typeof r.result === "object" && r.result !== null ? (r.result as RoundResult) : null,
+  };
+}
+
+/** 开新局（starter 指定；骰只发给当前 active；调用方随后 bump＋事件）。 */
+export async function startNextRound(
+  svc: SupabaseClient,
+  roomId: string,
+  no: number,
+  starterId: string,
+  activeIds: string[],
+  rules: LiarsRules,
+  nowMs: number,
+): Promise<{ ok: true } | { response: Response }> {
+  const dice: Record<string, number[]> = {};
+  for (const uid of activeIds) {
+    dice[uid] = rollDice(rules.dice_per_player);
+  }
+  const { error } = await svc.from("game_rounds").insert({
+    room_id: roomId,
+    no,
+    starter_id: starterId,
+    status: "bidding",
+    dice,
+    current_turn_user: starterId,
+    turn_deadline:
+      rules.turn_seconds > 0 ? new Date(nowMs + rules.turn_seconds * 1000).toISOString() : null,
+    last_bid: null,
+    bids: [],
+  });
+  if (error !== null) {
+    console.error(`[games] next-round error: code=${error.code} message=${error.message}`);
+    return { response: apiError("internal", "開局失敗", 500) };
+  }
+  return { ok: true };
+}
+
+export const NEXT_ROUND_AUTO_MS = 8000;
+
+/**
+ * 懒超时结算（每次 GET／POST 先调；无 cron）。
+ * - bidding＋deadline 过：有 last_bid→自动 challenge，无→当前者最小叫骰（auto 标记）。
+ * - revealed＋（全员确认或 8s）：输家先开新局（auto）。
+ * 回 `{room, fired}`（room 为重载后；fired 即 version 变了，调用方重读 version）。
+ */
+export async function settleRoom(
+  svc: SupabaseClient,
+  room: RoomJson,
+  nowMs: number,
+): Promise<{ room: RoomJson; fired: boolean }> {
+  if (room.status !== "playing") return { room, fired: false };
+  const round = await getLatestRound(svc, room.id);
+  if (round === null) return { room, fired: false };
+  const members = await getActiveMembers(svc, room.id);
+  const activeIds = members.map((m) => m.user_id);
+  if (activeIds.length === 0) return { room, fired: false };
+  const rules = parseRules(room.rules);
+  if (round.status === "bidding" && round.turn_deadline !== null) {
+    if (Date.parse(round.turn_deadline) > nowMs) return { room, fired: false };
+    const turn = round.current_turn_user;
+    if (turn === null || !activeIds.includes(turn)) return { room, fired: false };
+    if (round.last_bid !== null) {
+      const done = await applyChallenge(svc, room, round, turn, true, nowMs);
+      if (!("version" in done)) return { room, fired: false };
+      return { room: { ...room, version: done.version }, fired: true };
+    }
+    const auto = minAutoBid(rules);
+    const done = await applyBid(
+      svc, room, round, activeIds, turn,
+      { qty: auto.qty, face: auto.face, zhai: false }, true, nowMs,
+    );
+    if (!("version" in done)) return { room, fired: false };
+    return { room: { ...room, version: done.version }, fired: true };
+  }
+  if (round.status === "revealed" && round.result !== null) {
+    const confirmed = new Set(round.result.confirmations);
+    const allIn = activeIds.every((id) => confirmed.has(id));
+    const aged = nowMs - Date.parse(round.result.revealed_at) >= NEXT_ROUND_AUTO_MS;
+    if (!allIn && !aged) return { room, fired: false };
+    const starter =
+      round.result.loser_id !== "" && activeIds.includes(round.result.loser_id)
+        ? round.result.loser_id
+        : [...members].sort((a, b) => a.seat - b.seat)[0].user_id;
+    const created = await startNextRound(svc, room.id, round.no + 1, starter, activeIds, rules, nowMs);
+    if ("response" in created) return { room, fired: false };
+    const version = await bumpRoom(svc, room.id, room.version, nowMs);
+    if (version === null) return { room, fired: false };
+    await appendEvent(svc, room.id, version, "round_started", null, {
+      no: round.no + 1,
+      starter_id: starter,
+      auto: true,
+    });
+    return { room: { ...room, version }, fired: true };
+  }
+  return { room, fired: false };
+}
+
+/**
+ * 落叫骰（调用方已验合法性；推进轮次＋重置 deadline）。
+ * 回新 version（失败回 response）。
+ */
+export async function applyBid(
+  svc: SupabaseClient,
+  room: RoomJson,
+  round: RoundRow,
+  activeIdsSeatOrder: string[],
+  bidderId: string,
+  bid: { qty: number; face: number; zhai: boolean },
+  auto: boolean,
+  nowMs: number,
+  clientActionId?: string,
+): Promise<{ version: number } | { response: Response }> {
+  const nowIso = new Date(nowMs).toISOString();
+  const rules = parseRules(room.rules);
+  const bids = [...round.bids, { user_id: bidderId, qty: bid.qty, face: bid.face, zhai: bid.zhai, at: nowIso }];
+  const next = nextTurn(activeIdsSeatOrder, bidderId) ?? activeIdsSeatOrder[0];
+  const { error } = await svc
+    .from("game_rounds")
+    .update({
+      last_bid: { user_id: bidderId, qty: bid.qty, face: bid.face, zhai: bid.zhai },
+      bids,
+      current_turn_user: next,
+      turn_deadline:
+        rules.turn_seconds > 0 ? new Date(nowMs + rules.turn_seconds * 1000).toISOString() : null,
+    })
+    .eq("id", round.id);
+  if (error !== null) {
+    console.error(`[games] bid error: code=${error.code} message=${error.message}`);
+    return { response: apiError("internal", "叫骰失敗", 500) };
+  }
+  const version = await bumpRoom(svc, room.id, room.version, nowMs);
+  if (version === null) return { response: apiError("internal", "叫骰失敗", 500) };
+  await appendEvent(svc, room.id, version, "action_bid", auto ? null : bidderId, {
+    user_id: bidderId,
+    qty: bid.qty,
+    face: bid.face,
+    zhai: bid.zhai,
+    no: round.no,
+    ...(auto ? { auto: true } : {}),
+  }, clientActionId);
+  return { version };
+}
+
+/**
+ * 落開（即时开盅：统计→定输家→revealed；调用方已验 last_bid 存在）。
+ * 回 `{version, revealed}`（revealed 即 RoundResult，给 GET／响应拼）。
+ */
+export async function applyChallenge(
+  svc: SupabaseClient,
+  room: RoomJson,
+  round: RoundRow,
+  challengerId: string,
+  auto: boolean,
+  nowMs: number,
+  clientActionId?: string,
+): Promise<{ version: number; revealed: RoundResult } | { response: Response }> {
+  const lastBid = round.last_bid;
+  if (lastBid === null) {
+    return { response: apiError("wrong_phase", "無人叫骰不可開", 409) };
+  }
+  const rules = parseRules(room.rules);
+  const allDice: number[] = [];
+  for (const v of Object.values(round.dice)) {
+    allDice.push(...v);
+  }
+  const broken = deriveOnesBroken(round.bids, rules);
+  const { counted, bid_met } = resolveChallenge(allDice, lastBid, rules, broken);
+  const revealed: RoundResult = {
+    dice: round.dice,
+    challenger_id: challengerId,
+    bidder_id: lastBid.user_id,
+    counted,
+    bid_met,
+    loser_id: bid_met ? challengerId : lastBid.user_id,
+    revealed_at: new Date(nowMs).toISOString(),
+    confirmations: [],
+  };
+  const { error } = await svc
+    .from("game_rounds")
+    .update({ status: "revealed", loser_id: revealed.loser_id, result: revealed })
+    .eq("id", round.id);
+  if (error !== null) {
+    console.error(`[games] challenge error: code=${error.code} message=${error.message}`);
+    return { response: apiError("internal", "開盅失敗", 500) };
+  }
+  const version = await bumpRoom(svc, room.id, room.version, nowMs);
+  if (version === null) return { response: apiError("internal", "開盅失敗", 500) };
+  await appendEvent(svc, room.id, version, "action_challenge", auto ? null : challengerId, {
+    no: round.no,
+    challenger_id: challengerId,
+    bidder_id: lastBid.user_id,
+    counted,
+    bid_met,
+    loser_id: revealed.loser_id,
+    ...(auto ? { auto: true } : {}),
+  }, clientActionId);
+  return { version, revealed };
+}
+
+export type EventJson = {
+  version: number;
+  type: string;
+  actor_id: string | null;
+  payload: Record<string, unknown>;
+  created_at: string;
+};
+
+function toEventJson(r: Record<string, unknown>): EventJson | null {
+  if (typeof r.version !== "number" || typeof r.type !== "string") return null;
+  return {
+    version: r.version,
+    type: r.type,
+    actor_id: typeof r.actor_id === "string" ? r.actor_id : null,
+    payload:
+      typeof r.payload === "object" && r.payload !== null
+        ? (r.payload as Record<string, unknown>)
+        : {},
+    created_at: typeof r.created_at === "string" ? r.created_at : "",
+  };
+}
+
+/** since 之后事件（version>since 升序，最多 50；断线补事件用）。 */
+export async function getEventsSince(
+  svc: SupabaseClient,
+  roomId: string,
+  since: number,
+): Promise<EventJson[]> {
+  const { data } = await svc
+    .from("game_events")
+    .select("version,type,actor_id,payload,created_at")
+    .eq("room_id", roomId)
+    .gt("version", since)
+    .order("version", { ascending: true })
+    .limit(50);
+  const out: EventJson[] = [];
+  for (const r of ((data ?? []) as unknown[]) as Record<string, unknown>[]) {
+    const e = toEventJson(r);
+    if (e !== null) out.push(e);
+  }
+  return out;
+}
+
+export type GameActionType = "bid" | "challenge" | "next_round";
+
+export type ParsedAction =
+  | { type: "bid"; bid: { qty: number; face: number; zhai: boolean }; expectedVersion: number; clientActionId: string }
+  | { type: "challenge"; expectedVersion: number; clientActionId: string }
+  | { type: "next_round"; expectedVersion: number; clientActionId: string };
+
+/** 动作包解析（形状错 400；语义错各 action 内 409/422）。 */
+export function parseActionBody(raw: unknown): ParsedAction | { error: string } {
+  if (typeof raw !== "object" || raw === null) return { error: "body 需为对象" };
+  const r = raw as Record<string, unknown>;
+  const type = r.type;
+  if (type !== "bid" && type !== "challenge" && type !== "next_round") {
+    return { error: "type 只要 bid|challenge|next_round" };
+  }
+  if (typeof r.expected_version !== "number" || !Number.isInteger(r.expected_version) || r.expected_version < 0) {
+    return { error: "expected_version 非法" };
+  }
+  const cid = r.client_action_id;
+  if (typeof cid !== "string" || cid.trim() === "" || cid.trim().length > 64) {
+    return { error: "client_action_id 非法" };
+  }
+  const base = { expectedVersion: r.expected_version, clientActionId: cid.trim() };
+  if (type !== "bid") return { type, ...base };
+  const p = (typeof r.payload === "object" && r.payload !== null ? r.payload : {}) as Record<string, unknown>;
+  if (typeof p.qty !== "number" || !Number.isInteger(p.qty) || typeof p.face !== "number" || !Number.isInteger(p.face)) {
+    return { error: "bid payload 需 qty／face 整数" };
+  }
+  return { type, bid: { qty: p.qty, face: p.face, zhai: p.zhai === true }, ...base };
 }
