@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+- **UR H.1 游戏房间＋大話骰 POC（纯 API，[WIP]，待 0042＋三批端点）**
+  - 第一批：0042 五表（rooms／players／rounds／events／invites；RLS 全锁 service 读写）＋`lib/games/liars.ts` 纯函数（crypto 摇骰／叫骰校验／百搭计数／开盅结算／顺位／房规解析／房间码）＋15 单测（含 6000 颗均匀分布）
+
 ### Fixed
 - **DEF-20261006-002 iOS 好友釘 pill 无走马灯（v2-only，未提交；pins 补 note 读链）**
   - 读链三处全缺：`PINS_COLUMNS` 无 `note` → `toPinJson` 无映射 → openapi `MapPin` 无字段（写链 POST／详情早有 note，唯列表漏了）

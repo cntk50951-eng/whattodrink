@@ -4169,3 +4169,37 @@ UR B.3　好友请求中心（v2-only，iOS 输入）[WIP]
 - 2026-10-10：建檔置 [WIP]（WEB_HANDOFF_FRIEND_REQUESTS 输入＋四问答；直做）
 - 2026-10-10：实作：0040 origin 列＋requests 双端点（富行＋pending＋accept/decline/cancel＋拉黑门）＋DELETE 重写（删双行＋双拉黑）＋DELETE blocks＋POST 拉黑门＋日 20＋origin 落列＋messages 拉黑门＋counters/badge 含请求＋推送双事件＋prefs friends＋openapi 1.25.0＋单测。
 - 2026-10-10：联调返工（交接 §六全关）：badge 真正计入请求数（五数相加）＋禁言拆表 chat_mutes（0041；只禁聊天；POST 只认手动屏蔽；accept 成对清 mute）＋发消息 403 conversation_muted＋openapi 1.26.0；旧 cheers_blocks 自动行不迁移。
+
+---
+
+EPIC H　酒桌游戏（服务端权威＋大話骰 POC，iOS-0.84 输入）[WIP]
+
+> vision 旧称 EPIC 4.0（暂缓），现重启为字母序 H。POC 只做房间平台＋大話骰；
+> 引擎按游戏可插拔设计（十五二十等只加状态机，不改房间接口）。
+
+UR H.1　游戏房间＋大話骰 POC（纯 API，无 web UI，[shared-only]）[WIP]
+
+> iOS 需求见 `whattodrink_ios/docs/WEB_HANDOFF_GAME_ROOMS.md`（非契约，契约以 yaml 为准）。
+
+### 背景（四问答定案＋两自定，2026-10-10）
+- 分 4 批：① migration＋规则纯函数库 ② 房间端点 ③ 状态＋动作 ④ 邀请＋推送。
+- 轮询 1.5s（回合）／3s（大厅）可接受；`since` 相同回 304（iOS 两种都能处理）。
+- 邀请走新表 `game_invites`（lobby 门＋过期＋counters 直读）。
+- 同酒局口径＝与房主有任一共同活跃 party（`joins` 交集）；陌生人永不。
+- badge 不计入游戏邀请（沿 iOS 建议，免打扰）；Q5 自定 yes——规则纯函数放 `lib/games/`（web 将来同房间直接复用）。
+
+### 範圍
+1. **數據**：0042（`game_rooms`＋`game_room_players`＋`game_rounds`＋`game_rounds`＋`game_events`＋`game_invites`；RLS 全开零 policy 锁死，service 读写，沿 push_log）。
+2. **純函數**：`lib/games/liars.ts`（`rollDice` crypto／`isValidBid`／`countMatching`／`resolveChallenge`／`nextTurn`／`minAutoBid`／`parseRules`＋单测，含分布近似均匀）。
+3. **端點**（②③④批）：房间 9 口（建／码加入／active／邀请／准备／开始／离开／踢／改规／结束）＋`GET room?since=`（304＋按人裁剪＋懒超时）＋`POST actions`（幂等键＋expected_version＋409 矩阵）＋`GET /games/invites`＋counters 加数＋`game_invite` 推送。
+4. openapi 契約先行（②批起）＋單測；过期房间懒删（无 cron，touch 时清）。
+
+### 非目標
+- 齋／飛／劈／圍骰（字段预留）、`game_turn` 推送（P2）、Realtime（形状预留）、陌生人匹配、酒量记录／排行、v1/v2 任何文件。
+
+### AC（交接 §八）
+- AC1：4 端各见己骰、开盅见全场；AC2 超时自动动作（auto 标记）；AC3 `/active` 重连；
+- AC4 双击幂等同一结果；AC5 expected_version 落后 409；AC6 非好友／未成年／拉黑门码明确；AC7 过期删数。
+
+*改動記錄*
+- 2026-10-10：建檔置 [WIP]（WEB_HANDOFF_GAME_ROOMS 输入＋四问答；分 4 批）
