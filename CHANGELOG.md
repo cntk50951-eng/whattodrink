@@ -7,6 +7,7 @@
 ### Added
 - **UR H.1 游戏房间＋大話骰 POC（纯 API，[WIP]，待 0042＋三批端点）**
   - 第一批：0042 五表（rooms／players／rounds／events／invites；RLS 全锁 service 读写）＋`lib/games/liars.ts` 纯函数（crypto 摇骰／叫骰校验／百搭计数／开盅结算／顺位／房规解析／房间码）＋15 单测（含 6000 颗均匀分布）
+  - 第二批：房间 8 端点（建／码加入／active／准备／开始／离开／踢／改规／结束）＋门禁一体 helper（18+／拉黑双表／好友或 joins 交集／同时 1 房／满员／踢禁重进）＋懒过期（2h 续／ended 24h 删）＋openapi 1.27.0＋`GameRoom` schema＋5 单测；11 新错误码一次加齐（三批共用）
 
 ### Fixed
 - **DEF-20261006-002 iOS 好友釘 pill 无走马灯（v2-only，未提交；pins 补 note 读链）**

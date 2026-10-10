@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.26.0
+  version: 1.27.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -2032,6 +2032,459 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/games/rooms:
+    post:
+      operationId: createGameRoom
+      summary: 建房（需登录；18+ 403；同时 1 房 409＋调 active 回去；小时 10 房 429，UR H.1）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                game:
+                  type: string
+                  enum: [liars_dice]
+                  default: liars_dice
+                max_players:
+                  type: integer
+                  minimum: 2
+                  maximum: 8
+                  default: 6
+                rules:
+                  type: object
+                  description: 房规（min_open_qty／ones_wild／ones_break／zhai_enabled／turn_seconds 15|30|60|0；非法回落默认）
+      responses:
+        "201":
+          description: 建房成功（房主 seat 0，ready=false）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [room]
+                properties:
+                  room:
+                    $ref: "#/components/schemas/GameRoom"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 未成年（code=age_restricted）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 已在房中（code=already_in_room；调 GET /games/rooms/active 回去）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 建房超限（小时 10 房）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/games/rooms/join:
+    post:
+      operationId: joinGameRoom
+      summary: 输码加入（需登录；码大写不敏感；好友或同酒局＋双表拉黑门，UR H.1）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  maxLength: 6
+      responses:
+        "200":
+          description: 加入成功（本房重复调幂等同回）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [room_id]
+                properties:
+                  room_id:
+                    type: string
+                    format: uuid
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 未成年／曾被踢／拉黑解友／非好友非同酒局（code=age_restricted|not_allowed）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 房間不存在或已結束（code=room_not_found，不泄存在性）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 已在房中／已开局／满员（code=already_in_room|room_started|room_full）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 房间码尝试超限（10 次／分钟）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/games/rooms/active:
+    get:
+      operationId: getActiveGameRoom
+      summary: 当前房间（需登录；断线重连先调本口，UR H.1）
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 所在非 ended 房间（无即 null）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [room_id]
+                properties:
+                  room_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/games/rooms/{id}/ready:
+    post:
+      operationId: setGameReady
+      summary: 准备（需登录；仅 lobby；成员，UR H.1）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ready]
+              properties:
+                ready:
+                  type: boolean
+      responses:
+        "200":
+          description: 已更新（同值重调幂等同回 version 不变）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, ready]
+                properties:
+                  version:
+                    type: integer
+                  ready:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 房間不存在／非成员（code=room_not_found）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 已结束或局中（code=wrong_phase）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/games/rooms/{id}/start:
+    post:
+      operationId: startGameRoom
+      summary: 开始（需登录；仅房主；≥2 人全员 ready；开首局 service 摇骰，UR H.1）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: lobby→playing（首局 starter＝座位最小）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version]
+                properties:
+                  version:
+                    type: integer
+        "400":
+          description: 人数不足／有成员未准备
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非房主（code=not_host）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 房間不存在／非成员（code=room_not_found）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 已开局或已结束（code=wrong_phase）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/games/rooms/{id}/leave:
+    post:
+      operationId: leaveGameRoom
+      summary: 离开（需登录；房主走移交座位最小，无人则散；局中剩<2 人散，UR H.1）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 已离开
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version]
+                properties:
+                  version:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 房間不存在／非成员（code=room_not_found）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 已结束（code=wrong_phase）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/games/rooms/{id}/kick:
+    post:
+      operationId: kickGameRoomMember
+      summary: 踢人（需登录；仅房主；不可踢自己；被踢重进码 403，UR H.1）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: 已请出
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version]
+                properties:
+                  version:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非房主（code=not_host）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 房間不存在／非成员／目标不在房（code=room_not_found|not_found）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 已结束（code=wrong_phase）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/games/rooms/{id}/rules:
+    post:
+      operationId: updateGameRoomRules
+      summary: 改房规（需登录；仅房主仅 lobby；非法回落默认，UR H.1）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rules]
+              properties:
+                rules:
+                  type: object
+      responses:
+        "200":
+          description: 已更新
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, rules]
+                properties:
+                  version:
+                    type: integer
+                  rules:
+                    type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非房主（code=not_host）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 房間不存在／非成员（code=room_not_found）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 开局后不可改（code=wrong_phase）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/games/rooms/{id}/end:
+    post:
+      operationId: endGameRoom
+      summary: 结束（需登录；仅房主；行留 24h 供回看结算，UR H.1）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 已结束
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version]
+                properties:
+                  version:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非房主（code=not_host）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 房間不存在／非成员（code=room_not_found）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 已结束（code=wrong_phase；结算看 GET 状态）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
   /api/v1/presence:
     post:
       operationId: postPresence
@@ -2936,6 +3389,34 @@ components:
         status:
           type: string
           enum: [pending, accepted]
+    GameRoom:
+      type: object
+      required: [id, code, game, host_id, status, rules, max_players, version, expires_at]
+      description: 游戏房间（UR H.1；骰值永不进本结构，状态口另给）
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          maxLength: 6
+        game:
+          type: string
+          enum: [liars_dice]
+        host_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [lobby, playing, ended]
+        rules:
+          type: object
+        max_players:
+          type: integer
+        version:
+          type: integer
+        expires_at:
+          type: string
     LiveFriend:
       type: object
       required: [user_id, nickname, avatar_url, lat, lng, updated_at]

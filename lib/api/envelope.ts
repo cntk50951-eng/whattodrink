@@ -14,6 +14,17 @@ export type ApiErrorCode =
   | "payload_too_large"
   | "stranger_quota"
   | "conversation_muted"
+  | "age_restricted"
+  | "not_allowed"
+  | "room_not_found"
+  | "room_full"
+  | "room_started"
+  | "already_in_room"
+  | "not_host"
+  | "not_your_turn"
+  | "wrong_phase"
+  | "invalid_bid"
+  | "stale_version"
   | "internal";
 
 export function apiError(
