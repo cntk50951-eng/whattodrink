@@ -22,6 +22,7 @@
 ---
 
 | ID | 标题 | 状态 | 严重度 | 发现日期 / 报告人 | 关联 UR | 确诊根因 |
+| DEF-20261010-001 | 好友发消息被当陌生人（3 条＋禁图音） | Fixing | P0 | 2026-10-10 / @iOS | UR D.10 | 成员表 RLS 只读己行，peerIds 恒空→isFriend 恒 false，见详情 |
 | DEF-20261009-001 | /mine 看不到已归档旧快贴（足迹断代） | Fixing | P1 | 2026-10-09 / @iOS(0.68) | UR E.22 | 归档 embed beers 无 FK 即 PGRST200 整段静默跳过＋slice 切旧行，见详情 |
 | DEF-20261009-002 | 主页 nights/places 恒 0（week 连带） | Fixing | P1 | 2026-10-09 / @iOS | UR E.27 | 扫描查询漏解构 data＋1000 行静默截断，见详情 |
 |---|---|---|---|---|---|---|
@@ -888,3 +889,16 @@
 - **修复**：解构补 `data`＋失败 warn；扫描改分页拉全（1000 页循环，有错即停）；`eat` 提纯 `collectNightStats`＋单测（mock 行断言 nights/places>0）
 - **修复验证**：`vitest` profile 全绿；待联调（有打卡号 `nights_total` 对足迹夜数）
 - **回归范围**：profile stats；recent／relationship 不动
+
+### DEF-20261010-001 好友发消息被当陌生人（3 条＋禁图音）
+
+- **状态**：Fixing（2026-10-10：修法已写，待联调 AC1–AC5 转 Verified）
+- **严重度**：P0（所有好友聊天受影响；iOS 真机报告，iOS 已加固显示，服务端修好无需 iOS 改）
+- **发现日期 / 报告人**：2026-10-10 / @iOS
+- **复现步骤**：好友 A、B，A 连发文字→第 4 条 `429 stranger_quota`；好友发图／音→`400 陌生會話只支持文字與打卡卡片`
+- **期望 vs 实际**：期望好友无限制＋quota null；实际全走陌生人分支
+- **确诊根因**：`messages/route.ts` 用 authed client 读 `conversation_members`，但 RLS `members self read`（0012:74-77）只返己行 → `peerIds` 恒空 → `isFriend` 恒 false（空列表判陌生）；同文件隐身双验（modes 查）同样只查到自己，对方隐身从未生效；`conversations/route.ts` 列表 peers 查询同病（is_friend 全 false）。证据：iOS 行号＋迁移策略＋本地该查询恒返单行
+- **关联 UR**：UR D.10
+- **修复**：成员读改 service（建会话 POST 的 friendships 读沿用 authed，该表可读）；peerIds 为空即 500（fail-closed，不静默按陌生人限流）；`peerIdsOf` 提纯＋单测（含空集）
+- **修复验证**：AC1 好友 4 条全过＋quota null；AC2 好友图音过；AC3 陌生人 3＋1 拒＋回复清零；AC4 对方隐身 403；AC5 `peerIdsOf` 空集用例（真 RLS 集成限本地／staging 手工验）
+- **回归范围**：发消息、会话列表；建会话（friendships 可读，不动）

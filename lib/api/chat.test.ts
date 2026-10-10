@@ -12,6 +12,7 @@ import {
   parseCreateConversationBody,
   parseCreateMessageBody,
   parseReadBody,
+  peerIdsOfMembers,
   parseSignBody,
   parseViewBody,
   strangerQuota,
@@ -53,8 +54,7 @@ describe("parseCreateConversationBody", () => {
   });
 });
 
-describe("strangerQuota", () => {
-  const m = (sender_id: string, i: number): { sender_id: string; created_at: string } => ({
+describe("strangerQuota", () => {  const m = (sender_id: string, i: number): { sender_id: string; created_at: string } => ({
     sender_id,
     created_at: `2026-10-10T00:00:0${i}Z`,
   });
@@ -358,5 +358,14 @@ describe("isConversationExpired", () => {
     expect(isConversationExpired(new Date(now - 1).toISOString(), now)).toBe(true);
     expect(isConversationExpired(new Date(now + 1000).toISOString(), now)).toBe(false);
     expect(isConversationExpired("bad", now)).toBe(true);
+  });
+});
+
+describe("peerIdsOfMembers", () => {
+  it("滤自己；空成员回空（调用方 500，不判陌生）", () => {
+    expect(peerIdsOfMembers([{ user_id: "me" }, { user_id: "you" }], "me")).toEqual(["you"]);
+    expect(peerIdsOfMembers([{ user_id: "me" }], "me")).toEqual([]);
+    expect(peerIdsOfMembers([], "me")).toEqual([]);
+    expect(peerIdsOfMembers([{ user_id: 42 } as never], "me")).toEqual([]);
   });
 });

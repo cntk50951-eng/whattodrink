@@ -11,6 +11,7 @@ import {
   encodeChatCursor,
   toChatMessage,
   isSizeWithin,
+  peerIdsOfMembers,
   strangerQuota,
   STRANGER_MSG_LIMIT,
 } from "@/lib/api/chat";
@@ -116,8 +117,11 @@ export async function POST(
     }
     return apiError("invalid_params", parsed.error, 400);
   }
-  // 成員＋隱身雙驗（非成員 404；任一端隱身 403，沿 live 三刀口徑）
-  const { data: members } = await supabase
+  // 成員＋隱身雙驗（非成員 404；任一端隱身 403，沿 live 三刀口徑）。
+  // DEF-20261010-001：成员读走 service（conversation_members RLS 只返己行，
+  // authed 读恒缺对方，peerIds 为空即全员判陌生）。
+  const svc = await createServiceClient();
+  const { data: members } = await svc
     .from("conversation_members")
     .select("user_id")
     .eq("conversation_id", parsedId.id);
@@ -126,7 +130,12 @@ export async function POST(
     return apiError("not_found", "找不到该会话", 404);
   }
   // UR D.10 好友判定（陌生人配额／kind 门／分享放宽用；好友免检）。
-  const peerIds = memberIds.map((m) => m.user_id).filter((mid) => mid !== userId);
+  // DEF-20261010-001：空集即 500（成员必有对方，拿不到是对不上账，不判陌生）。
+  const peerIds = peerIdsOfMembers(memberIds, userId);
+  if (peerIds.length === 0) {
+    console.error(`[api/v1/conversations/messages] no peers for ${parsedId.id}`);
+    return apiError("internal", "发送失败", 500);
+  }
   let isFriend = true;
   {
     const { data: fsRows } = await supabase
@@ -144,7 +153,8 @@ export async function POST(
       }[],
     );
     // direct 1v1：除自己外唯一成员即对方；群预留（多人即按"有陌生人"从严）。
-    isFriend = peerIds.length > 0 && peerIds.every((pid) => myFids.includes(pid));
+    // peerIds 非空已在上保证（空即 500 早退）。
+    isFriend = peerIds.every((pid) => myFids.includes(pid));
   }  const { data: modes } = await supabase
     .from("users")
     .select("id,mode")
@@ -252,8 +262,7 @@ export async function POST(
     }
     const bucket = parsed.kind === "image" ? "chat-images" : "chat-voice";
     // D.8 文件存在性＋真实大小（service 查桶；缺档 400；超申报 ±10%→400＋删档）。
-    // RLS 不拦 service；path 归属上已验首段是自己。
-    const svc = await createServiceClient();
+    // RLS 不拦 service；path 归属上已验首段是自己（svc 沿函数顶复用）。
     for (const a of parsed.attachments) {
       const slash = a.path.indexOf("/");
       const found = await svc.storage

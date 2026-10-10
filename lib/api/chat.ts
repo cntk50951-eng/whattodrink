@@ -69,6 +69,18 @@ export function parseConversationOrigin(raw: unknown): ConversationOrigin {
 /** UR D.10 陌生人配额（对方最新消息后我的连续数；3 达线拒，沿交接 §3.2）。 */
 export const STRANGER_MSG_LIMIT = 3;
 
+/**
+ * DEF-20261010-001 会话对方 id（成员行滤自己；空即调用方 500，
+ * 不静默判陌生——空只该出现在数据异常，正常 doublee 必有对方）。
+ */
+export function peerIdsOfMembers(
+  members: { user_id: unknown }[],
+  myId: string,
+): string[] {
+  return members
+    .map((m) => m.user_id)
+    .filter((id): id is string => typeof id === "string" && id !== myId);
+}
 export type ChatLiteMsg = { sender_id: string; created_at: string };
 
 /**

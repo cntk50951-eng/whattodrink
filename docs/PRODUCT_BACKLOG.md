@@ -4135,4 +4135,5 @@ UR D.10　陌生人消息（碰杯快捷回复＋3 条机制）[WIP]
 
 *改動記錄*
 - 2026-10-10：建檔置 [WIP]（WEB_HANDOFF_STRANGER_CHAT 输入＋产品两答；直做）
+- 2026-10-10：DEF-20261010-001（P0）：成员读改 service＋空集 500 fail-closed＋`peerIdsOf` 提纯＋单测；列表 peer 走 RPC 本就对，不动。
 - 2026-10-10：实作：0039 origin 列＋建会话重写（去 areFriends 门＋拉黑 404＋未成年＋日 10＋is_friend/origin 回显）＋发消息配额（stranger_quota 429＋kind 门＋quota 回显）＋分享放宽（碰过帖）＋列表三字段（RPC 不动）＋counters 拆分（badge 四数相加）＋prefs stranger_chat＋envelope 码＋openapi 1.24.0＋单测。
