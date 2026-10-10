@@ -136,6 +136,24 @@ export async function POST(
     console.error(`[api/v1/conversations/messages] no peers for ${parsedId.id}`);
     return apiError("internal", "发送失败", 500);
   }
+  // UR B.3 拉黑门（删好友自动双拉黑后，会话保留但禁言；任一对端有行即 404 不泄）。
+  // 走 service：blocks RLS 只返 blocker=己的行，反向（对方拉黑我）authed 查不到。
+  {
+    const ors = peerIds
+      .flatMap((pid) => [
+        `and(blocker_id.eq.${userId},blocked_id.eq.${pid})`,
+        `and(blocker_id.eq.${pid},blocked_id.eq.${userId})`,
+      ])
+      .join(",");
+    const { data: blockRows } = await svc
+      .from("cheers_blocks")
+      .select("blocker_id")
+      .or(ors)
+      .limit(1);
+    if (Array.isArray(blockRows) && blockRows.length > 0) {
+      return apiError("not_found", "找不到该会话", 404);
+    }
+  }
   let isFriend = true;
   {
     const { data: fsRows } = await supabase

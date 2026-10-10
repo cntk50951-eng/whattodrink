@@ -471,6 +471,8 @@
     "pushCheersTitle": "{name} 碰了你的杯",
     "pushCheersBody": "在你的打卡 · {beer}",
     "pushCheersMulti": "{n} 个新碰杯",
+    "pushFriendRequestTitle": "{name} 想加你为好友",
+    "pushFriendAcceptedTitle": "{name} 接受了你的好友请求",
     "chatSearch": "搜索好友",
     "chatNoMatch": "没有相符的好友",
     "chatRecents": "最近",

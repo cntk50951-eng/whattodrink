@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.24.0
+  version: 1.25.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1066,6 +1066,39 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+    delete:
+      operationId: cheersUnblock
+      summary: 解除屏蔽（需登录；删本人对该用户行，幂等；删好友后重加的回头路，UR B.3）
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [blocked_id]
+              properties:
+                blocked_id:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: 已解除（无行也 200）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [unblocked]
+                properties:
+                  unblocked:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
   /api/v1/cheers/reports:
     post:
       operationId: cheersReport
@@ -1820,7 +1853,7 @@ paths:
   /api/v1/friends:
     post:
       operationId: addFriend
-      summary: 加好友邀請（需登录；雙向 pending 即接受，DEF-009）
+      summary: 加好友邀請（需登录；雙向 pending 即接受；拉黑 404；每日 20；DEF-009，UR B.3）
       security:
         - bearerAuth: []
       requestBody:
@@ -1829,12 +1862,15 @@ paths:
           application/json:
             schema:
               type: object
-              description: friend_id 與 checkin_id 二選一（後者 server 解作者）
+              description: friend_id 與 checkin_id 二選一（後者 server 解作者；origin 仅 friend_id 路，checkin 路固定 checkin）
               properties:
                 friend_id:
                   type: string
                 checkin_id:
                   type: string
+                origin:
+                  type: string
+                  enum: [profile, cheers, party, checkin, direct]
       responses:
         "200":
           description: 已是好友（accepted）或邀請已在途（pending，冪等）
@@ -1854,11 +1890,17 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          description: 每日新请求超限（20 个）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
     delete:
       operationId: removeFriend
-      summary: 解除好友（需登录；双向 accepted→pending，沿 0010 绝交语义，UR E.15）
+      summary: 解除好友（需登录；删双向行＋双向禁言，会话保留但禁言；重加须先 unblock，UR B.3）
       security:
         - bearerAuth: []
       requestBody:
@@ -1908,6 +1950,83 @@ paths:
                       $ref: "#/components/schemas/FriendListItem"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/friends/requests:
+    get:
+      operationId: listFriendRequests
+      summary: 请求列表（需登录；incoming 缺省／outgoing；富行＋pending 总数，UR B.3）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: box
+          in: query
+          schema:
+            type: string
+            enum: [incoming, outgoing]
+            default: incoming
+      responses:
+        "200":
+          description: 请求行（对方公开三列＋性别＋origin＋来源帖＋时间）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, pending]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                  pending:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/friends/requests/{id}:
+    patch:
+      operationId: handleFriendRequest
+      summary: 请求动作（需登录；accept 仅收件人／decline 删入／cancel 删己方；越权 404，UR B.3）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [accept, decline, cancel]
+      responses:
+        "200":
+          description: 已处理（accept 幂等；decline／cancel 删行）
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 不存在／已处理／越权／拉黑（不泄存在性）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/presence:

@@ -69,8 +69,9 @@ export async function POST(req: Request): Promise<Response> {
     return apiError("forbidden", "隱身模式不可發起聊天", 403);
   }
   // UR D.10 陌生人放行（不限关系； RSVP 门改拉黑＋未成年＋日限额）。
-  // 拉黑任一方向即 404（不泄存在，沿 profile 口径）。
-  const { data: blockRows } = await supabase
+  // 拉黑任一方向即 404（不泄存在，沿 profile 口径；走 service，blocks 反向行 authed 不可见）。
+  const blockSvc = await createServiceClient();
+  const { data: blockRows } = await blockSvc
     .from("cheers_blocks")
     .select("blocker_id")
     .or(`and(blocker_id.eq.${userId},blocked_id.eq.${peerId}),and(blocker_id.eq.${peerId},blocked_id.eq.${userId})`)

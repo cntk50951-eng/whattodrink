@@ -7,6 +7,8 @@ import {
   parseAddFriendBody,
   parseCheckUserId,
   parseFriendCheckParams,
+  parseRequestAction,
+  parseRequestOrigin,
   parseScope,
   toFriendListItem,
 } from "./friends";
@@ -126,5 +128,18 @@ describe("toFriendListItem (UR D.4)", () => {
         ?.online,
     ).toBe(false);
     expect(toFriendListItem({ id: "u1" }, NOW)).toBeNull();
+  });
+});
+
+describe("parseRequestOrigin／parseRequestAction", () => {
+  it("来源白名单＋非法回落 direct；动作三选＋非法拒", () => {
+    expect(parseRequestOrigin("cheers")).toBe("cheers");
+    expect(parseRequestOrigin("party")).toBe("party");
+    expect(parseRequestOrigin("nope")).toBe("direct");
+    expect(parseRequestOrigin(undefined)).toBe("direct");
+    expect(parseRequestAction("accept")).toEqual({ action: "accept" });
+    expect(parseRequestAction("decline")).toEqual({ action: "decline" });
+    expect(parseRequestAction("cancel")).toEqual({ action: "cancel" });
+    expect(parseRequestAction("maybe")).toHaveProperty("error");
   });
 });

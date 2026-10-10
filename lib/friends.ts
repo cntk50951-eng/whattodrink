@@ -134,6 +134,32 @@ export function parseAddFriendBody(
   return { error: "friend_id 或 checkin_id 必填其一" };
 }
 
+/** UR B.3 请求来源（列表来源展示；非法回落 direct，不 400）。 */
+export type FriendRequestOrigin = "profile" | "cheers" | "party" | "checkin" | "direct";
+
+export function parseRequestOrigin(raw: unknown): FriendRequestOrigin {
+  if (
+    raw === "profile" ||
+    raw === "cheers" ||
+    raw === "party" ||
+    raw === "checkin" ||
+    raw === "direct"
+  ) {
+    return raw;
+  }
+  return "direct";
+}
+
+/** UR B.3 请求动作（accept 仅收件人／decline 删入／cancel 删己方；非法 400）。 */
+export type FriendRequestAction = "accept" | "decline" | "cancel";
+
+export function parseRequestAction(raw: unknown): { action: FriendRequestAction } | { error: string } {
+  if (raw === "accept" || raw === "decline" || raw === "cancel") {
+    return { action: raw };
+  }
+  return { error: "action 只要 accept|decline|cancel" };
+}
+
 /**
  * 綠點關係過濾（A.15 D4）：friends 模式作者只給好友看在線。
  * authorMode 未知（舊行／匿名源）按 public 沿舊行為。

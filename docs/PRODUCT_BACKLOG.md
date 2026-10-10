@@ -4137,3 +4137,34 @@ UR D.10　陌生人消息（碰杯快捷回复＋3 条机制）[WIP]
 - 2026-10-10：建檔置 [WIP]（WEB_HANDOFF_STRANGER_CHAT 输入＋产品两答；直做）
 - 2026-10-10：DEF-20261010-001（P0）：成员读改 service＋空集 500 fail-closed＋`peerIdsOf` 提纯＋单测；列表 peer 走 RPC 本就对，不动。
 - 2026-10-10：实作：0039 origin 列＋建会话重写（去 areFriends 门＋拉黑 404＋未成年＋日 10＋is_friend/origin 回显）＋发消息配额（stranger_quota 429＋kind 门＋quota 回显）＋分享放宽（碰过帖）＋列表三字段（RPC 不动）＋counters 拆分（badge 四数相加）＋prefs stranger_chat＋envelope 码＋openapi 1.24.0＋单测。
+
+---
+
+UR B.3　好友请求中心（v2-only，iOS 输入）[WIP]
+
+> iOS 好友页靠主页 relationship 手工发现请求；本单补列表＋接受／拒绝／收回＋删除语义＋通知。
+
+### 背景（四问答定案）
+- decline＝删行无冷却（migration 最小）；删除＝微信式（删双方行＋双向 cheers_blocks禁言，列表保留；重加须先 unblock 再发请求）。
+- badge 含请求数（相加）；推送一起做（friend_request／accepted＋prefs friends 默认 true）。
+- unblock 口不存在，本单顺手加 `DELETE /cheers/blocks`（否则删好友即永久死结）。
+- 每日新请求 20 个（HK 天，429）；拉黑任一方不可发（404 不泄）。
+
+### 範圍
+1. **數據**：0040（friendships 加 origin＋source_checkin_id；declined 不做）。
+2. **端點**：`GET /friends/requests?box=`（incoming／outgoing 富行＋pending 总数）＋`PATCH /friends/requests/{id}`（accept 仅收件人双翻／decline 删入＋清反向／cancel 删己方；404 幂等语义）＋`DELETE /friends` 重写（删双行＋双拉黑）＋`DELETE /cheers/blocks`（解绑幂等）＋`POST /friends` 加拉黑门＋日限＋origin 落列。
+3. **通知**：counters 加数入 badge＋`friend_request`／`friend_accepted` 推送（沿 D.9 发送器）＋prefs `friends` 键。
+4. messages POST 加拉黑门（删后禁言闭环；建会话已有）。
+5. openapi 1.25.0＋單測（action／origin／badge 口径）。
+
+### 非目標
+- 24h 过期、Realtime、昵称搜索加好友（另立项）、v1 任何文件。
+
+### AC（交接 §三全七条）
+- AC1 双列表＋pending；AC2 accept 双向＋清空＋relationship；AC3 decline 回 none（无冷却可重发）；
+- AC4 cancel 对方消失；AC5 越权 404；AC6 删后 none＋禁言（消息 404/403）＋重加需 unblock＋同意；
+- AC7 日限／拉黑／隐身码明确＋yaml 先行。
+
+*改動記錄*
+- 2026-10-10：建檔置 [WIP]（WEB_HANDOFF_FRIEND_REQUESTS 输入＋四问答；直做）
+- 2026-10-10：实作：0040 origin 列＋requests 双端点（富行＋pending＋accept/decline/cancel＋拉黑门）＋DELETE 重写（删双行＋双拉黑）＋DELETE blocks＋POST 拉黑门＋日 20＋origin 落列＋messages 拉黑门＋counters/badge 含请求＋推送双事件＋prefs friends＋openapi 1.25.0＋单测。

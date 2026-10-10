@@ -18,6 +18,7 @@ describe("pushPrefsOf", () => {
       chat: true,
       stranger_invites: false,
       stranger_chat: false,
+      friends: true,
       party: true,
     });
     expect(pushPrefsOf({ cheers: false, stranger_invites: true })).toEqual({
@@ -27,6 +28,7 @@ describe("pushPrefsOf", () => {
       chat: true,
       stranger_invites: true,
       stranger_chat: false,
+      friends: true,
       party: true,
     });
   });
@@ -42,6 +44,7 @@ describe("parsePushPrefs", () => {
         chat: true,
         stranger_invites: false,
         stranger_chat: false,
+        friends: true,
         party: true,
       },
     });

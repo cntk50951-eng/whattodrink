@@ -471,6 +471,8 @@
     "pushCheersTitle": "{name} cheered you",
     "pushCheersBody": "On your check-in · {beer}",
     "pushCheersMulti": "{n} new cheers",
+    "pushFriendRequestTitle": "{name} wants to be friends",
+    "pushFriendAcceptedTitle": "{name} accepted your friend request",
     "chatSearch": "Search friends",
     "chatNoMatch": "No matching friends",
     "chatRecents": "Recent",

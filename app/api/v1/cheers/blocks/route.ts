@@ -30,3 +30,35 @@ export async function POST(req: Request): Promise<Response> {
   }
   return apiOk({ blocked: true });
 }
+
+/**
+ * UR B.3 解除屏蔽（🔒，幂等）。
+ * `DELETE /api/v1/cheers/blocks {blocked_id}` —— 删本人对该用户的屏蔽行；
+ * 找不到也 200。删好友后重加的唯一回头路（先 unblock，再发请求对方同意）。
+ */
+export async function DELETE(req: Request): Promise<Response> {
+  const { supabase, userId } = await getAuthedClient(req);
+  if (userId === null) {
+    return apiError("unauthorized", "未登录", 401);
+  }
+  let raw: unknown = null;
+  try {
+    raw = await req.json();
+  } catch {
+    return apiError("invalid_params", "body 需为 JSON", 400);
+  }
+  const id = (raw as Record<string, unknown>).blocked_id;
+  if (typeof id !== "string" || id === "" || id === userId || id.length > 64) {
+    return apiError("invalid_params", "blocked_id 非法", 400);
+  }
+  const { error } = await supabase
+    .from("cheers_blocks")
+    .delete()
+    .eq("blocker_id", userId)
+    .eq("blocked_id", id);
+  if (error !== null) {
+    console.error(`[api/v1/cheers/blocks] delete error: code=${error.code} message=${error.message}`);
+    return apiError("internal", "解除屏蔽失败", 500);
+  }
+  return apiOk({ unblocked: true });
+}
