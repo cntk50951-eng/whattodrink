@@ -473,6 +473,7 @@
     "pushCheersMulti": "{n} new cheers",
     "pushFriendRequestTitle": "{name} wants to be friends",
     "pushFriendAcceptedTitle": "{name} accepted your friend request",
+    "pushGameInviteTitle": "{name} invited you to Liars Dice",
     "chatSearch": "Search friends",
     "chatNoMatch": "No matching friends",
     "chatRecents": "Recent",

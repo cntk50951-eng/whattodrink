@@ -202,8 +202,7 @@ export async function sendCheersPush(args: {
 /**
  * UR B.3 好友推送（`friend_request` 新请求／`friend_accepted` 被接受；prefs `friends` 门）。
  * 沿 E1 同形（badge＋collapse＋410 删行＋重试＋日志）；无合并（请求低频）。
- */
-export async function sendFriendPush(
+ */export async function sendFriendPush(
   kind: "request" | "accepted",
   args: { fromUserId: string; toUserId: string },
 ): Promise<{ sent: number; skipped?: string }> {
@@ -288,6 +287,103 @@ export async function sendFriendPush(
     return { sent };
   } catch (e) {
     console.warn(`[push] friend ${kind} threw: ${e instanceof Error ? e.message : "unknown"}`);
+    return { sent: 0, skipped: "threw" };
+  }
+}
+
+/**
+ * UR H.1 游戏邀请推送（`game_invite`；prefs `game_invites` 门，默认开）。
+ * 沿 friend 同形；badge 用 computeBadge（游戏邀请不计 badge，只展示）。
+ * 点开 iOS 进房间（payload 带 room_id＋code）。
+ */
+export async function sendGameInvitePush(args: {
+  fromUserId: string;
+  toUserId: string;
+  roomId: string;
+  code: string;
+}): Promise<{ sent: number; skipped?: string }> {
+  const { fromUserId, toUserId, roomId, code } = args;
+  try {
+    const cfg = apnsConfigFromEnv(process.env as Record<string, string | undefined>);
+    if (cfg === null) {
+      console.warn("[push] game_invite skipped: missing APNs env");
+      return { sent: 0, skipped: "no-creds" };
+    }
+    const supa = await createServiceClient();
+    const { data: devices } = await supa
+      .from("devices")
+      .select("id,push_token,environment,locale")
+      .eq("user_id", toUserId)
+      .eq("platform", "ios")
+      .eq("enabled", true)
+      .limit(10);
+    const devs = (((devices ?? []) as unknown[]) as Record<string, unknown>[]).filter(
+      (d): d is unknown & { id: string; push_token: string } =>
+        typeof d.id === "string" && typeof d.push_token === "string" && d.push_token !== "",
+    ) as PushDevice[];
+    if (devs.length === 0) return { sent: 0, skipped: "no-devices" };
+    const { data: peerRow } = await supa
+      .from("users")
+      .select("push_prefs")
+      .eq("id", toUserId)
+      .maybeSingle();
+    const prefs = pushPrefsOf((peerRow as { push_prefs?: unknown } | null)?.push_prefs);
+    if (!prefs.game_invites) return { sent: 0, skipped: "prefs-off" };
+    const badge = await computeBadge(supa, toUserId);
+    const { data: fromRow } = await supa
+      .from("users")
+      .select("nickname")
+      .eq("id", fromUserId)
+      .maybeSingle();
+    const nick = (fromRow as { nickname?: unknown } | null)?.nickname;
+    const fromName = typeof nick === "string" && nick !== "" ? nick : "酒友";
+    let sent = 0;
+    for (const d of devs) {
+      const t = (k: string): string => copyFor(typeof d.locale === "string" ? d.locale : "zh-Hant")[k] ?? copyFor("zh-Hant")[k] ?? k;
+      const payload = {
+        aps: {
+          alert: { title: fillPushTemplate(t("pushGameInviteTitle"), { name: fromName }) },
+          badge: badge.badge,
+          sound: "default",
+          "thread-id": "game",
+          "mutable-content": 0,
+        },
+        t: "game_invite",
+        from: fromUserId,
+        room_id: roomId,
+        code,
+      };
+      const env: ApnsEnv = d.environment === "sandbox" ? "sandbox" : "production";
+      const collapse = `game-invite-${toUserId}`;
+      let res = await sendApn({ cfg, env, deviceToken: d.push_token, collapseId: collapse, payload });
+      let tries = 0;
+      while (!res.ok && (res.status === 429 || res.status >= 500 || res.status === 0) && tries < 2) {
+        tries += 1;
+        await sleep(tries * 1000);
+        res = await sendApn({ cfg, env, deviceToken: d.push_token, collapseId: collapse, payload });
+      }
+      if (!res.ok && DEAD_REASONS.has(res.reason)) {
+        await supa.from("devices").delete().eq("id", d.id);
+        await supa.from("push_log").insert({
+          recipient_id: toUserId,
+          kind: "game_invite",
+          dedupe_key: `${fromUserId}:${toUserId}:${roomId}`,
+          status: "dead",
+        });
+        continue;
+      }
+      await supa.from("push_log").insert({
+        recipient_id: toUserId,
+        kind: "game_invite",
+        dedupe_key: `${fromUserId}:${toUserId}:${roomId}`,
+        status: res.ok ? "sent" : "failed",
+      });
+      if (res.ok) sent += 1;
+      else console.warn(`[push] game_invite failed: status=${res.status} reason=${res.reason}`);
+    }
+    return { sent };
+  } catch (e) {
+    console.warn(`[push] game_invite threw: ${e instanceof Error ? e.message : "unknown"}`);
     return { sent: 0, skipped: "threw" };
   }
 }

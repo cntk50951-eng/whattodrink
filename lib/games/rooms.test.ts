@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  parseCreateBody,
   parseActionBody,
+  parseCreateBody,
+  parseInviteBody,
   parseJoinCode,
   parseKickBody,
   parseReadyBody,
@@ -59,6 +60,12 @@ describe("房间请求体解析", () => {
     expect(parseJoinCode({ code: " ab12cd " })).toEqual({ code: "AB12CD" });
     expect("error" in parseJoinCode({ code: "ABC" })).toBe(true);
     expect("error" in parseJoinCode({})).toBe(true);
+  });
+  it("invite：去重去己＋1-7 人", () => {
+    expect(parseInviteBody({ user_ids: ["a", "a", "me", "b"] }, "me")).toEqual({ userIds: ["a", "b"] });
+    expect("error" in parseInviteBody({ user_ids: [] }, "me")).toBe(true);
+    expect("error" in parseInviteBody({ user_ids: ["me"] }, "me")).toBe(true);
+    expect("error" in parseInviteBody({ user_ids: ["1", "2", "3", "4", "5", "6", "7", "8"] }, "me")).toBe(true);
   });
   it("ready／kick／roomId", () => {
     expect(parseReadyBody({ ready: true })).toEqual({ ready: true });

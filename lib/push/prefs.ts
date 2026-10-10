@@ -12,6 +12,7 @@ export const PUSH_PREF_KEYS = [
   "stranger_chat",
   "friends",
   "party",
+  "game_invites",
 ] as const;
 
 export type PushPrefKey = (typeof PUSH_PREF_KEYS)[number];
@@ -27,6 +28,7 @@ const DEFAULTS: PushPrefs = {
   stranger_chat: false,
   friends: true,
   party: true,
+  game_invites: true,
 };
 
 /** 读缺键默认（坏形回全默认，不炸包）。 */

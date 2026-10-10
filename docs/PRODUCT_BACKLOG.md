@@ -4206,3 +4206,4 @@ UR H.1　游戏房间＋大話骰 POC（纯 API，无 web UI，[shared-only]）[
 - 2026-10-10：第一批：0042 五表＋`lib/games/liars.ts` 纯函数（crypto／叫骰／百搭／开盅／顺位／房规／房间码）＋15 单测。
 - 2026-10-10：第二批：房间 8 端点（建／码加入／active／准备／开始／离开／踢／改规／结束）＋门禁 helper＋懒过期＋openapi 1.27.0＋5 单测；11 新错误码一次加齐。
 - 2026-10-10：第三批：`GET room?since=`（304＋裁剪＋懒超时）＋`POST actions`（三动作＋幂等＋409 矩阵＋8s 自动进局）＋openapi 1.28.0＋3 单测。
+- 2026-10-10：第四批：邀请端点＋`GET /games/invites`＋counters 加数＋`game_invite` 推送＋openapi 1.29.0；H.1 端点齐，待 iOS 联调（UR 保持 [WIP]）。

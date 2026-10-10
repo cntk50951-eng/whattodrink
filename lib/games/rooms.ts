@@ -889,3 +889,23 @@ export function parseActionBody(raw: unknown): ParsedAction | { error: string } 
   }
   return { type, bid: { qty: p.qty, face: p.face, zhai: p.zhai === true }, ...base };
 }
+
+/** 邀请包解析（1–7 人，去重去空去己；ids 非法即 error）。 */
+export function parseInviteBody(
+  raw: unknown,
+  selfId: string,
+): { userIds: string[] } | { error: string } {
+  if (typeof raw !== "object" || raw === null) return { error: "body 需为对象" };
+  const v = (raw as Record<string, unknown>).user_ids;
+  if (!Array.isArray(v) || v.length === 0) return { error: "user_ids 非空数组" };
+  const seen = new Set<string>();
+  for (const id of v) {
+    if (typeof id !== "string" || id.trim() === "" || id.trim().length > 64) {
+      return { error: "user_ids 含非法 id" };
+    }
+    if (id.trim() !== selfId) seen.add(id.trim());
+  }
+  if (seen.size === 0) return { error: "user_ids 非空数组" };
+  if (seen.size > 7) return { error: "一次最多邀请 7 人" };
+  return { userIds: [...seen] };
+}

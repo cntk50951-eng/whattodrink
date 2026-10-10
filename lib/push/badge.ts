@@ -7,14 +7,15 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** 五数相加（badge＝和；纯加法，单测锁口径；friendRequests 后加默认 0 向后兼容）。 */
-export function sumBadge(cheers: number, invites: number, chat: number, stranger = 0, friendRequests = 0): BadgeCounts {
+/** 六数相加（badge＝前五和；game_invites_pending 只展示不计 badge，免打扰，问答定案）。 */
+export function sumBadge(cheers: number, invites: number, chat: number, stranger = 0, friendRequests = 0, gameInvites = 0): BadgeCounts {
   const c = Number.isFinite(cheers) && cheers > 0 ? Math.floor(cheers) : 0;
   const i = Number.isFinite(invites) && invites > 0 ? Math.floor(invites) : 0;
   const h = Number.isFinite(chat) && chat > 0 ? Math.floor(chat) : 0;
   const s = Number.isFinite(stranger) && stranger > 0 ? Math.floor(stranger) : 0;
   const f = Number.isFinite(friendRequests) && friendRequests > 0 ? Math.floor(friendRequests) : 0;
-  return { cheers_unread: c, invites_pending: i, chat_unread: h, stranger_unread: s, friend_requests_pending: f, badge: c + i + h + s + f };
+  const g = Number.isFinite(gameInvites) && gameInvites > 0 ? Math.floor(gameInvites) : 0;
+  return { cheers_unread: c, invites_pending: i, chat_unread: h, stranger_unread: s, friend_requests_pending: f, game_invites_pending: g, badge: c + i + h + s + f };
 }
 
 export type BadgeCounts = {
@@ -25,8 +26,38 @@ export type BadgeCounts = {
   stranger_unread: number;
   /** UR B.3 收到的好友请求（incoming pending；badge 含，相加）。 */
   friend_requests_pending: number;
+  /** UR H.1 收到的游戏邀请（lobby 房 pending；badge 不含，只展示）。 */
+  game_invites_pending: number;
   badge: number;
 };
+
+/**
+ * UR H.1 游戏邀请数（pending 且房间仍 lobby；表缺席 fail-open 计 0）。
+ * 先取我的 pending 行，再看房间是否还在 lobby（playing／ended 即过期）。
+ */
+export async function countGameInvites(
+  supa: SupabaseClient,
+  userId: string,
+): Promise<number> {
+  const { data: invRows } = await supa
+    .from("game_invites")
+    .select("room_id")
+    .eq("to_user_id", userId)
+    .eq("status", "pending")
+    .limit(100);
+  const roomIds = (
+    ((invRows ?? []) as unknown[]) as { room_id?: unknown }[]
+  )
+    .map((r) => r.room_id)
+    .filter((id): id is string => typeof id === "string");
+  if (roomIds.length === 0) return 0;
+  const { data: rooms } = await supa
+    .from("game_rooms")
+    .select("id")
+    .in("id", roomIds)
+    .eq("status", "lobby");
+  return ((rooms ?? []) as unknown[]).length;
+}
 
 /**
  * 算某人四数（service 或 authed client 皆可；调用方定 RLS 语义）。
@@ -44,6 +75,7 @@ export async function computeBadge(
     supa.from("friendships").select("id", { count: "exact", head: true }).eq("friend_id", userId).eq("status", "pending"),
     supa.from("conversation_members").select("conversation_id,last_read_at").eq("user_id", userId).limit(200),
   ]);
+  // UR H.1 收到的游戏邀请（pending 且房间仍 lobby；badge 不含）。
   const { data: fsRows } = await supa
     .from("friendships")
     .select("user_id,friend_id,status")
@@ -85,5 +117,5 @@ export async function computeBadge(
     if (isFriend) chat += count ?? 0;
     else stranger += count ?? 0;
   }
-  return sumBadge(cheers ?? 0, invites ?? 0, chat, stranger, friendRequests ?? 0);
+  return sumBadge(cheers ?? 0, invites ?? 0, chat, stranger, friendRequests ?? 0, await countGameInvites(supa, userId));
 }

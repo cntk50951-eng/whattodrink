@@ -20,6 +20,7 @@ describe("pushPrefsOf", () => {
       stranger_chat: false,
       friends: true,
       party: true,
+      game_invites: true,
     });
     expect(pushPrefsOf({ cheers: false, stranger_invites: true })).toEqual({
       cheers: false,
@@ -30,6 +31,7 @@ describe("pushPrefsOf", () => {
       stranger_chat: false,
       friends: true,
       party: true,
+      game_invites: true,
     });
   });
 });
@@ -46,6 +48,7 @@ describe("parsePushPrefs", () => {
         stranger_chat: false,
         friends: true,
         party: true,
+        game_invites: true,
       },
     });
     expect(parsePushPrefs({ weed: true })).toHaveProperty("error");
@@ -66,13 +69,14 @@ describe("fillPushTemplate／collapse／merge", () => {
 });
 
 describe("sumBadge", () => {
-  it("四数相加；非法钳零", () => {
+  it("六数相加（游戏邀请只展示；非法钳零）", () => {
     expect(sumBadge(3, 2, 7)).toEqual({
       cheers_unread: 3,
       invites_pending: 2,
       chat_unread: 7,
       stranger_unread: 0,
       friend_requests_pending: 0,
+      game_invites_pending: 0,
       badge: 12,
     });
     expect(sumBadge(3, 2, 7, 1)).toEqual({
@@ -81,6 +85,7 @@ describe("sumBadge", () => {
       chat_unread: 7,
       stranger_unread: 1,
       friend_requests_pending: 0,
+      game_invites_pending: 0,
       badge: 13,
     });
     expect(sumBadge(-1, NaN, 2.7)).toEqual({
@@ -89,6 +94,7 @@ describe("sumBadge", () => {
       chat_unread: 2,
       stranger_unread: 0,
       friend_requests_pending: 0,
+      game_invites_pending: 0,
       badge: 2,
     });
   });
@@ -99,6 +105,7 @@ describe("sumBadge", () => {
       chat_unread: 1,
       stranger_unread: 1,
       friend_requests_pending: 2,
+      game_invites_pending: 0,
       badge: 6,
     });
     expect(sumBadge(0, 0, 0, 0, NaN)).toEqual({
@@ -107,7 +114,19 @@ describe("sumBadge", () => {
       chat_unread: 0,
       stranger_unread: 0,
       friend_requests_pending: 0,
+      game_invites_pending: 0,
       badge: 0,
+    });
+  });
+  it("UR H.1 游戏邀请只展示不计 badge", () => {
+    expect(sumBadge(1, 1, 1, 1, 1, 2)).toEqual({
+      cheers_unread: 1,
+      invites_pending: 1,
+      chat_unread: 1,
+      stranger_unread: 1,
+      friend_requests_pending: 1,
+      game_invites_pending: 2,
+      badge: 5,
     });
   });
 });

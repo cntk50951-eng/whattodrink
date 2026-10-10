@@ -473,6 +473,7 @@
     "pushCheersMulti": "{n} 个新碰杯",
     "pushFriendRequestTitle": "{name} 想加你为好友",
     "pushFriendAcceptedTitle": "{name} 接受了你的好友请求",
+    "pushGameInviteTitle": "{name} 邀你玩大话骰",
     "chatSearch": "搜索好友",
     "chatNoMatch": "没有相符的好友",
     "chatRecents": "最近",
