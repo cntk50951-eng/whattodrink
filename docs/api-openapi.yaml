@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.37.0
+  version: 1.38.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1877,6 +1877,11 @@ paths:
                 origin:
                   type: string
                   enum: [profile, cheers, party, checkin, direct]
+                message:
+                  type: string
+                  maxLength: 50
+                  nullable: true
+                  description: 请求附言（可选；超长 400；仅新建 pending 写入，幂等／已好友忽略）
       responses:
         "200":
           description: 已是好友（accepted）或邀請已在途（pending，冪等）
@@ -1973,7 +1978,7 @@ paths:
             default: incoming
       responses:
         "200":
-          description: 请求行（对方公开三列＋性别＋origin＋来源帖＋时间）
+          description: 请求行（对方公开三列＋性别＋origin＋附言＋来源帖＋时间）
           content:
             application/json:
               schema:
@@ -1983,7 +1988,7 @@ paths:
                   items:
                     type: array
                     items:
-                      type: object
+                      $ref: "#/components/schemas/FriendRequestItem"
                   pending:
                     type: integer
         "400":
@@ -3679,6 +3684,45 @@ components:
         status:
           type: string
           enum: [pending, accepted]
+    FriendRequestItem:
+      type: object
+      required: [id, user, status, created_at, origin, message, source_checkin]
+      description: 好友请求行（WEB_HANDOFF_FRIEND_REQUEST_MESSAGE；iOS 头像进主页用 user.user_id）
+      properties:
+        id:
+          type: string
+          format: uuid
+        user:
+          type: object
+          required: [user_id, nickname, avatar_url, gender]
+          properties:
+            user_id:
+              type: string
+              format: uuid
+            nickname:
+              type: string
+            avatar_url:
+              type: string
+              nullable: true
+            gender:
+              type: string
+              nullable: true
+        status:
+          type: string
+          enum: [pending]
+        created_at:
+          type: string
+          format: date-time
+        origin:
+          type: string
+          enum: [profile, cheers, party, checkin, direct]
+        message:
+          type: string
+          nullable: true
+          description: 请求附言（无即 null）
+        source_checkin:
+          type: object
+          nullable: true
     GameRoom:
       type: object
       required: [id, code, game, host_id, status, rules, max_players, version, expires_at]

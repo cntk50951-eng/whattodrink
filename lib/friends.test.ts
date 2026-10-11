@@ -8,6 +8,7 @@ import {
   parseCheckUserId,
   parseFriendCheckParams,
   parseRequestAction,
+  parseRequestMessage,
   parseRequestOrigin,
   parseScope,
   toFriendListItem,
@@ -141,5 +142,15 @@ describe("parseRequestOrigin／parseRequestAction", () => {
     expect(parseRequestAction("decline")).toEqual({ action: "decline" });
     expect(parseRequestAction("cancel")).toEqual({ action: "cancel" });
     expect(parseRequestAction("maybe")).toHaveProperty("error");
+  });
+  it("附言：缺省 null／去空／50 字上限（emoji 按字计）", () => {
+    expect(parseRequestMessage(undefined)).toEqual({ message: null });
+    expect(parseRequestMessage("   ")).toEqual({ message: null });
+    expect(parseRequestMessage("  你好，我是 Chloe ")).toEqual({ message: "你好，我是 Chloe" });
+    expect(parseRequestMessage("x".repeat(50))).toEqual({ message: "x".repeat(50) });
+    expect(parseRequestMessage("x".repeat(51))).toHaveProperty("error");
+    expect(parseRequestMessage("🍺".repeat(50))).toEqual({ message: "🍺".repeat(50) });
+    expect(parseRequestMessage("🍺".repeat(51))).toHaveProperty("error");
+    expect(parseRequestMessage(123)).toHaveProperty("error");
   });
 });

@@ -8,6 +8,7 @@ type FsRow = {
   status: string;
   origin: string | null;
   source_checkin_id: string | null;
+  message: string | null;
   created_at: string;
 };
 
@@ -29,7 +30,7 @@ export async function GET(req: Request): Promise<Response> {
   }
   const { data, error } = await supabase
     .from("friendships")
-    .select("id,user_id,friend_id,status,origin,source_checkin_id,created_at")
+    .select("id,user_id,friend_id,status,origin,source_checkin_id,message,created_at")
     .eq("status", "pending")
     .eq(boxRaw === "incoming" ? "friend_id" : "user_id", userId)
     .order("created_at", { ascending: false })
@@ -80,6 +81,7 @@ export async function GET(req: Request): Promise<Response> {
       status: "pending" as const,
       created_at: r.created_at,
       origin: r.origin ?? "direct",
+      message: typeof r.message === "string" && r.message !== "" ? r.message : null,
       source_checkin:
         post === null
           ? null

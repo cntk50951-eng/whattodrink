@@ -2,7 +2,7 @@ import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { after } from "next/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { directKey } from "@/lib/api/chat";
-import { areFriends, friendIdsOf, parseAddFriendBody, parseRequestOrigin, toFriendListItem } from "@/lib/friends";
+import { areFriends, friendIdsOf, parseAddFriendBody, parseRequestMessage, parseRequestOrigin, toFriendListItem } from "@/lib/friends";
 import { sendFriendPush } from "@/lib/push/send";
 
 /**
@@ -53,6 +53,12 @@ export async function POST(req: Request): Promise<Response> {
   if ("error" in parsed) {
     return apiError("invalid_params", parsed.error, 400);
   }
+  // 请求附言（可选 50 字；超长 400；仅新建 pending 时写入，幂等／已好友忽略）。
+  const msgParsed = parseRequestMessage((raw as Record<string, unknown>).message);
+  if ("error" in msgParsed) {
+    return apiError("invalid_params", msgParsed.error, 400);
+  }
+  const requestMessage = msgParsed.message;
   // 解目標 user id（checkin 走 server 解，行不可見即 404）
   let targetUserId: string;
   if ("friendId" in parsed.body) {
@@ -180,6 +186,8 @@ export async function POST(req: Request): Promise<Response> {
         status: "pending",
         origin: "checkinId" in parsed.body ? "checkin" : parseRequestOrigin((raw as Record<string, unknown>).origin),
         source_checkin_id: "checkinId" in parsed.body ? parsed.body.checkinId : null,
+        // 附言仅新建时写入（stale 复活视为新建；myPending 幂等与 flip 不覆盖旧留言）。
+        message: requestMessage,
       };
       // 本方向残留的旧行（如遗留 blocked）：不匹配上面任何分支，直接更新为新请求，避免 insert 撞唯一键。
       const myStale = rows.some(

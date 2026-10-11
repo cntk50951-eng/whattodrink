@@ -134,6 +134,20 @@ export function parseAddFriendBody(
   return { error: "friend_id 或 checkin_id 必填其一" };
 }
 
+/** 好友请求附言（WEB_HANDOFF_FRIEND_REQUEST_MESSAGE）：可选，最长 50 字，去首尾空，空即 null。 */
+export const FRIEND_REQUEST_MESSAGE_MAX = 50;
+
+export function parseRequestMessage(raw: unknown): { message: string | null } | { error: string } {
+  if (raw === undefined || raw === null) return { message: null };
+  if (typeof raw !== "string") return { error: "message 需为字符串" };
+  const v = raw.trim();
+  if (v === "") return { message: null };
+  if (Array.from(v).length > FRIEND_REQUEST_MESSAGE_MAX) {
+    return { error: `message 最长 ${FRIEND_REQUEST_MESSAGE_MAX} 字` };
+  }
+  return { message: v };
+}
+
 /** UR B.3 请求来源（列表来源展示；非法回落 direct，不 400）。 */
 export type FriendRequestOrigin = "profile" | "cheers" | "party" | "checkin" | "direct";
 
