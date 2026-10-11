@@ -25,3 +25,4 @@
 3. title 改静态；判例：文案占位改动必 grep 调用处传参形状。
 4. `locked` 保留恒 false＋yaml 注明；`no_visible_post` 进 envelope＋yaml。
 - 未做：真机验证（等用户；iOS 配合改后联调）；migration 零（visibility 列 0007 已有）。
+- 2026-10-11 晚 iOS 回复三问：locked 恒 false 同意／leave 不拦同意／保留新文案——零代码改动，只留档。

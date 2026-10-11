@@ -19,6 +19,7 @@
   - 隐身可打卡（visibility 定格 private）＋聊天发起／收发全放行＋主页对所有人完整（足迹按 visibility 过滤，统计只计可见，`locked` 恒 false 保留字段，`friends_only_count` 只数 friends）
   - 自己被攔的留痕类统一文案（`STEALTH_SELF_BLOCK_MSG`；评论／赞／表态／打分／碰杯／取消碰杯／约酒／发局／参局／游戏）；被动方全放行不说原因（约酒删对方隐身门、聊天删双门、游戏邀请跳过不泄因）；回敬无靶 `no_visible_post`
   - `lib/api/privacy.ts` 纯函数＋8 单测；三语文案（guard／mailStealthHint／stealthDesc 去唯讀）；条款页走文案键零代码改；openapi 1.36.0；零 migration
+  - iOS 确认三问（locked 恒 false／leave 不拦／保留新文案），零代码改动
   - `vitest` 610 綠＋`tsc` 零错＋`lint` 零错（7 warnings 既有他处）
 - **DEF-20261006-002 iOS 好友釘 pill 无走马灯（v2-only，未提交；pins 补 note 读链）**
   - 读链三处全缺：`PINS_COLUMNS` 无 `note` → `toPinJson` 无映射 → openapi `MapPin` 无字段（写链 POST／详情早有 note，唯列表漏了）

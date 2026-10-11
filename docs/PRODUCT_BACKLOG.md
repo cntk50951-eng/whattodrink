@@ -1673,6 +1673,7 @@ UR A.16 隱身模式（API＋DB＋UI）[✓]
 - 2026-09-26：fix DEF-20260926-002（引導層被他人卡蓋→守衛先收卡記 `pendingCardId`，切換成功 `onSwitched` 恢復原卡續操作，取消／登出不清恢復；`ModePrompt` 加可選回調，共用方默認不變；三閘綠，待复驗）
 - 2026-09-26：用戶驗收通過（常駐 pill＋一點展開三檔＋隱身守衛五處＋收卡恢復＋刷新模式保持＋DB 控制確認），置 [✓]；隨本 commit 合 main
 - 2026-10-11：重定义（PRIVACY_MODE_MATRIX＋WEB_HANDOFF_STEALTH_REDESIGN，iOS 输入）：隱身≠唯讀——隐身可打卡（visibility 定格 private）／聊天照常／主页对所有人完整（统计只计可见，locked 恒 false 保留字段）；自己被攔的留痕类（评论／赞／表态／打分／碰杯／取消碰杯／约酒／发局／参局／游戏）统一文案；被动方（被聊天／被约／被碰杯／被加好友／游戏邀请跳过）不拦不说原因；openapi 1.36.0；零 migration
+- 2026-10-11：iOS 确认 web 三问：① locked 恒 false 同意（iOS 仅 locked==true 锁整页，以后走不到，后续清逻辑）；② leave 不拦同意（离开非留痕）；③ 保留新文案（旧"只读"与行为矛盾）；零代码改动
 
 ---
 
