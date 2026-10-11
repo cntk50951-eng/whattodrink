@@ -230,11 +230,14 @@ export async function POST(req: Request): Promise<Response> {
  * 只吐四列：精確坐標永不進列表，一鍵定位走地圖深鏈用 live 數據，隱私分離）。
  */
 export async function GET(req: Request): Promise<Response> {
-  const { supabase, userId } = await getAuthedClient(req);
+  const { userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
   }
-  const { data: fsRows } = await supabase
+  // 读走 service（WEB_HANDOFF_FRIEND_LIVE：users authed 读策略只返自己＋public 打卡作者，
+  // 无 public 帖的好友昵称会被静默丢掉；id 集已由 friendships 互好友限定，只吐四列）。
+  const svc = await createServiceClient();
+  const { data: fsRows } = await svc
     .from("friendships")
     .select("user_id,friend_id,status")
     .eq("status", "accepted")
@@ -248,7 +251,7 @@ export async function GET(req: Request): Promise<Response> {
     }[],
   );
   if (ids.length === 0) return apiOk({ friends: [] });
-  const { data: users, error: uErr } = await supabase
+  const { data: users, error: uErr } = await svc
     .from("users")
     .select("id,nickname,avatar_url,mode,last_seen_at")
     .in("id", ids);

@@ -21,6 +21,8 @@
   - `lib/api/privacy.ts` 纯函数＋8 单测；三语文案（guard／mailStealthHint／stealthDesc 去唯讀）；条款页走文案键零代码改；openapi 1.36.0；零 migration
   - iOS 确认三问（locked 恒 false／leave 不拦／保留新文案），零代码改动
   - `vitest` 610 綠＋`tsc` 零错＋`lint` 零错（7 warnings 既有他处）
+- **UR A.21 好友实时位读不到（WEB_HANDOFF_FRIEND_LIVE，iOS 输入，未提交）**
+  - `GET /friends/live`＋`GET /friends` 改走 service 读（沿 POST /friends 同口径；不过放开 RLS）；610 绿＋tsc 零错＋lint 零错
 - **DEF-20261006-002 iOS 好友釘 pill 无走马灯（v2-only，未提交；pins 补 note 读链）**
   - 读链三处全缺：`PINS_COLUMNS` 无 `note` → `toPinJson` 无映射 → openapi `MapPin` 无字段（写链 POST／详情早有 note，唯列表漏了）
   - 修法对标 E.20 photoThumb：select 加列 → `toPinJson.note` 原文透传（空／空白／非串／缺席即 null）→ `PinJson` 类型 → openapi 补字段句；零 migration（`note` 列 0001 已有）；`pins.test` 新用例＋主映射断言＋`v2Pins.test` 三处补键

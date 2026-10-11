@@ -1847,6 +1847,7 @@ UR A.21　我的位置＋在線態＋好友實時追踪 [✓]
 - 2026-09-27：實作完待驗（DB 0011 待執行＋雙端點＋hooks＋自釘變色＋好友滑行層＋聊天 Sheet＋chat*×3＋openapi；單測 20；三閘綠；單機可驗中心／燈／色／心跳／Sheet，雙人實時待聯驗）
 - 2026-09-27：置 [✓]（用户指令 mark done；PR #28 已合入；2026-09-28 備註：此行曾被同樹並寫蓋掉，本輪重建；雙人聯驗＋0012 後通道另開 D 線已立）
 - 2026-09-27：實作完（DB 0011＋雙端點＋hooks＋自釘變色＋好友層＋聊天 Sheet；單測 20；lint 0 error）——驗收被擋：隊友 C.11 足跡重構進行中（`trailRef` 更名殘留致 build 紅），非我方代碼；待協調
+- 2026-10-11：fix（WEB_HANDOFF_FRIEND_LIVE，iOS 输入）：`GET /friends/live`＋`GET /friends` 的 friendships／users 读改走 service（users authed 读策略只返自己＋public 打卡作者，无 public 帖的好友被静默丢；互好友校验＋服务端三刀过滤不变，不放开 RLS）；tsc 零错＋610 绿＋lint 零错
 
 ---
 

@@ -1,4 +1,4 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { friendIdsOf } from "@/lib/friends";
 import { toLiveFriend } from "@/lib/presence";
@@ -9,14 +9,17 @@ import { toLiveFriend } from "@/lib/presence";
  * 1. 查看者隱身 → 直接 `[]`（不查不報，沿 A.19 全攔口徑）；
  * 2. 只取 accepted 互好友（沿 A.15 D3，`friendIdsOf` 共用）；
  * 3. 對方隱身／超窗／無坐標 → `toLiveFriend` 丟棄。
+ * 讀走 service（WEB_HANDOFF_FRIEND_LIVE：users 的 authed 讀策略只返自己＋public 打卡作者，
+ * 无 public 帖的好友会被静默丢掉；id 集已由 friendships 互好友校验限定，可见性仍由 server 端三刀保证）。
  * 輪詢 30s 一次（首期；EPIC B 落地切訂閱，shape 不變）。
  */
 export async function GET(req: Request): Promise<Response> {
-  const { supabase, userId } = await getAuthedClient(req);
+  const { userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
   }
-  const { data: me } = await supabase
+  const svc = await createServiceClient();
+  const { data: me } = await svc
     .from("users")
     .select("mode")
     .eq("id", userId)
@@ -26,7 +29,7 @@ export async function GET(req: Request): Promise<Response> {
   }
   let fsRows: { user_id: unknown; friend_id: unknown; status: unknown }[] = [];
   try {
-    const { data } = await supabase
+    const { data } = await svc
       .from("friendships")
       .select("user_id,friend_id,status")
       .eq("status", "accepted")
@@ -41,7 +44,7 @@ export async function GET(req: Request): Promise<Response> {
   }
   const ids = friendIdsOf(userId, fsRows);
   if (ids.length === 0) return apiOk({ friends: [] });
-  const { data: users, error: uErr } = await supabase
+  const { data: users, error: uErr } = await svc
     .from("users")
     .select("id,nickname,avatar_url,mode,last_seen_at,live_lat,live_lng")
     .in("id", ids);
