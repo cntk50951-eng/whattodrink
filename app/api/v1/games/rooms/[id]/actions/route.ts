@@ -25,7 +25,8 @@ import {
  *   幂等先行——重试带旧 version 不判 409。
  * - expected 落后→409 stale_version（iOS 重拉，不重试）。
  * - bid／challenge 须轮到我（409 not_your_turn）且 bidding 中（409 wrong_phase）；
- *   bid 规则错→422 invalid_bid（reason 进 message）；next_round 须 revealed 后任何人。
+ *   bid 规则错→422 invalid_bid（reason 进 message）；next_round 须 revealed 后任何人
+ *   （§十三：deal_only 房仅房主可调，调用即开，不等确认；开盅后不自动开新局）。
  * - 限流 5/s（429）。每次写前先懒超时结算。
  */
 export async function POST(
@@ -143,6 +144,25 @@ export async function POST(
   // next_round：revealed 后任何人；记确认，集齐即开新局（输家先叫）。
   if (round.status !== "revealed" || round.result === null) {
     return apiError("wrong_phase", "未開盅不可進下一局", 409);
+  }
+  // §十三（§十一落地）：deal_only 房仅房主可开，且调用即开，不等确认。
+  if (rules.mode === "deal_only") {
+    if (room.host_id !== userId) {
+      return apiError("not_host", "等房主開始下一局", 403);
+    }
+    const starter = order[0];
+    const created = await startNextRound(svc, room.id, round.no + 1, starter, order, rules, nowMs);
+    if ("response" in created) return created.response;
+    const version = await bumpRoom(svc, room.id, room.version, nowMs);
+    if (version === null) {
+      return apiError("internal", "開局失敗", 500);
+    }
+    await appendEvent(svc, room.id, version, "round_started", userId, {
+      no: round.no + 1,
+      starter_id: starter,
+    }, parsed.clientActionId);
+    const events = await getEventsSince(svc, room.id, parsed.expectedVersion);
+    return apiOk({ version, events });
   }
   const confirmed = new Set(round.result.confirmations);
   if (!confirmed.has(userId)) {

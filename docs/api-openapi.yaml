@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.31.0
+  version: 1.32.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -2337,6 +2337,12 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           description: 房間不存在／非成员（code=room_not_found）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: deal_only 房非房主调 next_round（code=not_host）
           content:
             application/json:
               schema:

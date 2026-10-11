@@ -12,6 +12,7 @@
   - 第四批：邀请（房主 lobby 邀好友，逐人门＋去重＋`game_invite` 推送）＋`GET /games/invites`（lobby 行＋过期顺手清）＋counters 加数（badge 不含）＋prefs `game_invites` 键＋三语文案＋openapi 1.29.0＋3 单测；H.1 端点齐，待 iOS 联调
   - §九發骰器：`rules.mode:deal_only`（非法回落 standard）＋`reveal` 动作（任一 active bidding 中亮骰，不判输赢，已亮重调幂等 200；bid／challenge 在此房 409）＋开局／次局无轮次无倒计时＋`next_round` 照旧（starter 座位最小）＋openapi 1.30.0＋2 单测
   - §十二留守重开：deal_only 房局中剩 <2 人→回 lobby（留守 ready=false＋`back_to_lobby` 事件），standard 不动；`start` 局号顺延（回 lobby 重开不撞 unique）＋openapi 1.31.0
+  - §十三停住等房主：deal_only 房开盅后不自动开新局（settle＋集齐确认都不开）＋`next_round` 仅房主可调、调用即开＋openapi 1.32.0（补 403 \(not_host\) 描述）
 
 ### Fixed
 - **DEF-20261006-002 iOS 好友釘 pill 无走马灯（v2-only，未提交；pins 补 note 读链）**

@@ -692,7 +692,7 @@ export const NEXT_ROUND_AUTO_MS = 8000;
 /**
  * 懒超时结算（每次 GET／POST 先调；无 cron）。
  * - bidding＋deadline 过：有 last_bid→自动 challenge，无→当前者最小叫骰（auto 标记）。
- * - revealed＋（全员确认或 8s）：输家先开新局（auto）。
+ * - revealed＋（全员确认或 8s）：输家先开新局（auto；§十三：deal_only 房不开，停住等房主）。
  * 回 `{room, fired}`（room 为重载后；fired 即 version 变了，调用方重读 version）。
  */
 export async function settleRoom(
@@ -725,6 +725,8 @@ export async function settleRoom(
     return { room: { ...room, version: done.version }, fired: true };
   }
   if (round.status === "revealed" && round.result !== null) {
+    // §十三（§十一落地）：deal_only 房开盅后停住，等房主手动 next_round，不自动开。
+    if (rules.mode === "deal_only") return { room, fired: false };
     const confirmed = new Set(round.result.confirmations);
     const allIn = activeIds.every((id) => confirmed.has(id));
     const aged = nowMs - Date.parse(round.result.revealed_at) >= NEXT_ROUND_AUTO_MS;
