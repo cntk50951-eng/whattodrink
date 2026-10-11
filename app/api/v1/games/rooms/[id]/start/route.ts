@@ -7,7 +7,9 @@ import {
   getLatestRound,
   loadRoomAsMember,
   requireHost,
+  isStealthUser,
 } from "@/lib/games/rooms";
+import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 
 /**
  * UR H.1 开始（🔒，仅房主）。
@@ -26,6 +28,9 @@ export async function POST(
   }
   const { id } = await params;
   const svc = await createServiceClient();
+  if (await isStealthUser(svc, userId)) {
+    return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
+  }
   const loaded = await loadRoomAsMember(svc, id, userId);
   if ("response" in loaded) return loaded.response;
   const hostErr = requireHost(loaded, userId);

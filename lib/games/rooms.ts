@@ -987,3 +987,9 @@ export async function applyReveal(
   }, clientActionId);
   return { version, revealed };
 }
+
+/** 隐身者不可进入游戏（PRIVACY_MODE_MATRIX 矩阵 A；留痕类，自己被攔即明說）。 */
+export async function isStealthUser(svc: SupabaseClient, userId: string): Promise<boolean> {
+  const { data } = await svc.from("users").select("mode").eq("id", userId).maybeSingle();
+  return (data as { mode?: unknown } | null)?.mode === "stealth";
+}

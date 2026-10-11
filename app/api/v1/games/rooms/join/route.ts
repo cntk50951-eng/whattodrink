@@ -14,7 +14,9 @@ import {
   purgeExpiredRooms,
   sharesActiveParty,
   toRoomJson,
+  isStealthUser,
 } from "@/lib/games/rooms";
+import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 
 /**
  * UR H.1 输码加入（🔒，POC）。
@@ -43,6 +45,9 @@ export async function POST(req: Request): Promise<Response> {
     return apiError("invalid_params", parsed.error, 400);
   }
   const svc = await createServiceClient();
+  if (await isStealthUser(svc, userId)) {
+    return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
+  }
   const nowMs = Date.now();
   await purgeExpiredRooms(svc, nowMs);
   const { data: meRow } = await svc.from("users").select("dob").eq("id", userId).maybeSingle();

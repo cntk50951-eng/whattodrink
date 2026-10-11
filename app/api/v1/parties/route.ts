@@ -3,6 +3,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { isMinorDob } from "@/lib/api/cheers";
 import { countGenders, hkDayStartISO, mineOrCondition, parsePartyBody, partyExpiresAt } from "@/lib/api/party";
 import { haversineMeters } from "@/lib/geo";
+import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 
 /**
  * UR E.23 發攢局（🔒，匿名 401；隐身／未成年 403；3／天 429；iOS-0.57 联调）。
@@ -32,7 +33,7 @@ export async function POST(req: Request): Promise<Response> {
     .maybeSingle();
   const me = (meRow ?? {}) as { mode?: unknown; dob?: unknown };
   if (me.mode === "stealth") {
-    return apiError("forbidden", "隱身模式不可發局", 403);
+    return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
   }
   if (isMinorDob(me.dob, Date.now())) {
     return apiError("forbidden", "未滿 18 歲不可發局", 403);

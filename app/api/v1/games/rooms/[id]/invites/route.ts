@@ -8,7 +8,9 @@ import {
   loadRoomAsMember,
   parseInviteBody,
   requireHost,
+  isStealthUser,
 } from "@/lib/games/rooms";
+import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 
 /**
  * UR H.1 邀请（🔒，仅房主，仅 lobby）。
@@ -38,6 +40,9 @@ export async function POST(
   }
   const { id } = await params;
   const svc = await createServiceClient();
+  if (await isStealthUser(svc, userId)) {
+    return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
+  }
   const loaded = await loadRoomAsMember(svc, id, userId);
   if ("response" in loaded) return loaded.response;
   const hostErr = requireHost(loaded, userId);
@@ -47,10 +52,24 @@ export async function POST(
     return apiError("wrong_phase", "對局已開始，不可再邀", 409);
   }
   const memberIds = new Set(members.map((m) => m.user_id));
+  // 矩阵 B：隐身者不可被邀进游戏房——对方只见「未能邀请」，不说原因（reason 用 internal，不泄隐身）。
+  const { data: targetModes } = await svc
+    .from("users")
+    .select("id,mode")
+    .in("id", parsed.userIds);
+  const stealthTargets = new Set(
+    (((targetModes ?? []) as unknown[]) as { id?: unknown; mode?: unknown }[])
+      .filter((u) => u.mode === "stealth" && typeof u.id === "string")
+      .map((u) => u.id as string),
+  );
   const invited: string[] = [];
   const skipped: { user_id: string; reason: string }[] = [];
   const freshPush: { toUserId: string }[] = [];
   for (const target of parsed.userIds) {
+    if (stealthTargets.has(target)) {
+      skipped.push({ user_id: target, reason: "internal" });
+      continue;
+    }
     if (memberIds.has(target)) {
       skipped.push({ user_id: target, reason: "member" });
       continue;

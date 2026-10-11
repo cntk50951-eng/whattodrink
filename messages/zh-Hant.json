@@ -285,8 +285,8 @@
     "deleteFailed": "刪除失敗，請再試一次"
   },
   "mode": {
-    "guardTitle": "隱身模式僅可瀏覽",
-    "guardBody": "你而家係隱身模式（唯讀），唔可以{action}。轉做好友或者公開模式之後再試。",
+    "guardTitle": "隱身模式做唔到呢個動作",
+    "guardBody": "隱身模式下唔可以：評論／點讚／表態／打分／碰杯／取消碰杯／約酒／發酒局／參加酒局／玩遊戲。切換到公開或好友模式即可。",
     "actCheckin": "打卡",
     "actCheers": "乾杯",
     "actInvite": "約飲酒",
@@ -537,7 +537,7 @@
     "partyNeedPos": "需要定位先可以發局",
     "partyHostBadge": "發起人",
     "partyFailed": "讀取失敗，點重試",
-    "mailStealthHint": "你正在隱身，别人看不到你，也收不到新的乾杯",
+    "mailStealthHint": "你正在隱身：不暴露位置同實時動態，呢段時間出嘅打卡只係自己睇到",
     "mailBefriend": "成為好友",
     "mailUnfriend": "解除好友",
     "mailUnfriendConfirm": "確認解除？",
@@ -644,7 +644,7 @@
     "friendsDesc": "淨係互加咗好友嘅人先睇到你嘅打卡同綠點，只可以同好友互動。",
     "friendsRisk": "風險：好友截圖轉發控制唔到，唔熟嘅人唔好亂加。",
     "stealthName": "隱身",
-    "stealthDesc": "睇到人哋嘅公開嘢，但唔可以打卡、乾杯、約飲酒、讚好；無心跳、無綠點，邊個都見你唔到。",
+    "stealthDesc": "唔暴露位置同實時動態：無心跳、無綠點，呢段時間出嘅打卡只係自己睇到；但照樣傾偈、交朋友、被人約、被人乾杯，邊個都察覺唔到你隱身。",
     "stealthRisk": "風險：轉隱身之前出過嘅公開內容依然係公開；隱身唔係刪除。",
     "crossBorder": "AI 分析會用海外雲端處理，你嘅相片同文字可能會被傳送到境外處理。",
     "ageNote": "飲酒內容只適合 18 歲或以上人士。",

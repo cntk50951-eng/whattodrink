@@ -4,6 +4,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { canViewCheckin } from "@/lib/api/checkins";
 import { type FriendshipRow, friendIdsOf } from "@/lib/friends";
 import { cheersQuota, isMinorDob, parseCheersBody, parseCheersMessage } from "@/lib/api/cheers";
+import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 import { sendCheersPush } from "@/lib/push/send";
 
 type CheckinRow = {
@@ -57,14 +58,14 @@ export async function POST(req: Request): Promise<Response> {
   if ("error" in parsed) {
     return apiError("invalid_params", parsed.error, 400);
   }
-  // 隐身禁敬（沿旧门；敬酒具名，隐身敬即暴露）。
+  // 隐身禁敬／取消（矩阵 A：留痕类，自己被攔即明說）。
   const { data: meRow } = await supabase
     .from("users")
     .select("mode")
     .eq("id", userId)
     .maybeSingle();
   if ((meRow as { mode?: unknown } | null)?.mode === "stealth") {
-    return apiError("forbidden", "隱身模式不可乾杯", 403);
+    return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
   }
   // 定靶：敬帖解作者；回敬解对方最新可见帖。
   let targetPost: CheckinRow | null = null;
@@ -105,7 +106,7 @@ export async function POST(req: Request): Promise<Response> {
         ? true
         : canViewCheckin(userId, p.user_id, p.visibility, fids),
     );
-    if (hit === undefined) return apiError("not_found", "對方暫無可敬的打卡", 404);
+    if (hit === undefined) return apiError("no_visible_post", "對方暫時冇可以碰杯嘅打卡", 404);
     targetPost = hit;
     toUserId = peerId;
   }
@@ -194,6 +195,15 @@ export async function DELETE(req: Request): Promise<Response> {
   const { supabase, userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
+  }
+  // 隐身不可取消碰杯（矩阵 A：取消是留痕类操作，自己被攔即明說；2026-10-11 新增）。
+  const { data: meRow } = await supabase
+    .from("users")
+    .select("mode")
+    .eq("id", userId)
+    .maybeSingle();
+  if ((meRow as { mode?: unknown } | null)?.mode === "stealth") {
+    return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
   }
   let raw: unknown = null;
   try {

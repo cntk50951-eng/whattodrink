@@ -4,6 +4,7 @@ import { canViewCheckin } from "@/lib/api/checkins";
 import { friendIdsOf, type FriendshipRow } from "@/lib/friends";
 import { inviteWindow, parseInviteBody } from "@/lib/api/invites";
 import { isMinorDob } from "@/lib/api/cheers";
+import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 
 /** HK 今日 0 点 UTC ISO（3／天窗口下界，沿 cheers 口径）。 */
 function hkDayStartISO(nowMs: number): string {
@@ -13,7 +14,7 @@ function hkDayStartISO(nowMs: number): string {
 }
 
 /**
- * UR E.16 发起＋收发箱（🔒，匿名 401；隐身发送 403）。
+ * UR E.16 发起＋收发箱（🔒，匿名 401；隐身发送 403——留痕类，自己被攔明說；对方隐身不拦，矩阵 B）。
  * `POST /api/v1/invites {to_user_id, place, slot}` —— 3／天＋同对象 1／天；
  * 对方隐身／屏蔽中性 403（绝不写原因）；回 `{id, expires_at}`。
  * `GET /api/v1/invites?box=inbox|sent` —— 收（sent 待回＋accepted 未来到）／
@@ -77,7 +78,7 @@ export async function POST(req: Request): Promise<Response> {
     .eq("id", userId)
     .maybeSingle();
   if ((meRow as { mode?: unknown } | null)?.mode === "stealth") {
-    return apiError("forbidden", "隱身模式不可約喝酒", 403);
+    return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
   }
   const { data: peerRow } = await supabase
     .from("users")
@@ -86,9 +87,6 @@ export async function POST(req: Request): Promise<Response> {
     .maybeSingle();
   if (peerRow === null) return apiError("not_found", "對方不存在", 404);
   const peer = peerRow as { id: string; mode?: unknown };
-  if (peer.mode === "stealth") {
-    return apiError("forbidden", "TA 暫時不接收邀請", 403);
-  }
   const { data: blockRows } = await supabase
     .from("cheers_blocks")
     .select("blocker_id,blocked_id")

@@ -57,17 +57,7 @@ export async function POST(req: Request): Promise<Response> {
   if (peerRow === null || typeof peerRow.id !== "string") {
     return apiError("not_found", "找不到该用户", 404);
   }
-  if (peerRow.mode === "stealth") {
-    return apiError("forbidden", "對方處於隱身模式，暫不可聊天", 403);
-  }
-  const { data: meRow } = await supabase
-    .from("users")
-    .select("mode")
-    .eq("id", userId)
-    .maybeSingle();
-  if ((meRow as { mode?: unknown } | null)?.mode === "stealth") {
-    return apiError("forbidden", "隱身模式不可發起聊天", 403);
-  }
+  // PRIVACY_MODE_MATRIX 矩阵 A/B：隐身可发起／被发起聊天，不拦、不说原因。
   // UR D.10 陌生人放行（不限关系； RSVP 门改拉黑＋未成年＋日限额）。
   // 拉黑任一方向即 404（不泄存在，沿 profile 口径；走 service，blocks 反向行 authed 不可见）。
   const blockSvc = await createServiceClient();

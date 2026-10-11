@@ -211,19 +211,6 @@ export async function POST(
     // direct 1v1：除自己外唯一成员即对方；群预留（多人即按"有陌生人"从严）。
     // peerIds 非空已在上保证（空即 500 早退）。
     isFriend = peerIds.every((pid) => myFids.includes(pid));
-  }  const { data: modes } = await supabase
-    .from("users")
-    .select("id,mode")
-    .in(
-      "id",
-      memberIds.map((m) => m.user_id),
-    );
-  if (
-    ((modes ?? []) as unknown[]).some(
-      (u) => (u as { mode?: unknown }).mode === "stealth",
-    )
-  ) {
-    return apiError("forbidden", "隱身模式不可收發消息", 403);
   }
   // D.6 附件歸屬：path 首段必須是自己（storage RLS 同口徑，雙保險；
   // 陌生人拿別人的 path 發即 400，會話成員校验在下）。
@@ -239,6 +226,10 @@ export async function POST(
     const post = postRaw as { id: string; user_id: string | null; visibility: unknown } | null;
     if (post === null) {
       return apiError("not_found", "打卡不存在", 404);
+    }
+    // 矩阵 C/D：私人帖（隐身期间发的）任何人都不能分享——含本人，对方也打不开。
+    if (post.visibility === "private") {
+      return apiError("forbidden", "私人打卡不可分享", 403);
     }
     // 仅自家可分享（UR 范围；他人帖分享另议）。
     if (post.user_id === null || post.user_id !== userId) {

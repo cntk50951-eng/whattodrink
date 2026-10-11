@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STEALTH_SELF_BLOCK_MSG,
   isWriteBlocked,
   parseMode,
   parsePatchModeBody,
@@ -44,6 +45,11 @@ describe("isWriteBlocked (UR A.16)", () => {
     expect(isWriteBlocked("friends")).toBe(false);
     expect(isWriteBlocked("public")).toBe(false);
     expect(isWriteBlocked(null)).toBe(false);
+  });
+  it("STEALTH_SELF_BLOCK_MSG（矩阵 §6）：对自己明说被拦项，不提唯讀", () => {
+    expect(STEALTH_SELF_BLOCK_MSG).toContain("玩遊戲");
+    expect(STEALTH_SELF_BLOCK_MSG).toContain("取消碰杯");
+    expect(STEALTH_SELF_BLOCK_MSG).not.toContain("唯讀");
   });
 });
 

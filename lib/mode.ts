@@ -1,8 +1,15 @@
 /**
  * UR A.16 隱身模式 — 用戶可見模式純函數（可單測）。
- * mode 三檔沿 0007（`users.mode`，預設 public）；隱身＝唯讀，任何寫操作皆攔。
- * 匿名／未載入（null）不攔，交各端點既有守衛（401 未登入／403 隱身）。
+ * mode 三檔沿 0007（`users.mode`，預設 public）。
+ * 2026-10-11 定案（PRIVACY_MODE_MATRIX）：隱身＝不暴露位置與實時動態，社交通道照常；
+ * 只有隱身者自己做「留痕類」操作時被攔，攔截文案對自己明說（STEALTH_SELF_BLOCK_MSG）。
+ * 匿名／未載入（null）不攔，交各端點既有守衛（401 未登入）。
  */
+
+/** 隱身者自己被攔（留痕類操作）時的統一文案（對自己說，PRIVACY_MODE_MATRIX §6）。 */
+export const STEALTH_SELF_BLOCK_MSG =
+  "隱身模式下唔可以：評論／點讚／表態／打分／碰杯／取消碰杯／約酒／發酒局／參加酒局／玩遊戲。切換到公開或好友模式即可。";
+
 
 export const USER_MODES = ["stealth", "friends", "public"] as const;
 
@@ -33,7 +40,7 @@ export function parsePatchModeBody(
   return { body: { mode } };
 }
 
-/** 隱身是否攔截寫操作：只有明確 stealth 才攔。 */
+/** 隱身是否攔截寫操作（已不是唯讀：仅供仍需「自己被攔」的留痕类判断，调用方逐端点决定）。 */
 export function isWriteBlocked(mode: UserMode | null): boolean {
   return mode === "stealth";
 }

@@ -1,6 +1,7 @@
 import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { canViewCheckin, parseCheckinIdParam, parseMineParams } from "@/lib/api/checkins";
+import { parseCheckinIdParam, parseMineParams } from "@/lib/api/checkins";
+import { friendsOnlyCountOf, visibleRowsFor } from "@/lib/api/privacy";
 import { friendIdsOf } from "@/lib/friends";
 import { hkAge, collectNightStats, weekNights, weekStreak } from "@/lib/api/profile";
 import { aggregateTaste, TAXONOMY_VERSION } from "@/lib/api/taste";
@@ -141,7 +142,9 @@ type FsRow = { user_id: unknown; friend_id: unknown; status: unknown };
 /**
  * UR E.27 个人主页（🔒，匿名 401；iOS profile 输入）。
  * `GET /api/v1/users/:id/profile` —— id 或 `me`（自己视角完整）；
- * 不存在／拉黑／对方隐身统一 404；stats 全服务端算；recent 默认 30（max 50）＋cursor。
+ * PRIVACY_MODE_MATRIX 矩阵 C（2026-10-11）：主页对所有人完整，不再 404 整页锁定；
+ * 足迹按 visibility 过滤（本人全见；好友 public＋friends；陌生人 public；private 永不见）；
+ * 统计只计可见集合；mode 只回本人。拉黑仍 404。
  * 读走 service（跨表聚合 RLS 表述不了，可见门全代码判，沿 ratings 聚合口径）。
  */
 export async function GET(
@@ -182,16 +185,13 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
   let myFriendIds: string[] = [];
   let targetFriendIds: string[] = [];
   if (!self) {
-    // 拉黑任一方向即 404（不泄存在，沿交接）。
+    // 拉黑任一方向即 404（不泄存在，沿交接）。矩阵 C：对方隐身不再 404，主页对所有人完整。
     const { data: blockRows } = await supa
       .from("cheers_blocks")
       .select("blocker_id")
       .or(`and(blocker_id.eq.${viewerId},blocked_id.eq.${targetId}),and(blocker_id.eq.${targetId},blocked_id.eq.${viewerId})`)
       .limit(1);
     if (Array.isArray(blockRows) && blockRows.length > 0) {
-      return apiError("not_found", "用户不存在", 404);
-    }
-    if (u.mode === "stealth") {
       return apiError("not_found", "用户不存在", 404);
     }
     const { data: fsRows } = await supa
@@ -246,8 +246,10 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
   const mutualCount = self
     ? null
     : myFriendIds.filter((id) => targetFriendIds.includes(id)).length;
-  const statsVisible = self || relationship === "friend" || u.mode === "public";
-  const locked = !self && relationship !== "friend" && u.mode !== "public";
+  // 矩阵 C：主页对所有人完整（stats／preferences／recent 全给，不再整页锁定）。
+  // locked 字段保留恒 false（契约 required，删字段会破旧客户端）。
+  const statsVisible = true;
+  const locked = false;
 
   // user（mode／dob 仅自己；别人只 age）。
   const user: Record<string, unknown> = {
@@ -264,14 +266,17 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
     user.dob = u.dob ?? null;
   }
 
-  // stats（self 或 friend／public 才算；未知回 null 不冒 0，沿交接）。
+  // stats（矩阵 C：对所有人可见，但只统计查看者看得到的行；本人看全部总数）。
   let stats: Record<string, number | null> | null = null;
   let nights: Set<string> | null = null;
   if (statsVisible) {
+    // 本人全集；好友 public＋friends；陌生人 public（private 永不计入）。
+    const visForStats =
+      self || relationship === "friend" ? ["public", "friends", ...(self ? ["private"] : [])] : ["public"];
     const [{ count: mainCount }, { count: archCount }, { count: savesCount }, { count: cheersCount }] =
       await Promise.all([
-        supa.from("checkins").select("id", { count: "exact", head: true }).eq("user_id", targetId),
-        supa.from("checkins_archive").select("id", { count: "exact", head: true }).eq("user_id", targetId),
+        supa.from("checkins").select("id", { count: "exact", head: true }).eq("user_id", targetId).in("visibility", visForStats),
+        supa.from("checkins_archive").select("id", { count: "exact", head: true }).eq("user_id", targetId).in("visibility", visForStats),
         supa.from("checkin_saves").select("checkin_id", { count: "exact", head: true }).eq("user_id", targetId),
         supa.from("cheers").select("id", { count: "exact", head: true }).eq("to_user_id", targetId),
       ]);
@@ -282,8 +287,9 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
       for (let page = 0; ; page += 1) {
         const { data, error } = await supa
           .from(table)
-          .select("created_at,place_name")
+          .select("created_at,place_name,visibility")
           .eq("user_id", targetId)
+          .in("visibility", visForStats)
           .order("created_at", { ascending: false })
           .range(page * PAGE, page * PAGE + PAGE - 1);
         if (error !== null) {
@@ -328,7 +334,7 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
   let recent: Record<string, unknown>[] = [];
   let recent_cursor: string | null = null;
   let friends_only_count: number | null = null;
-  if (!locked) {
+  {
     const { data: mainRows } = await supa
       .from("checkins")
       .select("id,kind,visibility,place_name,lat,lng,created_at,expires_at,note,photo_thumb,beer_id,tags")
@@ -350,21 +356,11 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
       const cb = typeof b.created_at === "string" ? b.created_at : "";
       return cb < ca ? -1 : cb > ca ? 1 : 0;
     });
-    // 可见过滤（self 全见；friend 沿 canViewCheckin；public陌生人只要 public＋计数 friends-only）。
-    let visible = all;
-    if (!self) {
-      if (relationship === "friend") {
-        visible = all.filter((r) =>
-          canViewCheckin(viewerId, targetId, r.visibility, myFriendIds),
-        );
-      } else {
-        const pub = all.filter((r) => r.visibility === "public");
-        friends_only_count = all.filter(
-          (r) =>
-            r.visibility === "friends" && canViewCheckin(viewerId, targetId, r.visibility, myFriendIds),
-        ).length;
-        visible = pub;
-      }
+    // 矩阵 C：本人全见（含 private，前端加锁）；好友 public＋friends；陌生人 public；
+    // private 永不见。「另有 N 条」只数 friends（不含 private，不泄露存在）。
+    const visible = visibleRowsFor(viewerId, targetId, all, myFriendIds);
+    if (!self && relationship !== "friend") {
+      friends_only_count = friendsOnlyCountOf(all);
     }
     const afterCursor =
       Number.isFinite(cursorMs)

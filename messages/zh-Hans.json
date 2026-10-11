@@ -285,8 +285,8 @@
     "deleteFailed": "删除失败，请再试一次"
   },
   "mode": {
-    "guardTitle": "隐身模式仅可浏览",
-    "guardBody": "你现在是隐身模式（唯读），不可{action}。切换到好友或公开模式后再试。",
+    "guardTitle": "隐身模式下做不了这个动作",
+    "guardBody": "隐身模式下不可：评论／点赞／表态／打分／碰杯／取消碰杯／约酒／发酒局／参加酒局／玩游戏。切换到公开或好友模式即可。",
     "actCheckin": "打卡",
     "actCheers": "干杯",
     "actInvite": "约喝酒",
@@ -537,7 +537,7 @@
     "partyNeedPos": "需要定位才能发局",
     "partyHostBadge": "发起人",
     "partyFailed": "读取失败，点重试",
-    "mailStealthHint": "你正在隐身，别人看不到你，也收不到新的干杯",
+    "mailStealthHint": "你正在隐身：不暴露位置和实时动态，这段时间发的打卡只有自己看得到",
     "mailBefriend": "成为好友",
     "mailUnfriend": "解除好友",
     "mailUnfriendConfirm": "确认解除？",
@@ -644,7 +644,7 @@
     "friendsDesc": "只有互加好友的人才能看到你的打卡和绿点，只可与好友互动。",
     "friendsRisk": "风险：好友截图转发不可控，不熟的人不要乱加。",
     "stealthName": "隐身",
-    "stealthDesc": "看得到别人的公开内容，但不可打卡、干杯、约喝酒、点赞；无心跳、无绿点，谁都看不到你。",
+    "stealthDesc": "不暴露位置和实时动态：无心跳、无绿点，这段时间发的打卡只有自己看得到；但照样聊天、交朋友、被约、被碰杯，谁都察觉不到你在隐身。",
     "stealthRisk": "风险：切换隐身前发过的公开内容依然公开；隐身不是删除。",
     "crossBorder": "AI 分析会使用海外云端处理，你的照片和文字可能会被传输到境外处理。",
     "ageNote": "饮酒内容仅适合 18 岁或以上人士。",

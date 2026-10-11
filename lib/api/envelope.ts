@@ -14,6 +14,7 @@ export type ApiErrorCode =
   | "payload_too_large"
   | "stranger_quota"
   | "conversation_muted"
+  | "no_visible_post"
   | "age_restricted"
   | "not_allowed"
   | "room_not_found"

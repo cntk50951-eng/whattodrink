@@ -9,7 +9,9 @@ import {
   parseRoomId,
   settleRoom,
   toRoomJson,
+  isStealthUser,
 } from "@/lib/games/rooms";
+import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 
 const ONLINE_WINDOW_MS = 15_000;
 
@@ -36,6 +38,9 @@ export async function GET(
     return apiError("invalid_params", parsedId.error, 400);
   }
   const svc = await createServiceClient();
+  if (await isStealthUser(svc, userId)) {
+    return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
+  }
   const nowMs = Date.now();
   const { data: roomRaw } = await svc
     .from("game_rooms")

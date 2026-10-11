@@ -4,6 +4,7 @@ import { canViewCheckin, parseCheckinIdParam } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
 import { parseRatingBody, summarizeRatings } from "@/lib/api/rating";
 import { isMinorDob } from "@/lib/api/cheers";
+import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 
 type PostRow = { id: string; user_id: string | null; visibility: unknown };
 
@@ -90,7 +91,7 @@ export async function POST(
     .eq("id", userId)
     .maybeSingle();
   if ((meRow as { mode?: unknown } | null)?.mode === "stealth") {
-    return apiError("forbidden", "隱身模式不可打分", 403);
+    return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
   }
   // 写（RLS owner insert／update／delete 三保险；upsert 天然一人一票）。
   const service = await createServiceClient();

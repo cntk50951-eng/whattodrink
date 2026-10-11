@@ -21,6 +21,7 @@ import {
   COMMENT_LOGIN_WINDOW_MS,
   type CommentJson,
 } from "@/lib/api/comments";
+import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 
 /**
  * UR E.7 留言列表（🌐 免登入）＋發表（🌐 匿名／登入雙通道）。
@@ -247,7 +248,7 @@ export async function POST(
       }
       const mode = (meRow as { mode?: string } | null)?.mode ?? "public";
       if (mode === "stealth") {
-        return apiError("forbidden", "隱身模式不可留言，請切換至好友或公開模式", 403);
+        return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
       }
     }
 

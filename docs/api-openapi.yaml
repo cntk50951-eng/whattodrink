@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.35.0
+  version: 1.36.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -348,7 +348,7 @@ paths:
                   checkin:
                     $ref: "#/components/schemas/Checkin"
         "403":
-          description: 隱身模式不可打卡（A.12 模式權限）／內容未通過審核（E.2 rejected，發送工作流 fail-closed）
+          description: 內容未通過審核（E.2 rejected，發送工作流 fail-closed；隐身可打卡，visibility 定格 private）
           content:
             application/json:
               schema:
@@ -910,7 +910,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
         "404":
-          description: 帖子不存在／無可見權限／對方暫無可敬打卡
+          description: 帖子不存在／無可見權限／對方暫無可敬打卡（code=no_visible_post，iOS 提示「對方暫時冇可以碰杯嘅打卡」）
           content:
             application/json:
               schema:
@@ -925,7 +925,7 @@ paths:
           $ref: "#/components/responses/Internal"
     delete:
       operationId: uncheersCheckin
-      summary: 取消碰杯（需登录；删自己在该帖的行；有帖无行也 200 幂等，404 只＝帖不存在／无权，UR E.14 round-5）
+      summary: 取消碰杯（需登录；删自己在该帖的行；有帖无行也 200 幂等，404 只＝帖不存在／无权；自己隱身 403，UR E.14 round-5）
       security:
         - cookieAuth: []
       requestBody:
@@ -1139,7 +1139,7 @@ paths:
   /api/v1/invites:
     post:
       operationId: sendInvite
-      summary: 發約喝酒（需登录；對象二选一＋店＋時段＋買單必填；custom 帶 custom_time；自約／隱身 403；3／天＋同對象1／天 429，UR E.16 round-2）
+      summary: 發約喝酒（需登录；對象二选一＋店＋時段＋買單必填；custom 帶 custom_time；自約／自己隱身 403；3／天＋同對象1／天 429，UR E.16 round-2）
       security:
         - cookieAuth: []
       requestBody:
@@ -1187,7 +1187,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: 自約／隱身／對方隱身或屏蔽（中性文案）
+          description: 自約／自己隱身 403；屏蔽中性（對方隱身不攔，矩陣 B）
           content:
             application/json:
               schema:
@@ -1818,7 +1818,7 @@ paths:
   /api/v1/users/{id}/profile:
     get:
       operationId: getUserProfile
-      summary: 个人主页（需登录；id 或 me；stealth／拉黑／不存在 404；stats 全服务端算，UR E.27）
+      summary: 个人主页（需登录；id 或 me；拉黑／不存在 404；矩阵 C：对所有人完整，统计只计可见，UR E.27）
       security:
         - bearerAuth: []
       parameters:
@@ -1839,7 +1839,7 @@ paths:
             type: string
       responses:
         "200":
-          description: 主页包（user＋relationship＋stats＋recent＋locked；iOS 对表解）
+          description: 主页包（user＋relationship＋stats＋recent＋locked 恒 false；iOS 对表解；矩阵 C：对所有人完整，足迹按 visibility 过滤，统计只计可见）
           content:
             application/json:
               schema:
@@ -1849,7 +1849,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
-          description: 不存在／拉黑／对方隐身（不泄存在性）
+          description: 不存在／拉黑（不泄存在性；对方隐身不再 404）
           content:
             application/json:
               schema:
@@ -2944,7 +2944,7 @@ paths:
               properties:
                 user_id:
                   type: string
-                  description: 對方 user id（雙非隱身；拉黑 404；未成年 403；每日新建陌生人会话 10 个）
+                  description: 對方 user id（拉黑 404；未成年 403；每日新建陌生人会话 10 个；隐身不拦）
                 origin:
                   type: string
                   enum: [friend, cheers, party, profile, direct]
@@ -2967,7 +2967,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: 隱身／未成年
+          description: 未成年
           content:
             application/json:
               schema:
@@ -3141,7 +3141,7 @@ paths:
           $ref: "#/components/responses/Internal"
     post:
       operationId: sendMessage
-      summary: 發送（text／image／audio；需登录；隱身任一端 403＋限流＋冪等；E.13 text 可帶分享附件一枚；D.8 image caption＋文件存在性＋413；D.10 陌生人配额＋kind 门＋quota，UR D.10）
+      summary: 發送（text／image／audio；需登录；限流＋冪等；E.13 text 可帶分享附件一枚；D.8 image caption＋文件存在性＋413；D.10 陌生人配额＋kind 门＋quota；隐身不拦，UR D.10）
       security:
         - bearerAuth: []
       parameters:
@@ -3225,7 +3225,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: 隱身任一端（不可收發）；禁言（删好友／屏蔽后，code=conversation_muted，可与 404 区分，UR B.3）
+          description: 禁言（删好友／屏蔽后，code=conversation_muted，可与 404 区分，UR B.3）
           content:
             application/json:
               schema:
@@ -4153,7 +4153,7 @@ components:
         stats:
           type: object
           nullable: true
-          description: nights_total／places_total／checkins_total／friends_total／saves_total／cheers_total／week_streak／nights_this_week
+          description: nights_total／places_total／checkins_total 只计查看者可见（本人全集；好友 public＋friends；陌生人 public）；其余同前
         level:
           type: object
           nullable: true
@@ -4222,8 +4222,10 @@ components:
         friends_only_count:
           type: integer
           nullable: true
+          description: 陌生人视角「另有 N 条仅好友可见」（只数 friends，不含 private）
         locked:
           type: boolean
+          description: 恒 false（保留字段，旧客户端兼容；整页锁定已取消）
     TasteKey:
       type: string
       description: 口味 taxonomy key（大类或子类，全局唯一，UR E.28）

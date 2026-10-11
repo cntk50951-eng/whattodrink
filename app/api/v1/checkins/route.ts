@@ -1,6 +1,7 @@
 import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseCreateCheckinBody } from "@/lib/api/checkins";
+import { checkinVisibilityFor } from "@/lib/api/privacy";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 
 /**
@@ -62,7 +63,8 @@ export async function POST(req: Request): Promise<Response> {
         await supabase.from("users").insert({ id: userId, nickname, avatar_url: avatar, gender: "secret" });
       }
     } catch {}
-    // 取用戶模式派生 visibility；隱身直接 403（A.12 模式權限）。0007 未遷移時 users.mode 缺列，按 public 回退
+    // PRIVACY_MODE_MATRIX 矩阵 D：隐身也可打卡，visibility 定格为 private（只有自己看得到）。
+    // 0007 未遷移時 users.mode 缺列，按 public 回退
     let mode: string = "public";
     try {
       const { data: userRow, error: userErr } = await supabase
@@ -84,9 +86,7 @@ export async function POST(req: Request): Promise<Response> {
     } catch {
       mode = "public";
     }
-    if (mode === "stealth") {
-      return apiError("forbidden", "隱身模式不可打卡，請切換至好友或公開模式", 403);
-    }
+    // 矩阵 D：隐身不再拦打卡（见上）；visibility 由发布时模式定格。
     // UR E.2 發送工作流：即時在線審核（圖＋文＋轉錄一次調過；語音本體兩邊
     // 都不支援，走 transcript；鏈：OpenAI 主審 → Minimax 兜底 → 全掛放行＋warn）。
     const modText =
@@ -141,7 +141,7 @@ export async function POST(req: Request): Promise<Response> {
       // 兜底命中記錄（驗證時可分清誰審的；日常乾淨請求不打日誌）。
       console.info("[api/v1/checkins] moderation pass via minimax（主審下沉）");
     }
-    const visibility = mode === "friends" ? "friends" : "public";
+    const visibility = checkinVisibilityFor(mode);
     const expiresAt = kind === "flash" ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
 
     // 先校验 beer_id 是否存在（無酒纯照片打卡跳过；FK 不存在会 500，提前转 400 更友好；并发竞态下仍可能落 FK，故容错两路）

@@ -2,6 +2,7 @@ import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { isMinorDob } from "@/lib/api/cheers";
 import { seatFor } from "@/lib/api/party";
+import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 
 type PartyRow = {
   id: string;
@@ -51,7 +52,7 @@ export async function POST(
     .maybeSingle();
   const me = (meRow ?? {}) as { mode?: unknown; gender?: unknown; dob?: unknown };
   if (me.mode === "stealth") {
-    return apiError("forbidden", "隱身模式不可參加", 403);
+    return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
   }
   if (isMinorDob(me.dob, Date.now())) {
     return apiError("forbidden", "未滿 18 歲不可參加", 403);

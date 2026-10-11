@@ -285,8 +285,8 @@
     "deleteFailed": "Delete failed, try again"
   },
   "mode": {
-    "guardTitle": "Stealth mode is read-only",
-    "guardBody": "You are in stealth mode (read-only) and cannot {action}. Switch to friends or public mode and try again.",
+    "guardTitle": "Not available in stealth mode",
+    "guardBody": "Stealth mode blocks: comments, likes, reactions, ratings, cheers, uncheers, invites, parties, and games. Switch to public or friends mode to continue.",
     "actCheckin": "check in",
     "actCheers": "cheers",
     "actInvite": "invite for drinks",
@@ -537,7 +537,7 @@
     "partyNeedPos": "Location needed to publish",
     "partyHostBadge": "Host",
     "partyFailed": "Failed to load, retry",
-    "mailStealthHint": "You are invisible: others cannot see you or cheer you",
+    "mailStealthHint": "You are in stealth: no location or live status is shared, and check-ins you post now stay private to you",
     "mailBefriend": "Add friend",
     "mailUnfriend": "Unfriend",
     "mailUnfriendConfirm": "Unfriend?",
@@ -644,7 +644,7 @@
     "friendsDesc": "Only mutual friends see your check-ins and green dot; interactions are friends-only.",
     "friendsRisk": "Risk: friends can screenshot and forward. Don't add strangers lightly.",
     "stealthName": "Stealth",
-    "stealthDesc": "You see others' public content, but can't check in, cheers, invite, or like. No heartbeat, no green dot — nobody sees you.",
+    "stealthDesc": "No location or live status is shared: no heartbeat, no green dot, and check-ins you post now stay private. You can still chat, make friends, get invited, and receive cheers — nobody can tell you are in stealth.",
     "stealthRisk": "Risk: public content posted before going stealth stays public. Stealth is not deletion.",
     "crossBorder": "AI analysis runs on overseas cloud services; your photos and text may be transferred abroad for processing.",
     "ageNote": "Drinking content is for adults aged 18 and above only.",
