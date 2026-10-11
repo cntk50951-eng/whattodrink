@@ -4,6 +4,7 @@ import { parseRules, rollDice } from "@/lib/games/liars";
 import {
   appendEvent,
   bumpRoom,
+  getLatestRound,
   loadRoomAsMember,
   requireHost,
 } from "@/lib/games/rooms";
@@ -46,11 +47,14 @@ export async function POST(
   for (const m of members) {
     dice[m.user_id] = rollDice(rules.dice_per_player);
   }
+  // 局号顺延（回 lobby 重开即新局；写死 no:1 会撞 UNIQUE(room_id,no)）。
+  const latest = await getLatestRound(svc, room.id);
+  const no = latest !== null ? latest.no + 1 : 1;
   // §九：deal_only 房无轮次无倒计时（current_turn／deadline／last_bid 全 null）。
   const dealOnly = rules.mode === "deal_only";
   const { error: rErr } = await svc.from("game_rounds").insert({
     room_id: room.id,
-    no: 1,
+    no,
     starter_id: starter,
     status: "bidding",
     dice,
@@ -79,7 +83,7 @@ export async function POST(
     return apiError("internal", "開局失敗", 500);
   }
   await appendEvent(svc, room.id, version, "round_started", userId, {
-    no: 1,
+    no,
     starter_id: starter,
     players: members.map((m) => m.user_id),
   });

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.30.0
+  version: 1.31.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -2563,7 +2563,7 @@ paths:
   /api/v1/games/rooms/{id}/leave:
     post:
       operationId: leaveGameRoom
-      summary: 离开（需登录；房主走移交座位最小，无人则散；局中剩<2 人散，UR H.1）
+      summary: 离开（需登录；房主走移交座位最小，无人则散；局中剩<2 人：deal_only 回 lobby（back_to_lobby 事件），standard 散房，UR H.1）
       security:
         - bearerAuth: []
       parameters:
@@ -2603,7 +2603,7 @@ paths:
   /api/v1/games/rooms/{id}/kick:
     post:
       operationId: kickGameRoomMember
-      summary: 踢人（需登录；仅房主；不可踢自己；被踢重进码 403，UR H.1）
+      summary: 踢人（需登录；仅房主；不可踢自己；被踢重进码 403；deal_only 房剩<2 人回 lobby，UR H.1）
       security:
         - bearerAuth: []
       parameters:

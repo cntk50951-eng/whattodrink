@@ -420,6 +420,34 @@ export async function applyDeparture(
   }
   if (dep.room.status === "playing") {
     if (remaining.length < 2) {
+      // §十二：deal_only 房剩 <2 人→回 lobby（留守继续邀人重开），standard 房照旧 ended。
+      if (parseRules(dep.room.rules).mode === "deal_only") {
+        const { error } = await svc
+          .from("game_rooms")
+          .update({ status: "lobby", ended_at: null })
+          .eq("id", dep.room.id);
+        if (error !== null) {
+          console.error(`[games] back-to-lobby error: code=${error.code} message=${error.message}`);
+          return { response: apiError("internal", "離開失敗", 500) };
+        }
+        // 留守全员未准备（旧局保留但 GET lobby 不下发，重开即新局）。
+        const { error: rErr } = await svc
+          .from("game_room_players")
+          .update({ ready: false })
+          .eq("room_id", dep.room.id)
+          .eq("status", "active");
+        if (rErr !== null) {
+          console.error(`[games] unready error: code=${rErr.code} message=${rErr.message}`);
+          return { response: apiError("internal", "離開失敗", 500) };
+        }
+        const version = await bumpRoom(svc, dep.room.id, dep.room.version, nowMs);
+        if (version === null) return { response: apiError("internal", "離開失敗", 500) };
+        await appendEvent(svc, dep.room.id, version, "back_to_lobby", actorId, {
+          reason: "too_few",
+          ...(hostEvent !== null ? { host_transferred: hostEvent } : {}),
+        });
+        return { version };
+      }
       const { error } = await svc
         .from("game_rooms")
         .update({ status: "ended", ended_at: new Date(nowMs).toISOString() })
