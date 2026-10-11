@@ -4139,6 +4139,7 @@ UR D.10　陌生人消息（碰杯快捷回复＋3 条机制）[WIP]
 - 2026-10-10：DEF-20261010-001（P0）：成员读改 service＋空集 500 fail-closed＋`peerIdsOf` 提纯＋单测；列表 peer 走 RPC 本就对，不动。
 - 2026-10-10：实作：0039 origin 列＋建会话重写（去 areFriends 门＋拉黑 404＋未成年＋日 10＋is_friend/origin 回显）＋发消息配额（stranger_quota 429＋kind 门＋quota 回显）＋分享放宽（碰过帖）＋列表三字段（RPC 不动）＋counters 拆分（badge 四数相加）＋prefs stranger_chat＋envelope 码＋openapi 1.24.0＋单测。
 - 2026-10-11：§十四配额改版（累计制）：0043 `sent_as_stranger` 列＋回填＋发送时定格＋三处 quota（发送／列表／历史顶层）＋解除好友清标记＋新文案＋openapi 1.33.0；429 不带 quota（包络冻结，读记录 quota）。
+- 2026-10-11：§十五联调修复：0044（清 0043 误标＋清旧镜像 cheers_blocks）；`uploads/view` 改会话成员授权（解除好友后历史附件可读）；openapi 1.34.0。
 
 ---
 

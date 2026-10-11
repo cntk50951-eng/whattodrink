@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.33.0
+  version: 1.34.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -3307,7 +3307,7 @@ paths:
   /api/v1/uploads/view:
     post:
       operationId: signViewUrl
-      summary: 播時簽名下載 URL（私有桶；自己或互好友可簽，陌生人 404，D.6）
+      summary: 播時簽名下載 URL（私有桶；自己上传，或本人是该附件所在会话成员（§十五.2，不要求当前好友）；否则 404，D.6）
       security:
         - bearerAuth: []
       requestBody:

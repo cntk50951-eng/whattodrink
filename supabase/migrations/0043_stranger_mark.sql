@@ -2,8 +2,9 @@
 -- 可重放：IF NOT EXISTS。Dashboard 贴跑，成功 "Success. No rows returned"。
 -- 说明：sent_as_stranger（发送时 !isFriend 写入；解除好友时清，见 DELETE /friends；
 --   成为好友时不清——好友免检，标记无用；RLS 无需动：写沿旧 insert policy，读走 service）。
--- 回填：direct 会话里、发送时与对方无 accepted 关系的消息置 true
---  （现好友会话豁免，标脏无害；在途陌生人按新口径累计，天然正确）。
+-- 回填：direct 会话里、现在与对方无 accepted 关系的消息置 true。
+--  ⚠️ 已知缺陷（§十五.1）：判据是「现在」而非「发送时」，曾是好友、已解除的会话里，
+--  当时作为好友发的消息也会被误标。由 0044 统一清除，勿以本段为准。
 
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS sent_as_stranger boolean NOT NULL DEFAULT false;
 
