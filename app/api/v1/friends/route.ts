@@ -113,8 +113,11 @@ export async function POST(req: Request): Promise<Response> {
 
   try {
     await ensureUserRow(supabase, userId);
+    // friendships 读写一律走 service：userId 已由 token 验证，且所有查询都限定在「我和对方」这一对。
+    // 不依赖 RLS——insert 策略曾因 42501 拒写（Vercel 日志确认，见 WEB_HANDOFF_FRIEND_REQUESTS §八）。
+    const svc = await createServiceClient();
     const decide = async (retried: boolean): Promise<Response> => {
-      const { data, error } = await supabase
+      const { data, error } = await svc
         .from("friendships")
         .select("user_id,friend_id,status")
         .or(
@@ -144,7 +147,7 @@ export async function POST(req: Request): Promise<Response> {
       );
       if (reversePending) {
         // 對方加過我：雙翻 accepted（雙向 opt-in，無需接受 UI）
-        const { error: flipErr } = await supabase
+        const { error: flipErr } = await svc
           .from("friendships")
           .update({ status: "accepted" })
           .eq("status", "pending")
@@ -153,10 +156,10 @@ export async function POST(req: Request): Promise<Response> {
           );
         if (flipErr) {
           console.error(`[api/v1/friends] flip error: code=${flipErr.code} message=${flipErr.message}`);
-          return apiError("internal", "好友接受失敗", 500);
+          return apiError("internal", `好友接受失敗（db ${flipErr.code ?? "unknown"}）`, 500);
         }
         // 翻转成好友即成对清除自动禁言（与 PATCH accept 同语义；否则互发即成好友但永久禁言）。
-        await (await createServiceClient())
+        await svc
           .from("chat_mutes")
           .delete()
           .or(
@@ -173,18 +176,41 @@ export async function POST(req: Request): Promise<Response> {
       if (myPending) {
         return apiOk({ status: "pending" as const });
       }
-      const { error: insErr } = await supabase.from("friendships").insert({
-        user_id: userId,
-        friend_id: targetUserId,
+      const requestFields = {
         status: "pending",
         origin: "checkinId" in parsed.body ? "checkin" : parseRequestOrigin((raw as Record<string, unknown>).origin),
         source_checkin_id: "checkinId" in parsed.body ? parsed.body.checkinId : null,
+      };
+      // 本方向残留的旧行（如遗留 blocked）：不匹配上面任何分支，直接更新为新请求，避免 insert 撞唯一键。
+      const myStale = rows.some(
+        (r) => r.user_id === userId && r.friend_id === targetUserId && r.status !== "pending" && r.status !== "accepted",
+      );
+      if (myStale) {
+        const { error: uErr } = await svc
+          .from("friendships")
+          .update(requestFields)
+          .eq("user_id", userId)
+          .eq("friend_id", targetUserId);
+        if (uErr !== null) {
+          console.error(`[api/v1/friends] stale-reset error: code=${uErr.code} message=${uErr.message}`);
+          return apiError("internal", `好友邀請失敗（db ${uErr.code ?? "unknown"}）`, 500);
+        }
+        after(() => {
+          void sendFriendPush("request", { fromUserId: userId, toUserId: targetUserId });
+        });
+        return apiOk({ status: "pending" as const }, 201);
+      }
+      const { error: insErr } = await svc.from("friendships").insert({
+        user_id: userId,
+        friend_id: targetUserId,
+        ...requestFields,
       });
       if (insErr) {
         // 並發競態撞 UNIQUE：重讀走同分支一次（冪等），再撞即 500
         if (insErr.code === "23505" && !retried) return decide(true);
         console.error(`[api/v1/friends] insert error: code=${insErr.code} message=${insErr.message}`);
-        return apiError("internal", "好友邀請失敗", 500);
+        // 错误码带进 message（iOS 直接显示，不必翻日志）。
+        return apiError("internal", `好友邀請失敗（db ${insErr.code ?? "unknown"}）`, 500);
       }
       // UR B.3 新请求推送（after 语义；失败不影响请求本身）。
       after(() => {

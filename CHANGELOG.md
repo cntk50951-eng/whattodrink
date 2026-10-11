@@ -44,7 +44,8 @@
 - **UR D.10 陌生人消息（v2-only，[WIP]，待 0039＋联调）**
   - 0039 origin 列；建会话重写（去 areFriends 门＋拉黑 404＋未成年＋日 10＋is_friend/origin）；发消息配额（stranger_quota 429＋kind 门＋quota 回显）＋分享放宽（碰过帖）；列表三字段；counters 拆分 badge 四数相加；prefs stranger_chat；openapi 1.24.0＋单测
   - §十四改版（累计制，以好友为界）：0043 `sent_as_stranger` 列＋回填＋三处 quota＋解除清标记＋新文案＋openapi 1.33.0＋单测；待 0043 贴跑＋iOS 联调
-  - §十五修复（联调三问题）：0044 清 0043 误标老标记＋清 B.3 前旧 `cheers_blocks` 镜像屏蔽行；`uploads/view` 改为会话成员＋附件归属授权（不再要求好友）；openapi 1.34.0；待 0044 贴跑
+  - §十五修复（联调三问题）：0044 清 0043 误标老标记＋清 B.3 前旧 `cheers_blocks` 镜像屏蔽行；`uploads/view` 改为会话成员＋附件归属授权（不再要求好友）；openapi 1.34.0；待 0044 贴跑（已贴跑）
+  - 加好友 500 修复（Vercel 日志 42501 RLS）：`POST /friends` 的 friendships 读／翻转／插入改走 service（userId 已验 token，查询限定本对用户，不依赖 insert 策略）；本方向残留非 pending/accepted 行改为更新而非 insert；错误文案带 db 错误码；openapi 1.35.0
   - `lang`（en 缺省／yue／zh，非法回落；system 追加覆盖行；voice boost 覆写，yue 用 Chinese,Yue）＋按 IP 60s 30 次＋上游 429 透传 Retry-After／502 区分＋`apiError` headers 加法＋openapi 补两条 bar 路径 1.23.0＋单测；429 定案为上游短时限速（直探 200）
 - **UR D.9 iOS 真推送 P1（v2-only，[WIP]，待 0038＋APNs key＋联调）**
   - 0038（devices 加 6 列＋users.push_prefs＋push_log＋索引＋本人 policy；push_log 零 policy 锁死）＋devices 三端点（service 写；upsert／re-bind／顶旧／解绑／更新）＋test-push（testOnly）＋PATCH /me push_prefs＋GET /me 回显＋counters（同口径＋cache 头）
