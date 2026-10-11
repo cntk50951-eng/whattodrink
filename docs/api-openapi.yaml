@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.32.0
+  version: 1.33.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -3243,7 +3243,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
         "429":
-          description: 限流（30/min 或 200/day；陌生人配额用尽 code=stranger_quota）
+          description: 限流（30/min 或 200/day；陌生人累计 3 条用尽 code=stranger_quota，message「未成為好友前，你最多可以發 3 條」；429 不带 quota，读记录／列表 quota，§十四）
           content:
             application/json:
               schema:
@@ -3642,7 +3642,7 @@ components:
         quota:
           type: object
           nullable: true
-          description: 陌生人配额 {limit, used, remaining}；好友行 null
+          description: 陌生人配额 {limit:3, used, remaining}（累计制；好友行 null，§十四）
     ConversationPage:
       type: object
       required: [conversations, nextCursor]
@@ -3657,7 +3657,7 @@ components:
           description: 下一頁 cursor；null＝到底了
     MessagePage:
       type: object
-      required: [messages, nextCursor]
+      required: [messages, nextCursor, quota]
       properties:
         messages:
           type: array
@@ -3667,6 +3667,10 @@ components:
           type: string
           nullable: true
           description: 下一頁 cursor（更舊）；null＝到底了
+        quota:
+          type: object
+          nullable: true
+          description: 陌生人配额 {limit:3, used, remaining}（累计制，好友 null，§十四）
     FriendResult:
       type: object
       required: [status]

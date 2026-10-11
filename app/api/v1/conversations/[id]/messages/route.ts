@@ -5,6 +5,7 @@ import { friendIdsOf } from "@/lib/friends";
 import {
   CHAT_DAY_LIMIT,
   CHAT_MINUTE_LIMIT,
+  countStrangerSent,
   parseChatListParams,
   parseConversationId,
   parseCreateMessageBody,
@@ -12,7 +13,7 @@ import {
   toChatMessage,
   isSizeWithin,
   peerIdsOfMembers,
-  strangerQuota,
+  strangerQuotaJson,
   STRANGER_MSG_LIMIT,
 } from "@/lib/api/chat";
 
@@ -48,6 +49,36 @@ export async function GET(
   if (mine === null) {
     return apiError("not_found", "找不到该会话", 404);
   }
+  // §十四：顶层 quota（好友 null；陌生累计凭 sent_as_stranger 列，走 service）。
+  const svc = await createServiceClient();
+  const { data: allMembers } = await svc
+    .from("conversation_members")
+    .select("user_id")
+    .eq("conversation_id", parsedId.id);
+  const peerIds = peerIdsOfMembers(
+    ((allMembers ?? []) as unknown[]) as { user_id: unknown }[],
+    userId,
+  );
+  let quota: { limit: number; used: number; remaining: number } | null = null;
+  if (peerIds.length > 0) {
+    const { data: fsRows } = await supabase
+      .from("friendships")
+      .select("user_id,friend_id,status")
+      .eq("status", "accepted")
+      .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+      .limit(200);
+    const myFids = friendIdsOf(
+      userId,
+      ((fsRows ?? []) as unknown[]) as {
+        user_id: unknown;
+        friend_id: unknown;
+        status: unknown;
+      }[],
+    );
+    if (!peerIds.every((pid) => myFids.includes(pid))) {
+      quota = strangerQuotaJson(await countStrangerSent(svc, parsedId.id, userId));
+    }
+  }
   let query = supabase
     .from("messages")
     .select("id,sender_id,kind,body,attachments,created_at")
@@ -82,7 +113,7 @@ export async function GET(
         })
       : null;
   // 回正序（聊天流由舊到新；壞行已跳過，頁內不足 स्वयं補——POC 口徑，下頁補齊）
-  return apiOk({ messages: pageDesc.reverse(), nextCursor });
+  return apiOk({ messages: pageDesc.reverse(), nextCursor, quota });
 }
 
 /**
@@ -306,25 +337,14 @@ export async function POST(
     }
     attachments = parsed.attachments.map((a) => ({ ...a, bucket }));
   }
-  // UR D.10 陌生人配额（对方最新消息后我的连续数；3 达线 429 stranger_quota；
-  // 好友免检；四种全计，沿交接 §3.2）。
+  // UR D.10 陌生人配额（§十四改版：累计制——成为好友前我发的陌生人消息数；
+  // 对方回复不清零；3 达线 429 stranger_quota；好友免检；四种全计）。
+  // 走 service 计（RLS 读行不全不可信，沿 DEF-20261010-001）。
   let quotaUsed = 0;
   if (!isFriend) {
-    const { data: recent } = await supabase
-      .from("messages")
-      .select("sender_id,created_at")
-      .eq("conversation_id", parsedId.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
-    const asc = (((recent ?? []) as unknown[]) as { sender_id: unknown; created_at: unknown }[])
-      .filter(
-        (m): m is { sender_id: string; created_at: string } =>
-          typeof m.sender_id === "string" && typeof m.created_at === "string",
-      )
-      .reverse();
-    quotaUsed = strangerQuota(asc, userId).used;
+    quotaUsed = await countStrangerSent(svc, parsedId.id, userId);
     if (quotaUsed >= STRANGER_MSG_LIMIT) {
-      return apiError("stranger_quota", "對方未回覆前，你最多可以發 3 條", 429);
+      return apiError("stranger_quota", "未成為好友前，你最多可以發 3 條", 429);
     }
   }
   // 限流（兩檔計數；POC 直查，上量後換計數列，見 UR）
@@ -355,16 +375,12 @@ export async function POST(
   if (dup !== null) {
     const m = toChatMessage(dup, userId);
     if (m !== null) {
+      // 幂等命中：配额重算现值（累计制下重发不 double，used 即现值）。
+      const dupUsed = isFriend ? 0 : await countStrangerSent(svc, parsedId.id, userId);
       return apiOk({
         message: m,
         duplicate: true,
-        quota: isFriend
-          ? null
-          : {
-              limit: STRANGER_MSG_LIMIT,
-              used: quotaUsed,
-              remaining: Math.max(0, STRANGER_MSG_LIMIT - quotaUsed),
-            },
+        quota: isFriend ? null : strangerQuotaJson(dupUsed),
       });
     }
   }
@@ -378,6 +394,8 @@ export async function POST(
       body: parsed.kind === "text" ? parsed.body : parsed.kind === "image" ? parsed.body : null,
       attachments,
       client_msg_id: parsed.client_msg_id,
+      // §十四：发送时定格（好友免检，陌生累计凭此列）。
+      sent_as_stranger: !isFriend,
     })
     .select("id,sender_id,kind,body,attachments,created_at")
     .single();
@@ -392,16 +410,11 @@ export async function POST(
         .maybeSingle();
       const m = toChatMessage(raced, userId);
       if (m !== null) {
+        const racedUsed = isFriend ? 0 : await countStrangerSent(svc, parsedId.id, userId);
         return apiOk({
           message: m,
           duplicate: true,
-          quota: isFriend
-            ? null
-            : {
-                limit: STRANGER_MSG_LIMIT,
-                used: quotaUsed,
-                remaining: Math.max(0, STRANGER_MSG_LIMIT - quotaUsed),
-              },
+          quota: isFriend ? null : strangerQuotaJson(racedUsed),
         });
       }
     }
@@ -422,13 +435,7 @@ export async function POST(
     {
       message,
       duplicate: false,
-      quota: isFriend
-        ? null
-        : {
-            limit: STRANGER_MSG_LIMIT,
-            used: usedAfter,
-            remaining: Math.max(0, STRANGER_MSG_LIMIT - usedAfter),
-          },
+      quota: isFriend ? null : strangerQuotaJson(usedAfter),
     },
     201,
   );

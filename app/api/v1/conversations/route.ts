@@ -10,8 +10,8 @@ import {
   toChatPeer,
   directKey,
   encodeChatCursor,
-  strangerQuota,
-  STRANGER_MSG_LIMIT,
+  countStrangerSent,
+  strangerQuotaJson,
   type ChatMessageJson,
   type ConversationJson,
 } from "@/lib/api/chat";
@@ -199,6 +199,8 @@ export async function GET(req: Request): Promise<Response> {
   }
   const { limit, cursor } = parsed.params;
   const nowMs = Date.now();
+  // §十四配额走 service（messages 列读，RLS 不全，沿 DEF-20261010-001）。
+  const svc = await createServiceClient();
 
   // UR D.6 提速：列表 N+1（3N+1 roundtrips）收斂到單 RPC（見 0014；
   // 函數內硬校驗 auth.uid()=p_uid，會話可見性＋水位＋末條＋未讀一次回）。
@@ -284,20 +286,8 @@ export async function GET(req: Request): Promise<Response> {
     const rowOrigin = originById.get(r.conv_id) ?? (rowFriend ? "friend" : "direct");
     let rowQuota: { limit: number; used: number; remaining: number } | null = null;
     if (!rowFriend && r.peer_id !== null) {
-      const { data: recent } = await supabase
-        .from("messages")
-        .select("sender_id,created_at")
-        .eq("conversation_id", r.conv_id)
-        .order("created_at", { ascending: false })
-        .limit(50);
-      const asc = (((recent ?? []) as unknown[]) as { sender_id: unknown; created_at: unknown }[])
-        .filter(
-          (m): m is { sender_id: string; created_at: string } =>
-            typeof m.sender_id === "string" && typeof m.created_at === "string",
-        )
-        .reverse();
-      const qq = strangerQuota(asc, userId);
-      rowQuota = { limit: STRANGER_MSG_LIMIT, used: qq.used, remaining: qq.remaining };
+      // §十四累计制（走 service；recent-50 推算已退役）。
+      rowQuota = strangerQuotaJson(await countStrangerSent(svc, r.conv_id, userId));
     }
     items.push({
       id: r.conv_id,

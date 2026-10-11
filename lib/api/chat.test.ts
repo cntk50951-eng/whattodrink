@@ -15,7 +15,7 @@ import {
   peerIdsOfMembers,
   parseSignBody,
   parseViewBody,
-  strangerQuota,
+  strangerQuotaJson,
   toChatMessage,
   toChatPeer,
 } from "./chat";
@@ -54,16 +54,13 @@ describe("parseCreateConversationBody", () => {
   });
 });
 
-describe("strangerQuota", () => {  const m = (sender_id: string, i: number): { sender_id: string; created_at: string } => ({
-    sender_id,
-    created_at: `2026-10-10T00:00:0${i}Z`,
-  });
-  it("对方一回即清零；空列 0；连续累计", () => {
-    expect(strangerQuota([], "me")).toEqual({ used: 0, remaining: 3 });
-    expect(strangerQuota([m("me", 1), m("me", 2)], "me")).toEqual({ used: 2, remaining: 1 });
-    expect(strangerQuota([m("me", 1), m("me", 2), m("me", 3)], "me")).toEqual({ used: 3, remaining: 0 });
-    expect(strangerQuota([m("me", 1), m("you", 2), m("me", 3)], "me")).toEqual({ used: 1, remaining: 2 });
-    expect(strangerQuota([m("you", 1)], "me")).toEqual({ used: 0, remaining: 3 });
+describe("strangerQuotaJson（§十四累计制）", () => {
+  it("used 钳零＋remaining＝3-used", () => {
+    expect(strangerQuotaJson(0)).toEqual({ limit: 3, used: 0, remaining: 3 });
+    expect(strangerQuotaJson(2)).toEqual({ limit: 3, used: 2, remaining: 1 });
+    expect(strangerQuotaJson(3)).toEqual({ limit: 3, used: 3, remaining: 0 });
+    expect(strangerQuotaJson(9)).toEqual({ limit: 3, used: 9, remaining: 0 });
+    expect(strangerQuotaJson(-1)).toEqual({ limit: 3, used: 0, remaining: 3 });
   });
 });
 

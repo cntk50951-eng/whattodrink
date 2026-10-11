@@ -1,6 +1,7 @@
 import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { after } from "next/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { directKey } from "@/lib/api/chat";
 import { areFriends, friendIdsOf, parseAddFriendBody, parseRequestOrigin, toFriendListItem } from "@/lib/friends";
 import { sendFriendPush } from "@/lib/push/send";
 
@@ -275,6 +276,25 @@ export async function DELETE(req: Request): Promise<Response> {
   // 非好友调即幂等 200，不写禁言（无好友行即无"前好友"可禁；防陌生人被误禁言）。
   if (!Array.isArray(removed) || removed.length === 0) {
     return apiOk({ removed: true });
+  }
+  // §十四规则 c：解除后配额从 0 重算——清两人 direct 会话的陌生标记
+  // （成为好友时不清：好友免检，标记无用；效果等价，单路径）。
+  const { data: sharedConvs } = await svc
+    .from("conversations")
+    .select("id")
+    .eq("type", "direct")
+    .eq("direct_key", directKey(userId, fid));
+  const sharedIds = (((sharedConvs ?? []) as unknown[]) as { id?: unknown }[])
+    .map((c) => c.id)
+    .filter((id): id is string => typeof id === "string");
+  if (sharedIds.length > 0) {
+    const { error: cErr } = await svc
+      .from("messages")
+      .update({ sent_as_stranger: false })
+      .in("conversation_id", sharedIds);
+    if (cErr !== null) {
+      console.error(`[api/v1/friends] unmark error: code=${cErr.code} message=${cErr.message}`);
+    }
   }
   // 双向禁言（chat_mutes，删好友专用；碰杯／打卡不受影响，用户定案；service 写）。
   const { error: bErr } = await svc.from("chat_mutes").upsert(

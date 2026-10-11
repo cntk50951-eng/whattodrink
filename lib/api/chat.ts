@@ -4,6 +4,8 @@
  * 陌生人／隱身／水位語義由 route 層執行，本層只管形狀。
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 export const CHAT_DEFAULT_LIMIT = 20;
 export const CHAT_MAX_LIMIT = 50;
 /** D.3 首期文本上限＋發送限流（沿乾杯額度配方，防刷；匿名走不到此層，全 🔒）。 */
@@ -66,8 +68,37 @@ export function parseConversationOrigin(raw: unknown): ConversationOrigin {
   return "direct";
 }
 
-/** UR D.10 陌生人配额（对方最新消息后我的连续数；3 达线拒，沿交接 §3.2）。 */
+/** UR D.10 陌生人配额（§十四改版：累计制——成为好友前我发的陌生人消息数；3 达线拒）。 */
 export const STRANGER_MSG_LIMIT = 3;
+
+export type StrangerQuotaJson = {
+  limit: number;
+  used: number;
+  remaining: number;
+};
+
+export function strangerQuotaJson(used: number): StrangerQuotaJson {
+  const u = Number.isFinite(used) && used > 0 ? Math.floor(used) : 0;
+  return { limit: STRANGER_MSG_LIMIT, used: u, remaining: Math.max(0, STRANGER_MSG_LIMIT - u) };
+}
+
+/**
+ * 累计已发（该会话 sender=我 AND sent_as_stranger；调用方已判非好友才调）。
+ * client 复用调用方既有句柄（authed 读自己发的行沿旧 policy 可返；service 必返）。
+ */
+export async function countStrangerSent(
+  client: SupabaseClient,
+  conversationId: string,
+  userId: string,
+): Promise<number> {
+  const { count } = await client
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("conversation_id", conversationId)
+    .eq("sender_id", userId)
+    .eq("sent_as_stranger", true);
+  return count ?? 0;
+}
 
 /**
  * DEF-20261010-001 会话对方 id（成员行滤自己；空即调用方 500，
@@ -82,25 +113,6 @@ export function peerIdsOfMembers(
     .filter((id): id is string => typeof id === "string" && id !== myId);
 }
 export type ChatLiteMsg = { sender_id: string; created_at: string };
-
-/**
- * 配额计算（消息按 created_at 升序传入；返回我方连续数 used＋剩 remaining）。
- * 对方任意一条即清零（其后只数我的）；空列 used 0。
- */
-export function strangerQuota(
-  ordered: ChatLiteMsg[],
-  myId: string,
-): { used: number; remaining: number } {
-  let used = 0;
-  for (const m of ordered) {
-    if (m.sender_id === myId) {
-      used += 1;
-    } else {
-      used = 0;
-    }
-  }
-  return { used, remaining: Math.max(0, STRANGER_MSG_LIMIT - used) };
-}
 
 /* ---- 不透明 cursor（base64url JSON；壞了＝400，不猜，沿 wall 口徑） ---- */
 
