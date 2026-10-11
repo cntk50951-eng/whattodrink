@@ -3261,6 +3261,7 @@ UR E.20　他人釘照片縮影（v2-only）[WIP]
 *改動記錄*
 - 2026-10-06：建檔置 [WIP]（用戶指令他人同視角；直做）
 - 2026-10-06：DEF-20261006-002 round-2（iOS pill 走馬燈缺 note：`PINS_COLUMNS`＋`note` 列 → `toPinJson.note` 原文透传（空／空白／非串／缺席即 null）→ `PinJson` 类型 → openapi `MapPin` 补字段句 → `pins.test.ts` 新用例＋主映射断言＋`v2Pins.test.ts` 三处补键；零 migration（`note` 列 0001 已有）；23 绿＋tsc 零错；待 iOS 亲验）
+- 2026-10-11：作者 id（WEB_HANDOFF_PIN_AUTHOR，iOS 输入）：`PinJson.userId` 必有（`checkins.user_id` 直映，缺席整行 null；fallback 查询补选列）→ openapi `MapPin` 补字段句（required＋property）→ `pins.test.ts` 主映射断言＋缺席 null＋fixture 补列，`v2Pins.test.ts` 三处补键；零 migration（列 0001 已有）；openapi 1.37.0
 ---
 
 UR E.21　pins 快貼倒計時（API kind＋expiresAt＋web 足跡剩餘，v2-only）[WIP]

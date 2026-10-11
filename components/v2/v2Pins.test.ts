@@ -7,6 +7,7 @@ describe("apiPinsToMarkers (UR C.1)", () => {
     const out = apiPinsToMarkers([
       {
         id: "u1",
+        userId: "author-1",
         lat: 22.28,
         lng: 114.15,
         area: "中環",
@@ -31,6 +32,7 @@ describe("apiPinsToMarkers (UR C.1)", () => {
     const out = apiPinsToMarkers([
       {
         id: "u3",
+        userId: "author-1",
         lat: 22.3,
         lng: 114.2,
         area: null,
@@ -55,6 +57,7 @@ describe("apiPinsToMarkers (UR C.1)", () => {
     const out = apiPinsToMarkers([
       {
         id: "u2",
+        userId: "author-1",
         lat: 22.3,
         lng: 114.2,
         area: null,

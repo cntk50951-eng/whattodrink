@@ -98,6 +98,7 @@ describe("toPinJson", () => {
     const now = Date.parse("2026-09-15T12:00:00Z");
     const row = {
       id: "pin-1",
+      user_id: "u-1",
       lat: 22.27889,
       lng: 114.18299,
       place_name: "銅鑼灣",
@@ -109,6 +110,7 @@ describe("toPinJson", () => {
     };
     const pin = toPinJson(row, now);
     expect(pin).not.toBeNull();
+    expect(pin?.userId).toBe("u-1");
     expect(pin?.lat).toBe(22.278);
     expect(pin?.lng).toBe(114.182);
     expect(pin?.area).toBe("銅鑼灣");
@@ -123,6 +125,7 @@ describe("toPinJson", () => {
   it("UR E.20 縮圖壞形即 null 不炸行（非 data:image／超長／缺席）", () => {
     const base = {
       id: "x",
+      user_id: "u-1",
       lat: 22.27889,
       lng: 114.18299,
       place_name: null,
@@ -138,6 +141,7 @@ describe("toPinJson", () => {
   it("快貼 kind＋expiresAt 透传（iOS 剩餘时间用；post 无 expiresAt）", () => {
     const base = {
       id: "x",
+      user_id: "u-1",
       lat: 22.27889,
       lng: 114.18299,
       place_name: null,
@@ -156,6 +160,7 @@ describe("toPinJson", () => {
   it("kind／expiresAt 壞形／缺席回 null 整行不炸", () => {
     const base = {
       id: "x",
+      user_id: "u-1",
       lat: 22.27889,
       lng: 114.18299,
       place_name: null,
@@ -174,6 +179,7 @@ describe("toPinJson", () => {
   it("iOS 走馬燈 note 原文透传，空串／空白／非字符串／缺席即 null", () => {
     const base = {
       id: "x",
+      user_id: "u-1",
       lat: 22.27889,
       lng: 114.18299,
       place_name: null,
@@ -192,11 +198,13 @@ describe("toPinJson", () => {
     expect(toPinJson({ id: null, lat: 22, lng: 114, created_at: "2026-09-15T12:00:00Z" })).toBeNull();
     expect(toPinJson({ id: "x", lat: null, lng: 114, created_at: "2026-09-15T12:00:00Z" })).toBeNull();
     expect(toPinJson({ id: "x", lat: 22, lng: 114, created_at: "bad" })).toBeNull();
+    expect(toPinJson({ id: "x", user_id: null, lat: 22, lng: 114, created_at: "2026-09-15T12:00:00Z" })).toBeNull();
   });
 
   it("handles deleted user (users null) gracefully", () => {
     const row = {
       id: "pin-2",
+      user_id: "u-1",
       lat: 22.3,
       lng: 114.17,
       place_name: null,

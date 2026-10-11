@@ -21,6 +21,8 @@
   - `lib/api/privacy.ts` 纯函数＋8 单测；三语文案（guard／mailStealthHint／stealthDesc 去唯讀）；条款页走文案键零代码改；openapi 1.36.0；零 migration
   - iOS 确认三问（locked 恒 false／leave 不拦／保留新文案），零代码改动
   - `vitest` 610 綠＋`tsc` 零错＋`lint` 零错（7 warnings 既有他处）
+- **MapPin 作者 id（WEB_HANDOFF_PIN_AUTHOR，iOS 输入，未提交）**
+  - `PinJson.userId` 必有（`checkins.user_id` 直映；只回本来就可见的行，无新增暴露）＋fallback 查询补选列＋openapi 1.37.0＋单测；零 migration
 - **UR A.21 好友实时位读不到（WEB_HANDOFF_FRIEND_LIVE，iOS 输入，未提交）**
   - `GET /friends/live`＋`GET /friends` 改走 service 读（沿 POST /friends 同口径；不过放开 RLS）；610 绿＋tsc 零错＋lint 零错
 - **DEF-20261006-002 iOS 好友釘 pill 无走马灯（v2-only，未提交；pins 补 note 读链）**

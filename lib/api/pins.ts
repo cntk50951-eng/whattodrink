@@ -33,6 +33,8 @@ export type BBox = {
 
 export type PinJson = {
   id: string;
+  /** 作者 user id（WEB_HANDOFF_PIN_AUTHOR：打卡列表头像进主页用；只回本来就可见的行）。 */
+  userId: string;
   lat: number;
   lng: number;
   area: string | null;
@@ -119,11 +121,12 @@ export function toPinJson(raw: unknown, nowMs: number = Date.now()): PinJson | n
   if (typeof raw !== "object" || raw === null) return null;
   const r = raw as Record<string, unknown>;
   const id = typeof r.id === "string" ? r.id : null;
+  const userId = typeof r.user_id === "string" ? r.user_id : null;
   const lat = typeof r.lat === "number" && Number.isFinite(r.lat) ? r.lat : null;
   const lng = typeof r.lng === "number" && Number.isFinite(r.lng) ? r.lng : null;
   const placeName = typeof r.place_name === "string" ? r.place_name : r.place_name === null ? null : null;
   const createdAtRaw = typeof r.created_at === "string" ? r.created_at : null;
-  if (id === null || lat === null || lng === null || createdAtRaw === null) return null;
+  if (id === null || userId === null || lat === null || lng === null || createdAtRaw === null) return null;
   const checkedInAt = Date.parse(createdAtRaw);
   if (!Number.isFinite(checkedInAt)) return null;
 
@@ -192,6 +195,7 @@ export function toPinJson(raw: unknown, nowMs: number = Date.now()): PinJson | n
 
   return {
     id,
+    userId,
     lat: fuzzedLat,
     lng: fuzzedLng,
     area,

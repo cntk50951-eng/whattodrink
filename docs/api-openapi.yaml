@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.36.0
+  version: 1.37.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -3729,11 +3729,15 @@ components:
           description: last_seen_at epoch ms（鮮度憑證）
     MapPin:
       type: object
-      required: [id, lat, lng, area, drinkName, drinkEmoji, nickname, avatarUrl, gender, checkedInAt, isOnline]
+      required: [id, userId, lat, lng, area, drinkName, drinkEmoji, nickname, avatarUrl, gender, checkedInAt, isOnline]
       properties:
         id:
           type: string
           format: uuid
+        userId:
+          type: string
+          format: uuid
+          description: 作者 id（打卡列表头像进主页用；只回本来就可见的行，WEB_HANDOFF_PIN_AUTHOR）
         lat:
           type: number
           description: 模糊后纬度（3位小数，约100m街区）
