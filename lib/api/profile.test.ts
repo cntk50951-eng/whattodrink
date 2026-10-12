@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ageOf, avatarPublicUrl, collectNightStats, hkAge, nightKeyHK, parseProfileBody, shouldOnboard, weekNights, weekStartHK, weekStreak } from "./profile";
+import { ageOf, avatarPublicUrl, collectNightStats, hkAge, infoVisibilityOf, nightKeyHK, parseProfileBody, parseProfileInfoBody, shouldOnboard, weekNights, weekStartHK, weekStreak } from "./profile";
 
 describe("ageOf", () => {
   // 2026-10-04（UTC）为锚。
@@ -124,5 +124,40 @@ describe("collectNightStats", () => {
     expect(places).toEqual(new Set(["中環", "x"]));
     expect(collectNightStats({ data: rows })).toEqual({ nights: new Set(), places: new Set() });
     expect(collectNightStats(null)).toEqual({ nights: new Set(), places: new Set() });
+  });
+});
+
+describe("parseProfileInfoBody（新欄）", () => {
+  it("全选填；去重；超量／未知 key／越界拒", () => {
+    expect(
+      parseProfileInfoBody({ height_cm: 175, occupation: "tech", languages: ["yue", "yue", "en"], interests: [], info_visibility: { height: "public", occupation: null } }),
+    ).toEqual({
+      height_cm: 175,
+      occupation: "tech",
+      languages: ["yue", "en"],
+      interests: [],
+      info_visibility: { height: "public", occupation: null },
+    });
+    expect(parseProfileInfoBody({})).toEqual({});
+    expect(parseProfileInfoBody({ height_cm: null, occupation: null })).toEqual({ height_cm: null, occupation: null });
+    expect(parseProfileInfoBody({ height_cm: 139 })).toHaveProperty("error");
+    expect(parseProfileInfoBody({ height_cm: 221 })).toHaveProperty("error");
+    expect(parseProfileInfoBody({ height_cm: 175.5 })).toHaveProperty("error");
+    expect(parseProfileInfoBody({ occupation: "astronaut" })).toHaveProperty("error");
+    expect(parseProfileInfoBody({ languages: ["xx"] })).toHaveProperty("error");
+    expect(parseProfileInfoBody({ languages: ["yue", "zh", "en", "ja", "ko", "fr"] })).toHaveProperty("error");
+    expect(parseProfileInfoBody({ interests: ["nope"] })).toHaveProperty("error");
+    expect(parseProfileInfoBody({ info_visibility: { height: "galaxy" } })).toHaveProperty("error");
+    expect(parseProfileInfoBody({ info_visibility: { nickname: "public" } })).toHaveProperty("error");
+  });
+});
+
+describe("infoVisibilityOf（缺鍵＝friends）", () => {
+  it("显式值透过；缺键／坏值回 friends", () => {
+    expect(infoVisibilityOf({ height: "public" }, "height")).toBe("public");
+    expect(infoVisibilityOf({ height: "private" }, "height")).toBe("private");
+    expect(infoVisibilityOf({}, "height")).toBe("friends");
+    expect(infoVisibilityOf(null, "height")).toBe("friends");
+    expect(infoVisibilityOf({ height: "galaxy" }, "height")).toBe("friends");
   });
 });

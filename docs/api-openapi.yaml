@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.42.0
+  version: 1.43.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1757,6 +1757,29 @@ paths:
                   type: string
                   maxLength: 20
                   description: 改昵称（去空 1-20 字；每天最多 3 次，超限 429）
+                height_cm:
+                  type: integer
+                  minimum: 140
+                  maximum: 220
+                  nullable: true
+                  description: 身高（null 清除）
+                occupation:
+                  type: string
+                  nullable: true
+                  description: 职业枚举（见 ProfileInfo；null 清除）
+                languages:
+                  type: array
+                  items:
+                    type: string
+                  description: 语言整体替换（[] 清空；最多 5，去重）
+                interests:
+                  type: array
+                  items:
+                    type: string
+                  description: 兴趣整体替换（[] 清空；最多 8，去重）
+                info_visibility:
+                  type: object
+                  description: 可见性合并（key 缺席不动；值为 null 恢复默认 friends）
                 avatar_url:
                   type: string
                 onboarded:
@@ -3615,6 +3638,50 @@ components:
         push_prefs:
           type: object
           description: 推送偏好（缺键读端默认全开唯 stranger_invites 关，UR D.9）
+        height_cm:
+          type: integer
+          nullable: true
+        occupation:
+          type: string
+          nullable: true
+        languages:
+          type: array
+          items:
+            type: string
+        interests:
+          type: array
+          items:
+            type: string
+        info_visibility:
+          type: object
+          description: 本人全回（含默认 friends 的缺键语义由客户端判）
+    ProfileInfo:
+      type: object
+      description: 个人资料新欄（WEB_HANDOFF_PROFILE_FIELDS；全部选填，枚举 key，标签客户端翻）
+      properties:
+        height_cm:
+          type: integer
+          minimum: 140
+          maximum: 220
+          nullable: true
+        occupation:
+          type: string
+          enum: [finance, tech, design, media, education, healthcare, fnb, retail, legal, engineering, public_service, student, freelance, other]
+          nullable: true
+        languages:
+          type: array
+          maxItems: 5
+          items:
+            type: string
+            enum: [yue, zh, en, ja, ko, fr, de, es, th, other]
+        interests:
+          type: array
+          maxItems: 8
+          items:
+            type: string
+        info_visibility:
+          type: object
+          description: 键 height|occupation|languages|interests，值 public|friends|private；缺键＝friends
     CheckResult:
       type: object
       required: [is_friend]
@@ -4265,6 +4332,24 @@ components:
             dob:
               type: string
               description: 仅自己视角
+            height_cm:
+              type: integer
+              nullable: true
+              description: 本人全回；他人按可见性（被隐藏直接不出现）
+            occupation:
+              type: string
+              nullable: true
+              description: 同上
+            languages:
+              type: array
+              items:
+                type: string
+              description: 同上
+            interests:
+              type: array
+              items:
+                type: string
+              description: 同上
         relationship:
           type: string
           enum: [self, friend, pending_out, pending_in, none]

@@ -3,7 +3,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseCheckinIdParam, parseMineParams } from "@/lib/api/checkins";
 import { friendsOnlyCountOf, visibleRowsFor } from "@/lib/api/privacy";
 import { friendIdsOf } from "@/lib/friends";
-import { hkAge, collectNightStats, weekNights, weekStreak } from "@/lib/api/profile";
+import { hkAge, collectNightStats, infoVisibilityOf, weekNights, weekStreak } from "@/lib/api/profile";
 import { aggregateTaste, TAXONOMY_VERSION } from "@/lib/api/taste";
 
 type UserRow = {
@@ -16,7 +16,31 @@ type UserRow = {
   mode: string;
   created_at: string;
   preferences: unknown;
+  height_cm: number | null;
+  occupation: string | null;
+  languages: string[] | null;
+  interests: string[] | null;
+  info_visibility: unknown;
 };
+
+/** 他人视角新欄：按可見性逐欄放行（缺鍵＝friends；被隱藏直接不出現，不留痕跡）。 */
+function visibleInfoFor(
+  u: UserRow,
+  isFriend: boolean,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const put = (key: string, field: "height" | "occupation" | "languages" | "interests", value: unknown): void => {
+    const vis = infoVisibilityOf(u.info_visibility, field);
+    if (vis === "private") return;
+    if (vis === "friends" && !isFriend) return;
+    out[key] = value;
+  };
+  put("height_cm", "height", typeof u.height_cm === "number" ? u.height_cm : null);
+  put("occupation", "occupation", typeof u.occupation === "string" ? u.occupation : null);
+  put("languages", "languages", Array.isArray(u.languages) ? u.languages.filter((x): x is string => typeof x === "string") : []);
+  put("interests", "interests", Array.isArray(u.interests) ? u.interests.filter((x): x is string => typeof x === "string") : []);
+  return out;
+}
 
 /** preferences 读端窄化（写时已验；坏形回 null 不炸包）。 */
 function narrowPreferences(
@@ -228,7 +252,7 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
   const nowMs = Date.now();
   const { data: userRaw } = await supa
     .from("users")
-    .select("id,nickname,avatar_url,gender,dob,bio,mode,created_at,preferences")
+    .select("id,nickname,avatar_url,gender,dob,bio,mode,created_at,preferences,height_cm,occupation,languages,interests,info_visibility")
     .eq("id", targetId)
     .maybeSingle();
   const u = userRaw as UserRow | null;
@@ -321,6 +345,17 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
   if (self) {
     user.mode = u.mode;
     user.dob = u.dob ?? null;
+    user.height_cm = typeof u.height_cm === "number" ? u.height_cm : null;
+    user.occupation = typeof u.occupation === "string" ? u.occupation : null;
+    user.languages = Array.isArray(u.languages) ? u.languages.filter((x): x is string => typeof x === "string") : [];
+    user.interests = Array.isArray(u.interests) ? u.interests.filter((x): x is string => typeof x === "string") : [];
+    user.info_visibility =
+      typeof u.info_visibility === "object" && u.info_visibility !== null
+        ? u.info_visibility
+        : {};
+  } else {
+    // 新欄按可見性過濾（好友 public＋friends；陌生人 public；info_visibility 永不回他人）。
+    Object.assign(user, visibleInfoFor(u, relationship === "friend"));
   }
 
   // stats（矩阵 C：对所有人可见，但只统计查看者看得到的行；本人看全部总数）。

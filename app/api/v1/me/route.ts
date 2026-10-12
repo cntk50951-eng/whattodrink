@@ -1,7 +1,7 @@
 import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parsePatchModeBody, toMeJson } from "@/lib/mode";
-import { NICKNAME_DAILY_LIMIT, parseProfileBody } from "@/lib/api/profile";
+import { NICKNAME_DAILY_LIMIT, parseProfileBody, parseProfileInfoBody } from "@/lib/api/profile";
 import { hkDayStartISO } from "@/lib/api/party";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { parsePreferences } from "@/lib/api/taste";
@@ -16,7 +16,7 @@ import { parsePushPrefs } from "@/lib/push/prefs";
  */
 
 const ME_SELECT =
-  "id,nickname,avatar_url,gender,mode,mode_updated_at,dob,bio,onboarded_at,created_at,preferences,push_prefs";
+  "id,nickname,avatar_url,gender,mode,mode_updated_at,dob,bio,onboarded_at,created_at,preferences,push_prefs,height_cm,occupation,languages,interests,info_visibility";
 const ME_SELECT_LEGACY = "id,nickname,avatar_url,gender,created_at";
 
 async function ensureUserRow(
@@ -112,12 +112,16 @@ export async function PATCH(req: Request): Promise<Response> {  const { supabase
   }
   const parsed = parsePatchModeBody(raw);
   const profile = parseProfileBody(raw);
+  const info = parseProfileInfoBody(raw);
   const hasMode = (raw as Record<string, unknown>).mode !== undefined;
   if (hasMode && "error" in parsed) {
     return apiError("invalid_params", parsed.error, 400);
   }
   if (!hasMode && "error" in profile) {
     return apiError("invalid_params", profile.error, profile.error === "AGE_RESTRICTED" ? 422 : 400);
+  }
+  if ("error" in info) {
+    return apiError("invalid_params", info.error, 400);
   }
   // UR E.28 口味偏好（整体替换；null 清空；对象走 parsePreferences；非法 400）。
   const prefRaw = (raw as Record<string, unknown>).preferences;
@@ -140,7 +144,7 @@ export async function PATCH(req: Request): Promise<Response> {  const { supabase
     // 当前行（改名频率＋变化检测＋旧头像清理用；本人行自读）。
     const { data: curRaw } = await supabase
       .from("users")
-      .select("nickname,bio,avatar_url,nickname_updated_at,nickname_daily_count")
+      .select("nickname,bio,avatar_url,nickname_updated_at,nickname_daily_count,info_visibility")
       .eq("id", userId)
       .maybeSingle();
     const cur = (curRaw ?? {}) as {
@@ -149,6 +153,7 @@ export async function PATCH(req: Request): Promise<Response> {  const { supabase
       avatar_url?: unknown;
       nickname_updated_at?: unknown;
       nickname_daily_count?: unknown;
+      info_visibility?: unknown;
     };
     const update: Record<string, unknown> = {};
     if (!("error" in parsed)) {
@@ -164,6 +169,22 @@ export async function PATCH(req: Request): Promise<Response> {  const { supabase
       if (profile.nickname !== undefined) update.nickname = profile.nickname;
       if ((raw as Record<string, unknown>).onboarded === true) {
         update.onboarded_at = nowIso;
+      }
+      // 新欄（全选填；languages／interests 整體替換；info_visibility 合併，null 值刪鍵回默认）。
+      if (info.height_cm !== undefined) update.height_cm = info.height_cm;
+      if (info.occupation !== undefined) update.occupation = info.occupation;
+      if (info.languages !== undefined) update.languages = info.languages;
+      if (info.interests !== undefined) update.interests = info.interests;
+      if (info.info_visibility !== undefined) {
+        const merged: Record<string, string> =
+          typeof cur.info_visibility === "object" && cur.info_visibility !== null
+            ? { ...(cur.info_visibility as Record<string, string>) }
+            : {};
+        for (const [k, v] of Object.entries(info.info_visibility)) {
+          if (v === null) delete merged[k];
+          else merged[k] = v;
+        }
+        update.info_visibility = merged;
       }
       // 改名频率（WEB_HANDOFF_PROFILE_EDIT_MODERATION：每天最多 3 次，HK 天；真改才计）。
       if (profile.nickname !== undefined && profile.nickname !== cur.nickname) {

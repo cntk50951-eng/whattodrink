@@ -211,3 +211,118 @@ export function collectNightStats(rows: unknown): { nights: Set<string>; places:
   }
   return { nights, places };
 }
+
+/** 個人資料新欄（WEB_HANDOFF_PROFILE_FIELDS，iOS 遇見鋪路；全部選填，枚舉 key，標籤客戶端翻）。 */
+export const HEIGHT_MIN = 140;
+export const HEIGHT_MAX = 220;
+export const LANGUAGES_MAX = 5;
+export const INTERESTS_MAX = 8;
+
+export const OCCUPATIONS = [
+  "finance", "tech", "design", "media", "education", "healthcare", "fnb",
+  "retail", "legal", "engineering", "public_service", "student", "freelance", "other",
+] as const;
+
+export const LANGUAGES = [
+  "yue", "zh", "en", "ja", "ko", "fr", "de", "es", "th", "other",
+] as const;
+
+export const INTERESTS = [
+  "live_music", "karaoke", "djing", "instruments",
+  "gym", "running", "yoga", "hiking", "swimming", "ball_sports", "cycling", "climbing",
+  "camping", "beach", "sailing", "photography",
+  "cooking", "coffee", "cafe_hopping", "street_food", "wine_tasting", "cocktails", "craft_beer", "whisky",
+  "movies", "theatre", "museums", "reading", "drawing", "design",
+  "video_games", "board_games", "mahjong", "trivia",
+  "travel", "road_trip", "staycation",
+  "pets", "fashion", "wellness", "volunteering", "tech_gadgets",
+] as const;
+
+export const INFO_FIELDS = ["height", "occupation", "languages", "interests"] as const;
+export type InfoField = (typeof INFO_FIELDS)[number];
+export const INFO_VISIBILITIES = ["public", "friends", "private"] as const;
+export type InfoVisibility = (typeof INFO_VISIBILITIES)[number];
+
+/** 欄位可見性（缺鍵＝friends；壞值回 friends，不炸包）。 */
+export function infoVisibilityOf(stored: unknown, field: InfoField): InfoVisibility {
+  if (typeof stored === "object" && stored !== null) {
+    const v = (stored as Record<string, unknown>)[field];
+    if (v === "public" || v === "friends" || v === "private") return v;
+  }
+  return "friends";
+}
+
+export type ProfileInfoBody = {
+  height_cm?: number | null;
+  occupation?: string | null;
+  languages?: string[];
+  interests?: string[];
+  info_visibility?: Partial<Record<InfoField, InfoVisibility | null>>;
+};
+
+/** `PATCH /me` 新欄段：全可选；languages／interests 整體替換；info_visibility null 值＝恢復默認（路由合併時刪鍵）。 */
+export function parseProfileInfoBody(raw: unknown): ProfileInfoBody | { error: string } {
+  if (typeof raw !== "object" || raw === null) return { error: "body 需为对象" };
+  const r = raw as Record<string, unknown>;
+  const out: ProfileInfoBody = {};
+  if (r.height_cm !== undefined) {
+    if (r.height_cm === null) {
+      out.height_cm = null;
+    } else if (typeof r.height_cm !== "number" || !Number.isInteger(r.height_cm) || r.height_cm < HEIGHT_MIN || r.height_cm > HEIGHT_MAX) {
+      return { error: `height_cm 只要 ${HEIGHT_MIN}-${HEIGHT_MAX} 整数或 null` };
+    } else {
+      out.height_cm = r.height_cm;
+    }
+  }
+  if (r.occupation !== undefined) {
+    if (r.occupation === null) {
+      out.occupation = null;
+    } else if (typeof r.occupation !== "string" || !(OCCUPATIONS as readonly string[]).includes(r.occupation)) {
+      return { error: "occupation 非法（见开枚举）" };
+    } else {
+      out.occupation = r.occupation;
+    }
+  }
+  if (r.languages !== undefined) {
+    if (!Array.isArray(r.languages)) return { error: "languages 只要字符串数组" };
+    const seen: string[] = [];
+    for (const l of r.languages) {
+      if (typeof l !== "string" || !(LANGUAGES as readonly string[]).includes(l)) {
+        return { error: `languages 含非法 key：${String(l)}` };
+      }
+      if (!seen.includes(l)) seen.push(l);
+    }
+    if (seen.length > LANGUAGES_MAX) return { error: `languages 最多 ${LANGUAGES_MAX} 个` };
+    out.languages = seen;
+  }
+  if (r.interests !== undefined) {
+    if (!Array.isArray(r.interests)) return { error: "interests 只要字符串数组" };
+    const seen: string[] = [];
+    for (const k of r.interests) {
+      if (typeof k !== "string" || !(INTERESTS as readonly string[]).includes(k)) {
+        return { error: `interests 含非法 key：${String(k)}` };
+      }
+      if (!seen.includes(k)) seen.push(k);
+    }
+    if (seen.length > INTERESTS_MAX) return { error: `interests 最多 ${INTERESTS_MAX} 个` };
+    out.interests = seen;
+  }
+  if (r.info_visibility !== undefined) {
+    if (typeof r.info_visibility !== "object" || r.info_visibility === null || Array.isArray(r.info_visibility)) {
+      return { error: "info_visibility 只要对象" };
+    }
+    const patch: Partial<Record<InfoField, InfoVisibility | null>> = {};
+    for (const [k, v] of Object.entries(r.info_visibility as Record<string, unknown>)) {
+      if (!(INFO_FIELDS as readonly string[]).includes(k)) return { error: `info_visibility 未知欄：${k}` };
+      if (v === null) {
+        patch[k as InfoField] = null;
+      } else if (v === "public" || v === "friends" || v === "private") {
+        patch[k as InfoField] = v;
+      } else {
+        return { error: `info_visibility.${k} 只要 public|friends|private|null` };
+      }
+    }
+    out.info_visibility = patch;
+  }
+  return out;
+}

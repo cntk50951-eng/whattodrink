@@ -33,6 +33,8 @@
   - `GET /users/{id}/saves`（同 /me/saves 形；本人随便看，他人只限好友，陌生人 403；只回 viewer 可见帖）＋profile `saves_total` 对陌生人回 0＋openapi 1.41.0；零 migration
 - **改昵称＋资料审核（WEB_HANDOFF_PROFILE_EDIT_MODERATION，iOS 输入，未提交）**
   - `PATCH /me` 加 `nickname`（1–20 字，每天最多 3 次，0046 两列；无唯一约束）；昵称／bio 文审、头像图审（沿打卡链；reject 403 标项／全挂 503）；整单原子；头像被拒删新文件、成功删旧文件；存量不追溯不补扫＋openapi 1.42.0
+- **资料新欄（WEB_HANDOFF_PROFILE_FIELDS，iOS 输入，未提交）**
+  - 0047 五列＋四索引；`PATCH /me` 加身高／职业／语言／兴趣／可见性（整体替换＋可见性合并，超范围 400）；`GET /me` 全回；他人主页按可见性过滤（被隐藏直接不出现）；openapi 1.43.0＋`ProfileInfo`＋单测
 - **UR A.21 好友实时位读不到（WEB_HANDOFF_FRIEND_LIVE，iOS 输入，未提交）**
   - `GET /friends/live`＋`GET /friends` 改走 service 读（沿 POST /friends 同口径；不过放开 RLS）；610 绿＋tsc 零错＋lint 零错
 - **DEF-20261006-002 iOS 好友釘 pill 无走马灯（v2-only，未提交；pins 补 note 读链）**
