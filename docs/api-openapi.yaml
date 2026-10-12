@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.44.0
+  version: 1.45.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1225,7 +1225,7 @@ paths:
   /api/v1/parties:
     post:
       operationId: createParty
-      summary: 發攢局（需登录；總量2–12＋名額和≤總量＋門檻2..總量＋start未來14天；隱身／未成年 403；3／天 429；host 不占席，UR E.23）
+      summary: 發攢局（需登录；總量2–12＋名額和≤總量＋門檻2..總量＋start未來14天；目的1–3＋介绍10–140必填且过审；隱身／未成年 403；3／天 429；host 不占席，UR E.23）
       security:
         - cookieAuth: []
       requestBody:
@@ -1234,7 +1234,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [place, lat, lng, start_at, seats_total, min_members, bill_intent]
+              required: [place, lat, lng, start_at, seats_total, min_members, bill_intent, purposes, host_intro]
               properties:
                 place:
                   type: string
@@ -1268,6 +1268,22 @@ paths:
                 bill_intent:
                   type: string
                   enum: [host, aa, flexible]
+                purposes:
+                  type: array
+                  minItems: 1
+                  maxItems: 3
+                  items:
+                    type: string
+                    enum: [social, chill, celebrate, colleagues, newbar, sports, network, language, other]
+                purpose_other:
+                  type: string
+                  maxLength: 12
+                  description: 选 other 时必填（1–12 字）；不选忽略
+                host_intro:
+                  type: string
+                  minLength: 10
+                  maxLength: 140
+                  description: 发起人自我介绍（必填；过审，不过 403 整单不存）
       responses:
         "201":
           description: 發局成功（回 id＋過期＝開始＋3h）
@@ -1281,7 +1297,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: 隱身／未成年禁發
+          description: 隱身／未成年禁發；介绍／目的不过审（code=rejected，message 标明项；整单不存）
           content:
             application/json:
               schema:
@@ -1292,11 +1308,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+        "503":
+          description: 审核服务暂不可用（两家全挂，沿 PATCH /me 口径）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
     get:
       operationId: listParties
-      summary: 看板列表（匿名可看；缺省未过期非 cancelled；box=mine 回我发起＋我参加含 cancelled／过期需登录；行含 status，UR E.23 round-2）
+      summary: 看板列表（匿名可看，匿名只回 purposes；缺省未过期非 cancelled；box=mine 回我发起＋我参加含 cancelled／过期需登录；行含 status，UR E.23 round-2）
       parameters:
         - name: box
           in: query
@@ -1325,7 +1347,7 @@ paths:
             type: string
       responses:
         "200":
-          description: 酒局行（含 status／joined_count／male_count／female_count／host／joined_by_me／is_mine／distance_m；sync_cursor 服务端 ms，UR E.29）
+          description: 酒局行（含 status／joined_count／male_count／female_count／host／joined_by_me／is_mine／distance_m／purposes＋登录才回 purpose_other／host_intro；sync_cursor 服务端 ms，UR E.29）
           content:
             application/json:
               schema:
@@ -1341,7 +1363,7 @@ paths:
   /api/v1/parties/{id}:
     get:
       operationId: getParty
-      summary: 局詳情（匿名可看；members 含性別＋is_host，UR E.23）
+      summary: 局詳情（匿名可看，匿名只回 purposes；members 含性別＋is_host，UR E.23）
       parameters:
         - name: id
           in: path

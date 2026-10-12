@@ -16,6 +16,9 @@ type PartyRow = {
   seats_female: number;
   min_members: number;
   bill_intent: string;
+  purposes: string[];
+  purpose_other: string | null;
+  host_intro: string | null;
   status: string;
   created_at: string;
 };
@@ -38,7 +41,7 @@ export async function GET(
   const { data: rowRaw, error } = await supabase
     .from("parties")
     .select(
-      "id,host_user_id,place,poi_id,city,lat,lng,start_at,expires_at,seats_total,seats_male,seats_female,min_members,bill_intent,status,created_at",
+      "id,host_user_id,place,poi_id,city,lat,lng,start_at,expires_at,seats_total,seats_male,seats_female,min_members,bill_intent,purposes,purpose_other,host_intro,status,created_at",
     )
     .eq("id", id)
     .maybeSingle();
@@ -96,6 +99,14 @@ export async function GET(
     seats_female: row.seats_female,
     min_members: row.min_members,
     bill_intent: row.bill_intent,
+    purposes: Array.isArray(row.purposes) ? row.purposes.filter((p): p is string => typeof p === "string") : [],
+    // 匿名只回 purposes（同列表口径）。
+    ...(viewerId !== null
+      ? {
+          purpose_other: typeof row.purpose_other === "string" ? row.purpose_other : null,
+          host_intro: typeof row.host_intro === "string" ? row.host_intro : null,
+        }
+      : {}),
     status: row.status,
     created_at: row.created_at,
     joined_count: jrows.length,

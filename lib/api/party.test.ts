@@ -15,6 +15,8 @@ describe("parsePartyBody", () => {
     seats_female: 2,
     min_members: 2,
     bill_intent: "aa",
+    purposes: ["social", "chill"],
+    host_intro: "大家好，我是阿怡，喜歡試新酒吧！",
   };
   it("收全段（去空白，默認值透传）", () => {
     const r = parsePartyBody(good, NOW);
@@ -22,6 +24,28 @@ describe("parsePartyBody", () => {
     if ("error" in r) throw new Error("unreachable");
     expect(r.body.place).toBe("中環 Soho");
     expect(r.body.min_members).toBe(2);
+    expect(r.body.purposes).toEqual(["social", "chill"]);
+    expect(r.body.purpose_other).toBeNull();
+  });
+  it("目的＋介绍必填项（去重／other 自填／10–140 字）", () => {
+    expect(parsePartyBody({ ...good, purposes: ["social", "social"] }, NOW)).toEqual(
+      expect.objectContaining({ body: expect.objectContaining({ purposes: ["social"] }) }),
+    );
+    expect(parsePartyBody({ ...good, purposes: [] }, NOW)).toHaveProperty("error");
+    expect(parsePartyBody({ ...good, purposes: ["a", "b", "c", "d"] }, NOW)).toHaveProperty("error");
+    expect(parsePartyBody({ ...good, purposes: ["nope"] }, NOW)).toHaveProperty("error");
+    expect(parsePartyBody({ ...good, purposes: ["other"] }, NOW)).toHaveProperty("error");
+    expect(
+      parsePartyBody({ ...good, purposes: ["other"], purpose_other: "  睇波  " }, NOW),
+    ).toEqual(expect.objectContaining({ body: expect.objectContaining({ purpose_other: "睇波" }) }));
+    expect(
+      parsePartyBody({ ...good, purposes: ["other"], purpose_other: "x".repeat(13) }, NOW),
+    ).toHaveProperty("error");
+    expect(parsePartyBody({ ...good, host_intro: "太短了" }, NOW)).toHaveProperty("error");
+    expect(parsePartyBody({ ...good, host_intro: "x".repeat(141) }, NOW)).toHaveProperty("error");
+    expect(parsePartyBody({ ...good, host_intro: "  大家好，我是阿怡，喜歡試新酒吧！  " }, NOW)).toEqual(
+      expect.objectContaining({ body: expect.objectContaining({ host_intro: "大家好，我是阿怡，喜歡試新酒吧！" }) }),
+    );
   });
   it("總量 2–12／名額和≤總量／門檻 2..總量／14 天拒", () => {
     expect(parsePartyBody({ ...good, seats_total: 13 }, NOW)).toHaveProperty("error");

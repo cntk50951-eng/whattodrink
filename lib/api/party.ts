@@ -19,7 +19,20 @@ export type PartyInput = {
   seats_female: number;
   min_members: number;
   bill_intent: BillIntent;
+  purposes: string[];
+  purpose_other: string | null;
+  host_intro: string;
 };
+
+/** 酒局目的枚举（WEB_HANDOFF_PARTY_INTRO；标签客户端翻）。 */
+export const PARTY_PURPOSES = [
+  "social", "chill", "celebrate", "colleagues", "newbar", "sports", "network", "language", "other",
+] as const;
+export const PARTY_PURPOSES_MAX = 3;
+/** 自填目的上限 12 字；介绍 10–140 字（UTF-16，长短由交接定）。 */
+export const PURPOSE_OTHER_MAX = 12;
+export const HOST_INTRO_MIN = 10;
+export const HOST_INTRO_MAX = 140;
 
 /** `POST /parties` body 校验（WGS-84 由客户端转好；`start_at` 未来 14 天内）。 */
 export function parsePartyBody(raw: unknown, nowMs: number = Date.now()): { body: PartyInput } | { error: string } {
@@ -61,6 +74,31 @@ export function parsePartyBody(raw: unknown, nowMs: number = Date.now()): { body
   if (r.bill_intent !== "host" && r.bill_intent !== "aa" && r.bill_intent !== "flexible") {
     return { error: "bill_intent 必填（host｜aa｜flexible）" };
   }
+  // 目的（必填 1–3 个，去重；other 须自填 1–12 字，否则忽略）。
+  if (!Array.isArray(r.purposes)) return { error: "purposes 必填（1–3 个）" };
+  const purposes: string[] = [];
+  for (const p of r.purposes) {
+    if (typeof p !== "string" || !(PARTY_PURPOSES as readonly string[]).includes(p)) {
+      return { error: `purposes 含非法 key：${String(p)}` };
+    }
+    if (!purposes.includes(p)) purposes.push(p);
+  }
+  if (purposes.length < 1 || purposes.length > PARTY_PURPOSES_MAX) {
+    return { error: `purposes 只要 1–${PARTY_PURPOSES_MAX} 个` };
+  }
+  let purpose_other: string | null = null;
+  if (purposes.includes("other")) {
+    const t = typeof r.purpose_other === "string" ? r.purpose_other.trim() : "";
+    if (t === "" || t.length > PURPOSE_OTHER_MAX) {
+      return { error: `purpose_other 选 other 时必填（1–${PURPOSE_OTHER_MAX} 字）` };
+    }
+    purpose_other = t;
+  }
+  // 发起人介绍（必填 10–140 字，挡敷衍）。
+  const intro = typeof r.host_intro === "string" ? r.host_intro.trim() : "";
+  if (intro.length < HOST_INTRO_MIN || intro.length > HOST_INTRO_MAX) {
+    return { error: `host_intro 必填（${HOST_INTRO_MIN}–${HOST_INTRO_MAX} 字）` };
+  }
   return {
     body: {
       place,
@@ -74,6 +112,9 @@ export function parsePartyBody(raw: unknown, nowMs: number = Date.now()): { body
       seats_female: female,
       min_members: min,
       bill_intent: r.bill_intent,
+      purposes,
+      purpose_other,
+      host_intro: intro,
     },
   };
 }

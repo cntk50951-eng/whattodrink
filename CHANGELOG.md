@@ -33,6 +33,8 @@
   - `GET /users/{id}/saves`（同 /me/saves 形；本人随便看，他人只限好友，陌生人 403；只回 viewer 可见帖）＋profile `saves_total` 对陌生人回 0＋openapi 1.41.0；零 migration
 - **改昵称＋资料审核（WEB_HANDOFF_PROFILE_EDIT_MODERATION，iOS 输入，未提交）**
   - `PATCH /me` 加 `nickname`（1–20 字，每天最多 3 次，0046 两列；无唯一约束）；昵称／bio 文审、头像图审（沿打卡链；reject 403 标项／全挂 503）；整单原子；头像被拒删新文件、成功删旧文件；存量不追溯不补扫＋openapi 1.42.0
+- **酒局目的＋介绍（WEB_HANDOFF_PARTY_INTRO，iOS 输入，未提交）**
+  - 0048 三列；POST 必填三欄＋过审（reject 403／全挂 503，原子）；列表／详情回显（匿名只回 purposes）＋openapi 1.45.0＋单测
 - **新用户引导：生日锁定（WEB_HANDOFF_ONBOARDING，iOS 输入，未提交）**
   - `PATCH /me` 的 dob 首次写入后不可改为不同日期（403 forbidden，相同值放行）；未成年 422 时从未写库，仍可重试；openapi 1.44.0
 - **资料新欄（WEB_HANDOFF_PROFILE_FIELDS，iOS 输入，未提交）**

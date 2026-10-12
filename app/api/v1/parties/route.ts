@@ -2,6 +2,7 @@ import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { isMinorDob } from "@/lib/api/cheers";
 import { countGenders, hkDayStartISO, mineOrCondition, parsePartyBody, partyExpiresAt } from "@/lib/api/party";
+import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { haversineMeters } from "@/lib/geo";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 
@@ -49,6 +50,28 @@ export async function POST(req: Request): Promise<Response> {
   const b = parsed.body;
   const startMs = Date.parse(b.start_at);
   const expiresIso = new Date(partyExpiresAt(startMs)).toISOString();
+  // 自我介绍＋自填目的过审（沿 PATCH /me：reject 403 标项／全挂 503；整单原子，先审后插）。
+  const modTargets = [
+    { label: "自我介紹", text: b.host_intro },
+    ...(b.purpose_other !== null ? [{ label: "目的", text: b.purpose_other }] : []),
+  ];
+  for (const t of modTargets) {
+    const verdict = await moderateCheckin(
+      { text: t.text },
+      {
+        openaiKey: process.env.OPENAI_API_KEY ?? process.env.OPENAI_KEY,
+        minimaxKey: process.env.minimaxi_api_key,
+        minimaxBaseUrl: process.env.MINIMAX_API_BASE,
+      },
+    );
+    const action = moderationAction(verdict);
+    if (action === "reject") {
+      return apiError("rejected", `內容未通過審核（${t.label}），請修改後再發`, 403);
+    }
+    if (action === "unavailable") {
+      return apiError("rejected", "審核服務暫不可用，請稍後再試", 503);
+    }
+  }
   const { data: inserted, error: iErr } = await supabase
     .from("parties")
     .insert({
@@ -65,6 +88,9 @@ export async function POST(req: Request): Promise<Response> {
       seats_female: b.seats_female,
       min_members: b.min_members,
       bill_intent: b.bill_intent,
+      purposes: b.purposes,
+      purpose_other: b.purpose_other,
+      host_intro: b.host_intro,
       status: "open",
     })
     .select("id")
@@ -92,6 +118,9 @@ type PartyListRow = {
   seats_female: number;
   min_members: number;
   bill_intent: string;
+  purposes: string[];
+  purpose_other: string | null;
+  host_intro: string | null;
   status: string;
   created_at: string;
 };
@@ -137,7 +166,7 @@ export async function GET(req: Request): Promise<Response> {
   let query = supabase
     .from("parties")
     .select(
-      "id,host_user_id,place,city,lat,lng,start_at,expires_at,seats_total,seats_male,seats_female,min_members,bill_intent,status,created_at",
+      "id,host_user_id,place,city,lat,lng,start_at,expires_at,seats_total,seats_male,seats_female,min_members,bill_intent,purposes,purpose_other,host_intro,status,created_at",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -221,6 +250,8 @@ export async function GET(req: Request): Promise<Response> {
   const items = list.map((r) => {
     const host = hosts.get(r.host_user_id) ?? { nickname: "酒友", avatar_url: null };
     const gc = countGenders(gendersByParty.get(r.id) ?? []);
+    // 匿名只回 purposes 枚举（自填目的＋介绍仅登录可见，WEB_HANDOFF_PARTY_INTRO 定案）。
+    const authed = viewerId !== null;
     return {
       id: r.id,
       place: r.place,
@@ -234,6 +265,13 @@ export async function GET(req: Request): Promise<Response> {
       seats_female: r.seats_female,
       min_members: r.min_members,
       bill_intent: r.bill_intent,
+      purposes: Array.isArray(r.purposes) ? r.purposes.filter((p): p is string => typeof p === "string") : [],
+      ...(authed
+        ? {
+            purpose_other: typeof r.purpose_other === "string" ? r.purpose_other : null,
+            host_intro: typeof r.host_intro === "string" ? r.host_intro : null,
+          }
+        : {}),
       status: r.status,
       joined_count: joinCounts.get(r.id) ?? 0,
       male_count: gc.male,
