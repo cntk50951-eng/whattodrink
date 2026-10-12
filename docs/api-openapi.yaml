@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.43.0
+  version: 1.44.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1750,6 +1750,7 @@ paths:
                 dob:
                   type: string
                   format: date
+                  description: 首次写入后锁定；已有生日再改为不同日期 403（WEB_HANDOFF_ONBOARDING，防未成年绕过）
                 bio:
                   type: string
                   maxLength: 140
@@ -1805,7 +1806,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: 内容未通过审核（code=rejected，message 标明哪一项；沿打卡口径）
+          description: 内容未通过审核（code=rejected，message 标明哪一项；沿打卡口径）；或生日首次填写后再改为不同日期（code=forbidden，生日锁定，WEB_HANDOFF_ONBOARDING）
           content:
             application/json:
               schema:

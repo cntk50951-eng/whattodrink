@@ -3144,6 +3144,7 @@ UR E.18　首登資料＋個人面板＋面板性別年齡（v2-only）[✓]
 - 2026-10-04：用戶新老號雙路親驗通過（首登閘＋保存＋徽章簽名）置 [✓]，隨本車合入
 - 2026-10-12：改昵称＋三项审核（WEB_HANDOFF_PROFILE_EDIT_MODERATION，iOS 输入）：`nickname` 1–20 字（每天最多 3 次，0046 两列）；昵称／bio 文审、头像图审（自家桶下载，Google 略过）； reject 403 标项／全挂 503（沿打卡）；整单原子；头像被拒删新文件、成功删旧文件；存量不追溯不补扫；openapi 1.42.0
 - 2026-10-12：资料新欄（WEB_HANDOFF_PROFILE_FIELDS，iOS 输入）：0047 五列＋四索引；PATCH 加五欄（替换＋合并）＋GET /me 全回＋他人主页过滤＋openapi 1.43.0＋`ProfileInfo`
+- 2026-10-12：新用户引导生日锁定（WEB_HANDOFF_ONBOARDING，iOS 输入）：dob 首次写入后不可改为不同日期（403，相同值放行；422 未写库仍可重试）；openapi 1.44.0
 
 ---
 

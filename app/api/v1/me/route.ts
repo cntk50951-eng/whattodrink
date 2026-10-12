@@ -144,7 +144,7 @@ export async function PATCH(req: Request): Promise<Response> {  const { supabase
     // 当前行（改名频率＋变化检测＋旧头像清理用；本人行自读）。
     const { data: curRaw } = await supabase
       .from("users")
-      .select("nickname,bio,avatar_url,nickname_updated_at,nickname_daily_count,info_visibility")
+      .select("nickname,bio,avatar_url,nickname_updated_at,nickname_daily_count,info_visibility,dob")
       .eq("id", userId)
       .maybeSingle();
     const cur = (curRaw ?? {}) as {
@@ -154,6 +154,7 @@ export async function PATCH(req: Request): Promise<Response> {  const { supabase
       nickname_updated_at?: unknown;
       nickname_daily_count?: unknown;
       info_visibility?: unknown;
+      dob?: unknown;
     };
     const update: Record<string, unknown> = {};
     if (!("error" in parsed)) {
@@ -163,7 +164,14 @@ export async function PATCH(req: Request): Promise<Response> {  const { supabase
     if (!("error" in profile)) {
       // UR E.18 首登資料（四段全可选；首登必填由调用方表单判，不进端点）。
       if (profile.gender !== undefined) update.gender = profile.gender;
-      if (profile.dob !== undefined) update.dob = profile.dob;
+      // 生日锁定（WEB_HANDOFF_ONBOARDING）：首次写入后不可改成不同日期，防止未成年被 422 后改填成年日期绕过。
+      // 相同值放行（iOS 首页重传同一生日幂等）；未成年从未写入库（422 在前），故 dob 为空时仍可重试。
+      if (profile.dob !== undefined) {
+        if (typeof cur.dob === "string" && cur.dob !== "" && profile.dob !== cur.dob) {
+          return apiError("forbidden", "生日首次填寫後不可修改，如需更正請聯繫客服", 403);
+        }
+        update.dob = profile.dob;
+      }
       if (profile.bio !== undefined) update.bio = profile.bio;
       if (profile.avatar_url !== undefined) update.avatar_url = profile.avatar_url;
       if (profile.nickname !== undefined) update.nickname = profile.nickname;
