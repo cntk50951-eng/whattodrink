@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.39.0
+  version: 1.40.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -4202,6 +4202,7 @@ components:
           $ref: "#/components/schemas/TastePreferences"
         taste_inference:
           $ref: "#/components/schemas/TasteInference"
+          description: 本人口味推测（本人缓存）；好友按其可见行（public＋friends，不含 private）现算；陌生人 null（iOS-0.95）
         stats:
           type: object
           nullable: true

@@ -137,6 +137,63 @@ async function tasteInference(
   }
 }
 
+/**
+ * 好友视角推测（WEB_HANDOFF_FRIEND_TASTE_INFERENCE，iOS-0.95）：
+ * 只用 public＋friends 行现算（private 永不进聚合）；不读本人缓存
+ * （本人缓存是全量，复用即经条形图泄露私人帖），也不写缓存。
+ * 形状与本人同（sample_count／computed_at／groups，<5 组空）。
+ */
+async function tasteInferenceForFriend(
+  supa: Awaited<ReturnType<typeof createServiceClient>>,
+  targetId: string,
+  nowMs: number,
+): Promise<{ sample_count: number; computed_at: string; groups: unknown[] } | null> {
+  try {
+    const vis = ["public", "friends"];
+    const [{ data: mainRows }, { data: archRows }] = await Promise.all([
+      supa.from("checkins").select("tags,beer_id").eq("user_id", targetId).in("visibility", vis),
+      supa.from("checkins_archive").select("tags,beer_id").eq("user_id", targetId).in("visibility", vis),
+    ]);
+    const all = [...((mainRows ?? []) as unknown[]), ...((archRows ?? []) as unknown[])];
+    const beerIds = [
+      ...new Set(
+        all
+          .map((r) => (r as Record<string, unknown>)?.beer_id)
+          .filter((id): id is string => typeof id === "string" && id !== ""),
+      ),
+    ];
+    const catByBeer = new Map<string, string>();
+    if (beerIds.length > 0) {
+      const { data: beers } = await supa.from("beers").select("id,category").in("id", beerIds);
+      for (const b of ((beers ?? []) as unknown[]) as Record<string, unknown>[]) {
+        if (typeof b.id === "string" && typeof b.category === "string") {
+          catByBeer.set(b.id, b.category);
+        }
+      }
+    }
+    const { groups, sample_count } = aggregateTaste(
+      all.map((r) => {
+        const rec = (r ?? {}) as Record<string, unknown>;
+        return {
+          tags: Array.isArray(rec.tags)
+            ? (rec.tags as unknown[]).filter((x): x is string => typeof x === "string")
+            : [],
+          beerCategory:
+            typeof rec.beer_id === "string" ? (catByBeer.get(rec.beer_id) ?? null) : null,
+        };
+      }),
+    );
+    return {
+      sample_count,
+      computed_at: new Date(nowMs).toISOString(),
+      groups: sample_count < 5 ? [] : groups,
+    };
+  } catch (e) {
+    console.warn(`[api/v1/users/profile] friend taste skipped: ${e instanceof Error ? e.message : "unknown"}`);
+    return null;
+  }
+}
+
 type FsRow = { user_id: unknown; friend_id: unknown; status: unknown };
 
 /**
@@ -433,7 +490,13 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
     stats,
     // UR E.28 口味（preferences 与 stats 同门；taste 只给自己）。
     preferences: statsVisible ? narrowPreferences(u.preferences) : null,
-    taste_inference: self ? await tasteInference(supa, targetId, nowMs) : null,
+    // 好友视角推测（iOS-0.95）：好友按可见行现算，陌生人 null。
+    taste_inference:
+      self || relationship === "friend"
+        ? self
+          ? await tasteInference(supa, targetId, nowMs)
+          : await tasteInferenceForFriend(supa, targetId, nowMs)
+        : null,
     level: null,
     badges: [],
     badges_total: null,

@@ -27,6 +27,8 @@
   - 0045 `friendships.message` 列＋`POST /friends` 可选 50 字（超长 400，仅新建写入）＋列表回 `message`＋具名 `FriendRequestItem`＋openapi 1.38.0＋单测；推送正文带留言另议
 - **头像签名回公开 URL（WEB_HANDOFF_AVATAR_UPLOAD，iOS-0.92 输入，未提交）**
   - `POST /uploads/sign` 在 `purpose=avatar` 时附 `publicUrl`（复用 `avatarPublicUrl`，与网页同口径；iOS 直接 PATCH /me）；openapi 1.39.0；旧头像孤儿清理另议
+- **好友主页口味推测（WEB_HANDOFF_FRIEND_TASTE_INFERENCE，iOS-0.95 输入，未提交）**
+  - 好友按可见行（public＋friends）现算，不读／不写本人缓存（全量，复用即泄露私人帖）；陌生人 null；openapi 1.40.0
 - **UR A.21 好友实时位读不到（WEB_HANDOFF_FRIEND_LIVE，iOS 输入，未提交）**
   - `GET /friends/live`＋`GET /friends` 改走 service 读（沿 POST /friends 同口径；不过放开 RLS）；610 绿＋tsc 零错＋lint 零错
 - **DEF-20261006-002 iOS 好友釘 pill 无走马灯（v2-only，未提交；pins 补 note 读链）**
