@@ -29,6 +29,8 @@
   - `POST /uploads/sign` 在 `purpose=avatar` 时附 `publicUrl`（复用 `avatarPublicUrl`，与网页同口径；iOS 直接 PATCH /me）；openapi 1.39.0；旧头像孤儿清理另议
 - **好友主页口味推测（WEB_HANDOFF_FRIEND_TASTE_INFERENCE，iOS-0.95 输入，未提交）**
   - 好友按可见行（public＋friends）现算，不读／不写本人缓存（全量，复用即泄露私人帖）；陌生人 null；openapi 1.40.0
+- **看别人收藏（WEB_HANDOFF_USER_SAVES，iOS 输入，未提交）**
+  - `GET /users/{id}/saves`（同 /me/saves 形；本人随便看，他人只限好友，陌生人 403；只回 viewer 可见帖）＋profile `saves_total` 对陌生人回 0＋openapi 1.41.0；零 migration
 - **UR A.21 好友实时位读不到（WEB_HANDOFF_FRIEND_LIVE，iOS 输入，未提交）**
   - `GET /friends/live`＋`GET /friends` 改走 service 读（沿 POST /friends 同口径；不过放开 RLS）；610 绿＋tsc 零错＋lint 零错
 - **DEF-20261006-002 iOS 好友釘 pill 无走马灯（v2-only，未提交；pins 补 note 读链）**

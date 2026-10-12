@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.40.0
+  version: 1.41.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1813,6 +1813,59 @@ paths:
           $ref: "#/components/responses/InvalidParams"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/users/{id}/saves:
+    get:
+      operationId: listUserSaves
+      summary: 看别人收藏（需登录；本人随便看，他人只限互好友，陌生人 403，拉黑 404；只回查看者看得到的帖，WEB_HANDOFF_USER_SAVES）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: 1–50，默认 30（沿 /mine）
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          description: 收藏 created_at ISO（keyset 下一页）
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 打卡公开列（saved_by_me 为查看者是否收藏）；删帖／不可见自动消失
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [checkins]
+                properties:
+                  checkins:
+                    type: array
+                    items:
+                      type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非好友不可看（陌生人；iOS 藏标签）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 不存在／拉黑（不泄存在性）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/users/{id}/profile:

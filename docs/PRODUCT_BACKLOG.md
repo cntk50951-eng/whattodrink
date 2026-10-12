@@ -3858,6 +3858,7 @@ UR E.26　打卡收藏 save（v2-only，iOS-0.62 输入）[WIP]
 
 *改動記錄*
 - 2026-10-08：建檔置 [WIP]（WEB_HANDOFF_SAVES 输入；直做）
+- 2026-10-12：看别人收藏（WEB_HANDOFF_USER_SAVES，iOS 输入）：`GET /users/{id}/saves`（同 /me/saves 形；本人随便看，他人只限好友，陌生人 403；只回 viewer 可见帖；`saved_by_me` 按查看者）＋profile `saves_total` 对陌生人回 0＋openapi 1.41.0
 
 ---
 

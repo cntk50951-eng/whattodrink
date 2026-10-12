@@ -371,7 +371,8 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
       places_total: places.size,
       checkins_total: (mainCount ?? 0) + (archCount ?? 0),
       friends_total: self ? myFriendIds.length : targetFriendIds.length,
-      saves_total: savesCount ?? 0,
+      // WEB_HANDOFF_USER_SAVES：陌生人看不到收藏列表，计数也回 0（与可见集一致）。
+      saves_total: self || relationship === "friend" ? (savesCount ?? 0) : 0,
       cheers_total: cheersCount ?? 0,
       week_streak: weekStreak(nights, nowMs),
       nights_this_week: weekNights(nights, nowMs),
