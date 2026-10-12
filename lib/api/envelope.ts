@@ -26,6 +26,8 @@ export type ApiErrorCode =
   | "wrong_phase"
   | "invalid_bid"
   | "stale_version"
+  | "ai_unavailable"
+  | "onboarding_required"
   | "internal";
 
 export function apiError(

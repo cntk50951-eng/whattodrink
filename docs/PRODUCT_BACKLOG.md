@@ -4223,3 +4223,41 @@ UR H.1　游戏房间＋大話骰 POC（纯 API，无 web UI，[shared-only]）[
 - 2026-10-10：§九發骰器（iOS 联调输入）：`rules.mode`＋`reveal` 动作＋开局无轮次＋openapi 1.30.0；standard 房行为零改动。
 - 2026-10-11：§十二留守重开：deal_only 剩 <2 人回 lobby＋留守 unready＋`back_to_lobby` 事件；`start` 局号顺延；openapi 1.31.0。
 - 2026-10-11：§十三停住等房主（§十一落地）：deal_only 开盅后不自动开＋`next_round` 仅房主即开；openapi 1.32.0。
+
+---
+
+EPIC I　遇見 AI 找人（固定流水線，iOS 输入）[WIP]
+
+> 自然语言→最多 10 张卡片。LLM 只翻受限 JSON 条件，查询／过滤／打分全代码 deterministic；
+> 不做 agent（范围说明见交接 §6，另开需求）。
+
+UR I.1　遇見搜索＋被搜到同意（纯 API，[shared-only]）[WIP]
+
+> iOS 需求见 `whattodrink_ios/docs/WEB_HANDOFF_MEET_AI.md`（非契约，契约以 yaml 为准）。
+
+### 背景（问答定案）
+- 被搜到默认关闭（discoverable null＝未问；false／null 仍可搜别人）。
+- query 走 LLM（MiniMax，20s 超时；扣次数）／criteria 直查（不调 LLM 不扣）。
+- 硬过滤：自己／双向拉黑／解友／隐身／未成年／discoverable 非 true／明确条件；
+   occupations／languages／interests／taste 软打分（权重表确定性，单测锁死）。
+- 可见欄位匹配回传（friends 仅好友，private 永不）；距离／在线仅好友可见；
+  理由代码拼装（无 LLM 润色）；放宽建议（年龄±5／距离翻倍／去 online）。
+- 每日 10 次（HK 天，只算 query）；描述过审；LLM 失败 503 不扣；日志不落原文。
+- 搜索者须性别生日齐＋18+（后者为 web 自定，超出交接，沿全站 18+ 姿态）。
+
+### 範圍
+1. **數據**：0049（`discoverable`＋`meet_search_date`／`meet_search_count`）。
+2. **純函數**：`lib/meet.ts`（白名单校验／打分／理由／放宽／prompt／回包解析）＋8 单测。
+3. **端點**：`POST /meet/search`＋`GET /meet/status`＋`PATCH /me {discoverable}`＋`GET /me` 回欄。
+4. openapi 1.46.0＋`MeetCriteria`／`MeetResult`＋新码 `ai_unavailable`／`onboarding_required`。
+
+### 非目標
+- agent／function calling、多轮调用（另开）；LLM 理由润色（预留未做）；
+- 搜索历史持久化；v1／v2 任何文件。
+
+### AC（交接 §4 测试建议）
+- 隐私矩阵（好友／陌生人／隐身／拉黑／discoverable 三态／各欄三态）——需真机＋DB，单测只锁纯函数
+- 白名单丢弃／限流 429／LLM 挂 503 不扣／criteria 重搜不调 LLM（单测＋代码走读）
+
+*改動記錄*
+- 2026-10-12：建檔置 [WIP]（WEB_HANDOFF_MEET_AI 输入；固定流水線，agent 另开）

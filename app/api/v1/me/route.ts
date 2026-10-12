@@ -16,7 +16,7 @@ import { parsePushPrefs } from "@/lib/push/prefs";
  */
 
 const ME_SELECT =
-  "id,nickname,avatar_url,gender,mode,mode_updated_at,dob,bio,onboarded_at,created_at,preferences,push_prefs,height_cm,occupation,languages,interests,info_visibility";
+  "id,nickname,avatar_url,gender,mode,mode_updated_at,dob,bio,onboarded_at,created_at,preferences,push_prefs,height_cm,occupation,languages,interests,info_visibility,discoverable";
 const ME_SELECT_LEGACY = "id,nickname,avatar_url,gender,created_at";
 
 async function ensureUserRow(
@@ -261,6 +261,14 @@ export async function PATCH(req: Request): Promise<Response> {  const { supabase
           return apiError("rejected", "審核服務暫不可用，請稍後再試", 503);
         }
       }
+    }
+    // UR I.1 被搜到同意（boolean；整体替换，非 boolean 即 400，计有效字段）。
+    const discRaw = (raw as Record<string, unknown>).discoverable;
+    if (discRaw !== undefined) {
+      if (typeof discRaw !== "boolean") {
+        return apiError("invalid_params", "discoverable 只要 boolean", 400);
+      }
+      update.discoverable = discRaw;
     }
     if (Object.keys(update).length === 0) {
       return apiError("invalid_params", "body 無有效字段", 400);

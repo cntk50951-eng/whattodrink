@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.45.0
+  version: 1.46.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1803,6 +1803,9 @@ paths:
                 info_visibility:
                   type: object
                   description: 可见性合并（key 缺席不动；值为 null 恢复默认 friends）
+                discoverable:
+                  type: boolean
+                  description: 被搜到同意（遇見；null 从未问过，UR I.1）
                 avatar_url:
                   type: string
                 onboarded:
@@ -2491,6 +2494,98 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/meet/search:
+    post:
+      operationId: searchMeet
+      summary: 遇見搜索（需登录；性别生日齐＋18+；query 走 LLM 翻条件扣次数，criteria 直查不扣；UR I.1）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: query 与 criteria 二选一（可同时给，以 criteria 为准，不调 LLM 不扣次数）
+              properties:
+                query:
+                  type: string
+                  maxLength: 100
+                  description: 自然语言描述（过审；不过 403 rejected，全挂 503）
+                criteria:
+                  $ref: "#/components/schemas/MeetCriteria"
+      responses:
+        "200":
+          description: 条件＋忽略＋Top 10（results<3 附 relaxed 放宽建议；remaining_today 剩余额度）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [criteria, ignored, results, remaining_today]
+                properties:
+                  criteria:
+                    $ref: "#/components/schemas/MeetCriteria"
+                  ignored:
+                    type: array
+                    items:
+                      type: string
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MeetResult"
+                  relaxed:
+                    type: object
+                    description: results<3 时给（一键重搜走 criteria，不扣次数）
+                  remaining_today:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 未完成引导（code=onboarding_required）／未成年（code=age_restricted）／描述不过审（code=rejected）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 今日搜索次数用完（remaining_today 0）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "503":
+          description: 审核全挂（code=rejected）／LLM 失败（code=ai_unavailable，不扣次数）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/meet/status:
+    get:
+      operationId: getMeetStatus
+      summary: 遇見状态（需登录；discoverable 三态＋剩余额度，UR I.1）
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 被搜到同意（null＝未问过）＋今日剩余额度
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [discoverable, remaining_today]
+                properties:
+                  discoverable:
+                    type: boolean
+                    nullable: true
+                  remaining_today:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/games/rooms/{id}/invites:
@@ -3678,10 +3773,98 @@ components:
         info_visibility:
           type: object
           description: 本人全回（含默认 friends 的缺键语义由客户端判）
+        discoverable:
+          type: boolean
+          nullable: true
+          description: 被搜到同意（null＝未问过，UR I.1）
+    MeetCriteria:
+      type: object
+      description: 遇見搜索条件（白名单；超界丢弃记 ignored，UR I.1）
+      properties:
+        gender:
+          type: string
+          enum: [male, female]
+        age_min:
+          type: integer
+        age_max:
+          type: integer
+        height_min:
+          type: integer
+        height_max:
+          type: integer
+        occupations:
+          type: array
+          items:
+            type: string
+        languages:
+          type: array
+          items:
+            type: string
+        interests:
+          type: array
+          items:
+            type: string
+        taste_groups:
+          type: array
+          items:
+            type: string
+        nearby_km:
+          type: integer
+        online_only:
+          type: boolean
+    MeetResult:
+      type: object
+      required: [user_id, nickname, score, reasons, relationship]
+      description: 遇見卡片（只含对搜索者可见的欄位；distance 在线仅好友可见，UR I.1）
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        gender:
+          type: string
+        age:
+          type: integer
+        score:
+          type: integer
+        reasons:
+          type: array
+          items:
+            type: string
+        height_cm:
+          type: integer
+          nullable: true
+        occupation:
+          type: string
+          nullable: true
+        languages:
+          type: array
+          items:
+            type: string
+        interests:
+          type: array
+          items:
+            type: string
+        taste_headline:
+          type: string
+          nullable: true
+        mutual_friends_count:
+          type: integer
+        distance_m:
+          type: integer
+          nullable: true
+        online:
+          type: boolean
+        relationship:
+          type: string
+          enum: [friend, none, pending_out, pending_in]
     ProfileInfo:
       type: object
-      description: 个人资料新欄（WEB_HANDOFF_PROFILE_FIELDS；全部选填，枚举 key，标签客户端翻）
-      properties:
+      description: 个人资料新欄（WEB_HANDOFF_PROFILE_FIELDS；全部选填，枚举 key，标签客户端翻）      properties:
         height_cm:
           type: integer
           minimum: 140

@@ -60,7 +60,9 @@ export type MeJson = {
   birthRestricted?: boolean;
   /** UR E.28 口味偏好（自设；无则 null；校验在 taste.ts，读端只透传形状）。 */
   preferences?: { favorites: string[]; likes: string[]; dislikes: string[] } | null;
-  /** 個人資料新欄（WEB_HANDOFF_PROFILE_FIELDS；本人全回，缺席即 null／[]／{}）。 */
+  /** UR I.1 被搜到同意（null＝未问，iOS 弹首次询问）。 */
+  discoverable?: boolean | null;
+  /** 個人資料新欄（本人全回，缺席即 null／[]／{}）。 */
   height_cm?: number | null;
   occupation?: string | null;
   languages?: string[];
@@ -129,6 +131,8 @@ export function toMeJson(raw: unknown): MeJson | null {
       typeof r.info_visibility === "object" && r.info_visibility !== null
         ? (r.info_visibility as Record<string, string>)
         : {},
+    /** UR I.1 被搜到同意（null＝未问，iOS 弹首次询问）。 */
+    discoverable: typeof r.discoverable === "boolean" ? r.discoverable : null,
     // onboarded null 显式保留（首登判定靠它；列未选即整键缺席，调用方按未知不弹）。
     ...(r.onboarded_at === undefined
       ? {}
