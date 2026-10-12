@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.38.0
+  version: 1.39.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -3281,7 +3281,7 @@ paths:
                   description: 可選 hex64；有即確定性 path，同值重簽同址
       responses:
         "200":
-          description: 簽名成功（path server 生成；uploadUrl 直傳；expires_at 毫秒 epoch，簽名固定 2h 有效）
+          description: 簽名成功（path server 生成；uploadUrl 直傳；expires_at 毫秒 epoch，簽名固定 2h 有效；purpose=avatar 另回 publicUrl）
           content:
             application/json:
               schema:
@@ -3297,6 +3297,10 @@ paths:
                     format: uri
                   expires_at:
                     type: integer
+                  publicUrl:
+                    type: string
+                    format: uri
+                    description: 仅 purpose=avatar 回（avatars 公开读 URL，直接 PATCH /me avatar_url 用，iOS-0.92）
         "400":
           $ref: "#/components/responses/InvalidParams"
         "401":

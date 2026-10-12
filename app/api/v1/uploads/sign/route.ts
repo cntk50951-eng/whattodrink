@@ -4,6 +4,7 @@ import { getAuthedClient } from "@/lib/supabase/server";
 import { requireSupabaseEnv } from "@/lib/supabase/env";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseSignBody } from "@/lib/api/chat";
+import { avatarPublicUrl } from "@/lib/api/profile";
 
 /**
  * UR D.6 直傳簽名（🔒；D.8 加 sha256＋expires_at）。
@@ -49,12 +50,15 @@ export async function POST(req: Request): Promise<Response> {
     }
     // SDK 版无 expiresIn 參數（簽名固定 2h 有效，見 storage-js 文檔；交接 5min 不可配，留痕）；
     // 客戶端拿到立即上傳，逾時重簽。
+    // WEB_HANDOFF_AVATAR_UPLOAD：purpose=avatar 时附 publicUrl（iOS 不持有 Supabase URL，
+    // 拼不出 PATCH /me 的 avatar_url；其它 purpose 不回）。
     return apiOk({
       bucket,
       path,
       uploadUrl: data.signedUrl,
       token: data.token,
       expires_at: Date.now() + 2 * 3600_000,
+      ...(parsed.purpose === "avatar" ? { publicUrl: avatarPublicUrl(env.url, bucket, path) } : {}),
     });
   } catch (err) {
     console.error(`[api/v1/uploads/sign] threw: ${err instanceof Error ? err.message : "unknown"}`);
