@@ -37,6 +37,7 @@
   - 0048 三列；POST 必填三欄＋过审（reject 403／全挂 503，原子）；列表／详情回显（匿名只回 purposes）＋openapi 1.45.0＋单测
 - **遇見 AI 找人（WEB_HANDOFF_MEET_AI，iOS 输入，未提交）**
   - EPIC I＋UR I.1 建檔 [WIP]；0049 同意＋配额列；`lib/meet.ts` 纯函数＋8 单测；search／status 端点＋`PATCH /me` 同意欄；openapi 1.46.0；固定流水線（agent 另开）
+  - 遇不见好友修复（WEB_HANDOFF_MEET_FIX）：好友 bypass＋声明三档＋`taste_keys`＋`stats`／`match`＋openapi 1.47.0＋单测
 - **新用户引导：生日锁定（WEB_HANDOFF_ONBOARDING，iOS 输入，未提交）**
   - `PATCH /me` 的 dob 首次写入后不可改为不同日期（403 forbidden，相同值放行）；未成年 422 时从未写库，仍可重试；openapi 1.44.0
 - **资料新欄（WEB_HANDOFF_PROFILE_FIELDS，iOS 输入，未提交）**

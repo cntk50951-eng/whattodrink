@@ -13,13 +13,15 @@ import {
   MEET_MAX_RESULTS,
   MEET_QUERY_MAX,
   buildReasons,
+  declaredTasteOf,
+  isFullMatch,
   meetParsePrompt,
   parseMeetReply,
+  preferredHeadline,
   relaxedCriteria,
   sanitizeCriteria,
   scoreCandidate,
-  tasteHeadline,
-  tasteMatches,
+  tasteLevel,
   type MeetCriteria,
 } from "@/lib/meet";
 import { hkDayStartISO } from "@/lib/api/party";
@@ -37,7 +39,9 @@ type CandRow = {
   occupation: unknown;
   languages: unknown;
   interests: unknown;
+  preferences: unknown;
   info_visibility: unknown;
+  discoverable: unknown;
   mode: unknown;
   last_seen_at: unknown;
   live_lat: unknown;
@@ -208,6 +212,8 @@ async function remainingToday(
 type SearchOut = {
   criteria: MeetCriteria;
   results: unknown[];
+  stats: { pool: number; passed: number };
+  friends_not_discoverable: number;
   relaxed?: { note: string; criteria: MeetCriteria };
 };
 
@@ -218,29 +224,50 @@ async function runSearch(
   criteria: MeetCriteria,
   nowMs: number,
 ): Promise<SearchOut> {
-  // 候选池：discoverable＝true（POC 200 上限，按活跃排；NULL／false 永不入池）。
+  // P0 好友不受 discoverable 限制：先取我的全部边，好友集用于入池；池＝discoverable 真陌生人＋全部好友。
+  const { data: allFs } = await svc
+    .from("friendships")
+    .select("user_id,friend_id,status")
+    .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+    .limit(2000);
+  type Edge = { user_id: unknown; friend_id: unknown; status: unknown };
+  const preFriends = new Set<string>();
+  for (const r of ((allFs ?? []) as unknown[]) as Edge[]) {
+    if (typeof r.user_id !== "string" || typeof r.friend_id !== "string") continue;
+    if (r.status === "accepted") preFriends.add(r.user_id === userId ? r.friend_id : r.user_id);
+  }
+  const friendIn = [...preFriends].slice(0, 500).map((id) => `"${id}"`).join(",");
+  // 候选池：discoverable＝true 的陌生人＋全部好友（NULL／false 的陌生人永不入池）。
   const { data: pool } = await svc
     .from("users")
-    .select("id,nickname,avatar_url,gender,dob,height_cm,occupation,languages,interests,info_visibility,mode,last_seen_at,live_lat,live_lng")
-    .eq("discoverable", true)
+    .select("id,nickname,avatar_url,gender,dob,height_cm,occupation,languages,interests,preferences,info_visibility,discoverable,mode,last_seen_at,live_lat,live_lng")
     .neq("id", userId)
     .neq("mode", "stealth")
+    .or(friendIn !== "" ? `discoverable.eq.true,id.in.(${friendIn})` : `discoverable.eq.true`)
     .order("last_seen_at", { ascending: false, nullsFirst: false })
     .limit(200);
   const cands = (((pool ?? []) as unknown[]) as CandRow[]).filter((c) => typeof c.id === "string");
+  // P1 未开启好友数（精确计数，不受 200 池上限影响）。
+  let friendsNotDiscoverable = 0;
+  if (preFriends.size > 0) {
+    const { data: fDisc } = await svc
+      .from("users")
+      .select("id")
+      .in("id", [...preFriends].slice(0, 2000))
+      .or("discoverable.is.null,discoverable.eq.false");
+    friendsNotDiscoverable = ((fDisc ?? []) as unknown[]).length;
+  }
   if (cands.length === 0) {
-    return { criteria, results: [], relaxed: relaxedCriteria(criteria) };
+    return { criteria, results: [], relaxed: relaxedCriteria(criteria), stats: { pool: 0, passed: 0 }, friends_not_discoverable: friendsNotDiscoverable };
   }
   const candIds = cands.map((c) => c.id);
-  // 关系一次取：我的边（好友／拉黑／解友判）＋候选人边（共同好友计数）。
+  // 关系一次取：候选人边（共同好友计数）＋我的拉黑／解友（好友集上已取复用）。
   const inList = [...new Set([userId, ...candIds])].map((id) => `"${id}"`).join(",");
-  const [{ data: myFs }, { data: edgeFs }, { data: myBlocks }, { data: myMutes }] = await Promise.all([
-    svc.from("friendships").select("user_id,friend_id,status").or(`user_id.eq.${userId},friend_id.eq.${userId}`).limit(2000),
+  const [{ data: edgeFs }, { data: myBlocks }, { data: myMutes }] = await Promise.all([
     svc.from("friendships").select("user_id,friend_id,status").eq("status", "accepted").or(`user_id.in.(${inList}),friend_id.in.(${inList})`).limit(5000),
     svc.from("cheers_blocks").select("blocker_id,blocked_id").or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`).limit(2000),
     svc.from("chat_mutes").select("blocker_id,blocked_id").or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`).limit(2000),
   ]);
-  type Edge = { user_id: unknown; friend_id: unknown; status: unknown };
   const blocked = new Set<string>();
   for (const b of ((myBlocks ?? []) as unknown[]) as { blocker_id?: unknown; blocked_id?: unknown }[]) {
     if (typeof b.blocker_id === "string" && typeof b.blocked_id === "string") {
@@ -255,7 +282,7 @@ async function runSearch(
   }
   const myFriends = new Set<string>();
   const relById = new Map<string, "friend" | "pending_out" | "pending_in">();
-  for (const r of ((myFs ?? []) as unknown[]) as Edge[]) {
+  for (const r of ((allFs ?? []) as unknown[]) as Edge[]) {
     if (typeof r.user_id !== "string" || typeof r.friend_id !== "string") continue;
     const peer = r.user_id === userId ? r.friend_id : r.user_id;
     if (r.status === "accepted") {
@@ -285,13 +312,14 @@ async function runSearch(
   type Scored = {
     row: CandRow;
     isFriend: boolean;
+    declared: { favorites: string[]; likes: string[]; dislikes: string[] };
     score: number;
     activeMs: number | null;
     soft: {
       interests: number;
       languages: number;
       occupation: boolean;
-      taste: boolean;
+      tasteLevel: 0 | 1 | 2 | 3;
       mutual: number;
       online: boolean;
       nearby: boolean;
@@ -346,13 +374,14 @@ async function runSearch(
     passed.push({
       row: c,
       isFriend,
+      declared: { favorites: [], likes: [], dislikes: [] },
       score: 0,
       activeMs: cActive,
       soft: {
         interests: criteria.interests?.filter((k) => candInter.includes(k)).length ?? 0,
         languages: criteria.languages?.filter((k) => candLangs.includes(k)).length ?? 0,
         occupation: criteria.occupations !== undefined && candOcc !== null && criteria.occupations.includes(candOcc),
-        taste: false,
+        tasteLevel: 0,
         mutual,
         online: onlineVisible,
         nearby: nearbyOk && criteria.nearby_km !== undefined,
@@ -363,22 +392,35 @@ async function runSearch(
       },
     });
   }
+  // P0 声明口味（preferences.favorites/likes/dislikes；主頁本就對所有人可見，无新增暴露）。
+  for (const p of passed) {
+    p.declared = declaredTasteOf((p.row as unknown as Record<string, unknown>).preferences);
+  }
   // 两遍打分：先无口味取前 40，再算口味重排（口味要逐人查帖，POC 限流）。
   const first = passed
-    .map((p) => ({ p, s: scoreCandidate(criteria, { ...p.soft, taste: false }) }))
+    .map((p) => ({ p, s: scoreCandidate(criteria, { ...p.soft, tasteLevel: 0 }) }))
     .sort((a, b) => b.s - a.s || (a.p.activeMs ?? Infinity) - (b.p.activeMs ?? Infinity))
     .slice(0, TASTE_EVAL_CAP);
   for (const { p } of first) {
     const top = await topTasteGroup(svc, p.row.id, p.isFriend);
     p.soft.tasteGroup = top;
-    p.soft.taste = tasteMatches(top, criteria.taste_groups);
+    p.soft.tasteLevel = tasteLevel(criteria, p.declared, top);
   }
   const ranked = first
-    .map(({ p }) => ({ p, s: scoreCandidate(criteria, p.soft) }))
-    .sort((a, b) => b.s - a.s || (a.p.activeMs ?? Infinity) - (b.p.activeMs ?? Infinity))
+    .map(({ p }) => {
+      const full = isFullMatch(criteria, {
+        occupations: p.soft.occupation,
+        languages: p.soft.languages,
+        interests: p.soft.interests,
+        tasteLevel: p.soft.tasteLevel,
+      });
+      return { p, s: scoreCandidate(criteria, p.soft), full };
+    })
+    // P2：完全符合在前，同级按分、活跃排。
+    .sort((a, b) => Number(b.full) - Number(a.full) || b.s - a.s || (a.p.activeMs ?? Infinity) - (b.p.activeMs ?? Infinity))
     .slice(0, MEET_MAX_RESULTS);
 
-  const results = ranked.map(({ p, s }) => {
+  const results = ranked.map(({ p, s, full }) => {
     const c = p.row;
     const age = ageOf(asStr(c.dob) ?? "", nowMs) ?? 0;
     const nick = asStr(c.nickname);
@@ -389,8 +431,9 @@ async function runSearch(
       gender: c.gender,
       age,
       score: s,
+      match: full ? "full" : "partial",
       reasons: buildReasons({
-        taste: tasteHeadline(p.soft.tasteGroup),
+        taste: preferredHeadline(criteria, p.declared, p.soft.tasteGroup),
         interest: p.soft.interestHit,
         language: p.soft.languageHit,
         mutual: p.soft.mutual,
@@ -400,14 +443,20 @@ async function runSearch(
       occupation: p.isFriend || infoVisibilityOf(c.info_visibility, "occupation") === "public" ? asStr(c.occupation) : null,
       languages: p.isFriend || infoVisibilityOf(c.info_visibility, "languages") === "public" ? asStrArr(c.languages) : [],
       interests: p.isFriend || infoVisibilityOf(c.info_visibility, "interests") === "public" ? asStrArr(c.interests) : [],
-      taste_headline: tasteHeadline(p.soft.tasteGroup),
+      taste_headline: preferredHeadline(criteria, p.declared, p.soft.tasteGroup),
       mutual_friends_count: p.soft.mutual,
       distance_m: p.soft.nearbyM,
       online: p.soft.online,
       relationship: p.isFriend ? "friend" : (relById.get(c.id) ?? "none"),
     };
   });
-  const out: SearchOut = { criteria, results };
+  // P1 匿名统计（只含人数，无个人信息；iOS 解释"为什么没结果"用）。
+  const out: SearchOut = {
+    criteria,
+    results,
+    stats: { pool: cands.length, passed: passed.length },
+    friends_not_discoverable: friendsNotDiscoverable,
+  };
   if (results.length < 3) {
     out.relaxed = relaxedCriteria(criteria);
   }

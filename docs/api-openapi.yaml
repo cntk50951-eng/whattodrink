@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.46.0
+  version: 1.47.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -2518,7 +2518,7 @@ paths:
                   $ref: "#/components/schemas/MeetCriteria"
       responses:
         "200":
-          description: 条件＋忽略＋Top 10（results<3 附 relaxed 放宽建议；remaining_today 剩余额度）
+          description: 条件＋忽略＋Top 10（results<3 附 relaxed 放宽建议；remaining_today 剩余额度；stats 匿名计数＋friends_not_discoverable）
           content:
             application/json:
               schema:
@@ -2535,6 +2535,12 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/MeetResult"
+                  stats:
+                    type: object
+                    description: 匿名计数（pool 候选池人数，passed 过硬条件人数）
+                  friends_not_discoverable:
+                    type: integer
+                    description: 未开启被搜到的好友数（iOS 提示用）
                   relaxed:
                     type: object
                     description: results<3 时给（一键重搜走 criteria，不扣次数）
@@ -3808,6 +3814,11 @@ components:
           type: array
           items:
             type: string
+        taste_keys:
+          type: array
+          items:
+            type: string
+          description: 口味子类 key（如 lager；命中分高于仅大类）
         nearby_km:
           type: integer
         online_only:
@@ -3831,6 +3842,10 @@ components:
           type: integer
         score:
           type: integer
+        match:
+          type: string
+          enum: [full, partial]
+          description: 完全符合（指定条件全中，排前）／部分符合
         reasons:
           type: array
           items:

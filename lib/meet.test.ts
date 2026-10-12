@@ -2,13 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildReasons,
+  isFullMatch,
   maxPossibleScore,
   meetParsePrompt,
   parseMeetReply,
+  preferredHeadline,
   relaxedCriteria,
   sanitizeCriteria,
   scoreCandidate,
   tasteHeadline,
+  tasteLevel,
   tasteMatches,
 } from "./meet";
 
@@ -40,18 +43,18 @@ describe("scoreCandidate（确定性）", () => {
   const c = { interests: ["whisky", "coffee"], languages: ["yue"], taste_groups: ["whisky"] };
   it("全中 100；部分按比例", () => {
     expect(
-      scoreCandidate(c, { interests: 2, languages: 1, occupation: false, taste: true, mutual: 9, online: true, nearby: false }),
+      scoreCandidate(c, { interests: 2, languages: 1, occupation: false, tasteLevel: 3, mutual: 9, online: true, nearby: false }),
     ).toBe(100);
-    const s = scoreCandidate(c, { interests: 0, languages: 0, occupation: false, taste: false, mutual: 0, online: false, nearby: false });
+    const s = scoreCandidate(c, { interests: 0, languages: 0, occupation: false, tasteLevel: 0, mutual: 0, online: false, nearby: false });
     expect(s).toBe(0);
     expect(
-      scoreCandidate(c, { interests: 1, languages: 0, occupation: false, taste: false, mutual: 0, online: false, nearby: false }),
-    ).toBe(Math.min(100, Math.round((4 * 100) / (8 + 3 + 4 + 5 + 2))));
+      scoreCandidate(c, { interests: 1, languages: 0, occupation: false, tasteLevel: 1, mutual: 0, online: false, nearby: false }),
+    ).toBe(Math.min(100, Math.round(((4 + 4) * 100) / (8 + 3 + 8 + 5 + 2))));
   });
   it("0 条件只剩 mutual／online 分（确定性）", () => {
     expect(maxPossibleScore({})).toBe(7);
-    expect(scoreCandidate({}, { interests: 9, languages: 9, occupation: true, taste: true, mutual: 9, online: true, nearby: true })).toBe(100);
-    expect(scoreCandidate({}, { interests: 0, languages: 0, occupation: false, taste: false, mutual: 2, online: false, nearby: false })).toBe(
+    expect(scoreCandidate({}, { interests: 9, languages: 9, occupation: true, tasteLevel: 3, mutual: 9, online: true, nearby: true })).toBe(100);
+    expect(scoreCandidate({}, { interests: 0, languages: 0, occupation: false, tasteLevel: 0, mutual: 2, online: false, nearby: false })).toBe(
       Math.round((2 * 100) / 7),
     );
   });
@@ -92,5 +95,34 @@ describe("parseMeetReply", () => {
     expect(tasteMatches("whisky", ["whisky", "beer"])).toBe(true);
     expect(tasteMatches(null, ["whisky"])).toBe(false);
     expect(meetParsePrompt().system).toContain("whisky");
+  });
+  it("taste_keys 白名单（大类＋子类；非法丢）", () => {
+    expect(sanitizeCriteria({ taste_keys: ["lager", "beer"] }).criteria).toEqual({ taste_keys: ["lager", "beer"] });
+    expect(sanitizeCriteria({ taste_keys: ["外貌"] }).dropped).toContain("taste_keys");
+    expect(sanitizeCriteria({ taste_keys: "lager" }).dropped).toContain("taste_keys");
+  });
+  it("tasteLevel：声明优先 favorites＞likes＞推断；dislikes 归零", () => {
+    const c = { taste_keys: ["lager"] };
+    expect(tasteLevel(c, { favorites: ["lager"], likes: [], dislikes: [] }, "beer")).toBe(3);
+    expect(tasteLevel(c, { favorites: ["beer"], likes: [], dislikes: [] }, null)).toBe(3);
+    expect(tasteLevel(c, { favorites: [], likes: ["beer"], dislikes: [] }, null)).toBe(2);
+    expect(tasteLevel(c, { favorites: [], likes: [], dislikes: [] }, "beer")).toBe(1);
+    expect(tasteLevel(c, { favorites: ["lager"], likes: [], dislikes: ["beer"] }, "beer")).toBe(0);
+    expect(tasteLevel(c, { favorites: [], likes: [], dislikes: [] }, null)).toBe(0);
+    expect(tasteLevel({}, { favorites: ["lager"], likes: [], dislikes: [] }, "beer")).toBe(0);
+    expect(tasteLevel({ taste_groups: ["whisky"] }, { favorites: [], likes: [], dislikes: [] }, "beer")).toBe(0);
+  });
+  it("isFullMatch／preferredHeadline", () => {
+    expect(
+      isFullMatch({ interests: ["a"], taste_keys: ["lager"] }, { occupations: false, languages: 0, interests: 1, tasteLevel: 3 }),
+    ).toBe(true);
+    expect(
+      isFullMatch({ interests: ["a"], taste_keys: ["lager"] }, { occupations: false, languages: 0, interests: 1, tasteLevel: 0 }),
+    ).toBe(false);
+    expect(isFullMatch({}, { occupations: false, languages: 0, interests: 0, tasteLevel: 0 })).toBe(true);
+    expect(
+      preferredHeadline({ taste_keys: ["lager"] }, { favorites: [], likes: ["beer"], dislikes: [] }, "wine"),
+    ).toBe("啤酒派");
+    expect(preferredHeadline({}, { favorites: [], likes: [], dislikes: [] }, "wine")).toBe("葡萄酒派");
   });
 });

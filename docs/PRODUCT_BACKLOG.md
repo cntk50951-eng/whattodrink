@@ -4261,3 +4261,4 @@ UR I.1　遇見搜索＋被搜到同意（纯 API，[shared-only]）[WIP]
 
 *改動記錄*
 - 2026-10-12：建檔置 [WIP]（WEB_HANDOFF_MEET_AI 输入；固定流水線，agent 另开）
+- 2026-10-12：遇不见好友修复（WEB_HANDOFF_MEET_FIX，iOS 输入）：好友 bypass discoverable＋声明口味三档＋`taste_keys` 子类＋`stats`／`friends_not_discoverable`＋`match` full 优先＋openapi 1.47.0

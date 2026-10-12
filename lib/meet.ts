@@ -5,7 +5,7 @@
  */
 
 import { INTERESTS, LANGUAGES, OCCUPATIONS } from "./api/profile";
-import { TASTE_GROUPS, type TasteGroupKey } from "./api/taste";
+import { TASTE_GROUPS, groupOfKey, type TasteGroupKey } from "./api/taste";
 
 export const MEET_DAILY_LIMIT = 10;
 export const MEET_MAX_RESULTS = 10;
@@ -22,6 +22,8 @@ export type MeetCriteria = {
   languages?: string[];
   interests?: string[];
   taste_groups?: string[];
+  /** 口味子類（如 lager、japanese_whisky；白名单＝大类＋子类，P1）。 */
+  taste_keys?: string[];
   nearby_km?: number;
   online_only?: boolean;
 };
@@ -58,7 +60,7 @@ export function sanitizeCriteria(raw: unknown): { criteria: MeetCriteria; droppe
   const r = raw as Record<string, unknown>;
   const KNOWN = new Set([
     "gender", "age_min", "age_max", "height_min", "height_max", "occupations",
-    "languages", "interests", "taste_groups", "nearby_km", "online_only",
+    "languages", "interests", "taste_groups", "taste_keys", "nearby_km", "online_only",
   ]);
   for (const k of Object.keys(r)) {
     if (!KNOWN.has(k) && !dropped.includes(k)) dropped.push(k);
@@ -119,6 +121,25 @@ export function sanitizeCriteria(raw: unknown): { criteria: MeetCriteria; droppe
   } else if (taste !== undefined && taste.length > 0) {
     criteria.taste_groups = taste;
   }
+  // P1：子類 key（大类＋子类皆可；非法／空即丢）。
+  const keysRaw = r.taste_keys;
+  if (keysRaw !== undefined) {
+    if (!Array.isArray(keysRaw)) {
+      dropped.push("taste_keys");
+    } else {
+      const keys: string[] = [];
+      let bad = false;
+      for (const k of keysRaw) {
+        if (typeof k !== "string" || groupOfKey(k) === null) {
+          bad = true;
+          break;
+        }
+        if (!keys.includes(k)) keys.push(k);
+      }
+      if (bad || keys.length === 0 || keys.length > 17) dropped.push("taste_keys");
+      else criteria.taste_keys = keys;
+    }
+  }
   const near = r.nearby_km === undefined ? null : intIn(r.nearby_km, 1, 100);
   if (r.nearby_km !== undefined && near === null) dropped.push("nearby_km");
   else if (near !== null) criteria.nearby_km = near;
@@ -131,7 +152,8 @@ export type ScoredSoft = {
   interests: number;
   languages: number;
   occupation: boolean;
-  taste: boolean;
+  /** 口味命中强度（0 无／1 推断弱／2 喜欢中／3 最爱强；dislikes 命中即 0）。 */
+  tasteLevel: 0 | 1 | 2 | 3;
   mutual: number;
   online: boolean;
   nearby: boolean;
@@ -143,12 +165,26 @@ export const MEET_WEIGHTS = {
   interest_cap: 3,
   language_each: 3,
   occupation: 3,
-  taste: 4,
+  taste_weak: 4,
+  taste_medium: 6,
+  taste_strong: 8,
   mutual_each: 1,
   mutual_cap: 5,
   online: 2,
   nearby: 3,
 } as const;
+
+function tastePoints(level: 0 | 1 | 2 | 3): number {
+  if (level === 3) return MEET_WEIGHTS.taste_strong;
+  if (level === 2) return MEET_WEIGHTS.taste_medium;
+  if (level === 1) return MEET_WEIGHTS.taste_weak;
+  return 0;
+}
+
+/** 是否指定了口味条件（大类或子类任一）。 */
+export function hasTasteCriteria(c: MeetCriteria): boolean {
+  return c.taste_groups !== undefined || c.taste_keys !== undefined;
+}
 
 /** 可能的最高分（按实际指定的条件算；0 条件即 0，全同分按活跃排）。 */
 export function maxPossibleScore(c: MeetCriteria): number {
@@ -157,7 +193,7 @@ export function maxPossibleScore(c: MeetCriteria): number {
   if (c.interests !== undefined) m += Math.min(c.interests.length, w.interest_cap) * w.interest_each;
   if (c.languages !== undefined) m += c.languages.length * w.language_each;
   if (c.occupations !== undefined) m += w.occupation;
-  if (c.taste_groups !== undefined) m += w.taste;
+  if (hasTasteCriteria(c)) m += w.taste_strong;
   m += w.mutual_cap;
   m += w.online;
   if (c.nearby_km !== undefined) m += w.nearby;
@@ -171,7 +207,7 @@ export function scoreCandidate(c: MeetCriteria, s: ScoredSoft): number {
   if (c.interests !== undefined) earned += Math.min(s.interests, w.interest_cap) * w.interest_each;
   if (c.languages !== undefined) earned += s.languages * w.language_each;
   if (c.occupations !== undefined && s.occupation) earned += w.occupation;
-  if (c.taste_groups !== undefined && s.taste) earned += w.taste;
+  if (hasTasteCriteria(c)) earned += tastePoints(s.tasteLevel);
   earned += Math.min(s.mutual, w.mutual_cap) * w.mutual_each;
   if (s.online) earned += w.online;
   if (c.nearby_km !== undefined && s.nearby) earned += w.nearby;
@@ -218,10 +254,112 @@ export function tasteHeadline(group: string | null): string | null {
   return TASTE_HEADLINE[group] ?? null;
 }
 
-/** taste_groups 命中（候选visible行聚合出的 top group 是否在条件里）。 */
+/** taste_groups 命中（候选visible行聚合出的 top group 是否在条件里；旧口径，taste_keys 用 tasteLevel）。 */
 export function tasteMatches(topGroup: TasteGroupKey | null, wanted: string[] | undefined): boolean {
   if (wanted === undefined || topGroup === null) return false;
   return wanted.includes(topGroup);
+}
+
+export type DeclaredTaste = {
+  favorites: string[];
+  likes: string[];
+  dislikes: string[];
+};
+
+function normTasteList(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
+
+export function declaredTasteOf(preferences: unknown): DeclaredTaste {
+  if (typeof preferences !== "object" || preferences === null) {
+    return { favorites: [], likes: [], dislikes: [] };
+  }
+  const p = preferences as Record<string, unknown>;
+  return { favorites: normTasteList(p.favorites), likes: normTasteList(p.likes), dislikes: normTasteList(p.dislikes) };
+}
+
+/** 条件口味归一到大类（子→组；大类保持）。 */
+function wantedGroups(c: MeetCriteria): string[] {
+  const out: string[] = [];
+  for (const g of c.taste_groups ?? []) {
+    if (!out.includes(g)) out.push(g);
+  }
+  for (const k of c.taste_keys ?? []) {
+    const g = groupOfKey(k);
+    if (g !== null && !out.includes(g)) out.push(g);
+  }
+  return out;
+}
+
+/** 条件是否含某子類 key（精确）。 */
+function wantsKey(c: MeetCriteria, key: string): boolean {
+  return (c.taste_keys ?? []).includes(key);
+}
+
+/**
+ * 口味命中强度（P0：声明优先——favorites 强 3＞likes 中 2＞打卡推断弱 1；
+ * dislikes 命中任一条件组即 0；无口味条件即 0）。
+ * favorites/likes 匹配：精确 key 命中，或组命中（条件组含该组；条件子 key 属该组亦算组命中）。
+ */
+export function tasteLevel(
+  c: MeetCriteria,
+  declared: DeclaredTaste,
+  inferredTop: TasteGroupKey | null,
+): 0 | 1 | 2 | 3 {
+  if (!hasTasteCriteria(c)) return 0;
+  const groups = wantedGroups(c);
+  const hit = (keys: string[]): boolean =>
+    keys.some((k) => {
+      if (wantsKey(c, k)) return true;
+      const g = groupOfKey(k);
+      return g !== null && groups.includes(g);
+    });
+  if (hit(declared.dislikes)) return 0;
+  if (hit(declared.favorites)) return 3;
+  if (hit(declared.likes)) return 2;
+  if (inferredTop !== null && groups.includes(inferredTop)) return 1;
+  return 0;
+}
+
+/** P2 完全符合（指定的每一类软条件至少命中一个；硬条件调用方已保证）。 */
+export function isFullMatch(
+  c: MeetCriteria,
+  hit: { occupations: boolean; languages: number; interests: number; tasteLevel: 0 | 1 | 2 | 3 },
+): boolean {
+  if (c.occupations !== undefined && !hit.occupations) return false;
+  if (c.languages !== undefined && hit.languages === 0) return false;
+  if (c.interests !== undefined && hit.interests === 0) return false;
+  if (hasTasteCriteria(c) && hit.tasteLevel === 0) return false;
+  return true;
+}
+
+/** P1 派系標題（聲明優先：favorites/likes 命中的組＞推斷 top；無即 null）。 */
+export function preferredHeadline(
+  c: MeetCriteria,
+  declared: DeclaredTaste,
+  inferredTop: TasteGroupKey | null,
+): string | null {
+  const groups: string[] = [];
+  for (const g of c.taste_groups ?? []) {
+    if (!groups.includes(g)) groups.push(g);
+  }
+  for (const k of c.taste_keys ?? []) {
+    const g = groupOfKey(k);
+    if (g !== null && !groups.includes(g)) groups.push(g);
+  }
+  const hitGroup = (keys: string[]): string | null => {
+    for (const k of keys) {
+      if (groups.includes(k)) return k;
+      const g = groupOfKey(k);
+      if (g !== null && groups.includes(g)) return g;
+    }
+    return null;
+  };
+  const fav = hitGroup(declared.favorites);
+  if (fav !== null) return tasteHeadline(fav);
+  const lik = hitGroup(declared.likes);
+  if (lik !== null) return tasteHeadline(lik);
+  return tasteHeadline(inferredTop);
 }
 
 export type ReasonHit = {
@@ -276,6 +414,10 @@ export function relaxedCriteria(c: MeetCriteria): { note: string; criteria: Meet
 
 /** LLM 系統提示（固定流水線①：只翻條件，不寫 SQL；枚举原样给出防编造）。 */
 export function meetParsePrompt(): { system: string } {
+  const subMap = TASTE_GROUP_KEYS.map((g) => {
+    const subs = (TASTE_GROUPS[g as TasteGroupKey] as readonly string[]).join(",");
+    return `${g}(${subs})`;
+  }).join("\n");
   const enums = [
     `gender: male|female`,
     `age_min/age_max: 18-99 整数`,
@@ -284,8 +426,10 @@ export function meetParsePrompt(): { system: string } {
     `languages: ${(LANGUAGES as readonly string[]).join(",")}`,
     `interests: ${(INTERESTS as readonly string[]).join(",")}`,
     `taste_groups: ${TASTE_GROUP_KEYS.join(",")}`,
+    `taste_keys: 大类或子类 key（如 lager、japanese_whisky；子→大类映射见下）`,
     `nearby_km: 1-100 整数（提到附近/距离才给）`,
     `online_only: true（明确说只要在线才给）`,
+    `大类→子类：\n${subMap}`,
   ].join("\n");
   return {
     system: [
