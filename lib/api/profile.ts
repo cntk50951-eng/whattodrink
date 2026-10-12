@@ -8,6 +8,10 @@ export type ProfileGender = "male" | "female";
 
 export const BIO_MAX = 140;
 export const DOB_MIN = "1900-01-01";
+/** 昵称上限 20 字（WEB_HANDOFF_PROFILE_EDIT_MODERATION 定案；按字计，emoji 算 1）。 */
+export const NICKNAME_MAX = 20;
+/** 改名频率：每天最多 3 次（HK 自然天，沿 cheers／invites 口径）。 */
+export const NICKNAME_DAILY_LIMIT = 3;
 
 /** 生日→足歲（未来／非法回 null，调用方藏年龄，不编岁数）。 */
 export function ageOf(dob: unknown, nowMs: number): number | null {
@@ -31,6 +35,7 @@ export function parseProfileBody(raw: unknown): {
   dob?: string;
   bio?: string | null;
   avatar_url?: string | null;
+  nickname?: string;
 } | { error: string } {
   if (typeof raw !== "object" || raw === null) return { error: "body 需为对象" };
   const r = raw as Record<string, unknown>;
@@ -39,6 +44,7 @@ export function parseProfileBody(raw: unknown): {
     dob?: string;
     bio?: string | null;
     avatar_url?: string | null;
+    nickname?: string;
   } = {};
   if (r.gender !== undefined) {
     if (r.gender !== "male" && r.gender !== "female") return { error: "gender 只要 male｜female" };
@@ -62,6 +68,13 @@ export function parseProfileBody(raw: unknown): {
     if (r.bio !== null && typeof r.bio !== "string") return { error: "bio 只要字符串或 null" };
     const t = typeof r.bio === "string" ? r.bio.trim() : "";
     out.bio = t === "" ? null : t.slice(0, BIO_MAX);
+  }
+  if (r.nickname !== undefined) {
+    if (typeof r.nickname !== "string") return { error: "nickname 只要字符串" };
+    const t = r.nickname.trim();
+    if (t === "") return { error: "nickname 不可为空" };
+    if (Array.from(t).length > NICKNAME_MAX) return { error: `nickname 最长 ${NICKNAME_MAX} 字` };
+    out.nickname = t;
   }
   if (r.avatar_url !== undefined) {
     if (r.avatar_url !== null) {

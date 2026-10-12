@@ -28,8 +28,7 @@ describe("parseProfileBody", () => {
     });
     expect(parseProfileBody({})).toEqual({});
   });
-  it("非法拒（secret／异 dob／bio 截断／外桶头像；Google 头像放行）", () => {
-    expect(parseProfileBody({ gender: "secret" })).toHaveProperty("error");
+  it("非法拒（secret／异 dob／bio 截断／外桶头像；Google 头像放行）", () => {    expect(parseProfileBody({ gender: "secret" })).toHaveProperty("error");
     expect(parseProfileBody({ dob: "01-01-2000" })).toHaveProperty("error");
     expect(parseProfileBody({ dob: "1800-01-01" })).toHaveProperty("error");
     const over = parseProfileBody({ bio: "x".repeat(200) });
@@ -40,6 +39,15 @@ describe("parseProfileBody", () => {
       "error",
     );
     expect(parseProfileBody({ dob: "2020-01-01" })).toEqual({ error: "AGE_RESTRICTED" });
+  });
+  it("昵称：去空／1-20 字／空与超长拒（emoji 按字计）", () => {
+    expect(parseProfileBody({ nickname: "  Chloe " })).toEqual({ nickname: "Chloe" });
+    expect(parseProfileBody({ nickname: "x".repeat(20) })).toEqual({ nickname: "x".repeat(20) });
+    expect(parseProfileBody({ nickname: "🍺".repeat(20) })).toEqual({ nickname: "🍺".repeat(20) });
+    expect(parseProfileBody({ nickname: "   " })).toHaveProperty("error");
+    expect(parseProfileBody({ nickname: "" })).toHaveProperty("error");
+    expect(parseProfileBody({ nickname: "x".repeat(21) })).toHaveProperty("error");
+    expect(parseProfileBody({ nickname: 123 })).toHaveProperty("error");
   });
 });
 

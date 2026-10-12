@@ -1,7 +1,9 @@
 import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parsePatchModeBody, toMeJson } from "@/lib/mode";
-import { parseProfileBody } from "@/lib/api/profile";
+import { NICKNAME_DAILY_LIMIT, parseProfileBody } from "@/lib/api/profile";
+import { hkDayStartISO } from "@/lib/api/party";
+import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { parsePreferences } from "@/lib/api/taste";
 import { parsePushPrefs } from "@/lib/push/prefs";
 
@@ -98,8 +100,7 @@ export async function GET(req: Request): Promise<Response> {
   }
 }
 
-export async function PATCH(req: Request): Promise<Response> {
-  const { supabase, userId } = await getAuthedClient(req);
+export async function PATCH(req: Request): Promise<Response> {  const { supabase, userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
   }
@@ -136,6 +137,19 @@ export async function PATCH(req: Request): Promise<Response> {
   try {
     await ensureUserRow(supabase, userId);
     const nowIso = new Date().toISOString();
+    // 当前行（改名频率＋变化检测＋旧头像清理用；本人行自读）。
+    const { data: curRaw } = await supabase
+      .from("users")
+      .select("nickname,bio,avatar_url,nickname_updated_at,nickname_daily_count")
+      .eq("id", userId)
+      .maybeSingle();
+    const cur = (curRaw ?? {}) as {
+      nickname?: unknown;
+      bio?: unknown;
+      avatar_url?: unknown;
+      nickname_updated_at?: unknown;
+      nickname_daily_count?: unknown;
+    };
     const update: Record<string, unknown> = {};
     if (!("error" in parsed)) {
       update.mode = parsed.body.mode;
@@ -147,8 +161,22 @@ export async function PATCH(req: Request): Promise<Response> {
       if (profile.dob !== undefined) update.dob = profile.dob;
       if (profile.bio !== undefined) update.bio = profile.bio;
       if (profile.avatar_url !== undefined) update.avatar_url = profile.avatar_url;
+      if (profile.nickname !== undefined) update.nickname = profile.nickname;
       if ((raw as Record<string, unknown>).onboarded === true) {
         update.onboarded_at = nowIso;
+      }
+      // 改名频率（WEB_HANDOFF_PROFILE_EDIT_MODERATION：每天最多 3 次，HK 天；真改才计）。
+      if (profile.nickname !== undefined && profile.nickname !== cur.nickname) {
+        const dayStart = hkDayStartISO(Date.now());
+        const sameDay =
+          typeof cur.nickname_updated_at === "string" && cur.nickname_updated_at >= dayStart;
+        const usedToday =
+          sameDay && typeof cur.nickname_daily_count === "number" ? cur.nickname_daily_count : 0;
+        if (usedToday >= NICKNAME_DAILY_LIMIT) {
+          return apiError("rate_limited", "改名太頻繁，每日最多 3 次", 429);
+        }
+        update.nickname_updated_at = nowIso;
+        update.nickname_daily_count = usedToday + 1;
       }
     }
     // UR E.28 口味偏好（对象替换／null 清空；计有效字段，沿"至少一个有效"）。
@@ -163,6 +191,47 @@ export async function PATCH(req: Request): Promise<Response> {
         return apiError("invalid_params", pp.error, 400);
       }
       update.push_prefs = pp.body;
+    }
+    // 内容审核（WEB_HANDOFF_PROFILE_EDIT_MODERATION）：昵称／bio 文审，头像图审；
+    // 任一项不过整个不保存（原子，单 update 在后）；空值（清 bio／清头像）不审直接放行。
+    const newAvatarUrl = !("error" in profile) && typeof profile.avatar_url === "string" ? profile.avatar_url : null;
+    const avatarChanged = newAvatarUrl !== null && newAvatarUrl !== cur.avatar_url;
+    const newAvatarPath = avatarChanged ? selfBucketPath(newAvatarUrl) : null;
+    if (Object.keys(update).length > 0 && !("error" in profile)) {
+      const targets: { label: string; text?: string; imageDataUrl?: string }[] = [];
+      if (typeof profile.nickname === "string" && profile.nickname !== cur.nickname) {
+        targets.push({ label: "暱稱", text: profile.nickname });
+      }
+      if (typeof profile.bio === "string" && profile.bio !== "" && profile.bio !== cur.bio) {
+        targets.push({ label: "自我介紹", text: profile.bio });
+      }
+      if (avatarChanged && newAvatarPath !== null) {
+        const imageDataUrl = await fetchAvatarDataUrl(newAvatarPath);
+        if (imageDataUrl === null) {
+          return apiError("rejected", "審核服務暫不可用，請稍後再試", 503);
+        }
+        targets.push({ label: "頭像", imageDataUrl });
+      }
+      for (const t of targets) {
+        const verdict = await moderateCheckin(
+          { ...(t.text !== undefined ? { text: t.text } : {}), ...(t.imageDataUrl !== undefined ? { imageDataUrl: t.imageDataUrl } : {}) },
+          {
+            openaiKey: process.env.OPENAI_API_KEY ?? process.env.OPENAI_KEY,
+            minimaxKey: process.env.minimaxi_api_key,
+            minimaxBaseUrl: process.env.MINIMAX_API_BASE,
+          },
+        );
+        const action = moderationAction(verdict);
+        if (action === "reject") {
+          // 头像已先落桶且公开：被拒即删（新文件；旧文件不动，本次无保存）。
+          if (newAvatarPath !== null) await deleteAvatarPath(newAvatarPath);
+          return apiError("rejected", `內容未通過審核（${t.label}），請修改後再發`, 403);
+        }
+        if (action === "unavailable") {
+          if (newAvatarPath !== null) await deleteAvatarPath(newAvatarPath);
+          return apiError("rejected", "審核服務暫不可用，請稍後再試", 503);
+        }
+      }
     }
     if (Object.keys(update).length === 0) {
       return apiError("invalid_params", "body 無有效字段", 400);
@@ -187,8 +256,64 @@ export async function PATCH(req: Request): Promise<Response> {
       console.error("[api/v1/me] bad users row after update");
       return apiError("internal", "模式切換失敗", 500);
     }
+    // 旧头像顺手清理（自家桶＋路径变了；失败只记 log，不拦响应）。
+    if (avatarChanged && typeof cur.avatar_url === "string") {
+      const oldPath = selfBucketPath(cur.avatar_url);
+      if (oldPath !== null && oldPath !== newAvatarPath) await deleteAvatarPath(oldPath);
+    }
     return apiOk({ me });
   } catch (err) {
     return apiError("internal", err instanceof Error ? err.message : "unknown", 500);
+  }
+}
+
+/** 自家 avatars 桶 URL→桶内 path（Google 头像／非法即 null，不碰）。 */
+function selfBucketPath(avatarUrl: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(avatarUrl);
+  } catch {
+    return null;
+  }
+  const marker = "/avatars/";
+  const i = u.pathname.indexOf(marker);
+  if (i === -1) return null;
+  const p = u.pathname.slice(i + marker.length);
+  if (p === "" || p.includes("..")) return null;
+  return p;
+}
+
+/** 取自家头像文件转 data URL 送图审（取不到即 null，调用方按不可用处理）。 */
+async function fetchAvatarDataUrl(storagePath: string): Promise<string | null> {
+  try {
+    const { createServiceClient } = await import("@/lib/supabase/server");
+    const svc = await createServiceClient();
+    const { data, error } = await svc.storage.from("avatars").download(storagePath);
+    if (error !== null || data === null) {
+      console.error(`[api/v1/me] avatar fetch error: message=${error?.message}`);
+      return null;
+    }
+    if (data.size > 5 * 1024 * 1024) return null;
+    const buf = Buffer.from(await data.arrayBuffer());
+    const ext = storagePath.split(".").pop()?.toLowerCase() ?? "";
+    const mime = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+    return `data:${mime};base64,${buf.toString("base64")}`;
+  } catch (err) {
+    console.error(`[api/v1/me] avatar fetch threw: ${err instanceof Error ? err.message : "unknown"}`);
+    return null;
+  }
+}
+
+/** 删桶内头像文件（被拒新文件／换下的旧文件；失败只记 log）。 */
+async function deleteAvatarPath(storagePath: string): Promise<void> {
+  try {
+    const { createServiceClient } = await import("@/lib/supabase/server");
+    const svc = await createServiceClient();
+    const { error } = await svc.storage.from("avatars").remove([storagePath]);
+    if (error !== null) {
+      console.error(`[api/v1/me] avatar remove error: message=${error.message}`);
+    }
+  } catch (err) {
+    console.error(`[api/v1/me] avatar remove threw: ${err instanceof Error ? err.message : "unknown"}`);
   }
 }

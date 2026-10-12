@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.41.0
+  version: 1.42.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1731,7 +1731,7 @@ paths:
           $ref: "#/components/responses/Internal"
     patch:
       operationId: patchMeMode
-      summary: 切換可見模式＋個人資料（需登录；A.16 三檔＋E.18 四字段＋打戳＋E.28 preferences＋D.9 push_prefs，字段全可选但至少一有效）
+      summary: 切換可見模式＋個人資料（需登录；A.16 三檔＋E.18 四字段＋暱稱＋打戳＋E.28 preferences＋D.9 push_prefs，字段全可选但至少一有效；昵称／bio／头像过审，任一不过整单不存）
       security:
         - bearerAuth: []
       requestBody:
@@ -1753,6 +1753,10 @@ paths:
                 bio:
                   type: string
                   maxLength: 140
+                nickname:
+                  type: string
+                  maxLength: 20
+                  description: 改昵称（去空 1-20 字；每天最多 3 次，超限 429）
                 avatar_url:
                   type: string
                 onboarded:
@@ -1777,6 +1781,24 @@ paths:
           $ref: "#/components/responses/InvalidParams"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 内容未通过审核（code=rejected，message 标明哪一项；沿打卡口径）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 改名超限（每天最多 3 次）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "503":
+          description: 审核服务暂不可用（两家全挂，fail-closed，沿打卡口径）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/me/saves:
