@@ -247,3 +247,59 @@ export function mineOrCondition(userId: string, joinedIds: string[]): string {
   if (ids.length > 0) parts.push(`id.in.(${ids.join(",")})`);
   return parts.join(",");
 }
+
+/** 撤銷／退出政策（WEB_HANDOFF_PARTY_CANCEL_LEAVE 階段 A；服務端時間算，iOS 只渲染）。 */
+export const PARTY_CANCEL_CUTOFF_MIN = 60;
+
+export type CancelBlockReason = "too_close_to_start" | "started" | "not_host" | "already_cancelled" | null;
+
+export type CancelPolicy = {
+  can_cancel: boolean;
+  block_reason: CancelBlockReason;
+  joiners_count: number;
+};
+
+/** 撤銷政策（host 视角；非 host 即 not_host；cancelled 即 already_cancelled）。 */
+export function cancelPolicy(args: {
+  isHost: boolean;
+  status: string;
+  startAtMs: number;
+  joinersCount: number;
+  nowMs: number;
+}): CancelPolicy {
+  const { isHost, status, startAtMs, joinersCount, nowMs } = args;
+  if (!isHost) return { can_cancel: false, block_reason: "not_host", joiners_count: joinersCount };
+  if (status === "cancelled") {
+    return { can_cancel: false, block_reason: "already_cancelled", joiners_count: joinersCount };
+  }
+  if (Number.isFinite(startAtMs) && nowMs >= startAtMs) {
+    return { can_cancel: false, block_reason: "started", joiners_count: joinersCount };
+  }
+  if (Number.isFinite(startAtMs) && startAtMs - nowMs < PARTY_CANCEL_CUTOFF_MIN * 60_000) {
+    return { can_cancel: false, block_reason: "too_close_to_start", joiners_count: joinersCount };
+  }
+  return { can_cancel: true, block_reason: null, joiners_count: joinersCount };
+}
+
+export type LeavePolicy = {
+  can_leave: boolean;
+  minutes_to_start: number;
+  late: boolean;
+};
+
+/** 退出政策（仅已参加者调用方拼；未参加 can_leave false 由路由直接回，分钟照算）。 */
+export function leavePolicy(args: { joined: boolean; startAtMs: number; nowMs: number }): LeavePolicy {
+  const { joined, startAtMs, nowMs } = args;
+  const minutes = Number.isFinite(startAtMs) ? Math.round((startAtMs - nowMs) / 60_000) : 0;
+  return {
+    can_leave: joined,
+    minutes_to_start: minutes,
+    late: minutes < PARTY_CANCEL_CUTOFF_MIN,
+  };
+}
+
+/** 距开局分钟（可负；退出回显＋事件列用）。 */
+export function minutesBeforeStart(startAtMs: number, nowMs: number): number {
+  if (!Number.isFinite(startAtMs)) return 0;
+  return Math.round((startAtMs - nowMs) / 60_000);
+}

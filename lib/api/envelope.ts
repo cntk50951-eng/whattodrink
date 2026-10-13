@@ -26,6 +26,7 @@ export type ApiErrorCode =
   | "wrong_phase"
   | "invalid_bid"
   | "stale_version"
+  | "too_close_to_start"
   | "ai_unavailable"
   | "onboarding_required"
   | "internal";

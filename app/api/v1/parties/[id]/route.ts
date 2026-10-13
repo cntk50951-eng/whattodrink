@@ -1,5 +1,6 @@
-import { getAuthedClient, getUserId } from "@/lib/supabase/server";
+import { createServiceClient, getAuthedClient, getUserId } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { cancelPolicy, leavePolicy, minutesBeforeStart } from "@/lib/api/party";
 
 type PartyRow = {
   id: string;
@@ -74,6 +75,8 @@ export async function GET(
     );
   }
   const joinedMap = new Map(jrows.map((j) => [j.user_id, j.joined_at]));
+  const joinedByMe = viewerId !== null && (joinedMap.has(viewerId) || row.host_user_id === viewerId);
+  const nowMs = Date.now();
   const members = memberIds.map((uid) => {
     const p = profiles.get(uid) ?? { nickname: "酒友", avatar_url: null, gender: null };
     return {
@@ -111,14 +114,32 @@ export async function GET(
     created_at: row.created_at,
     joined_count: jrows.length,
     members,
-    joined_by_me: viewerId !== null && (joinedMap.has(viewerId) || row.host_user_id === viewerId),
+    joined_by_me: joinedByMe,
     is_mine: viewerId !== null && row.host_user_id === viewerId,
+    // 阶段 A 政策欄（匿名缺席）。
+    ...(viewerId !== null
+      ? {
+          cancel_policy: cancelPolicy({
+            isHost: row.host_user_id === viewerId,
+            status: row.status,
+            startAtMs: Date.parse(row.start_at),
+            joinersCount: jrows.length,
+            nowMs,
+          }),
+          ...(joinedByMe
+            ? { leave_policy: leavePolicy({ joined: true, startAtMs: Date.parse(row.start_at), nowMs }) }
+            : {}),
+        }
+      : {}),
   });
 }
 
 /**
- * UR E.23 撤局（🔒，仅 host；cancelled 后不可再参加，沿 joins 状态门）。
- * `PATCH /api/v1/parties/:id {action: "cancel"}`。
+ * UR E.23 撤局（🔒，仅 host；阶段 A 规则）。
+ * `PATCH /api/v1/parties/:id {action: "cancel"}` —— 距开局 <60min／已开局 409
+ * `too_close_to_start`；无人报名随时可撤（`cancel_no_joiners`，不通知）；
+ * 有人时记事件＋通知全部在场者；`cancelled_at` 落库；重复撤幂等
+ * `{cancelled:true, notified_count:0}`。写走 service（事件＋通知表零 policy）。
  */
 export async function PATCH(
   req: Request,
@@ -143,23 +164,90 @@ export async function PATCH(
   }
   const { data: rowRaw } = await supabase
     .from("parties")
-    .select("id,host_user_id,status")
+    .select("id,host_user_id,status,start_at,place")
     .eq("id", id)
     .maybeSingle();
-  const row = rowRaw as { id: string; host_user_id: string; status: string } | null;
+  const row = rowRaw as {
+    id: string;
+    host_user_id: string;
+    status: string;
+    start_at: string;
+    place: string;
+  } | null;
   if (row === null) return apiError("not_found", "酒局不存在", 404);
   if (row.host_user_id !== userId) {
     return apiError("forbidden", "只有發起人可撤局", 403);
   }
-  if (row.status === "cancelled") return apiOk({ cancelled: true });
-  const { error } = await supabase
+  if (row.status === "cancelled") return apiOk({ cancelled: true, notified_count: 0 });
+  const svc = await createServiceClient();
+  const nowMs = Date.now();
+  const { data: joinRows } = await svc
+    .from("joins")
+    .select("user_id")
+    .eq("party_id", id);
+  const joinerIds = [
+    ...new Set(
+      ((joinRows ?? []) as { user_id?: unknown }[])
+        .map((j) => j.user_id)
+        .filter((v): v is string => typeof v === "string" && v !== ""),
+    ),
+  ];
+  const policy = cancelPolicy({
+    isHost: true,
+    status: row.status,
+    startAtMs: Date.parse(row.start_at),
+    joinersCount: joinerIds.length,
+    nowMs,
+  });
+  if (!policy.can_cancel) {
+    // 阶段 A 无紧急通道：<1h 与已开局一律拒绝（message 照交接，iOS 原文显示）。
+    return apiError("too_close_to_start", "臨近開局不可撤銷", 409);
+  }
+  const nowIso = new Date(nowMs).toISOString();
+  const { error } = await svc
     .from("parties")
-    .update({ status: "cancelled" })
+    .update({ status: "cancelled", cancelled_at: nowIso })
     .eq("id", id)
     .eq("status", "open");
   if (error !== null) {
     console.error(`[api/v1/parties] cancel error: code=${error.code} message=${error.message}`);
     return apiError("internal", "撤局失敗", 500);
   }
-  return apiOk({ cancelled: true });
+  if (joinerIds.length === 0) {
+    await svc.from("party_events").insert({
+      party_id: id,
+      user_id: userId,
+      kind: "cancel_no_joiners",
+      joiners_count: 0,
+      minutes_before_start: minutesBeforeStart(Date.parse(row.start_at), nowMs),
+    });
+    return apiOk({ cancelled: true, notified_count: 0 });
+  }
+  await svc.from("party_events").insert({
+    party_id: id,
+    user_id: userId,
+    kind: "cancel",
+    joiners_count: joinerIds.length,
+    minutes_before_start: minutesBeforeStart(Date.parse(row.start_at), nowMs),
+  });
+  // 通知全部在场者（撤銷前已退的不在 joins 里，自然不发；iOS 直接拼文案）。
+  const { data: hostRow } = await svc.from("users").select("nickname").eq("id", userId).maybeSingle();
+  const hostNick =
+    typeof (hostRow as { nickname?: unknown } | null)?.nickname === "string" &&
+    ((hostRow as { nickname?: string }).nickname ?? "") !== ""
+      ? (hostRow as { nickname: string }).nickname
+      : "酒友";
+  const { error: nErr } = await svc.from("notifications").insert(
+    joinerIds.map((uid) => ({
+      user_id: uid,
+      kind: "party_cancelled",
+      party_id: id,
+      actor_id: userId,
+      payload: { party_place: row.place, start_at: row.start_at, actor_nickname: hostNick },
+    })),
+  );
+  if (nErr !== null) {
+    console.error(`[api/v1/parties] notify error: code=${nErr.code} message=${nErr.message}`);
+  }
+  return apiOk({ cancelled: true, notified_count: joinerIds.length });
 }

@@ -3777,6 +3777,7 @@ UR E.23　公開攢局看板 API（v2-only，iOS-0.57 输入）[WIP]
 - 2026-10-08 round-2 撤销保留（iOS 追单，只做第 1 件 API；第 2 件 loading 归 iOS，web 零酒局 UI 不动）：`GET /parties?box=mine`（我发起＋我参加，含 cancelled／过期，需登录匿名 401；`.or` 单查询，空参加不拼 `in.()`）＋列表行加 `status`（详情早有）＋`mineOrCondition` 纯函数＋单测＋openapi 1.14.0；不建新表（审计视图如要沿 0027 另开）
 - 2026-10-08 可见性定案（用户）：valid 局所有人可见（缺省列表匿名无门，现状已满足）＋参加需登录＋非隐身（401／403 现状已有）；parties 无检举字段，检举隐藏二期等用户需求另开
 - 2026-10-12：目的＋介绍（WEB_HANDOFF_PARTY_INTRO，iOS 输入）：POST 必填三欄（目的 1–3＋other 自填 1–12＋介绍 10–140，介绍／自填过审，reject 403 标项／全挂 503，整单原子）＋列表／详情回显（匿名只回 purposes）＋0048 三列＋openapi 1.45.0
+- 2026-10-13：阶段 A 撤銷／退出／通知（WEB_HANDOFF_PARTY_CANCEL_LEAVE，iOS 输入）：<60min／已开局 409 `too_close_to_start`（无紧急通道）＋无人随时可撤＋`cancelled_at`＋`party_events`＋退出先记事件（late／after_start）＋host 通知（拉黑跳过）＋`notifications` 两端点＋列表／详情政策欄＋0050 四项＋openapi 1.50.0
 
 ---
 

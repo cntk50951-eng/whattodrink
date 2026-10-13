@@ -35,6 +35,8 @@
   - `PATCH /me` 加 `nickname`（1–20 字，每天最多 3 次，0046 两列；无唯一约束）；昵称／bio 文审、头像图审（沿打卡链；reject 403 标项／全挂 503）；整单原子；头像被拒删新文件、成功删旧文件；存量不追溯不补扫＋openapi 1.42.0
 - **酒局目的＋介绍（WEB_HANDOFF_PARTY_INTRO，iOS 输入，未提交）**
   - 0048 三列；POST 必填三欄＋过审（reject 403／全挂 503，原子）；列表／详情回显（匿名只回 purposes）＋openapi 1.45.0＋单测
+- **酒局阶段 A（WEB_HANDOFF_PARTY_CANCEL_LEAVE，iOS 输入，未提交）**
+  - 撤銷规则（<60min／已开局 409，无紧急通道）＋`cancelled_at`＋`party_events`＋退出事件＋host 通知＋`notifications` 两端点＋政策欄＋0050＋openapi 1.50.0＋单测；B／C／紧急通道不做
 - **遇見 AI 找人（WEB_HANDOFF_MEET_AI，iOS 输入，未提交）**
   - EPIC I＋UR I.1 建檔 [WIP]；0049 同意＋配额列；`lib/meet.ts` 纯函数＋8 单测；search／status 端点＋`PATCH /me` 同意欄；openapi 1.46.0；固定流水線（agent 另开）
   - 遇不见好友修复（WEB_HANDOFF_MEET_FIX）：好友 bypass＋声明三档＋`taste_keys`＋`stats`／`match`＋openapi 1.47.0＋单测

@@ -1,7 +1,7 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { isMinorDob } from "@/lib/api/cheers";
-import { seatFor } from "@/lib/api/party";
+import { PARTY_CANCEL_CUTOFF_MIN, minutesBeforeStart, seatFor } from "@/lib/api/party";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 
 type PartyRow = {
@@ -124,8 +124,11 @@ export async function POST(
 }
 
 /**
- * UR E.23 退席（🔒；到期前随时可退，幂等；席位即时回池——行删即回，无需计数器）。
- * `DELETE /api/v1/parties/:id/joins` —— 无行也 200；过期 410。
+ * UR E.23 退席（🔒；阶段 A：先记事件再删行，通知 host）。
+ * `DELETE /api/v1/parties/:id/joins` —— 无行也 200（幂等，不记事件）；
+ * 过期 410；回 `{left, minutes_before_start（可负）, late（<60min）}`。
+ * 已开局后退出记 `leave_after_start`，不发 late 通知（中途离席）。
+ * 写走 service（事件＋通知表零 policy；join 删沿旧 RLS）。
  */
 export async function DELETE(
   _req: Request,
@@ -141,14 +144,76 @@ export async function DELETE(
   }
   const { data: partyRaw } = await supabase
     .from("parties")
-    .select("id,expires_at,status")
+    .select("id,expires_at,status,start_at,host_user_id,place")
     .eq("id", id)
     .maybeSingle();
-  const party = partyRaw as { id: string; expires_at: string; status: string } | null;
+  const party = partyRaw as {
+    id: string;
+    expires_at: string;
+    status: string;
+    start_at: string;
+    host_user_id: string;
+    place: string;
+  } | null;
   if (party === null) return apiError("not_found", "酒局不存在", 404);
-  if (Date.parse(party.expires_at) < Date.now()) {
+  const nowMs = Date.now();
+  if (Date.parse(party.expires_at) < nowMs) {
     return apiError("invalid_params", "酒局已過期", 410);
   }
+  const svc = await createServiceClient();
+  const { data: myJoin } = await svc
+    .from("joins")
+    .select("user_id")
+    .eq("party_id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  const startMs = Date.parse(party.start_at);
+  const minutes = minutesBeforeStart(startMs, nowMs);
+  const late = minutes < PARTY_CANCEL_CUTOFF_MIN;
+  if (myJoin === null) {
+    return apiOk({ left: true, minutes_before_start: minutes, late });
+  }
+  const afterStart = Number.isFinite(startMs) && nowMs >= startMs;
+  const kind = afterStart ? "leave_after_start" : late ? "leave_late" : "leave";
+  const { count: joiners } = await svc
+    .from("joins")
+    .select("user_id", { count: "exact", head: true })
+    .eq("party_id", id);
+  await svc.from("party_events").insert({
+    party_id: id,
+    user_id: userId,
+    kind,
+    joiners_count: joiners ?? 0,
+    minutes_before_start: minutes,
+  });
   await supabase.from("joins").delete().eq("party_id", id).eq("user_id", userId);
-  return apiOk({ left: true });
+  // 通知 host（中途离席不发；host 自己退不发；拉黑关系不发，不泄存在）。
+  if (!afterStart && party.host_user_id !== userId) {
+    const { data: blockRows } = await svc
+      .from("cheers_blocks")
+      .select("blocker_id")
+      .or(`and(blocker_id.eq.${party.host_user_id},blocked_id.eq.${userId}),and(blocker_id.eq.${userId},blocked_id.eq.${party.host_user_id})`)
+      .limit(1);
+    if (!Array.isArray(blockRows) || blockRows.length === 0) {
+      const { data: nickRow } = await svc.from("users").select("nickname").eq("id", userId).maybeSingle();
+      const nick =
+        typeof (nickRow as { nickname?: unknown } | null)?.nickname === "string" &&
+        ((nickRow as { nickname?: string }).nickname ?? "") !== ""
+          ? (nickRow as { nickname: string }).nickname
+          : "酒友";
+      await svc.from("notifications").insert({
+        user_id: party.host_user_id,
+        kind: late ? "member_left_late" : "member_left",
+        party_id: id,
+        actor_id: userId,
+        payload: {
+          party_place: party.place,
+          start_at: party.start_at,
+          actor_nickname: nick,
+          minutes_before_start: minutes,
+        },
+      });
+    }
+  }
+  return apiOk({ left: true, minutes_before_start: minutes, late });
 }

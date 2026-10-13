@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.49.0
+  version: 1.50.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1347,7 +1347,7 @@ paths:
             type: string
       responses:
         "200":
-          description: 酒局行（含 status／joined_count／male_count／female_count／host／joined_by_me／is_mine／distance_m／purposes＋登录才回 purpose_other／host_intro；sync_cursor 服务端 ms，UR E.29）
+          description: 酒局行（含 status／joined_count／male_count／female_count／host／joined_by_me／is_mine／distance_m／purposes＋登录才回 purpose_other／host_intro；登录行加 cancel_policy，参加行加 leave_policy；sync_cursor 服务端 ms，UR E.29）
           content:
             application/json:
               schema:
@@ -1363,7 +1363,7 @@ paths:
   /api/v1/parties/{id}:
     get:
       operationId: getParty
-      summary: 局詳情（匿名可看，匿名只回 purposes；members 含性別＋is_host，UR E.23）
+      summary: 局詳情（匿名可看，匿名只回 purposes；members 含性別＋is_host；登录加 cancel_policy／leave_policy，UR E.23）
       parameters:
         - name: id
           in: path
@@ -1384,7 +1384,7 @@ paths:
           $ref: "#/components/responses/Internal"
     patch:
       operationId: cancelParty
-      summary: 撤局（需登录；仅 host；已撤幂等，UR E.23）
+      summary: 撤局（需登录；仅 host；<60min／已开局 409 too_close_to_start；无人随时可撤；重复撤幂等 notified_count:0，阶段 A）
       security:
         - cookieAuth: []
       requestBody:
@@ -1400,11 +1400,17 @@ paths:
                   enum: [cancel]
       responses:
         "200":
-          description: 已撤銷
+          description: 已撤銷（notified_count＝通知到的在场人数）
           content:
             application/json:
               schema:
                 type: object
+                required: [cancelled, notified_count]
+                properties:
+                  cancelled:
+                    type: boolean
+                  notified_count:
+                    type: integer
         "400":
           $ref: "#/components/responses/InvalidParams"
         "401":
@@ -1417,6 +1423,12 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          description: 临近开局／已开局不可撤（code=too_close_to_start；本期无紧急通道）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/parties/{id}/joins:
@@ -1458,16 +1470,24 @@ paths:
           $ref: "#/components/responses/Internal"
     delete:
       operationId: leaveParty
-      summary: 退席（需登录；无行幂等 200；过期 410，UR E.23）
+      summary: 退席（需登录；先记事件再删行；无行幂等 200；过期 410；回 left／minutes_before_start／late，阶段 A）
       security:
         - cookieAuth: []
       responses:
         "200":
-          description: 已退席
+          description: 已退席（minutes_before_start 可负；late＝<60min；开局后退不通知）
           content:
             application/json:
               schema:
                 type: object
+                required: [left, minutes_before_start, late]
+                properties:
+                  left:
+                    type: boolean
+                  minutes_before_start:
+                    type: integer
+                  late:
+                    type: boolean
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -1848,6 +1868,80 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/me/notifications:
+    get:
+      operationId: listMyNotifications
+      summary: 站内通知（需登录；unread＋倒序＋keyset cursor；阶段 A kind：party_cancelled／member_left／member_left_late）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: 1–50，默认 20
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          description: created_at ISO（keyset 下一页；轻量轮询可 limit=1 只取 unread）
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 未读数＋通知行（actor 无即 null；read 由 read_at 推）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [unread, items]
+                properties:
+                  unread:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/me/notifications/read:
+    patch:
+      operationId: markNotificationsRead
+      summary: 通知标已读（需登录；ids 缺省全标；仍限本人行）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  maxItems: 200
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        "200":
+          description: 已标记
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/me/saves:

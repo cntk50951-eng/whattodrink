@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { countGenders, hkDayStartISO, mineOrCondition, parsePartyBody, partyExpiresAt, partyJoinState, partyMixLine, partyMixText, partyProgress, partyRemainText, partySlotStartAt, seatFor } from "./party";
+import { cancelPolicy, countGenders, hkDayStartISO, leavePolicy, mineOrCondition, minutesBeforeStart, parsePartyBody, partyExpiresAt, partyJoinState, partyMixLine, partyMixText, partyProgress, partyRemainText, partySlotStartAt, seatFor } from "./party";
 
 describe("parsePartyBody", () => {
   const NOW = Date.parse("2026-10-08T00:00:00Z");
@@ -161,5 +161,28 @@ describe("mineOrCondition", () => {
   it("空参加只查发起；去重＋剔空串", () => {
     expect(mineOrCondition("u1", [])).toBe("host_user_id.eq.u1");
     expect(mineOrCondition("u1", ["a", "a", "", "b"])).toBe("host_user_id.eq.u1,id.in.(a,b)");
+  });
+});
+
+describe("cancelPolicy／leavePolicy（階段 A）", () => {
+  const NOW = Date.parse("2026-10-13T10:00:00Z");
+  const H = 3600_000;
+  it("host＋2h 前可撤；59 分拒；已開局拒 started；非 host／已撤各有码", () => {
+    expect(cancelPolicy({ isHost: true, status: "open", startAtMs: NOW + 2 * H, joinersCount: 3, nowMs: NOW })).toEqual({
+      can_cancel: true, block_reason: null, joiners_count: 3,
+    });
+    expect(cancelPolicy({ isHost: true, status: "open", startAtMs: NOW + 59 * 60_000, joinersCount: 0, nowMs: NOW }).block_reason).toBe("too_close_to_start");
+    expect(cancelPolicy({ isHost: true, status: "open", startAtMs: NOW + 61 * 60_000, joinersCount: 0, nowMs: NOW }).can_cancel).toBe(true);
+    expect(cancelPolicy({ isHost: true, status: "open", startAtMs: NOW - 1, joinersCount: 2, nowMs: NOW }).block_reason).toBe("started");
+    expect(cancelPolicy({ isHost: false, status: "open", startAtMs: NOW + 2 * H, joinersCount: 0, nowMs: NOW }).block_reason).toBe("not_host");
+    expect(cancelPolicy({ isHost: true, status: "cancelled", startAtMs: NOW + 2 * H, joinersCount: 0, nowMs: NOW }).block_reason).toBe("already_cancelled");
+  });
+  it("leavePolicy：分钟可负；<60 即 late", () => {
+    expect(leavePolicy({ joined: true, startAtMs: NOW + 2 * H, nowMs: NOW })).toEqual({
+      can_leave: true, minutes_to_start: 120, late: false,
+    });
+    expect(leavePolicy({ joined: true, startAtMs: NOW + 59 * 60_000, nowMs: NOW }).late).toBe(true);
+    expect(leavePolicy({ joined: false, startAtMs: NOW + 2 * H, nowMs: NOW }).can_leave).toBe(false);
+    expect(minutesBeforeStart(NOW - 30 * 60_000, NOW)).toBe(-30);
   });
 });

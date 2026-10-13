@@ -1,7 +1,7 @@
 import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { isMinorDob } from "@/lib/api/cheers";
-import { countGenders, hkDayStartISO, mineOrCondition, parsePartyBody, partyExpiresAt } from "@/lib/api/party";
+import { countGenders, cancelPolicy, hkDayStartISO, leavePolicy, mineOrCondition, parsePartyBody, partyExpiresAt } from "@/lib/api/party";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { haversineMeters } from "@/lib/geo";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
@@ -283,6 +283,27 @@ export async function GET(req: Request): Promise<Response> {
         near === null
           ? null
           : Math.round(haversineMeters(near, { lat: r.lat, lng: r.lng })),
+      // 阶段 A 政策欄（服务端时间算；匿名缺席；iOS 置灰＋确认文案用，不在客户端写规则）。
+      ...(viewerId !== null
+        ? {
+            cancel_policy: cancelPolicy({
+              isHost: r.host_user_id === viewerId,
+              status: r.status,
+              startAtMs: Date.parse(r.start_at),
+              joinersCount: joinCounts.get(r.id) ?? 0,
+              nowMs: Date.now(),
+            }),
+            ...(mine.has(r.id)
+              ? {
+                  leave_policy: leavePolicy({
+                    joined: true,
+                    startAtMs: Date.parse(r.start_at),
+                    nowMs: Date.now(),
+                  }),
+                }
+              : {}),
+          }
+        : {}),
     };
   });
   // UR E.29 同步游标（服务端 ms；changes 的 since 原样回传，与翻页 cursor 区分命名）。
