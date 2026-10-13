@@ -254,7 +254,7 @@ export function tasteHeadline(group: string | null): string | null {
   return TASTE_HEADLINE[group] ?? null;
 }
 
-/** taste_groups 命中（候选visible行聚合出的 top group 是否在条件里；旧口径，taste_keys 用 tasteLevel）。 */
+/** taste_groups 命中（旧口径保留；新代码用 tasteLevel，单类组兼容）。 */
 export function tasteMatches(topGroup: TasteGroupKey | null, wanted: string[] | undefined): boolean {
   if (wanted === undefined || topGroup === null) return false;
   return wanted.includes(topGroup);
@@ -412,7 +412,37 @@ export function relaxedCriteria(c: MeetCriteria): { note: string; criteria: Meet
   };
 }
 
-/** LLM 系統提示（固定流水線①：只翻條件，不寫 SQL；枚举原样给出防编造）。 */
+/** P0 噪音護欄（模型乱填整组即丢；只用于 LLM 路径，用户自选 criteria 不动）。 */
+export const MEET_NOISE_LIMITS = {
+  taste_groups: 5,
+  interests: 6,
+  occupations: 5,
+} as const;
+
+/** 整组丢弃并返回被丢的组名（调用方记入 notes＋ignored）。 */
+export function dropNoisyGroups(c: MeetCriteria): { criteria: MeetCriteria; droppedGroups: string[] } {
+  const next: MeetCriteria = { ...c };
+  const droppedGroups: string[] = [];
+  if (next.taste_groups !== undefined && next.taste_groups.length >= MEET_NOISE_LIMITS.taste_groups) {
+    delete next.taste_groups;
+    droppedGroups.push("taste_groups");
+  }
+  if (next.taste_keys !== undefined && next.taste_keys.length >= MEET_NOISE_LIMITS.taste_groups) {
+    delete next.taste_keys;
+    droppedGroups.push("taste_keys");
+  }
+  if (next.interests !== undefined && next.interests.length >= MEET_NOISE_LIMITS.interests) {
+    delete next.interests;
+    droppedGroups.push("interests");
+  }
+  if (next.occupations !== undefined && next.occupations.length >= MEET_NOISE_LIMITS.occupations) {
+    delete next.occupations;
+    droppedGroups.push("occupations");
+  }
+  return { criteria: next, droppedGroups };
+}
+
+/** LLM 系統提示（固定流水線①：只翻條件，不寫 SQL；规则写死＋少样本，防模型自悟）。 */
 export function meetParsePrompt(): { system: string } {
   const subMap = TASTE_GROUP_KEYS.map((g) => {
     const subs = (TASTE_GROUPS[g as TasteGroupKey] as readonly string[]).join(",");
@@ -431,11 +461,29 @@ export function meetParsePrompt(): { system: string } {
     `online_only: true（明确说只要在线才给）`,
     `大类→子类：\n${subMap}`,
   ].join("\n");
+  const shots = [
+    `输入：我想找一個女生\n输出：{"criteria": {"gender": "female"}, "ignored": []}`,
+    `输入：30 歲左右嘅女仔\n输出：{"criteria": {"gender": "female", "age_min": 27, "age_max": 33}, "ignored": []}`,
+    `输入：鍾意拉格啤酒嘅人\n输出：{"criteria": {"taste_keys": ["lager"]}, "ignored": []}`,
+    `输入：我想找一個女生，喜歡喝酒\n输出：{"criteria": {"gender": "female"}, "ignored": []}`,
+    `输入：想搵人一齊睇波，唔介意男定女\n输出：{"criteria": {"interests": ["ball_sports"]}, "ignored": []}`,
+    `输入：二十幾歲、識講廣東話嘅女仔\n输出：{"criteria": {"gender": "female", "age_min": 20, "age_max": 29, "languages": ["yue"]}, "ignored": []}`,
+    `输入：喺中環附近、而家喺線\n输出：{"criteria": {"nearby_km": 5, "online_only": true}, "ignored": []}`,
+  ].join("\n");
   return {
     system: [
       "你是交友搜索的条件解析器。输入是一句找人描述，只输出一个 JSON 对象，其他一律不输出。",
       "白名单字段（只用这些，多余一律丢弃并记入 ignored）：",
       enums,
+      "硬规则（违反即错误）：",
+      "1. 只输出用户明确说过的条件；没提的字段一律不给，绝不预设语言／年龄／兴趣。",
+      "2. 年龄：「X 歲左右／約／上下」→X±3；「二十幾」→20–29；「三十出頭」→30–33；「後生」不翻；单个精确数字才 min=max。",
+      "3. 性别：女生／女仔／女／靚女／lady→female；男生／男仔／男／靚仔→male；「唔介意／男女都得」→不给 gender。",
+      "4. 泛指「鍾意飲酒／飲嘢」不给 interests、不给 taste（无法区分人）；只有具体酒种／兴趣才给。",
+      "5. 附近／在线：用户明说才给。",
+      "6. ignored 只记确实无法映射的片段；已翻成条件的词不要再记进去。",
+      "示例：",
+      shots,
       "不支持的一律丢弃并把用户原文片段记入 ignored（≤5）：外貌、身材、种族、宗教、性取向等敏感属性，以及无法映射的描述。",
       '输出形状：{"criteria": {只含命中的白名单字段}, "ignored": ["原文片段"]}',
     ].join("\n"),

@@ -47,7 +47,7 @@ function decodeContent(raw: unknown): string {
 /** 文字对话（非流式；maxTokens 默认 200，酒保短回复够用）。 */
 export async function minimaxChat(
   messages: MinimaxChatMessage[],
-  opts: { apiKey: string; fetchFn?: FetchFn; maxTokens?: number },
+  opts: { apiKey: string; fetchFn?: FetchFn; maxTokens?: number; temperature?: number; topP?: number },
 ): Promise<string> {
   const doFetch = opts.fetchFn ?? fetch;
   const res = await doFetch(`${MINIMAX_BASE}/v1/chat/completions`, {
@@ -60,6 +60,9 @@ export async function minimaxChat(
       model: MINIMAX_CHAT_MODEL,
       thinking: { type: "disabled" },
       max_completion_tokens: opts.maxTokens ?? 200,
+      // 確定性輸出（遇見條件解析用 temperature 0；不傳即服务端默认）。
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      ...(opts.topP !== undefined ? { top_p: opts.topP } : {}),
       messages,
     }),
   });

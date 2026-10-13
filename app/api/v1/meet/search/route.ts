@@ -14,6 +14,7 @@ import {
   MEET_QUERY_MAX,
   buildReasons,
   declaredTasteOf,
+  dropNoisyGroups,
   isFullMatch,
   meetParsePrompt,
   parseMeetReply,
@@ -114,6 +115,7 @@ export async function POST(req: Request): Promise<Response> {
 
   let criteria: MeetCriteria;
   let ignored: string[];
+  const notes: string[] = [];
   let llmPath = false;
   if (hasCriteria) {
     const s = sanitizeCriteria(body.criteria);
@@ -158,7 +160,13 @@ export async function POST(req: Request): Promise<Response> {
             { role: "system", content: meetParsePrompt().system },
             { role: "user", content: queryRaw },
           ],
-          { apiKey: minimaxKey, fetchFn: (url, init) => fetch(url, { ...init, signal: ctrl.signal }) },
+          {
+            apiKey: minimaxKey,
+            fetchFn: (url, init) => fetch(url, { ...init, signal: ctrl.signal }),
+            // P0 稳定输出（同输入同结果；探针结论）。
+            temperature: 0,
+            topP: 1,
+          },
         );
       } finally {
         clearTimeout(timer);
@@ -175,8 +183,13 @@ export async function POST(req: Request): Promise<Response> {
       return apiError("ai_unavailable", "AI 暫時唔可用，請稍後再試", 503);
     }
     const s = sanitizeCriteria(parsed.criteria);
-    criteria = s.criteria;
+    // P0 噪音護欄（整组乱填即丢；只走 LLM 路径，用户自选不动）。
+    const g = dropNoisyGroups(s.criteria);
+    criteria = g.criteria;
     ignored = [...parsed.ignored, ...s.dropped].slice(0, 5);
+    if (g.droppedGroups.length > 0) {
+      notes.push("泛指條件已略過");
+    }
     // 扣次數（解析成功才扣；查询失败不回滚——条件已产出，沿"成功扣"口径）。
     const todayStr = new Date(nowMs + 8 * 3600_000).toISOString().slice(0, 10);
     await svc
@@ -189,7 +202,11 @@ export async function POST(req: Request): Promise<Response> {
 
   const out = await runSearch(svc, userId, me, criteria, nowMs);
   const remaining = await remainingToday(svc, userId, nowMs);
-  return apiOk({ ...out, ignored, remaining_today: remaining });
+  // P1 条件生效说明（距离／在线只对好友生效，用户需知道）。
+  if (criteria.nearby_km !== undefined || criteria.online_only === true) {
+    notes.push("距離／在線只對好友生效");
+  }
+  return apiOk({ ...out, ignored, notes, remaining_today: remaining });
 }
 
 async function remainingToday(

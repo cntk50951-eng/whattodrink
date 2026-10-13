@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.47.0
+  version: 1.48.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -2518,7 +2518,7 @@ paths:
                   $ref: "#/components/schemas/MeetCriteria"
       responses:
         "200":
-          description: 条件＋忽略＋Top 10（results<3 附 relaxed 放宽建议；remaining_today 剩余额度；stats 匿名计数＋friends_not_discoverable）
+          description: 条件＋忽略＋Top 10（results<3 附 relaxed 放宽建议；remaining_today 剩余额度；stats 匿名计数＋friends_not_discoverable；notes 条件生效说明）
           content:
             application/json:
               schema:
@@ -2531,6 +2531,11 @@ paths:
                     type: array
                     items:
                       type: string
+                  notes:
+                    type: array
+                    items:
+                      type: string
+                    description: 如「距離／在線只對好友生效」「泛指條件已略過」（条件 chips 下方显示）
                   results:
                     type: array
                     items:

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildReasons,
+  dropNoisyGroups,
   isFullMatch,
   maxPossibleScore,
   meetParsePrompt,
@@ -12,7 +13,6 @@ import {
   scoreCandidate,
   tasteHeadline,
   tasteLevel,
-  tasteMatches,
 } from "./meet";
 
 describe("sanitizeCriteria（白名单丢弃）", () => {
@@ -89,12 +89,28 @@ describe("parseMeetReply", () => {
     expect(r.ignored).toHaveLength(5);
     expect(() => parseMeetReply("唔明你講乜")).toThrow();
   });
-  it("tasteHeadline／tasteMatches", () => {
+  it("tasteHeadline／prompt 含规则＋示例", () => {
     expect(tasteHeadline("whisky")).toBe("威士忌派");
     expect(tasteHeadline("nope")).toBeNull();
-    expect(tasteMatches("whisky", ["whisky", "beer"])).toBe(true);
-    expect(tasteMatches(null, ["whisky"])).toBe(false);
-    expect(meetParsePrompt().system).toContain("whisky");
+    const sys = meetParsePrompt().system;
+    expect(sys).toContain("whisky");
+    expect(sys).toContain("X±3");
+    expect(sys).toContain("我想找一個女生");
+  });
+  it("dropNoisyGroups（整组乱填即丢）", () => {
+    const noisy = dropNoisyGroups({
+      taste_groups: ["beer", "wine", "sake", "gin", "rum"],
+      interests: ["a", "b", "c", "d", "e", "f"],
+      occupations: ["tech"],
+      languages: ["yue"],
+    });
+    expect(noisy.criteria.taste_groups).toBeUndefined();
+    expect(noisy.criteria.interests).toBeUndefined();
+    expect(noisy.criteria.occupations).toEqual(["tech"]);
+    expect(noisy.droppedGroups).toContain("taste_groups");
+    const clean = dropNoisyGroups({ taste_groups: ["beer"], interests: ["a"] });
+    expect(clean.droppedGroups).toEqual([]);
+    expect(clean.criteria.taste_groups).toEqual(["beer"]);
   });
   it("taste_keys 白名单（大类＋子类；非法丢）", () => {
     expect(sanitizeCriteria({ taste_keys: ["lager", "beer"] }).criteria).toEqual({ taste_keys: ["lager", "beer"] });
