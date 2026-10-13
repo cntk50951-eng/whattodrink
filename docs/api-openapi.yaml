@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.52.0
+  version: 1.53.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -2076,6 +2076,211 @@ paths:
           $ref: "#/components/responses/InvalidParams"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/parties/{id}/complaints:
+    post:
+      operationId: fileComplaint
+      summary: 投訴提交（需登录；名单内；局结束＋72h 窗口，safety 除外；每局每对一次；每日 5 条；late_* 拒；说明过审，UR E.31 C2）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_user_id, category, detail]
+              properties:
+                target_user_id:
+                  type: string
+                  format: uuid
+                category:
+                  type: string
+                  enum: [no_show, mismatch, harassment, safety, other]
+                detail:
+                  type: string
+                  maxLength: 200
+                evidence:
+                  type: array
+                  maxItems: 3
+                  items:
+                    type: string
+                    format: uri
+                    description: 本站上传链接
+      responses:
+        "201":
+          description: 已受理（safety 直进人工，其余等申辩）
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非名单（code=not_in_party）／暂停期（code=complaint_suspended）／隐身未成年
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: 未结束（code=not_ended）／超窗口（code=window_closed）／重复（code=duplicate）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 每日 5 条
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/me/complaints:
+    get:
+      operationId: listMyComplaints
+      summary: 我的投诉（需登录；role=filed|against；对方身份 safety 外隐藏；无 ai_json／flags，UR E.31 C2）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [filed, against]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 投诉行（can_respond／can_appeal 置灰用）
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/complaints/{id}:
+    get:
+      operationId: getComplaint
+      summary: 单案详情（需登录；仅双方；被投诉人看不到投訴人，safety 除外；无内部审计字段，UR E.31 C2）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 案件（逾期未申辩 touch 即转分诊）
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/complaints/{id}/respond:
+    post:
+      operationId: respondComplaint
+      summary: 申辩（需登录；被投訴人；24h 内；写后转分诊，UR E.31 C2）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  maxLength: 200
+      responses:
+        "200":
+          description: 已提交
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/complaints/{id}/appeal:
+    post:
+      operationId: appealComplaint
+      summary: 申诉（需登录；不利方；结果后 7 天内一次；回人工，UR E.31 C2）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  maxLength: 500
+      responses:
+        "200":
+          description: 已受理
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/me/trust:

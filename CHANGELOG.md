@@ -41,6 +41,8 @@
   - UR E.30 建檔 [WIP]；0051 賬本＋config／score／ledger＋两读端点＋host 徽章＋发局限制（默认关）＋counters `notices_unread`＋openapi 1.51.0；C 另开 E.31
 - **酒局 C1（WEB_HANDOFF_PARTY_COMPLAINT_C，iOS 输入，未提交）**
   - UR E.31 建檔 [WIP]；0052 四表一列＋config 键＋settle（懒触发＋dry-run）＋到场／出席三端点＋`completion_rate`＋提醒 SQL＋openapi 1.52.0；C2 另做
+- **酒局 C2（同上，iOS 输入，未提交）**
+  - 投诉提交／列表／详情／申辩／申诉＋AI 分診（shadow，temperature 0＋注入防護）＋`applyDecision`（成立／驳回／恶意＋沖銷＋暂停）＋隐蔽审核后台（白名单＋404＋队列／详情／CSV）＋`safety_alerts`（0053）＋openapi 1.53.0＋单测
 - **遇見 AI 找人（WEB_HANDOFF_MEET_AI，iOS 输入，未提交）**
   - EPIC I＋UR I.1 建檔 [WIP]；0049 同意＋配额列；`lib/meet.ts` 纯函数＋8 单测；search／status 端点＋`PATCH /me` 同意欄；openapi 1.46.0；固定流水線（agent 另开）
   - 遇不见好友修复（WEB_HANDOFF_MEET_FIX）：好友 bypass＋声明三档＋`taste_keys`＋`stats`／`match`＋openapi 1.47.0＋单测

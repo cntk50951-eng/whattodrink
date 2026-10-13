@@ -4025,6 +4025,7 @@ UR E.31　酒局出席／到场／结算／提醒（WEB_HANDOFF_PARTY_COMPLAINT_
 
 *改動記錄*
 - 2026-10-13：建檔置 [WIP]（C1 输入）＋实作：0052＋config 键＋settle 纯函数＋DB 落子＋三端点＋completion_rate＋openapi 1.52.0＋单测。
+- 2026-10-13：C2 投诉＋分诊＋后台（WEB_HANDOFF_PARTY_COMPLAINT_C）：提交／列表／详情／申辩／申诉＋AI 分诊（temperature 0＋shadow）＋`applyDecision`（成立／驳回／恶意＋沖銷＋暂停）＋隐蔽后台（队列／详情／CSV）＋`safety_alerts`（0053）＋openapi 1.53.0＋单测。
 
 ---
 

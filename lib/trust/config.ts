@@ -42,6 +42,31 @@ export const TRUST_CONFIG = {
   attendance_window_h: 24,
   /** C1 结算 dry-run（true＝只记 outcome 不写账本；观察一周再开）。 */
   settle_write_ledger: false,
+  /** C2 投诉窗口与上限。 */
+  complaint_window_h: 72,
+  response_window_h: 24,
+  appeal_window_days: 7,
+  complaint_daily_cap: 5,
+  dismissed_suspend_count: 3,
+  dismissed_suspend_window_days: 30,
+  suspend_days: 14,
+  retaliation_window_h: 48,
+  repeat_pair_flag_count: 3,
+  /** C2 判定分值。 */
+  no_show_delta_member: -10,
+  no_show_delta_host: -15,
+  upheld_mismatch_delta: -6,
+  upheld_harassment_lv1: -10,
+  upheld_harassment_lv2: -18,
+  upheld_harassment_lv3: -25,
+  upheld_other_delta: -4,
+  dismissed_filer_delta: -2,
+  malicious_delta: -15,
+  expires_no_show_days: 180,
+  expires_mismatch_days: 90,
+  expires_harassment_days: 365,
+  expires_malicious_days: 365,
+  expires_dismissed_days: 90,
 } as const;
 
 export type TrustTier = "newbie" | "trusted" | "normal" | "watch" | "restricted";
