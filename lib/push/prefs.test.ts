@@ -77,6 +77,7 @@ describe("sumBadge", () => {
       stranger_unread: 0,
       friend_requests_pending: 0,
       game_invites_pending: 0,
+      notices_unread: 0,
       badge: 12,
     });
     expect(sumBadge(3, 2, 7, 1)).toEqual({
@@ -86,6 +87,7 @@ describe("sumBadge", () => {
       stranger_unread: 1,
       friend_requests_pending: 0,
       game_invites_pending: 0,
+      notices_unread: 0,
       badge: 13,
     });
     expect(sumBadge(-1, NaN, 2.7)).toEqual({
@@ -95,6 +97,7 @@ describe("sumBadge", () => {
       stranger_unread: 0,
       friend_requests_pending: 0,
       game_invites_pending: 0,
+      notices_unread: 0,
       badge: 2,
     });
   });
@@ -106,6 +109,7 @@ describe("sumBadge", () => {
       stranger_unread: 1,
       friend_requests_pending: 2,
       game_invites_pending: 0,
+      notices_unread: 0,
       badge: 6,
     });
     expect(sumBadge(0, 0, 0, 0, NaN)).toEqual({
@@ -115,6 +119,7 @@ describe("sumBadge", () => {
       stranger_unread: 0,
       friend_requests_pending: 0,
       game_invites_pending: 0,
+      notices_unread: 0,
       badge: 0,
     });
   });
@@ -126,7 +131,20 @@ describe("sumBadge", () => {
       stranger_unread: 1,
       friend_requests_pending: 1,
       game_invites_pending: 2,
+      notices_unread: 0,
       badge: 5,
+    });
+  });
+  it("通知未读只展示不计 badge", () => {
+    expect(sumBadge(0, 0, 0, 0, 0, 0, 4)).toEqual({
+      cheers_unread: 0,
+      invites_pending: 0,
+      chat_unread: 0,
+      stranger_unread: 0,
+      friend_requests_pending: 0,
+      game_invites_pending: 0,
+      notices_unread: 4,
+      badge: 0,
     });
   });
 });

@@ -1,7 +1,9 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { isMinorDob } from "@/lib/api/cheers";
 import { countGenders, cancelPolicy, hkDayStartISO, leavePolicy, mineOrCondition, parsePartyBody, partyExpiresAt } from "@/lib/api/party";
+import { hostTrustMap, readTrust } from "@/lib/trust/ledger";
+import { TRUST_CONFIG } from "@/lib/trust/config";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { haversineMeters } from "@/lib/geo";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
@@ -46,6 +48,22 @@ export async function POST(req: Request): Promise<Response> {
     .gte("created_at", hkDayStartISO(Date.now()));
   if ((dayCount ?? 0) >= 3) {
     return apiError("rate_limited", "今日發局已達上限（3 次）", 429);
+  }
+  // E.30 诚信限制（默认全关，配置开；watch 日发 1 局，restricted 停 14 天）。
+  if (TRUST_CONFIG.enforce_watch_limit || TRUST_CONFIG.enforce_restricted) {
+    const svc = await createServiceClient();    const t = await readTrust(svc, userId);
+    if (TRUST_CONFIG.enforce_restricted && t.tier === "restricted") {
+      // 包络无带数通道（沿 429-quota 口径）：until＝now＋14d，写进 message，iOS 解析或展示。
+      const until = new Date(Date.now() + TRUST_CONFIG.restricted_days * 24 * 3600_000).toISOString();
+      return apiError(
+        "trust_restricted",
+        `誠信受限，暫停發起至 ${until}`,
+        403,
+      );
+    }
+    if (TRUST_CONFIG.enforce_watch_limit && t.tier === "watch" && (dayCount ?? 0) >= TRUST_CONFIG.watch_daily_parties) {
+      return apiError("rate_limited", "今日發局已達上限", 429);
+    }
   }
   const b = parsed.body;
   const startMs = Date.parse(b.start_at);
@@ -247,6 +265,8 @@ export async function GET(req: Request): Promise<Response> {
       );
     }
   }
+  // E.30 发起人信用徽章（批量 3 查询收敛；service 读，零 policy 表）。
+  const trustMap = await hostTrustMap(await createServiceClient(), hostIds, Date.now());
   const items = list.map((r) => {
     const host = hosts.get(r.host_user_id) ?? { nickname: "酒友", avatar_url: null };
     const gc = countGenders(gendersByParty.get(r.id) ?? []);
@@ -276,7 +296,7 @@ export async function GET(req: Request): Promise<Response> {
       joined_count: joinCounts.get(r.id) ?? 0,
       male_count: gc.male,
       female_count: gc.female,
-      host: { user_id: r.host_user_id, nickname: host.nickname, avatar_url: host.avatar_url },
+      host: { user_id: r.host_user_id, nickname: host.nickname, avatar_url: host.avatar_url, trust: trustMap.get(r.host_user_id) ?? { tier: "newbie", hosted_count: 0, completion_rate: null, cancel_90d: 0 } },
       joined_by_me: mine.has(r.id),
       is_mine: viewerId !== null && r.host_user_id === viewerId,
       distance_m:

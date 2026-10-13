@@ -2,6 +2,7 @@ import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { isMinorDob } from "@/lib/api/cheers";
 import { PARTY_CANCEL_CUTOFF_MIN, minutesBeforeStart, seatFor } from "@/lib/api/party";
+import { writeTrustEvent } from "@/lib/trust/ledger";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 
 type PartyRow = {
@@ -187,6 +188,23 @@ export async function DELETE(
     minutes_before_start: minutes,
   });
   await supabase.from("joins").delete().eq("party_id", id).eq("user_id", userId);
+  // E.30 诚信记账（开局后离席／≥24h 不记；幂等 ref 防重）。
+  if (!afterStart && minutes < 24 * 60) {
+    const leaveKind = minutes < 60 ? "leave_late" : minutes < 3 * 60 ? "leave_3h_1h" : "leave_24h_3h";
+    const leaveDelta = minutes < 60 ? -6 : minutes < 3 * 60 ? -3 : -1;
+    await writeTrustEvent(
+      svc,
+      {
+        user_id: userId,
+        kind: leaveKind,
+        delta: leaveDelta,
+        party_id: id,
+        ref_id: `party:${id}:leave:${userId}`,
+        expires_days: 90,
+      },
+      nowMs,
+    );
+  }
   // 通知 host（中途离席不发；host 自己退不发；拉黑关系不发，不泄存在）。
   if (!afterStart && party.host_user_id !== userId) {
     const { data: blockRows } = await svc

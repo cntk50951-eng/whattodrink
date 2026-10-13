@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.50.0
+  version: 1.51.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1297,13 +1297,13 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: 隱身／未成年禁發；介绍／目的不过审（code=rejected，message 标明项；整单不存）
+          description: 隱身／未成年禁發；介绍／目的不过审（code=rejected，message 标明项；整单不存）；诚信受限（code=trust_restricted，默认关闭，until 写 message）
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
         "429":
-          description: 3／天
+          description: 3／天；watch 每日 1 局（默认关闭）
           content:
             application/json:
               schema:
@@ -1718,17 +1718,17 @@ paths:
   /api/v1/me/counters:
     get:
       operationId: getMyCounters
-      summary: 轻量计数（需登录；六数＋badge 同推送口径；陌生人单计＋好友请求＋游戏邀请（不计 badge），UR D.10／B.3／H.1）
+      summary: 轻量计数（需登录；七数＋badge 同推送口径；陌生人单计＋好友请求＋游戏邀请＋站内通知（后两者不计 badge），UR D.10／B.3／H.1／酒局 A）
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: 计数（badge＝五数和，不含游戏邀请）
+          description: 计数（badge＝五数和，不含游戏邀请与站内通知）
           content:
             application/json:
               schema:
                 type: object
-                required: [cheers_unread, invites_pending, chat_unread, stranger_unread, friend_requests_pending, game_invites_pending, badge]
+                required: [cheers_unread, invites_pending, chat_unread, stranger_unread, friend_requests_pending, game_invites_pending, notices_unread, badge]
                 properties:
                   cheers_unread:
                     type: integer
@@ -1744,6 +1744,9 @@ paths:
                   game_invites_pending:
                     type: integer
                     description: 收到的游戏邀请（pending 且房间仍 lobby；badge 不含，只展示，UR H.1）
+                  notices_unread:
+                    type: integer
+                    description: 站内通知未读（badge 不含，动态红点用，酒局阶段 A）
                   badge:
                     type: integer
         "401":
@@ -1942,6 +1945,85 @@ paths:
           $ref: "#/components/responses/InvalidParams"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/me/trust:
+    get:
+      operationId: getMyTrust
+      summary: 本人诚信（需登录；分数＋等级＋完成数＋账本倒序＋keyset；UR E.30）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: 1–50，默认 20
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          description: created_at ISO（keyset 下一页）
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 分数（70 基准＋衰减现算）＋账本行（含 effective_delta＋reason_text＋party_place）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [score, tier, completed_count, hosted_count, cancel_90d, leave_late_90d, restricted_until]
+                properties:
+                  score:
+                    type: integer
+                  tier:
+                    type: string
+                    enum: [newbie, trusted, normal, watch, restricted]
+                  completed_count:
+                    type: integer
+                  hosted_count:
+                    type: integer
+                  cancel_90d:
+                    type: integer
+                  leave_late_90d:
+                    type: integer
+                  restricted_until:
+                    type: string
+                    format: date-time
+                    nullable: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/users/{id}/trust:
+    get:
+      operationId: getUserTrust
+      summary: 他人诚信（需登录；只回等级＋统计，不回精确分；拉黑 404，UR E.30）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 等级＋完成数＋主办数＋完成率（本期 null，C 填）＋90 天撤销数
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tier, completed_count, hosted_count, completion_rate, cancel_90d]
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 不存在／拉黑
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/me/saves:

@@ -27,6 +27,7 @@ export type ApiErrorCode =
   | "invalid_bid"
   | "stale_version"
   | "too_close_to_start"
+  | "trust_restricted"
   | "ai_unavailable"
   | "onboarding_required"
   | "internal";

@@ -7,15 +7,16 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** 六数相加（badge＝前五和；game_invites_pending 只展示不计 badge，免打扰，问答定案）。 */
-export function sumBadge(cheers: number, invites: number, chat: number, stranger = 0, friendRequests = 0, gameInvites = 0): BadgeCounts {
+/** 七数相加（badge＝前五和；game_invites_pending、notices_unread 只展示不计 badge，免打扰）。 */
+export function sumBadge(cheers: number, invites: number, chat: number, stranger = 0, friendRequests = 0, gameInvites = 0, notices = 0): BadgeCounts {
   const c = Number.isFinite(cheers) && cheers > 0 ? Math.floor(cheers) : 0;
   const i = Number.isFinite(invites) && invites > 0 ? Math.floor(invites) : 0;
   const h = Number.isFinite(chat) && chat > 0 ? Math.floor(chat) : 0;
   const s = Number.isFinite(stranger) && stranger > 0 ? Math.floor(stranger) : 0;
   const f = Number.isFinite(friendRequests) && friendRequests > 0 ? Math.floor(friendRequests) : 0;
   const g = Number.isFinite(gameInvites) && gameInvites > 0 ? Math.floor(gameInvites) : 0;
-  return { cheers_unread: c, invites_pending: i, chat_unread: h, stranger_unread: s, friend_requests_pending: f, game_invites_pending: g, badge: c + i + h + s + f };
+  const n = Number.isFinite(notices) && notices > 0 ? Math.floor(notices) : 0;
+  return { cheers_unread: c, invites_pending: i, chat_unread: h, stranger_unread: s, friend_requests_pending: f, game_invites_pending: g, notices_unread: n, badge: c + i + h + s + f };
 }
 
 export type BadgeCounts = {
@@ -28,6 +29,8 @@ export type BadgeCounts = {
   friend_requests_pending: number;
   /** UR H.1 收到的游戏邀请（lobby 房 pending；badge 不含，只展示）。 */
   game_invites_pending: number;
+  /** 酒局阶段 A 站内通知未读（badge 不含，动态红点用）。 */
+  notices_unread: number;
   badge: number;
 };
 
@@ -57,6 +60,21 @@ export async function countGameInvites(
     .in("id", roomIds)
     .eq("status", "lobby");
   return ((rooms ?? []) as unknown[]).length;
+}
+
+/**
+ * 阶段 A 站内通知未读（badge 不含；表缺席 fail-open 计 0）。
+ */
+export async function countNoticesUnread(
+  supa: SupabaseClient,
+  userId: string,
+): Promise<number> {
+  const { count } = await supa
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .is("read_at", null);
+  return count ?? 0;
 }
 
 /**
@@ -117,5 +135,5 @@ export async function computeBadge(
     if (isFriend) chat += count ?? 0;
     else stranger += count ?? 0;
   }
-  return sumBadge(cheers ?? 0, invites ?? 0, chat, stranger, friendRequests ?? 0, await countGameInvites(supa, userId));
+  return sumBadge(cheers ?? 0, invites ?? 0, chat, stranger, friendRequests ?? 0, await countGameInvites(supa, userId), await countNoticesUnread(supa, userId));
 }

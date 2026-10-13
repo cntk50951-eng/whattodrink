@@ -3971,6 +3971,37 @@ UR E.29　地图新内容轻量提示（v2-only，iOS-0.71 输入）[WIP]
 
 ---
 
+UR E.30　酒局誠信積分（WEB_HANDOFF_PARTY_TRUST_COMPLAINT 階段 B，iOS 输入）[WIP]
+
+> 阶段 A（E.23 撤銷／退出／通知）已合入；本单只做 B（C 另开 E.31）。
+
+### 背景（定案）
+- 賬本只追加（撤销用反向事件）；分数现算 `70＋Σdelta×decay`（线性，用戶拍板）；救濟读时生效。
+- 限制默认全关（观察 2 周再开）；`restricted_until` 包络无通道，写 message（沿 429-quota 口径）。
+- 加分（出席／成局／连击）触发点在 C（到场／确认），B 先落负分＋账本结构；互刷递减／周上限／连击已实现。
+- `completion_rate` 本期 null（C 填）；`users.trust_score_cache` 不建（现算够用）。
+
+### 範圍
+1. **數據**：0051（`trust_events`＋唯一 `(kind,ref_id)`＋索引；RLS 零 policy）。
+2. **純函數**：`lib/trust/config.ts`（全部数值＋开关）＋`score.ts`（衰减／等级／救濟）＋6 单测。
+3. **寫入**：`lib/trust/ledger.ts`（幂等＋周上限＋互刷＋连击＋`trust_changed` 通知≥3 分）＋撤銷／退出接线。
+4. **讀取**：`GET /me/trust`（分数＋账本 keyset）＋`GET /users/:id/trust`（等级＋统计，无精确分）＋列表／详情 `host.trust`（批量 3 查询）。
+5. **限制**：`POST /parties` 接入（默认关闭）＋`trust_restricted` 码。
+6. **計數**：counters 加 `notices_unread`（badge 不含）——阶段 A 收尾。
+7. openapi 1.51.0＋單測（衰减／边界／上限／互刷）。
+
+### 非目標
+- C（出席／投诉／AI 判定／结算 job／admin 页，E.31）、push、搜索历史、v1 任何文件。
+
+### AC（交接 §五测试建议子集）
+- 衰减／过期／周上限／互刷／等级边界（单测）；59 分撤 409（既有）；重复撤幂等（既有）；
+- 真机：撤銷／退出后我的分数变、账本有行、≥3 分收到通知；陌生人看不到精确分。
+
+*改動記錄*
+- 2026-10-13：建檔置 [WIP]（B 输入；C 另开 E.31）＋实作：0051＋config／score／ledger＋两读端点＋host 徽章＋发局限制＋counters＋openapi 1.51.0＋单测。
+
+---
+
 UR D.8　聊天附件 V2（iOS API_CHAT_V2 输入）[WIP]
 
 > iOS 按交接写了 client；web（ChatRoomLive＋Onboarding）已依赖 D.6 形状。用户定案：保留现有 sign 形状做加法，不断 web。

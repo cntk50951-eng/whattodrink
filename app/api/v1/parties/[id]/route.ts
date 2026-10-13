@@ -1,6 +1,8 @@
 import { createServiceClient, getAuthedClient, getUserId } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { cancelPolicy, leavePolicy, minutesBeforeStart } from "@/lib/api/party";
+import { hostTrustMap } from "@/lib/trust/ledger";
+import { writeTrustEvent } from "@/lib/trust/ledger";
 
 type PartyRow = {
   id: string;
@@ -88,6 +90,9 @@ export async function GET(
       is_host: uid === row.host_user_id,
     };
   });
+  // E.30 发起人信用徽章（与列表同形；service 读）。
+  const detailTrust = await hostTrustMap(await createServiceClient(), [row.host_user_id], nowMs);
+  const hostMember = members.find((m) => m.is_host) ?? { user_id: row.host_user_id, nickname: "酒友", avatar_url: null };
   return apiOk({
     id: row.id,
     place: row.place,
@@ -114,6 +119,12 @@ export async function GET(
     created_at: row.created_at,
     joined_count: jrows.length,
     members,
+    host: {
+      user_id: hostMember.user_id,
+      nickname: hostMember.nickname,
+      avatar_url: hostMember.avatar_url,
+      trust: detailTrust.get(row.host_user_id) ?? { tier: "newbie", hosted_count: 0, completion_rate: null, cancel_90d: 0 },
+    },
     joined_by_me: joinedByMe,
     is_mine: viewerId !== null && row.host_user_id === viewerId,
     // 阶段 A 政策欄（匿名缺席）。
@@ -230,6 +241,22 @@ export async function PATCH(
     joiners_count: joinerIds.length,
     minutes_before_start: minutesBeforeStart(Date.parse(row.start_at), nowMs),
   });
+  // E.30 诚信记账（有人报名才记；≥24h 不记；幂等 ref 防重）。
+  const cancelMinutes = minutesBeforeStart(Date.parse(row.start_at), nowMs);
+  if (cancelMinutes < 24 * 60) {
+    await writeTrustEvent(
+      svc,
+      {
+        user_id: userId,
+        kind: cancelMinutes < 3 * 60 ? "cancel_3h_1h" : "cancel_24h_3h",
+        delta: cancelMinutes < 3 * 60 ? -6 : -3,
+        party_id: id,
+        ref_id: `party:${id}:cancel:${userId}`,
+        expires_days: 90,
+      },
+      nowMs,
+    );
+  }
   // 通知全部在场者（撤銷前已退的不在 joins 里，自然不发；iOS 直接拼文案）。
   const { data: hostRow } = await svc.from("users").select("nickname").eq("id", userId).maybeSingle();
   const hostNick =
