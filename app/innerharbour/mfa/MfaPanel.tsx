@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
+import { normalizeTotp } from "@/lib/totpInput";
 
 type Mode = "loading" | "verify" | "enroll" | "error";
 
@@ -75,6 +76,7 @@ export default function MfaPanel({ next }: { next: string }) {
     <div>
       {mode === "enroll" ? (
         <>
+          <p style={{ color: "crimson" }}>掃碼後請<strong>不要重新整理本頁</strong>——重新整理會生成新的二維碼，舊的就失效了。</p>
           <p>首次使用：用驗證器 App（如 Google Authenticator、1Password）掃描二維碼，再輸入 6 位驗證碼。</p>
           {/* data: URI 的 SVG，經 <img> 載入不會執行腳本 */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -87,9 +89,11 @@ export default function MfaPanel({ next }: { next: string }) {
       <input
         inputMode="numeric"
         autoComplete="one-time-code"
-        maxLength={6}
         value={code}
-        onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+        onChange={(e) => setCode(normalizeTotp(e.target.value))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") void submit();
+        }}
         aria-label="6 位驗證碼"
         style={{ fontSize: 24, letterSpacing: 6, width: 180 }}
       />{" "}

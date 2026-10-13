@@ -55,3 +55,16 @@ describe("isOpsPath（proxy 跳過 intl，防止後台被改寫成 /zh-Hant/inne
     expect(isOpsPath("/bars")).toBe(false);
   });
 });
+
+import { normalizeTotp } from "./totpInput";
+
+describe("normalizeTotp（驗證碼輸入歸一，修「貼上 123 456 後按鈕灰」）", () => {
+  it("去空格／符號／全角，取前 6 位", () => {
+    expect(normalizeTotp("123 456")).toBe("123456");
+    expect(normalizeTotp(" 123-456 ")).toBe("123456");
+    expect(normalizeTotp("１２３４５６")).toBe("123456");
+    expect(normalizeTotp("1234567890")).toBe("123456");
+    expect(normalizeTotp("12a")).toBe("12");
+    expect(normalizeTotp("")).toBe("");
+  });
+});
