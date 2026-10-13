@@ -39,6 +39,7 @@
   - EPIC I＋UR I.1 建檔 [WIP]；0049 同意＋配额列；`lib/meet.ts` 纯函数＋8 单测；search／status 端点＋`PATCH /me` 同意欄；openapi 1.46.0；固定流水線（agent 另开）
   - 遇不见好友修复（WEB_HANDOFF_MEET_FIX）：好友 bypass＋声明三档＋`taste_keys`＋`stats`／`match`＋openapi 1.47.0＋单测
   - AI 质量（WEB_HANDOFF_MEET_AI_QUALITY，iOS 探针输入）：temperature 0＋噪音護欄（整组乱填丢）＋prompt 硬规则＋7 条少样本＋`notes`＋`meet-regression.ts` 手动探针＋openapi 1.48.0
+  - 测试重置端点（WEB_HANDOFF_MEET_TEST_RESET，iOS 输入）：`DELETE /meet/mine/today`（同门同风格，只动自己）＋openapi 1.49.0
 - **新用户引导：生日锁定（WEB_HANDOFF_ONBOARDING，iOS 输入，未提交）**
   - `PATCH /me` 的 dob 首次写入后不可改为不同日期（403 forbidden，相同值放行）；未成年 422 时从未写库，仍可重试；openapi 1.44.0
 - **资料新欄（WEB_HANDOFF_PROFILE_FIELDS，iOS 输入，未提交）**

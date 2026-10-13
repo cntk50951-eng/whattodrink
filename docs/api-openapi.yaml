@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.48.0
+  version: 1.49.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -2597,6 +2597,35 @@ paths:
                     type: integer
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/meet/mine/today:
+    delete:
+      operationId: resetMeetToday
+      summary: 重置今日搜索计数（测试专用；TEST_ENDPOINTS_ENABLED 未开 404；只动自己，UR I.1）
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 已重置（remaining_today 回满额）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reset, remaining_today]
+                properties:
+                  reset:
+                    type: boolean
+                  remaining_today:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 测试端点未开（prod 保持关闭）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/games/rooms/{id}/invites:

@@ -4263,3 +4263,4 @@ UR I.1　遇見搜索＋被搜到同意（纯 API，[shared-only]）[WIP]
 - 2026-10-12：建檔置 [WIP]（WEB_HANDOFF_MEET_AI 输入；固定流水線，agent 另开）
 - 2026-10-12：遇不见好友修复（WEB_HANDOFF_MEET_FIX，iOS 输入）：好友 bypass discoverable＋声明口味三档＋`taste_keys` 子类＋`stats`／`friends_not_discoverable`＋`match` full 优先＋openapi 1.47.0
 - 2026-10-12：AI 质量（WEB_HANDOFF_MEET_AI_QUALITY，iOS 探针输入）：temperature 0＋噪音護欄＋prompt 硬规则＋少样本＋`notes`＋回歸腳本＋openapi 1.48.0
+- 2026-10-12：测试重置端点（WEB_HANDOFF_MEET_TEST_RESET，iOS 输入）：`DELETE /meet/mine/today`（TEST_ENDPOINTS_ENABLED 门，只动自己）＋openapi 1.49.0
