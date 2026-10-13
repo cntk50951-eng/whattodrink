@@ -42,3 +42,16 @@ describe("配置", () => {
     }
   });
 });
+
+import { isOpsPath } from "./opsPath";
+
+describe("isOpsPath（proxy 跳過 intl，防止後台被改寫成 /zh-Hant/innerharbour 而 404）", () => {
+  it("只匹配後台根與其子路徑", () => {
+    expect(isOpsPath("/innerharbour")).toBe(true);
+    expect(isOpsPath("/innerharbour/mfa")).toBe(true);
+    expect(isOpsPath("/innerharbour/review/abc")).toBe(true);
+    expect(isOpsPath("/innerharbourx")).toBe(false);
+    expect(isOpsPath("/zh-Hans/innerharbour/mfa")).toBe(false);
+    expect(isOpsPath("/bars")).toBe(false);
+  });
+});

@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 import { parseHomeUi, resolveHomeTarget } from "@/lib/home";
 import { routing } from "./i18n/routing";
+import { isOpsPath } from "./lib/opsPath";
 
 const intlMiddleware = createMiddleware(routing);
 
@@ -18,6 +19,17 @@ const intlMiddleware = createMiddleware(routing);
  * `/api/v1/health` 看自檢狀態。
  */
 export default async function proxy(request: NextRequest) {
+  // 內部審核後台不在 [locale] 路由樹下：不能走 intl（否則被改寫成 /zh-Hant/innerharbour/* 而 404）。
+  // 仍要刷新 Supabase 會話 cookie（後台靠 cookie 會話＋TOTP）。
+  if (isOpsPath(request.nextUrl.pathname)) {
+    const plain = NextResponse.next();
+    try {
+      return await updateSession(request, plain);
+    } catch (err) {
+      console.error(`[supabase] session refresh skipped (ops): ${(err as Error).message}`);
+      return plain;
+    }
+  }
   // UR C.7：首頁版本開關先行——裸 `/`＋v2 檔明跳 `/v2`；
   // 其餘（含 v1 深鏈）原樣進 intl＋session 鏈，v1 一個字節不動。
   const homeTarget = resolveHomeTarget(
