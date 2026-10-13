@@ -39,7 +39,7 @@ export async function POST(
   } catch {
     storageHost = "";
   }
-  const parsed = parseComplaintBody(raw, storageHost);
+  const parsed = parseComplaintBody(raw, storageHost, userId);
   if ("error" in parsed) {
     return apiError("invalid_params", parsed.error, 400);
   }

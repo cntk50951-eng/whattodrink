@@ -35,6 +35,7 @@ export type ApiErrorCode =
   | "duplicate"
   | "complaint_suspended"
   | "trust_restricted"
+  | "mfa_required"
   | "ai_unavailable"
   | "onboarding_required"
   | "internal";

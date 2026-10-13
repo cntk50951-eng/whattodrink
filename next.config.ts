@@ -5,17 +5,16 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
 const nextConfig: NextConfig = {
   // Intentionally minimal — add config as needed.
-  // 清單 B14：后台路径安全头（防点击劫持＋不缓存隐私页；前台不动）。
+  // 安全头（全站统一，不再只给后台路径加——否则 404 响应头会暴露后台路径是否存在；审核报告 M3）。
+  // 不含 Cache-Control：含隐私的后台页读 cookie，Next 对动态页默认 no-store；
+  // 前台静态资源缓存策略不动。证据链接自带 rel=noreferrer＋referrerPolicy，后台不依赖全局 no-referrer。
   async headers() {
-    const admin = [
+    const common = [
       { key: "X-Frame-Options", value: "DENY" },
-      { key: "Referrer-Policy", value: "no-referrer" },
-      { key: "Cache-Control", value: "no-store" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     ];
-    return [
-      { source: "/innerharbour/:path*", headers: admin },
-      { source: "/api/internal/:path*", headers: admin },
-    ];
+    return [{ source: "/:path*", headers: common }];
   },
 };
 

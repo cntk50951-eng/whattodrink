@@ -25,13 +25,29 @@ describe("parseComplaintBody", () => {
     );
   });
   it("evidence 只要本站 https（≤3）", () => {
-    const ev = ["https://x.supabase.co/storage/v1/object/public/chat-images/a.jpg"];
+    const ev = ["https://x.supabase.co/storage/v1/object/public/chat-images/u1/a.jpg"];
     expect(parseComplaintBody({ ...base, evidence: ev }, "x.supabase.co")).toEqual(
       expect.objectContaining({ evidence: ev }),
     );
     expect(parseComplaintBody({ ...base, evidence: ["http://evil.test/a.jpg"] }, "x.supabase.co")).toHaveProperty("error");
     expect(parseComplaintBody({ ...base, evidence: ["https://other.test/a.jpg"] }, "x.supabase.co")).toHaveProperty("error");
     expect(parseComplaintBody({ ...base, evidence: ["a", "b", "c", "d"] }, "x.supabase.co")).toHaveProperty("error");
+  });
+  it("evidence 只能是投訴人自己在 chat-images 的上傳（審核報告 M4）", () => {
+    const own = "https://x.supabase.co/storage/v1/object/sign/chat-images/u1/2026-10/a.jpg?token=t";
+    expect(parseComplaintBody({ ...base, evidence: [own] }, "x.supabase.co", "u1")).toEqual(
+      expect.objectContaining({ evidence: [own] }),
+    );
+    // 別人的上傳／其他 bucket／頭像／帶賬號密碼的 URL 全拒
+    for (const bad of [
+      "https://x.supabase.co/storage/v1/object/sign/chat-images/u2/a.jpg",
+      "https://x.supabase.co/storage/v1/object/public/avatars/u1/a.jpg",
+      "https://x.supabase.co/storage/v1/object/public/chat-voice/u1/a.m4a",
+      "https://user:pw@x.supabase.co/storage/v1/object/public/chat-images/u1/a.jpg",
+      "https://x.supabase.co/storage/v1/object/public/chat-images/%2e%2e/u2/a.jpg",
+    ]) {
+      expect(parseComplaintBody({ ...base, evidence: [bad] }, "x.supabase.co", "u1")).toHaveProperty("error");
+    }
   });
   it("parseComplaintText 上下限", () => {
     expect(parseComplaintText({ text: "  ok " }, "text", 200)).toEqual({ text: "ok" });

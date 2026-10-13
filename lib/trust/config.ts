@@ -81,4 +81,9 @@ export const TRUST_KIND_TEXT: Record<string, string> = {
   attend: "出席酒局",
   hosted_completed: "發起的酒局成局",
   streak_bonus: "連續守約獎勵",
+  no_show: "被記為放鴿子",
+  complaint_upheld: "投訴成立",
+  harassment_upheld: "投訴成立（不當言行）",
+  complaint_dismissed: "投訴未獲成立",
+  complaint_malicious: "惡意投訴",
 };

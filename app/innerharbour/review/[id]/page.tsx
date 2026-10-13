@@ -1,92 +1,104 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { createServiceClient } from "@/lib/supabase/server";
-import { cookieSessionUserId, logAdmin, requireAdmin } from "@/lib/ops";
+import { decideComplaint, isPublicReasonKey, PUBLIC_REASONS, type Decision, type PublicReasonKey } from "@/lib/complaintDecision";
+import { adminRateLimited, auditOrThrow, auditViewOnce, checkSameOrigin, logAdmin } from "@/lib/ops";
+import { requireAdminPage } from "@/lib/opsPage";
 
-/* eslint-disable react-hooks/purity -- Server Component 门禁＋详情读库＋Server Action 写库；整页无客户端渲染，无其他写法。 */
+export const metadata = { robots: { index: false, follow: false } };
+
+/** 人工可選的對外理由（用戶只會看到這些固定文案；內部備註永不外發）。 */
+const MANUAL_REASONS: PublicReasonKey[] = [
+  "evidence_confirmed",
+  "insufficient_evidence",
+  "contradicted_by_records",
+  "guideline_violation",
+  "not_factual",
+];
+
+const ERROR_TEXT: Record<string, string> = {
+  not_found: "案件不存在",
+  invalid_state: "此案件目前不可判定（只有「待人工」或申訴中的案件可判）",
+  busy: "另一位審核員正在處理，請稍後刷新",
+  failed: "判定執行失敗，請稍後重試（未重複扣分）",
+};
 
 /**
- * 內部審核詳情＋操作（UR E.31 C2；白名單，非管理員 404）。
- * 展示：雙方陳述（匿名甲／乙）／申辯／證據／時間線／到場出席／90 天誠信摘要／AI 建議；
- * 操作：成立（選 severity）／駁回／惡意（備註必填）／申诉改判先沖銷。
+ * 內部審核詳情＋操作（UR E.31 C2；白名單＋TOTP，非管理員 404）。
+ * 操作：成立（選 severity）／駁回／惡意；申訴案維持原判或改判（改判需第二人）。
+ * 寫操作：moderator＋新鮮 TOTP＋同源校驗＋限速；先寫審計（失敗即中止）。
  */
 export default async function ReviewDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  // 清單 A3：只認 cookie 會話。
-  const userId = await cookieSessionUserId();
-  if (userId === null) notFound();
-  const svc = await createServiceClient();
-  if (!(await requireAdmin(svc, userId))) notFound();
+  const { userId, role, svc } = await requireAdminPage({}, `/innerharbour/review/${id}`);
   const { data: cRaw } = await svc.from("complaints").select("*").eq("id", id).maybeSingle();
   const c = cRaw as Record<string, unknown> | null;
   if (c === null) notFound();
-  // 清單 D21：查看敏感详情落子。
-  await logAdmin(svc, { admin_id: userId, action: "view_complaint", target: id });
+  // 查看敏感詳情留痕（寫失敗即中止顯示；同案 60 秒內合併）。
+  await auditViewOnce(svc, { admin_id: userId, action: "view_complaint", target: id });
 
   async function decide(formData: FormData): Promise<never> {
     "use server";
-    const { cookieSessionUserId: cookieId, checkSameOrigin: sameOrigin, logAdmin: audit } = await import("@/lib/ops");
-    const adminId = await cookieId();
-    if (adminId === null) notFound();
-    // 清單 B10：写操作验同源（CSRF）。
-    if (!(await sameOrigin())) {
-      throw new Error("跨站請求被拒");
-    }
-    const { createServiceClient: createSvc } = await import("@/lib/supabase/server");
-    const { requireAdmin: needAdmin, reverseTrustEvent: reverse } = await import("@/lib/ops");
-    const { applyDecision: apply } = await import("@/lib/complaints");
-    const s = await createSvc();
-    if (!(await needAdmin(s, adminId))) notFound();
-    const decision = String(formData.get("decision") ?? "");
-    const note = String(formData.get("note") ?? "").trim().slice(0, 500);
-    if (note === "") throw new Error("備註必填");
-    if (decision !== "uphold" && decision !== "dismiss" && decision !== "malicious") {
+    // 寫操作：moderator＋新鮮 TOTP；缺則引導到 MFA 頁（回到本案）。
+    const g = await requireAdminPage({ write: true, stepUp: true }, `/innerharbour/review/${id}`);
+    if (!(await checkSameOrigin())) throw new Error("跨站請求被拒");
+    const decisionRaw = String(formData.get("decision") ?? "");
+    if (decisionRaw !== "uphold" && decisionRaw !== "dismiss" && decisionRaw !== "malicious") {
       throw new Error("decision 非法");
     }
+    const decision: Decision = decisionRaw;
+    const reasonRaw = String(formData.get("reason") ?? "");
+    if (!isPublicReasonKey(reasonRaw) || !MANUAL_REASONS.includes(reasonRaw)) throw new Error("對外理由非法");
+    const note = String(formData.get("note") ?? "").trim().slice(0, 500);
+    if (note === "") throw new Error("內部備註必填");
     const sevRaw = Number(formData.get("severity") ?? 1);
     const severity = sevRaw === 3 ? 3 : sevRaw === 2 ? 2 : 1;
-    const { data: full } = await s.from("complaints").select("status,decision,filer_id,target_id,party_id,decided_by,appeal_status").eq("id", id).maybeSingle();
+    if (await adminRateLimited(g.svc, g.userId, ["decide_attempt"], 30, 600_000)) {
+      throw new Error("操作過於頻繁，請稍後再試");
+    }
+    const { data: full } = await g.svc
+      .from("complaints")
+      .select("status,filer_id,target_id,party_id,decided_by,appeal_status")
+      .eq("id", id)
+      .maybeSingle();
     const f = full as {
-      status?: unknown;
-      filer_id?: unknown;
-      target_id?: unknown;
-      party_id?: unknown;
-      decided_by?: unknown;
-      appeal_status?: unknown;
+      status?: unknown; filer_id?: unknown; target_id?: unknown; party_id?: unknown; decided_by?: unknown; appeal_status?: unknown;
     } | null;
     if (f === null) notFound();
-    // 清單 A9 上半：审核员不能审涉己案件（投訴人／被投訴人／同局成员）。
-    const involved = new Set<string>();
-    if (typeof f.filer_id === "string") involved.add(f.filer_id);
-    if (typeof f.target_id === "string") involved.add(f.target_id);
-    if (involved.has(adminId)) {
-      throw new Error("涉己案件不可審理");
-    }
+    // 涉己回避（投訴人／被投訴人／同局成員／局主）。
+    if (f.filer_id === g.userId || f.target_id === g.userId) throw new Error("涉己案件不可審理");
     if (typeof f.party_id === "string") {
-      const { data: myJoin } = await s.from("joins").select("user_id").eq("party_id", f.party_id).eq("user_id", adminId).maybeSingle();
-      const { data: myParty } = await s.from("parties").select("host_user_id").eq("id", f.party_id).maybeSingle();
-      if (myJoin !== null || (myParty as { host_user_id?: unknown } | null)?.host_user_id === adminId) {
+      const [{ data: myJoin }, { data: myParty }] = await Promise.all([
+        g.svc.from("joins").select("user_id").eq("party_id", f.party_id).eq("user_id", g.userId).maybeSingle(),
+        g.svc.from("parties").select("host_user_id").eq("id", f.party_id).maybeSingle(),
+      ]);
+      if (myJoin !== null || (myParty as { host_user_id?: unknown } | null)?.host_user_id === g.userId) {
         throw new Error("同局案件不可審理");
       }
     }
-    // 清單 A9 下半：申诉改判需第二人（原 decided_by 非本人）。
+    // 申訴案：第二人覆核（原判不是本人）。
     const prevBy = typeof f.decided_by === "string" && f.decided_by.startsWith("human:") ? f.decided_by.slice(6) : null;
-    const isAppealReview = f.appeal_status === "pending";
-    if (isAppealReview && prevBy !== null && prevBy === adminId) {
-      throw new Error("申诉改判需第二人覆核");
+    if (f.appeal_status === "pending" && prevBy !== null && prevBy === g.userId) {
+      throw new Error("申訴改判需第二人覆核");
     }
-    // 申诉改判：原扣分先沖銷（同 ref 审计保留两行）。
-    const curStatus = f.status;
-    if (curStatus === "upheld" || curStatus === "dismissed" || curStatus === "malicious") {
-      const kinds = ["uphold", "dismiss", "malicious"];
-      for (const k of kinds) {
-        await reverse(s, `complaint:${id}:${k}`, Date.now());
-      }
-    }
-    const r = await apply(s, id, decision, { severity, note, by: `human:${adminId}` });
-    if (!r.ok) throw new Error("判定執行失敗");
-    await audit(s, { admin_id: adminId, action: `decide_${decision}`, target: id, detail: { severity, note: note.slice(0, 200) } });
-    redirect("./");
+    // 先寫審計（意圖）；失敗即中止，不執行判定。
+    await auditOrThrow(g.svc, {
+      admin_id: g.userId,
+      action: "decide_attempt",
+      target: id,
+      detail: { decision, severity, reason: reasonRaw, note: note.slice(0, 200) },
+    });
+    const r = await decideComplaint(g.svc, id, decision, {
+      severity, internalNote: note, publicReason: reasonRaw, by: `human:${g.userId}`,
+    });
+    await logAdmin(g.svc, {
+      admin_id: g.userId,
+      action: r.ok ? `decide_${r.outcome}` : "decide_rejected",
+      target: id,
+      detail: r.ok ? { decision } : { error: r.error },
+    });
+    if (!r.ok) throw new Error(ERROR_TEXT[r.error] ?? "判定失敗");
+    redirect("/innerharbour/review");
   }
 
   const { data: events } = await svc
@@ -104,25 +116,37 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
     suggestion?: { recommended?: unknown; severity?: unknown; confidence?: unknown; evidence_strength?: unknown; rationale?: unknown };
     model?: unknown;
   } | null;
+  const isAppeal = c.status === "escalated" && c.appeal_status === "pending";
+  const canDecide = role === "moderator" && c.status === "escalated";
 
   return (
     <main style={{ padding: 24, fontFamily: "system-ui", maxWidth: 860 }}>
       <p>
-        <a href="../review">← 隊列</a>
+        <Link href="/innerharbour/review">← 隊列</Link>
       </p>
       <h1>
         {String(c.category)} · {String(c.status)}
+        {isAppeal ? " · 申訴中" : ""}
       </h1>
       <section>
         <h2>雙方陳述（已匿名）</h2>
         <p>甲（投訴人）：{String(c.detail ?? "")}</p>
         <p>乙申辯：{typeof c.response_text === "string" && c.response_text !== "" ? c.response_text : "（無）"}</p>
+        {isAppeal && (
+          <>
+            <p>申訴說明：{typeof c.appeal_text === "string" ? c.appeal_text : "（無）"}</p>
+            <p>
+              原判：{String(c.decision ?? "-")}（{typeof c.decided_by === "string" ? "他人/系統" : "-"}）；
+              原內部備註：{typeof c.internal_note === "string" ? c.internal_note : "（無）"}
+            </p>
+          </>
+        )}
         <p>
           證據：
           {Array.isArray(c.evidence) && (c.evidence as unknown[]).length > 0
             ? (c.evidence as unknown[]).map((e, i) => (
                 <span key={i}>
-                  <a href={String(e)} target="_blank" rel="noreferrer" referrerPolicy="no-referrer">
+                  <a href={String(e)} target="_blank" rel="noreferrer noopener" referrerPolicy="no-referrer">
                     圖{i + 1}
                   </a>{" "}
                 </span>
@@ -142,32 +166,51 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
       </section>
       <section>
         <h2>判定</h2>
-        <form action={decide}>
-          <label>
-            決定：
-            <select name="decision" defaultValue="uphold">
-              <option value="uphold">成立</option>
-              <option value="dismiss">駁回</option>
-              <option value="malicious">惡意</option>
-            </select>
-          </label>{" "}
-          <label>
-            severity（成立·騷擾用）：
-            <select name="severity" defaultValue="1">
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-            </select>
-          </label>
+        {!canDecide ? (
           <p>
-            <label>
-              備註（必填）：
-              <br />
-              <textarea name="note" rows={3} cols={60} required maxLength={500} />
-            </label>
+            {role === "viewer"
+              ? "你是只讀角色，不可判定。"
+              : "此案件目前不可判定（只有「待人工」或申訴中的案件可判）。"}
           </p>
-          <button type="submit">執行（冪等，可重複點）</button>
-        </form>
+        ) : (
+          <form action={decide}>
+            {isAppeal && <p>申訴案：與原判相同＝維持原判（不動積分）；不同＝沖銷原扣分後按新判執行，且需第二位審核員。</p>}
+            <label>
+              決定：
+              <select name="decision" defaultValue="uphold">
+                <option value="uphold">成立</option>
+                <option value="dismiss">駁回</option>
+                <option value="malicious">惡意</option>
+              </select>
+            </label>{" "}
+            <label>
+              severity（成立·騷擾用）：
+              <select name="severity" defaultValue="1">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            </label>{" "}
+            <label>
+              對外理由（用戶可見）：
+              <select name="reason" defaultValue="evidence_confirmed">
+                {MANUAL_REASONS.map((k) => (
+                  <option key={k} value={k}>
+                    {PUBLIC_REASONS[k]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p>
+              <label>
+                內部備註（必填，僅後台可見，不會發給任何用戶）：
+                <br />
+                <textarea name="note" rows={3} cols={60} required maxLength={500} />
+              </label>
+            </p>
+            <button type="submit">執行（需新鮮二次驗證；已判定的案件不可重複執行）</button>
+          </form>
+        )}
       </section>
     </main>
   );

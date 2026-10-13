@@ -1,4 +1,5 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
+import { publicReasonText } from "@/lib/complaintDecision";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { TRUST_CONFIG } from "@/lib/trust/config";
 
@@ -23,7 +24,7 @@ export async function GET(req: Request): Promise<Response> {
   const nowMs = Date.now();
   let query = svc
     .from("complaints")
-    .select("id,party_id,filer_id,target_id,category,detail,response_text,response_due_at,status,decision,decision_note,decided_at,appeal_status,created_at")
+    .select("id,party_id,filer_id,target_id,category,detail,response_text,response_due_at,status,decision,public_reason,decided_at,appeal_status,created_at")
     .eq(role === "filed" ? "filer_id" : "target_id", userId)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
@@ -77,7 +78,7 @@ export async function GET(req: Request): Promise<Response> {
       response_text: r.response_text ?? null,
       response_due_at: r.response_due_at ?? null,
       decision: r.decision ?? null,
-      decision_note: r.decision_note ?? null,
+      decision_note: publicReasonText(r.public_reason) || null,
       created_at: r.created_at,
       decided_at: r.decided_at ?? null,
       can_respond:

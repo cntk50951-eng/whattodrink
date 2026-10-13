@@ -6,7 +6,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { TRUST_CONFIG } from "./trust/config";
-import { writeTrustEvent } from "./trust/ledger";
 
 export const COMPLAINT_CATEGORIES = ["no_show", "mismatch", "harassment", "safety", "other"] as const;
 export type ComplaintCategory = (typeof COMPLAINT_CATEGORIES)[number];
@@ -21,9 +20,18 @@ export type ComplaintBody = {
   evidence: string[];
 };
 
+/** 證據只接受本站 chat-images bucket 下、屬於投訴人自己的上傳路徑（sign/public 兩種 URL 形態）。 */
+export function evidencePathAllowed(pathname: string, filerId: string | undefined): boolean {
+  const m = /^\/storage\/v1\/object\/(?:sign|public)\/chat-images\/([^/]+)\/.+$/.exec(pathname);
+  if (m === null) return false;
+  // 沒給 filerId（舊調用／單測）時只校驗 bucket；路由調用一律傳入 → 只能引用自己的上傳。
+  return filerId === undefined || m[1] === filerId;
+}
+
 export function parseComplaintBody(
   raw: unknown,
   storageHost: string,
+  filerId?: string,
 ): ComplaintBody | { error: string } {
   if (typeof raw !== "object" || raw === null) return { error: "body 需为对象" };
   const r = raw as Record<string, unknown>;
@@ -56,8 +64,11 @@ export function parseComplaintBody(
       } catch {
         return { error: "evidence 需为本站上传链接" };
       }
-      if (u.protocol !== "https:" || u.hostname !== storageHost) {
+      if (u.protocol !== "https:" || u.hostname !== storageHost || u.username !== "" || u.password !== "") {
         return { error: "evidence 需为本站上传链接" };
+      }
+      if (!evidencePathAllowed(decodeURIComponent(u.pathname), filerId)) {
+        return { error: "evidence 只能是你自己上传的图片" };
       }
       collected.push(e);
     }
@@ -145,118 +156,6 @@ export function parseTriageReply(text: string): TriageSuggestion | null {
     confidence: obj.confidence,
     rationale: obj.rationale,
   };
-}
-
-export type DecideResult = { ok: true } | { ok: false; error: string };
-
-/**
- * 判定執行（人工或自動统一入口；冪等：已终态直接 ok）。
- * - uphold：被投訴人按类别扣分（no_show −10/−15 看是否为 host；mismatch −6；
- *   harassment 按 severity −10/−18/−25；other −4）。
- * - dismiss：投訴人 −2；30 天内被驳回 ≥3 → 暂停投诉 14 天。
- * - malicious：投訴人 −15（365 天）＋暂停 14 天。
- * - 通知双方 `complaint_result`（PDPO 文案：系统辅助判定、可 7 天申诉）。
- */
-export async function applyDecision(
-  svc: SupabaseClient,
-  complaintId: string,
-  decision: "uphold" | "dismiss" | "malicious",
-  opts: { severity?: number; note?: string; by: string },
-  nowMs: number = Date.now(),
-): Promise<DecideResult> {
-  const { data: cRaw } = await svc.from("complaints").select("*").eq("id", complaintId).maybeSingle();
-  const c = cRaw as Record<string, unknown> | null;
-  if (c === null) return { ok: false, error: "not-found" };
-  const status = c.status as string;
-  if (status === "upheld" || status === "dismissed" || status === "malicious") {
-    return { ok: true };
-  }
-  const targetId = c.target_id as string;
-  const filerId = c.filer_id as string;
-  const partyId = (c.party_id as string) ?? null;
-  const category = c.category as string;
-  const nowIso = new Date(nowMs).toISOString();
-  const pdpoNote = "此結果由系統輔助判定，你有權在 7 天內申訴。";
-  if (decision === "uphold") {
-    let delta: number = TRUST_CONFIG.upheld_other_delta;
-    let expires = 90;
-    let kind = "complaint_upheld";
-    if (category === "no_show") {
-      const { data: party } = await svc.from("parties").select("host_user_id").eq("id", partyId).maybeSingle();
-      const isHost = (party as { host_user_id?: unknown } | null)?.host_user_id === targetId;
-      delta = isHost ? TRUST_CONFIG.no_show_delta_host : TRUST_CONFIG.no_show_delta_member;
-      expires = TRUST_CONFIG.expires_no_show_days;
-      kind = "no_show";
-    } else if (category === "mismatch") {
-      delta = TRUST_CONFIG.upheld_mismatch_delta;
-      expires = TRUST_CONFIG.expires_mismatch_days;
-    } else if (category === "harassment") {
-      const sev = opts.severity === 3 ? 3 : opts.severity === 2 ? 2 : 1;
-      delta = sev === 3 ? TRUST_CONFIG.upheld_harassment_lv3 : sev === 2 ? TRUST_CONFIG.upheld_harassment_lv2 : TRUST_CONFIG.upheld_harassment_lv1;
-      expires = TRUST_CONFIG.expires_harassment_days;
-      kind = "harassment_upheld";
-    }
-    await writeTrustEvent(svc, {
-      user_id: targetId, kind, delta, party_id: partyId,
-      ref_id: `complaint:${complaintId}:uphold`, expires_days: expires,
-      note: opts.note ?? null,
-    }, nowMs);
-    await svc.from("complaints").update({
-      status: "upheld", decision: "uphold", decided_by: opts.by,
-      decision_note: opts.note ?? null, decided_at: nowIso,
-    }).eq("id", complaintId);
-    await svc.from("notifications").insert([
-      { user_id: targetId, kind: "complaint_result", party_id: partyId, actor_id: null, payload: { complaint_id: complaintId, decision: "upheld", note: `${opts.note ?? ""}${pdpoNote}` } },
-      { user_id: filerId, kind: "complaint_result", party_id: partyId, actor_id: null, payload: { complaint_id: complaintId, decision: "upheld", note: pdpoNote } },
-    ]);
-    return { ok: true };
-  }
-  if (decision === "dismiss") {
-    await writeTrustEvent(svc, {
-      user_id: filerId, kind: "complaint_dismissed", delta: TRUST_CONFIG.dismissed_filer_delta,
-      party_id: partyId, ref_id: `complaint:${complaintId}:dismiss`, expires_days: TRUST_CONFIG.expires_dismissed_days,
-    }, nowMs);
-    await svc.from("complaints").update({
-      status: "dismissed", decision: "dismiss", decided_by: opts.by,
-      decision_note: opts.note ?? null, decided_at: nowIso,
-    }).eq("id", complaintId);
-    // 駁回累計：30 天内 ≥3 → 暂停投诉 14 天。
-    const since = new Date(nowMs - TRUST_CONFIG.dismissed_suspend_window_days * 24 * 3600_000).toISOString();
-    const { data: dismissed } = await svc
-      .from("complaints")
-      .select("id")
-      .eq("filer_id", filerId)
-      .eq("status", "dismissed")
-      .gte("decided_at", since)
-      .limit(10);
-    if (Array.isArray(dismissed) && dismissed.length >= TRUST_CONFIG.dismissed_suspend_count) {
-      await svc.from("users").update({
-        complaint_suspended_until: new Date(nowMs + TRUST_CONFIG.suspend_days * 24 * 3600_000).toISOString(),
-      }).eq("id", filerId);
-    }
-    await svc.from("notifications").insert({
-      user_id: filerId, kind: "complaint_result", party_id: partyId, actor_id: null,
-      payload: { complaint_id: complaintId, decision: "dismissed", note: pdpoNote },
-    });
-    return { ok: true };
-  }
-  // malicious
-  await writeTrustEvent(svc, {
-    user_id: filerId, kind: "complaint_malicious", delta: TRUST_CONFIG.malicious_delta,
-    party_id: partyId, ref_id: `complaint:${complaintId}:malicious`, expires_days: TRUST_CONFIG.expires_malicious_days,
-  }, nowMs);
-  await svc.from("users").update({
-    complaint_suspended_until: new Date(nowMs + TRUST_CONFIG.suspend_days * 24 * 3600_000).toISOString(),
-  }).eq("id", filerId);
-  await svc.from("complaints").update({
-    status: "malicious", decision: "malicious", decided_by: opts.by,
-    decision_note: opts.note ?? null, decided_at: nowIso,
-  }).eq("id", complaintId);
-  await svc.from("notifications").insert({
-    user_id: filerId, kind: "complaint_result", party_id: partyId, actor_id: null,
-    payload: { complaint_id: complaintId, decision: "malicious", note: pdpoNote },
-  });
-  return { ok: true };
 }
 
 /** AI 分診執行（temperature 0，8s 超時，重試 1 次；失敗即 null，调用方进人工）。 */
@@ -395,15 +294,53 @@ export async function triageComplaint(
   }
   // 自动分支（本期配置关闭；保留实现供校准后开）。
   if (ai.suggestion.confidence >= 0.85 && ai.suggestion.severity === 1) {
-    if (ai.suggestion.recommended === "dismiss") {
-      await applyDecision(svc, complaintId, "dismiss", { note: ai.suggestion.rationale, by: "ai" }, nowMs);
-      return { routed: true, status: "dismissed" };
-    }
-    if (ai.suggestion.recommended === "uphold") {
-      await applyDecision(svc, complaintId, "uphold", { severity: ai.suggestion.severity, note: ai.suggestion.rationale, by: "ai" }, nowMs);
-      return { routed: true, status: "upheld" };
+    // 判定统一走状态机：先 pending→escalated（条件更新），再 decideComplaint（理由只用枚举，AI 文本只进内部备注）。
+    const rec = ai.suggestion.recommended;
+    if (rec === "dismiss" || rec === "uphold") {
+      const { data: moved } = await svc
+        .from("complaints")
+        .update({ status: "escalated" })
+        .eq("id", complaintId)
+        .eq("status", "pending")
+        .select("id");
+      if (!Array.isArray(moved) || moved.length === 0) return { routed: false, status: "" };
+      const { decideComplaint } = await import("./complaintDecision");
+      const r = await decideComplaint(
+        svc, complaintId, rec,
+        { severity: ai.suggestion.severity, internalNote: ai.suggestion.rationale, publicReason: "system", by: "ai" },
+        nowMs,
+      );
+      return { routed: true, status: r.ok ? (rec === "dismiss" ? "dismissed" : "upheld") : "escalated" };
     }
   }
   await svc.from("complaints").update({ status: "escalated" }).eq("id", complaintId);
   return { routed: true, status: "escalated" };
+}
+
+/**
+ * 掃描申辯逾期的案件：awaiting_response 且 response_due_at 已過 → pending（條件更新防競態）→ 分診。
+ * 沒有獨立定時任務時，由後台隊列載入／用戶側 touch 順帶調用；冪等。
+ */
+export async function sweepOverdueResponses(svc: SupabaseClient, nowMs: number = Date.now()): Promise<number> {
+  const { data } = await svc
+    .from("complaints")
+    .select("id")
+    .eq("status", "awaiting_response")
+    .lte("response_due_at", new Date(nowMs).toISOString())
+    .limit(50);
+  let moved = 0;
+  for (const row of ((data ?? []) as unknown[]) as { id?: unknown }[]) {
+    if (typeof row.id !== "string") continue;
+    const { data: upd } = await svc
+      .from("complaints")
+      .update({ status: "pending" })
+      .eq("id", row.id)
+      .eq("status", "awaiting_response")
+      .select("id");
+    if (Array.isArray(upd) && upd.length > 0) {
+      moved += 1;
+      await triageComplaint(svc, row.id, nowMs);
+    }
+  }
+  return moved;
 }

@@ -4,6 +4,7 @@ import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { TRUST_CONFIG } from "@/lib/trust/config";
 import { triageComplaint } from "@/lib/complaints";
+import { publicReasonText } from "@/lib/complaintDecision";
 
 /**
  * UR E.31 C2 单案详情（🔒，仅双方）。
@@ -37,11 +38,19 @@ export async function GET(
     typeof c.response_due_at === "string" &&
     Date.parse(c.response_due_at) <= nowMs
   ) {
-    await svc.from("complaints").update({ status: "pending" }).eq("id", id);
+    // 条件更新（防与后台扫描／并发 touch 竞态）；只有真正转成功的一方触发分诊。
+    const { data: moved } = await svc
+      .from("complaints")
+      .update({ status: "pending" })
+      .eq("id", id)
+      .eq("status", "awaiting_response")
+      .select("id");
     c.status = "pending";
-    after(() => {
-      void triageComplaint(svc, id, nowMs);
-    });
+    if (Array.isArray(moved) && moved.length > 0) {
+      after(() => {
+        void triageComplaint(svc, id, nowMs);
+      });
+    }
   }
   const showPeer = iamFiler || c.category === "safety";
   const peerId = (iamFiler ? c.target_id : c.filer_id) as string;
@@ -69,7 +78,8 @@ export async function GET(
     response_text: c.response_text ?? null,
     response_due_at: c.response_due_at ?? null,
     decision: c.decision ?? null,
-    decision_note: c.decision_note ?? null,
+    // 只回固定枚举文案；管理员内部备注（internal_note）永不外发。
+    decision_note: publicReasonText(c.public_reason) || null,
     appeal_status: c.appeal_status ?? null,
     created_at: c.created_at,
     decided_at: c.decided_at ?? null,
