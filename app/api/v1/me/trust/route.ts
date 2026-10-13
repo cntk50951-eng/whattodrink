@@ -2,6 +2,7 @@ import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { TRUST_CONFIG, TRUST_KIND_TEXT } from "@/lib/trust/config";
 import { computeTrust, trustTier } from "@/lib/trust/score";
+import { completionRate } from "@/lib/trust/settle";
 
 /**
  * UR E.30 本人诚信（🔒）。
@@ -110,6 +111,7 @@ export async function GET(req: Request): Promise<Response> {
     tier,
     completed_count: completed,
     hosted_count: hostedCount ?? 0,
+    completion_rate: await completionRate(svc, userId, nowMs),
     cancel_90d: cancel90d,
     leave_late_90d: leaveLate90d,
     restricted_until: tier === "restricted" ? new Date(nowMs + TRUST_CONFIG.restricted_days * 24 * 3600_000).toISOString() : null,

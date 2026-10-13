@@ -4002,6 +4002,32 @@ UR E.30　酒局誠信積分（WEB_HANDOFF_PARTY_TRUST_COMPLAINT 階段 B，iOS 
 
 ---
 
+UR E.31　酒局出席／到场／结算／提醒（WEB_HANDOFF_PARTY_COMPLAINT_C 的 C1，iOS 输入）[WIP]
+
+> C2（投诉／AI 分诊／人工后台）另做；本单只有 C1＋提醒 job 说明。
+
+### 背景（定案）
+- 定时走 pg_cron 纯 SQL（只做提醒扫表，沿 0026 前例）；结算走读写 touch 懒触发（无新基建）。
+- 结算 dry-run（`settle_write_ledger=false`）：outcome 照记，settled_at 不写，账本不动；观察一周再开。
+- `completion_rate` 现算填 B 预留 null（三处读口＋徽章批量）。
+
+### 範圍
+1. **數據**：0052（attendance／complaints／reminders／admins／users 暂停列；提醒 SQL 注释内，cron job 用户另起）。
+2. 到场（窗口＋300m＋只存时间＋每人每局 10 次）＋出席读写（24h 窗＋410）＋懒结算（幂等＋放鸽子异议保护＋host 候选）＋`attendance_confirm` 懒通知。
+3. openapi 1.52.0＋單測（outcome／50m 取整）。
+
+### 非目標
+- C2、push、搜索历史、v1 任何文件。
+
+### AC（交接 §10 子集）
+- 窗口边界／299-301m／重复幂等／非名单 403／撤销局拒／响应无坐标；
+- 证据不足不扣；结算 dry-run 不写账本；放鸽子有异议不扣。
+
+*改動記錄*
+- 2026-10-13：建檔置 [WIP]（C1 输入）＋实作：0052＋config 键＋settle 纯函数＋DB 落子＋三端点＋completion_rate＋openapi 1.52.0＋单测。
+
+---
+
 UR D.8　聊天附件 V2（iOS API_CHAT_V2 输入）[WIP]
 
 > iOS 按交接写了 client；web（ChatRoomLive＋Onboarding）已依赖 D.6 形状。用户定案：保留现有 sign 形状做加法，不断 web。

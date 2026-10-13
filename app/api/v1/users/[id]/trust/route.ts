@@ -1,6 +1,7 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { computeTrust, trustTier } from "@/lib/trust/score";
+import { completionRate } from "@/lib/trust/settle";
 
 /**
  * UR E.30 他人诚信（🔒，不回精确分）。
@@ -57,7 +58,7 @@ export async function GET(
     tier: trustTier(score, completed),
     completed_count: completed,
     hosted_count: hostedCount ?? 0,
-    completion_rate: null,
+    completion_rate: await completionRate(svc, id, nowMs),
     cancel_90d: cancel90d,
   });
 }

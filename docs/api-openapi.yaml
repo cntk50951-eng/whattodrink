@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.51.0
+  version: 1.52.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1425,6 +1425,137 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           description: 临近开局／已开局不可撤（code=too_close_to_start；本期无紧急通道）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/parties/{id}/attendance:
+    get:
+      operationId: getPartyAttendance
+      summary: 出席确认读（需登录；名单内；局结束前 pending；窗口＋24h，过期 window_closed 仍可看结果；touch 懒结算，UR E.31 C1）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: host 视图（成员 arrived＋host_marked）／成员视图（host arrived＋my 标记＋outcome）
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非名单（code=not_in_party）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/Internal"
+    post:
+      operationId: markPartyAttendance
+      summary: 出席确认写（需登录；host 标成员／成员标 host；窗口内可改，过期 410，UR E.31 C1）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: host 用 marks，成员用 host_attended
+      responses:
+        "200":
+          description: 已标记
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非名单（code=not_in_party）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "410":
+          description: 确认已截止（code=window_closed）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/parties/{id}/arrive:
+    post:
+      operationId: checkinPartyArrival
+      summary: 到场打卡（需登录；名单内；开局前后 30min；300m 内；只存时间不存坐标；每人每局 10 次尝试，UR E.31 C1）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng]
+              properties:
+                lat:
+                  type: number
+                lng:
+                  type: number
+      responses:
+        "200":
+          description: 已到（arrived_at；重复打卡幂等）
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非名单（code=not_in_party）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 窗口外（code=arrive_window_closed）／太远（code=too_far，距离取整 50m）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 尝试太频繁
           content:
             application/json:
               schema:

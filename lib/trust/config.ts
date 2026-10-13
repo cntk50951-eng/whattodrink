@@ -33,6 +33,15 @@ export const TRUST_CONFIG = {
   restricted_days: 14,
   /** C 预留：AI 自动判定总开关（初期 false，只建议不处罚）。 */
   ai_auto_decide: false,
+  /** C1 到场窗口（开局前后分钟）＋半径（米）＋每人每局尝试上限。 */
+  arrive_before_min: 30,
+  arrive_after_min: 30,
+  arrive_radius_m: 300,
+  arrive_attempts_cap: 10,
+  /** C1 出席窗口（局结束后小时）。 */
+  attendance_window_h: 24,
+  /** C1 结算 dry-run（true＝只记 outcome 不写账本；观察一周再开）。 */
+  settle_write_ledger: false,
 } as const;
 
 export type TrustTier = "newbie" | "trusted" | "normal" | "watch" | "restricted";

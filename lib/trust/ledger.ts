@@ -234,12 +234,51 @@ export async function hostTrustMap(
     if (typeof e.user_id !== "string") continue;
     cancelCount.set(e.user_id, (cancelCount.get(e.user_id) ?? 0) + 1);
   }
+  // 完成率批量：近 90 天已结算自办局（分母）＋其中 attended≥2 的局（分子）。
+  const since90b = new Date(nowMs - 90 * DAY_MS).toISOString();
+  const { data: hostedSettled } = await svc
+    .from("parties")
+    .select("id,host_user_id,expires_at")
+    .in("host_user_id", ids)
+    .eq("status", "open")
+    .gte("created_at", since90b)
+    .limit(2000);
+  const settledIds = (((hostedSettled ?? []) as unknown[]) as { id?: unknown; host_user_id?: unknown; expires_at?: unknown }[]).filter(
+    (p) => typeof p.id === "string" && typeof p.host_user_id === "string" && typeof p.expires_at === "string" && Date.parse(p.expires_at) + 24 * 3600_000 <= nowMs,
+  );
+  const attCounts = new Map<string, number>();
+  const settledByHost = new Map<string, number>();
+  for (const p of settledIds) {
+    settledByHost.set(p.host_user_id as string, (settledByHost.get(p.host_user_id as string) ?? 0) + 1);
+  }
+  if (settledIds.length > 0) {
+    const { data: attAll } = await svc
+      .from("party_attendance")
+      .select("party_id,user_id")
+      .in("party_id", settledIds.map((p) => p.id as string))
+      .eq("outcome", "attended")
+      .limit(5000);
+    const hostOf = new Map(settledIds.map((p) => [p.id as string, p.host_user_id as string]));
+    for (const a of ((attAll ?? []) as unknown[]) as { party_id?: unknown; user_id?: unknown }[]) {
+      if (typeof a.party_id !== "string" || typeof a.user_id !== "string") continue;
+      if (a.user_id === hostOf.get(a.party_id)) continue;
+      attCounts.set(a.party_id, (attCounts.get(a.party_id) ?? 0) + 1);
+    }
+  }
+  const madeByHost = new Map<string, number>();
+  for (const p of settledIds) {
+    if ((attCounts.get(p.id as string) ?? 0) >= 2) {
+      const h = p.host_user_id as string;
+      madeByHost.set(h, (madeByHost.get(h) ?? 0) + 1);
+    }
+  }
   for (const id of ids) {
     const { score, completed } = computeTrust(byUser.get(id) ?? [], nowMs);
+    const denom = settledByHost.get(id) ?? 0;
     out.set(id, {
       tier: trustTier(score, completed),
       hosted_count: hostedCount.get(id) ?? 0,
-      completion_rate: null,
+      completion_rate: denom === 0 ? null : Math.round(((madeByHost.get(id) ?? 0) / denom) * 100) / 100,
       cancel_90d: cancelCount.get(id) ?? 0,
     });
   }
