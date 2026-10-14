@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS game_reports (
   message_id uuid REFERENCES game_room_messages (id) ON DELETE SET NULL,
   snapshot jsonb NOT NULL DEFAULT '[]',
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','reviewed','actioned','dismissed')),
+  ai_flagged boolean NOT NULL DEFAULT false,
+  ai_reviewed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   decided_by uuid REFERENCES users (id) ON DELETE SET NULL,
   decided_at timestamptz,

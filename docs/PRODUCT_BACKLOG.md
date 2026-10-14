@@ -4347,3 +4347,4 @@ UR H.2　游戏向陌生人开放＋房内聊天＋举报（纯 API，无 web UI
 *改動記錄*
 - 2026-10-14：建檔置 [WIP]（WEB_HANDOFF_GAMES_OPEN_CHAT 输入；分两批）
 - 2026-10-14：(a) 批：0055 四表一列＋join 202 申请流＋审批三端点＋counters＋openapi 1.54.0＋单测；tsc 零错＋676 绿＋lint 零错
+- 2026-10-14：(b) 批：房内聊天（quick 24＋限频去重＋拉黑过滤＋撤回＋24h 懒删，发送零外部调用可测）＋举报（快照匿名＋AI 复核＋禁言升级）＋kick-block＋friend origin game（24h 同房）＋admin 队列页（viewer 只读／moderator 标记＋禁玩）＋openapi 1.55.0＋单测

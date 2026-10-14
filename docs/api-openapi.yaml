@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.54.0
+  version: 1.55.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -2515,7 +2515,8 @@ paths:
                   type: string
                 origin:
                   type: string
-                  enum: [profile, cheers, party, checkin, direct]
+                  enum: [profile, cheers, party, checkin, direct, game]
+                  description: game 须 24h 内同房（否则 403），局后加好友用
                 message:
                   type: string
                   maxLength: 50
@@ -3581,10 +3582,195 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/games/rooms/{id}/messages:
+    get:
+      operationId: listGameMessages
+      summary: 房内聊天读（需登录；在座成员；left/kicked 不可读；拉黑过滤；撤回只回 removed；结束 24h 懒删，UR H.2）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: since
+          in: query
+          description: created_at ISO（只回之后）
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          description: 1–50，默认 50
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 消息（user 仅昵称头像；quick 回 quick_key，text 回 body）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 离房不可读（code=not_allowed）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 房間不存在（code=room_not_found）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+    post:
+      operationId: sendGameMessage
+      summary: 房内聊天发（需登录；在座成员＋房未结束；禁言 403；限频 2s·1条＋1min·20条；同内容 10s 去重；幂等键；零外部调用，UR H.2）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client_msg_id]
+              properties:
+                kind:
+                  type: string
+                  enum: [text, quick]
+                  default: text
+                body:
+                  type: string
+                  maxLength: 60
+                  description: text 用（1–60 字）
+                quick_key:
+                  type: string
+                  description: quick 用（固定枚举，见实现）
+                client_msg_id:
+                  type: string
+                  maxLength: 64
+      responses:
+        "201":
+          description: 已发送（duplicate=true 即去重／幂等命中）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, created_at]
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 禁言（code=muted_in_room）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 房間不存在／非成员（code=room_not_found）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 已结束（code=wrong_phase）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: 可选开关开时拦截（code=message_rejected；默认关）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 限频（code=chat_rate_limited）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/games/rooms/{id}/report:
+    post:
+      operationId: reportGamePlayer
+      summary: 举报玩家（需登录；双方都曾 active；不可举报自己；同房同对一次；快照匿名；AI 复核＋升级禁言；只记录不扣分，UR H.2）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_user_id, category]
+              properties:
+                target_user_id:
+                  type: string
+                  format: uuid
+                category:
+                  type: string
+                  enum: [harassment, cheating, inappropriate, other, safety]
+                detail:
+                  type: string
+                  maxLength: 200
+                message_id:
+                  type: string
+                  format: uuid
+      responses:
+        "201":
+          description: 已受理
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非成员（code=not_allowed）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 重复举报（同房同对一次）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
   /api/v1/games/rooms/{id}/kick:
     post:
       operationId: kickGameRoomMember
-      summary: 踢人（需登录；仅房主；不可踢自己；被踢重进码 403；deal_only 房剩<2 人回 lobby，UR H.1）
+      summary: 踢人（需登录；仅房主；不可踢自己；被踢重进码 403；block 并拉黑＋被踢通知；deal_only 房剩<2 人回 lobby，UR H.2）
       security:
         - bearerAuth: []
       parameters:
@@ -3605,6 +3791,9 @@ paths:
                 user_id:
                   type: string
                   format: uuid
+                block:
+                  type: boolean
+                  description: 同时拉黑（写 cheers_blocks，之后互不可见／互不可入）
       responses:
         "200":
           description: 已请出
@@ -4830,7 +5019,7 @@ components:
           format: date-time
         origin:
           type: string
-          enum: [profile, cheers, party, checkin, direct]
+          enum: [profile, cheers, party, checkin, direct, game]
         message:
           type: string
           nullable: true

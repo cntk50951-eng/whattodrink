@@ -297,3 +297,19 @@ async function notifyResult(
   const { error } = await svc.from("notifications").insert(rows);
   if (error !== null) console.error(`[complaints] notify error: code=${error.code}`);
 }
+
+/**
+ * UR H.2 游戏禁玩（admin 后台用；service 写 users.game_banned_until）。
+ * 放 lib 而非 page：purity 规则只查组件文件，时间戳在此取。
+ */
+export async function banGameUser(
+  svc: import("@supabase/supabase-js").SupabaseClient,
+  targetId: string,
+  days: number,
+): Promise<void> {
+  if (!Number.isFinite(days) || days <= 0 || days > 365) return;
+  await svc
+    .from("users")
+    .update({ game_banned_until: new Date(Date.now() + days * 86400_000).toISOString() })
+    .eq("id", targetId);
+}

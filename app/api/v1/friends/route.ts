@@ -88,6 +88,15 @@ export async function POST(req: Request): Promise<Response> {
   if (targetUserId === userId) {
     return apiError("invalid_params", "不可加自己為好友", 400);
   }
+  // UR H.2 局后加好友：origin=game 须 24h 内同房且都曾 active（防冒认）。
+  const reqOrigin = parseRequestOrigin((raw as Record<string, unknown>).origin);
+  if (reqOrigin === "game" && !("checkinId" in parsed.body)) {
+    const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+    const { sharedActiveRoom } = await import("@/lib/games/rooms");
+    if (!(await sharedActiveRoom(await createServiceClient(), userId, targetUserId, since))) {
+      return apiError("not_allowed", "只可加 24 小時內同房的玩家", 403);
+    }
+  }
   // UR B.3 拉黑任一方不可发（404 不泄；走 service，反向行 authed 不可见）。
   // 只认 cheers_blocks（手动屏蔽）：chat_mutes（删好友自动行）有意不拦，
   // 否则解除后重加死结（交接 §六-2）；mute 在 accept 成功时成对清除。

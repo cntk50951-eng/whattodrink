@@ -114,13 +114,13 @@ export function parseReadyBody(raw: unknown): { ready: boolean } | { error: stri
   return { ready: v };
 }
 
-export function parseKickBody(raw: unknown): { userId: string } | { error: string } {
+export function parseKickBody(raw: unknown): { userId: string; block: boolean } | { error: string } {
   if (typeof raw !== "object" || raw === null) return { error: "body 需为对象" };
   const v = (raw as Record<string, unknown>).user_id;
   if (typeof v !== "string" || v.trim() === "" || v.trim().length > 64) {
     return { error: "user_id 非法" };
   }
-  return { userId: v.trim() };
+  return { userId: v.trim(), block: (raw as Record<string, unknown>).block === true };
 }
 
 export type PlayerRow = {
@@ -1053,4 +1053,79 @@ export async function isGameBanned(svc: SupabaseClient, userId: string, nowMs: n
   const { data } = await svc.from("users").select("game_banned_until").eq("id", userId).maybeSingle();
   const until = (data as { game_banned_until?: unknown } | null)?.game_banned_until;
   return typeof until === "string" && Date.parse(until) > nowMs;
+}
+
+/** 房内快捷语枚举（~24 条；文案 iOS 本地化，服务端只认 key）。 */
+export const GAME_QUICK_KEYS = [
+  "ready", "hurry", "again", "drink", "cheers_all", "nice", "oops",
+  "good_luck", "well_played", "rematch", "brb", "waiting", "go_go",
+  "haha", "wow", "cheer_up", "my_turn", "your_turn", "toast_host",
+  "thanks", "sorry", "gj", "lol", "cheers_back",
+] as const;
+export type GameQuickKey = (typeof GAME_QUICK_KEYS)[number];
+
+/** 房内文字 1–60 字（trim 后计，UTF-16）。 */
+export const GAME_MSG_MAX = 60;
+
+/** 发送限频：同人 2 秒 1 条、1 分钟 20 条（进程级，沿 join 码限频口径）。 */
+export const GAME_MSG_MIN_MS = 2000;
+export const GAME_MSG_MINUTE_LIMIT = 20;
+
+export type GameMessageBody =
+  | { kind: "quick"; quick_key: string }
+  | { kind: "text"; body: string };
+
+/** 发送包解析（client_msg_id 必填，幂等键）。 */
+export function parseGameMessageBody(
+  raw: unknown,
+): { body: GameMessageBody; clientMsgId: string } | { error: string } {
+  if (typeof raw !== "object" || raw === null) return { error: "body 需为对象" };
+  const r = raw as Record<string, unknown>;
+  const cid = r.client_msg_id;
+  if (typeof cid !== "string" || cid.trim() === "" || cid.length > 64) {
+    return { error: "client_msg_id 必填（≤64）" };
+  }
+  if (r.kind === "quick") {
+    if (typeof r.quick_key !== "string" || !(GAME_QUICK_KEYS as readonly string[]).includes(r.quick_key)) {
+      return { error: "quick_key 非法" };
+    }
+    return { body: { kind: "quick", quick_key: r.quick_key }, clientMsgId: cid.trim() };
+  }
+  if (r.kind === "text" || r.kind === undefined) {
+    const t = typeof r.body === "string" ? r.body.trim() : "";
+    if (t === "" || t.length > GAME_MSG_MAX) {
+      return { error: `body 只要 1–${GAME_MSG_MAX} 字` };
+    }
+    return { body: { kind: "text", body: t }, clientMsgId: cid.trim() };
+  }
+  return { error: "kind 只要 text|quick" };
+}
+
+/**
+ * UR H.2 局后加好友校验：24h 内同房且双方都曾 active（game_room_players 有行即可，
+ * left/kicked 亦算；防冒认陌生人）。
+ */
+export async function sharedActiveRoom(
+  svc: SupabaseClient,
+  a: string,
+  b: string,
+  sinceIso: string,
+): Promise<boolean> {
+  const { data: aRows } = await svc
+    .from("game_room_players")
+    .select("room_id")
+    .eq("user_id", a)
+    .gte("joined_at", sinceIso)
+    .limit(50);
+  const aRooms = new Set(
+    ((aRows ?? []) as unknown[]).map((r) => (r as { room_id?: unknown }).room_id).filter((v): v is string => typeof v === "string"),
+  );
+  if (aRooms.size === 0) return false;
+  const { data: bRows } = await svc
+    .from("game_room_players")
+    .select("room_id")
+    .eq("user_id", b)
+    .in("room_id", [...aRooms])
+    .limit(10);
+  return Array.isArray(bRows) && bRows.length > 0;
 }

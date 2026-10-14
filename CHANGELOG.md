@@ -15,6 +15,7 @@
   - §十三停住等房主：deal_only 房开盅后不自动开新局（settle＋集齐确认都不开）＋`next_round` 仅房主可调、调用即开＋openapi 1.32.0（补 403 \(not_host\) 描述）
 - **UR H.2 游戏向陌生人开放＋房内聊天＋举报（纯 API，[WIP]，待 0055＋两批端点）**
   - (a) 批：0055 四表一列（requests／messages／reports／mutes＋`game_banned_until`；RLS 全锁 service 读写）＋陌生人 join 改 202 建申请（去重／小时 5／房 10／5min 懒过期＋房主通知）＋审批三端点（列表仅昵称头像／approve 入座＋version／reject＋双方通知）＋申请人状态＋取消＋建房／join 禁玩门＋counters `game_requests_pending`（badge 不含）＋openapi 1.54.0＋单测
+  - (b) 批：房内聊天（quick 枚举＋限频 2s·1／min·20＋同内容去重＋拉黑过滤＋撤回＋24h 懒删；发送零外部调用静态断言）＋举报（匿名快照＋AI 复核＋禁言升级；只记录不扣分）＋kick `block`（写 cheers_blocks＋被踢通知）＋friend origin `game`（24h 同房校验）＋admin 游戏举报队列页（角色＋审计＋禁玩）＋openapi 1.55.0＋单测
 
 ### Fixed
 - **UR A.16 隱身重定义（PRIVACY_MODE_MATRIX 定案，iOS 输入，未提交）**

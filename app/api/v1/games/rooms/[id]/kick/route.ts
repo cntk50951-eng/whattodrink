@@ -59,5 +59,21 @@ export async function POST(
   }
   const done = await applyDeparture(svc, loaded, parsed.userId, "member_kicked", userId, Date.now());
   if ("response" in done) return done.response;
+  // 踢人并拉黑（block:true 即写 cheers_blocks，沿现有口径；之后双方互不可见／互不可入）。
+  if (parsed.block) {
+    const { error: bErr } = await svc.from("cheers_blocks").upsert(
+      { blocker_id: userId, blocked_id: parsed.userId },
+      { onConflict: "blocker_id,blocked_id" },
+    );
+    if (bErr !== null) {
+      console.error(`[games/kick] block error: code=${bErr.code} message=${bErr.message}`);
+    }
+  }
+  await svc.from("notifications").insert({
+    user_id: parsed.userId,
+    kind: "game_kicked",
+    actor_id: userId,
+    payload: { room_id: loaded.room.id },
+  });
   return apiOk({ version: done.version });
 }

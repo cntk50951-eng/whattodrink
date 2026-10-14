@@ -136,6 +136,7 @@ describe("parseRequestOrigin／parseRequestAction", () => {
   it("来源白名单＋非法回落 direct；动作三选＋非法拒", () => {
     expect(parseRequestOrigin("cheers")).toBe("cheers");
     expect(parseRequestOrigin("party")).toBe("party");
+    expect(parseRequestOrigin("game")).toBe("game");
     expect(parseRequestOrigin("nope")).toBe("direct");
     expect(parseRequestOrigin(undefined)).toBe("direct");
     expect(parseRequestAction("accept")).toEqual({ action: "accept" });

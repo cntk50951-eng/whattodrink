@@ -72,7 +72,8 @@ describe("房间请求体解析", () => {
   it("ready／kick／roomId", () => {
     expect(parseReadyBody({ ready: true })).toEqual({ ready: true });
     expect("error" in parseReadyBody({ ready: "yes" })).toBe(true);
-    expect(parseKickBody({ user_id: "u1" })).toEqual({ userId: "u1" });
+    expect(parseKickBody({ user_id: "u1" })).toEqual({ userId: "u1", block: false });
+    expect(parseKickBody({ user_id: "u1", block: true })).toEqual({ userId: "u1", block: true });
     expect("error" in parseKickBody({})).toBe(true);
     expect(parseRoomId("r1")).toEqual({ id: "r1" });
     expect("error" in parseRoomId("")).toBe(true);
@@ -117,5 +118,31 @@ describe("入房审批 (UR H.2)", () => {
     expect(isRequestExpired("2026-10-14T11:55:00Z", now)).toBe(true);
     expect(isRequestExpired("2026-10-14T11:00:00Z", now)).toBe(true);
     expect(isRequestExpired("bad", now)).toBe(false);
+  });
+});
+
+describe("房内聊天 (UR H.2)", () => {
+  it("parseGameMessageBody 白名单＋长度＋幂等键", async () => {
+    const mod = await import("./rooms");
+    expect(mod.parseGameMessageBody({ kind: "quick", quick_key: "ready", client_msg_id: "c1" })).toEqual({
+      body: { kind: "quick", quick_key: "ready" },
+      clientMsgId: "c1",
+    });
+    expect(mod.parseGameMessageBody({ kind: "text", body: " 嗨 ", client_msg_id: "c2" })).toEqual({
+      body: { kind: "text", body: "嗨" },
+      clientMsgId: "c2",
+    });
+    expect("error" in mod.parseGameMessageBody({ kind: "quick", quick_key: "nope", client_msg_id: "c" })).toBe(true);
+    expect("error" in mod.parseGameMessageBody({ kind: "text", body: "", client_msg_id: "c" })).toBe(true);
+    expect("error" in mod.parseGameMessageBody({ kind: "text", body: "x".repeat(61), client_msg_id: "c" })).toBe(true);
+    expect("error" in mod.parseGameMessageBody({ kind: "text", body: "hi" })).toBe(true);
+    expect(mod.GAME_QUICK_KEYS.length).toBeGreaterThanOrEqual(20);
+  });
+  it("发送路径零外部调用（静态断言：不 import 审核/AI/推送）", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("app/api/v1/games/rooms/[id]/messages/route.ts", "utf8");
+    for (const banned of ["moderation", "minimax", "openai", "push/send", "apns", "fetch("]) {
+      expect(src.includes(banned), `banned import/call: ${banned}`).toBe(false);
+    }
   });
 });

@@ -149,7 +149,7 @@ export function parseRequestMessage(raw: unknown): { message: string | null } | 
 }
 
 /** UR B.3 请求来源（列表来源展示；非法回落 direct，不 400）。 */
-export type FriendRequestOrigin = "profile" | "cheers" | "party" | "checkin" | "direct";
+export type FriendRequestOrigin = "profile" | "cheers" | "party" | "checkin" | "direct" | "game";
 
 export function parseRequestOrigin(raw: unknown): FriendRequestOrigin {
   if (
@@ -157,7 +157,8 @@ export function parseRequestOrigin(raw: unknown): FriendRequestOrigin {
     raw === "cheers" ||
     raw === "party" ||
     raw === "checkin" ||
-    raw === "direct"
+    raw === "direct" ||
+    raw === "game"
   ) {
     return raw;
   }
