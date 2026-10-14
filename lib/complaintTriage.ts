@@ -8,6 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseStoredChatEvidence } from "./complaintChat";
 import {
   AI_THRESHOLDS,
+  chatInWindow,
   ROUTE_REASON_TEXT,
   aiAutoEnabled,
   buildTriageContent,
@@ -59,7 +60,7 @@ export async function buildAiInputs(
   const flags = Array.isArray(c.flags) ? (c.flags as unknown[]).filter((x): x is string => typeof x === "string") : [];
   const nowMs = Date.now();
   const [{ data: party }, { data: atts }, { data: events }, { count: pairCount }] = await Promise.all([
-    svc.from("parties").select("host_user_id,start_at,expires_at").eq("id", partyId).maybeSingle(),
+    svc.from("parties").select("host_user_id,start_at,expires_at,created_at").eq("id", partyId).maybeSingle(),
     svc.from("party_attendance").select("user_id,arrived_at,host_marked").eq("party_id", partyId).limit(500),
     svc.from("party_events").select("user_id,kind,created_at").eq("party_id", partyId).order("created_at", { ascending: true }).limit(200),
     svc.from("complaints").select("id", { count: "exact", head: true })
@@ -125,7 +126,18 @@ export async function buildAiInputs(
   }
   const chat: AiChatLine[] = [];
   let n = 0;
+  let stale = 0;
+  const win = {
+    createdAt: typeof p.created_at === "string" ? p.created_at : null,
+    startAt: typeof p.start_at === "string" ? p.start_at : null,
+    expiresAt: typeof p.expires_at === "string" ? p.expires_at : null,
+  };
   for (const m of parseStoredChatEvidence(c.chat_evidence)) {
+    // 與酒局時間不吻合的舊（或過晚）聊天不當證據：剔除並計數，AI 只看到條數
+    if (!chatInWindow(m.at, win)) {
+      stale += 1;
+      continue;
+    }
     n += 1;
     const from = m.sender === "filer" ? "A" : "B";
     const at_min = relMin(m.at, startMs) ?? 0;
@@ -153,8 +165,11 @@ export async function buildAiInputs(
     attendance: { A, B },
     chat_evidence: chat,
     chat_evidence_note: chat.length === 0
-      ? "投訴人沒有附聊天記錄（可能兩人之間沒有私信）。不要把「沒有聊天記錄」當作對任何一方不利的證據。"
-      : "以上是投訴人自己挑選附上的私信，可能缺上下文。",
+      ? stale > 0
+        ? "投訴人附的聊天記錄全部與酒局時間不吻合，已剔除；等同沒有有效聊天證據。"
+        : "投訴人沒有附聊天記錄（可能兩人之間沒有私信）。不要把「沒有聊天記錄」當作對任何一方不利的證據。"
+      : "以上是投訴人自己挑選附上、且時間與本局吻合的私信，可能缺上下文。",
+    chat_excluded_stale: stale,
     images,
     flags: {
       retaliation: flags.includes("retaliation"),
@@ -245,7 +260,7 @@ export async function runTriage(
     inputsIncomplete: incomplete,
     autoEnabled: aiAutoEnabled(),
   });
-  const inputs = { chat_n: facts.chat_evidence.length, images_n: imageUrls.length, incomplete };
+  const inputs = { chat_n: facts.chat_evidence.length, chat_stale: facts.chat_excluded_stale, images_n: imageUrls.length, incomplete };
   await svc.from("complaints").update({
     ai_json: aiRecord(r, route, inputs),
     ...(r === null ? { ai_error: apiKey === "" ? "no-key" : "ai-failed" } : {}),
@@ -296,7 +311,7 @@ export async function adviseComplaint(svc: SupabaseClient, complaintId: string):
   const route = routeTriage(r?.suggestion ?? null, {
     category: String(c.category ?? ""), flags: [], leaning: null, inputsIncomplete: incomplete, autoEnabled: false,
   });
-  const inputs = { chat_n: facts.chat_evidence.length, images_n: imageUrls.length, incomplete };
+  const inputs = { chat_n: facts.chat_evidence.length, chat_stale: facts.chat_excluded_stale, images_n: imageUrls.length, incomplete };
   await svc.from("complaints").update({
     ai_json: aiRecord(r, { action: "human", reason: String(c.category) === "safety" ? "safety" : route.reason }, inputs),
     ...(r === null ? { ai_error: "ai-failed" } : {}),

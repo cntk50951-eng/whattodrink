@@ -79,6 +79,7 @@ export default function ReviewStyles() {
       .rv-bubble { max-width:80%; border-radius:12px; padding:8px 12px; font-size:14px; word-break:break-word; }
       .rv-bubble p { margin:2px 0 0; white-space:pre-wrap; }
       .rv-bubble.filer { align-self:flex-start; background:#dbeafe; } .rv-bubble.target { align-self:flex-end; background:#fef3c7; }
+      .rv-bubble.stale { opacity:.55; border:1px dashed #dc2626; }
       .rv-gauge { position:relative; height:10px; border-radius:6px; background:#e2e8f0; margin-top:6px; }
       .rv-gauge i { position:absolute; top:0; bottom:0; } .rv-gauge i.lo { left:0; width:15%; background:#bbf7d0; border-radius:6px 0 0 6px; }
       .rv-gauge i.hi { right:0; width:15%; background:#fecaca; border-radius:0 6px 6px 0; }

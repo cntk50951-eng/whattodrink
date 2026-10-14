@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AI_THRESHOLDS, aiAutoEnabled, buildTriageContent, maskForAi, parseTriageV2, relMin, routeTriage, triageSystemPrompt, type AiSuggestionV2, type RouteCtx } from "./complaintAi";
+import { AI_THRESHOLDS, aiAutoEnabled, chatInWindow, chatTimeWindow, buildTriageContent, maskForAi, parseTriageV2, relMin, routeTriage, triageSystemPrompt, type AiSuggestionV2, type RouteCtx } from "./complaintAi";
 
 const sug = (o: Partial<AiSuggestionV2> = {}): AiSuggestionV2 => ({
   category: "mismatch", severity: 1, p_uphold: 0.9, confidence: 0.9, evidence_strength: "strong", recommended: "uphold",
@@ -72,5 +72,25 @@ describe("helpers", () => {
     const parts = buildTriageContent({} as never, ["data:image/png;base64,AA"]);
     expect(parts).toHaveLength(2);
     expect(triageSystemPrompt()).toContain("p_uphold");
+  });
+});
+
+describe("chat time window", () => {
+  const p = { createdAt: "2026-10-10T00:00:00Z", startAt: "2026-10-14T12:00:00Z", expiresAt: "2026-10-14T15:00:00Z" };
+  it("accepts messages between party creation and end+72h", () => {
+    expect(chatInWindow("2026-10-12T09:00:00Z", p)).toBe(true);
+    expect(chatInWindow("2026-10-14T12:30:00Z", p)).toBe(true);
+    expect(chatInWindow("2026-10-17T15:00:00Z", p)).toBe(true); // 邊界含
+  });
+  it("rejects stale (before the party existed) and too-late messages", () => {
+    expect(chatInWindow("2026-09-27T13:32:00Z", p)).toBe(false);
+    expect(chatInWindow("2026-10-17T15:00:01Z", p)).toBe(false);
+  });
+  it("bad timestamps are invalid; missing created_at falls back to start-7d", () => {
+    expect(chatInWindow("garbage", p)).toBe(false);
+    const q = { startAt: "2026-10-14T12:00:00Z" };
+    expect(chatInWindow("2026-10-06T00:00:00Z", q)).toBe(false);
+    expect(chatInWindow("2026-10-08T00:00:00Z", q)).toBe(true);
+    expect(chatTimeWindow({})).toBeNull();
   });
 });

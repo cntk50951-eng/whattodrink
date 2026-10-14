@@ -10,7 +10,7 @@ import { allowSelfCaseEnabled, isSelfCase, loadDecisionRecord, loadReviewContext
 
 import { buildCaseTimeline, fmtHK, nextAction } from "@/lib/reviewTimeline";
 import { parseStoredChatEvidence } from "@/lib/complaintChat";
-import { ROUTE_REASON_TEXT } from "@/lib/complaintAi";
+import { ROUTE_REASON_TEXT, chatInWindow } from "@/lib/complaintAi";
 import { TRUST_KIND_TEXT } from "@/lib/trust/config";
 import { auditActionLabel } from "@/lib/reviewContext";
 
@@ -237,6 +237,12 @@ export default async function ReviewDetailPage({
   }
   // 聊天記錄快照（投訴人挑選）；圖片消息現簽 5 分鐘讀取鏈接
   const chatEv = parseStoredChatEvidence(c.chat_evidence);
+  // 時效：與酒局時間不吻合的聊天（舊對話／窗口後）標紅，AI 已忽略
+  const { data: partyTimes } = await svc.from("parties").select("created_at,start_at,expires_at").eq("id", c.party_id).maybeSingle();
+  const pt = (partyTimes ?? {}) as { created_at?: string; start_at?: string; expires_at?: string };
+  const staleIds = new Set(
+    chatEv.filter((m) => !chatInWindow(m.at, { createdAt: pt.created_at, startAt: pt.start_at, expiresAt: pt.expires_at })).map((m) => m.id),
+  );
   const chatImageLinks = new Map<string, string | null>();
   for (const m of chatEv) {
     if (m.kind === "image" && m.image_path !== null) {
@@ -367,8 +373,9 @@ export default async function ReviewDetailPage({
               ) : (
                 <div className="rv-chat">
                   {chatEv.map((m) => (
-                    <div key={m.id} className={`rv-bubble ${m.sender}`}>
+                    <div key={m.id} className={`rv-bubble ${m.sender} ${staleIds.has(m.id) ? "stale" : ""}`}>
                       <span className="rv-sub">{m.sender === "filer" ? "投訴人" : "被投訴人"} · {fmtHK(m.at)}</span>
+                      {staleIds.has(m.id) && <span className="rv-chip bad" style={{ marginLeft: 6 }}>與酒局時間不符 · AI 已忽略</span>}
                       {m.kind === "text" ? (
                         <p>{m.body}</p>
                       ) : chatImageLinks.get(m.id) ? (
@@ -456,7 +463,7 @@ export default async function ReviewDetailPage({
                     {aiMeta?.inputs !== undefined && (
                       <>
                         <dt>讀了</dt>
-                        <dd>聊天 {String(aiMeta.inputs.chat_n ?? 0)} 條、圖片 {String(aiMeta.inputs.images_n ?? 0)} 張{aiMeta.inputs.incomplete === true ? "（有圖沒讀到）" : ""}</dd>
+                        <dd>聊天 {String(aiMeta.inputs.chat_n ?? 0)} 條{typeof (aiMeta.inputs as { chat_stale?: unknown }).chat_stale === "number" && (aiMeta.inputs as { chat_stale: number }).chat_stale > 0 ? `（另有 ${(aiMeta.inputs as { chat_stale: number }).chat_stale} 條時間不符已剔除）` : ""}、圖片 {String(aiMeta.inputs.images_n ?? 0)} 張{aiMeta.inputs.incomplete === true ? "（有圖沒讀到）" : ""}</dd>
                       </>
                     )}
                   </dl>
