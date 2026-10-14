@@ -4116,7 +4116,7 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - web 范围：酒局詳情投訴入口（`V2ComplaintCompose`：成員選人＋五類＋200 字，窗口／類別本機預判＋服務端為準）＋`V2ComplaintsSheet`（filed／against 双籤＋展開詳情＋申辯＋申訴）＋`V2TrustSheet`（分數等級＋四統計＋賬本，新手不露分）＋動態中心加兩行；API 现成（C2 complaints×5／trust×2）。
 - 非目标：證據上傳（二期）、審核後台（已有 admin）、v1。
 
-### UR G.9　發局草稿＋收藏過期＋我的地點（v2）[]
+### UR G.9　發局草稿＋收藏過期＋我的地點（v2）[WIP]
 - iOS 对标：PartyDraft（草稿 7 天＋記住上次＋再開一局）／SAVES_EXPIRED（過期收藏保留＋Pin 住位置）／PinnedPlace（純本地）。
 - web 范围：發局表單草稿（localStorage 按帳號分桶）＋收藏過期行（expired 灰顯＋帶我去地圖位置）＋pin 地點本地存；API 现成（/me/saves expired 行，E.22 歸檔口徑）。
 - 非目标：跨裝置同步（iOS 亦本地）、v1。
@@ -4373,6 +4373,33 @@ UR I.1　遇見搜索＋被搜到同意（纯 API，[shared-only]）[WIP]
 - 2026-10-12：遇不见好友修复（WEB_HANDOFF_MEET_FIX，iOS 输入）：好友 bypass discoverable＋声明口味三档＋`taste_keys` 子类＋`stats`／`friends_not_discoverable`＋`match` full 优先＋openapi 1.47.0
 - 2026-10-12：AI 质量（WEB_HANDOFF_MEET_AI_QUALITY，iOS 探针输入）：temperature 0＋噪音護欄＋prompt 硬规则＋少样本＋`notes`＋回歸腳本＋openapi 1.48.0
 - 2026-10-12：测试重置端点（WEB_HANDOFF_MEET_TEST_RESET，iOS 输入）：`DELETE /meet/mine/today`（TEST_ENDPOINTS_ENABLED 门，只动自己）＋openapi 1.49.0
+
+---
+
+UR I.2　遇见活动记录＋来源标记＋邮箱已验证（纯 API，[shared-only]）[WIP]
+
+> iOS 需求见 `whattodrink_ios/docs/WEB_HANDOFF_MEET_ACTIVITY.md`（想法 #8 第一期，非契约，契约以 yaml 为准）。
+
+### 背景（四决定，2026-10-14，iOS 已记档）
+1. 活动记录只做来源＋聚合数字，不做具体「谁看过我」。
+2. 对方联系你时显示其条件标签（如「他在找：女生 · 威士忌」）。
+3. IDV 后再说；第一期只给所有人亮「邮箱已验证」小标。
+4. 不强制验证；以后只做徽章加可选筛选。
+
+### 範圍
+1. **數據**：新表 `meet_searches`（user／白名单 criteria／result_ids ≤10；7 天懒删；不对用户暴露）＋`meet_contacts`（target／from／kind friend_request|chat／search_id／服务端生成 tags／read_at；90 天懒删；同对同 kind 7 天去重）；RLS 全开零 policy，service 读写。
+2. **搜索**：`POST /meet/search` 成功后写 `meet_searches`（只存白名单条件，不存原话／LLM 输出）＋响应加 `search_id`。
+3. **联系**：`FriendRequestOrigin`＋会话 origin 增 `"meet"`；`POST /friends`／`POST /conversations` 带 `origin:"meet"+search_id` 时校验（属调用者／7 天内／目标在 result_ids，否则 403 `invalid_meet_context`）；通过写 `meet_contacts`（tags 服务端按固定词表生成）；请求／会话列表项加 `meet_tags`。
+4. **记录页**：`GET /me/meet-activity`（items＋`weekly_seen` 小样本门槛＜3 只回 below_threshold＋`unread`；拉黑／隐身／未成年不出现）＋`PATCH /me/meet-activity/read`＋`DELETE /me/meet-activity`（清空自己记录）＋`GET /me/counters` 加 `meet_activity_unread`（badge 不含）；拒绝／拉黑／举报复用现有端点。
+5. **通知**：`meet_contact`（同对 7 天不重复）。
+6. **`email_verified`**：profile／me／遇见结果／好友请求项加布尔（`auth.users.email_confirmed_at` 非空；不返邮箱本身；以后加 `verification_level` 不破坏）。
+7. openapi（search_id／origin meet／meet_tags／新端点／counters／通知 kind／email_verified／错误码）＋单测。
+
+### 非目標
+- 具体「谁看过我」、人脸／证件验证、强制验证、v1／v2 任何文件。
+
+*改動記錄*
+- 2026-10-14：建檔置 [WIP]（WEB_HANDOFF_MEET_ACTIVITY 输入，第一期；DELETE 清空口纳入本期）
 
 ---
 
