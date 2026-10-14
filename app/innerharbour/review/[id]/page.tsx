@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -42,7 +43,7 @@ export default async function ReviewDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ err?: string; ok?: string; order?: string }>;
+  searchParams: Promise<{ err?: string; ok?: string; order?: string; resume?: string }>;
 }) {
   const { id } = await params;
   const { userId, role, svc } = await requireAdminPage({}, `/innerharbour/review/${id}`);
@@ -58,13 +59,26 @@ export default async function ReviewDetailPage({
     const back = (code: string): never => redirect(`${self}?err=${code}#err`);
     // 直接用 adminGate（只返回不拋）：need_mfa／need_stepup 去 MFA 頁，其餘失敗回頁顯字。
     const gate = await adminGate({ write: true, stepUp: true });
+    const jar = await cookies();
     if (!gate.ok) {
       if (gate.reason === "need_mfa" || gate.reason === "need_stepup") {
-        redirect(`/innerharbour/mfa?next=${encodeURIComponent(self)}`);
+        // 先把已填內容存進短時 httpOnly cookie，驗證碼通過後回來自動帶回並提交（不用重填）
+        const draft = {
+          id,
+          decision: String(formData.get("decision") ?? ""),
+          severity: String(formData.get("severity") ?? ""),
+          reason: String(formData.get("reason") ?? ""),
+          note: String(formData.get("note") ?? "").slice(0, 500),
+        };
+        jar.set("rv_draft", JSON.stringify(draft), {
+          httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/innerharbour/review", maxAge: 600,
+        });
+        redirect(`/innerharbour/mfa?next=${encodeURIComponent(`${self}?resume=1`)}`);
       }
       back(gate.reason === "forbidden_role" ? "forbidden" : "session_expired");
       throw new Error("unreachable"); // 收窄用：back 永不返回，此行只為 TS 收窄 gate
     }
+    jar.delete({ name: "rv_draft", path: "/innerharbour/review" });
     const gsvc = gate.svc;
     const adminId = gate.userId;
     if (!(await checkSameOrigin())) back("csrf");
@@ -117,15 +131,19 @@ export default async function ReviewDetailPage({
     const selfReview = allowSelfCaseEnabled() && isSelfCase(conflict);
     // 申訴案：第二人覆核（原判不是本人）。
     const prevBy = typeof f.decided_by === "string" && f.decided_by.startsWith("human:") ? f.decided_by.slice(6) : null;
+    // 放寬：測試模式（ADMIN_ALLOW_SELF_CASE=true）或只有一位審核員時，無「第二人」可找，允許原判人覆核（審計標 self_review）。
+    let sameAdminAppeal = false;
     if (f.appeal_status === "pending" && prevBy !== null && prevBy === adminId) {
-      back("second_review");
+      const { count: modCount } = await gsvc.from("admins").select("user_id", { count: "exact", head: true }).eq("role", "moderator");
+      if (!allowSelfCaseEnabled() && (modCount ?? 0) > 1) back("second_review");
+      sameAdminAppeal = true;
     }
     // 先寫審計（意圖）；失敗即中止，不執行判定。
     await auditOrThrow(gsvc, {
       admin_id: adminId,
       action: "decide_attempt",
       target: id,
-      detail: { decision, severity, reason: reasonKey, note: note.slice(0, 200), self_review: selfReview },
+      detail: { decision, severity, reason: reasonKey, note: note.slice(0, 200), self_review: selfReview || sameAdminAppeal },
     }).catch(() => back("audit_failed"));
     const r = await decideComplaint(gsvc, id, decision, {
       severity, internalNote: note, publicReason: reasonKey, by: `human:${adminId}`,
@@ -135,7 +153,7 @@ export default async function ReviewDetailPage({
       admin_id: adminId,
       action: r.ok ? `decide_${r.outcome}` : "decide_rejected",
       target: id,
-      detail: r.ok ? { decision, self_review: selfReview } : { error: r.error },
+      detail: r.ok ? { decision, self_review: selfReview || sameAdminAppeal } : { error: r.error },
     }).catch(() => undefined);
     if (!r.ok) {
       back(r.error === "busy" ? "busy" : r.error === "not_found" || r.error === "invalid_state" ? "state_changed" : "failed");
@@ -149,7 +167,20 @@ export default async function ReviewDetailPage({
   const wasDecided = typeof c.decided_at === "string" || ["upheld", "dismissed", "malicious"].includes(String(c.status));
   const rec = wasDecided ? await loadDecisionRecord(svc, c, publicReasonText) : null;
   const selfCaseMode = allowSelfCaseEnabled();
-  const { err, ok, order } = await searchParams;
+  const { err, ok, order, resume } = await searchParams;
+  // 驗證碼通過後帶回的草稿（只認同一案件、一次性；Server Action 開頭會刪掉）
+  let draft: { decision: string; severity: string; reason: string; note: string } | null = null;
+  if (resume === "1") {
+    try {
+      const raw = (await cookies()).get("rv_draft")?.value;
+      const d = raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+      if (d !== null && d.id === id && typeof d.decision === "string" && typeof d.reason === "string" && typeof d.note === "string") {
+        draft = { decision: d.decision, severity: String(d.severity ?? "1"), reason: d.reason, note: d.note };
+      }
+    } catch {
+      draft = null;
+    }
+  }
   const errMsg =
     typeof err === "string" && err !== "" ? (DECIDE_ERR_TEXT[err] ?? "操作失敗，請刷新再試。") : null;
 
@@ -363,11 +394,12 @@ export default async function ReviewDetailPage({
           </div>
           <aside className="rv-aside">
             {canDecide ? (
-              <details id="decide" className="rv-card" open={errMsg !== null}>
+              <details id="decide" className="rv-card" open={errMsg !== null || draft !== null}>
                 <summary>{isAppeal ? "判定 · 審核申訴" : "判定 · 審核投訴"}</summary>
                 <DecideForm
                   action={decide}
                   isAppeal={isAppeal}
+                  draft={draft}
                   reasons={MANUAL_REASONS.map((key) => ({ key, label: PUBLIC_REASONS[key] }))}
                 />
               </details>

@@ -278,7 +278,7 @@ export const DECIDE_ERR_TEXT: Record<string, string> = {
   rate_limited: "操作過於頻繁，請稍後再試。",
   self_case: "涉己案件不可審理（你是投訴人或被投訴人）。",
   same_party: "同局案件不可審理（含局主）。",
-  second_review: "申訴改判需第二人覆核（原判是你判的）。",
+  second_review: "申訴改判需第二人覆核（原判是你判的）；目前有多位審核員，請換另一位處理。",
   audit_failed: "審計寫入失敗，操作已中止未執行，可重試。",
   state_changed: "此案件目前不可判定（可能已被處理），請刷新隊列看看。",
   busy: "另一位審核員正在處理，請稍後刷新。",
