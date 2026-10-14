@@ -80,3 +80,16 @@ describe("toMinimaxMessages lang", () => {
     expect(def[0]?.content).toContain(BAR_LANG_LINES.en);
   });
 });
+
+describe("toMinimaxMessages with memory", () => {
+  it("appends a framed memory block to system only when memory is non-empty", async () => {
+    const { sanitizeBarMemory } = await import("./barMemory");
+    const mem = sanitizeBarMemory({ profile: { preferred_name: "Amy" }, taste: { likes: ["梅酒"] } })!;
+    const withMem = toMinimaxMessages([], { message: "hi", memory: mem });
+    expect(withMem[0].content).toContain("<guest_memory>");
+    expect(withMem[0].content).toContain("Preferred name: Amy");
+    const empty = toMinimaxMessages([], { message: "hi", memory: sanitizeBarMemory({})! });
+    expect(empty[0].content).not.toContain("guest_memory");
+    expect(toMinimaxMessages([], { message: "hi" })[0].content).not.toContain("guest_memory");
+  });
+});

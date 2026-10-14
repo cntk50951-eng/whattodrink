@@ -4,6 +4,7 @@
  * 零 hardcode 台词。失败时路由回 502，前端显示系统提示（非台词）。
  */
 
+import { memoryPromptBlock, type BarMemory } from "./barMemory";
 import type { MinimaxChatMessage } from "./minimax";
 
 export const BARTENDER_NAME = "Ivy";
@@ -51,11 +52,11 @@ export type IvyHistoryItem = {
 /** 组装模型消息（历史只取最后 10 条，防止爆 token；lang 缺省 en）。 */
 export function toMinimaxMessages(
   history: IvyHistoryItem[],
-  input: { message?: string; event?: IvyEvent; lang?: BarLang },
+  input: { message?: string; event?: IvyEvent; lang?: BarLang; memory?: BarMemory },
 ): MinimaxChatMessage[] {
   const lang: BarLang = input.lang ?? "en";
   const msgs: MinimaxChatMessage[] = [
-    { role: "system", content: `${IVY_SYSTEM_PROMPT}\n${BAR_LANG_LINES[lang]}` },
+    { role: "system", content: `${IVY_SYSTEM_PROMPT}\n${BAR_LANG_LINES[lang]}${input.memory !== undefined ? memoryPromptBlock(input.memory) : ""}` },
   ];
   for (const h of history.slice(-10)) {
     const text = h.text.trim().slice(0, 500);

@@ -5,12 +5,14 @@ import {
   toMinimaxMessages,
   type IvyHistoryItem,
 } from "@/lib/bartender";
+import { sanitizeBarMemory } from "@/lib/barMemory";
 import { MinimaxError, minimaxChat } from "@/lib/minimax";
 import { ipRateLimit } from "@/lib/rateLimit";
 
 /**
  * POC 酒保对话（公开：bar-room 页本身公开；零写库）。
  * 台词全部来自 MiniMax（M3＋Ivy 人设）；失败回 502，前端显示系统提示。
+ * 可选 `memory`（酒保記憶文檔，見 lib/barMemory；清洗後注入 system，不存庫）。
  * UR F.11：lang 可选（en 缺省／yue／zh，非法回落 en）；按 IP 60s 30 次（防刷额度，
  * 进程级尽力）；上游 429 透传＋Retry-After。
  */
@@ -20,6 +22,7 @@ export async function POST(req: Request): Promise<Response> {
     event?: unknown;
     history?: unknown;
     lang?: unknown;
+    memory?: unknown;
   };
   try {
     body = await req.json();
@@ -50,6 +53,8 @@ export async function POST(req: Request): Promise<Response> {
     return apiError("invalid_params", "message 或 event 二选一。", 400);
   }
   const lang = parseBarLang(body.lang);
+  // 可選：客戶端帶的酒保記憶（清洗後才注入；壞的當沒有，不影響聊天）
+  const memory = body.memory === undefined ? undefined : (sanitizeBarMemory(body.memory) ?? undefined);
 
   // UR F.11 按 IP 限频（公开零写库口，额度被刷光全员失声；超限 429＋Retry-After）。
   const ip =
@@ -68,7 +73,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   try {
-    const text = await minimaxChat(toMinimaxMessages(history, { message, event, lang }), { apiKey });
+    const text = await minimaxChat(toMinimaxMessages(history, { message, event, lang, memory }), { apiKey });
     return apiOk({ text, lang });
   } catch (e) {
     const status = e instanceof MinimaxError ? e.status : 500;

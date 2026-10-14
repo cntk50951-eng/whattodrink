@@ -81,6 +81,98 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/me/bar-memory:
+    get:
+      operationId: getBarMemory
+      summary: 酒保記憶（需登录；只存摘要；无记忆 doc=null、rev=0）
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "{doc: BarMemory|null, rev: integer}（BarMemory 见 iOS 仓 docs/research/2026-10-14-bar-memory-design.md）"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [doc, rev]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      operationId: putBarMemory
+      summary: 保存酒保記憶（base_rev 过期时服务端与现存合并后保存，回合并结果）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doc, base_rev]
+              properties:
+                doc:
+                  type: object
+                base_rev:
+                  type: integer
+                  minimum: 0
+      responses:
+        "200":
+          description: "{doc, rev, merged: boolean}；客户端用回包替换本地"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [doc, rev, merged]
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: 并发冲突重试 3 次仍失败
+    delete:
+      operationId: deleteBarMemory
+      summary: 忘记我（删除远端酒保記憶）
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "{ok:true}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/bar/memory/update:
+    post:
+      operationId: updateBarMemory
+      summary: 酒保記憶摘要（公开、无状态、零写库；IP 60s 10 次；把旧记忆＋本次对话融合成新文档）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transcript]
+              properties:
+                memory:
+                  type: object
+                transcript:
+                  type: array
+                  maxItems: 40
+                  items:
+                    type: object
+                    required: [from, text]
+                    properties:
+                      from:
+                        type: string
+                        enum: [her, me]
+                      text:
+                        type: string
+                        maxLength: 500
+      responses:
+        "200":
+          description: "{doc, changed}；模型失败／无法解析／会清空旧记忆 → 回旧文档 changed=false"
+        "429":
+          description: 限频（Retry-After）
+        "502":
+          description: 模型失败
   /api/v1/bar/chat:
     post:
       operationId: barChat
@@ -107,6 +199,9 @@ paths:
                   type: string
                   enum: [en, yue, zh]
                   description: 回复语言（缺省 en；yue 繁体粤语用字；zh 普通话繁体）
+                memory:
+                  type: object
+                  description: 可选，酒保記憶文档（客户端带；服务端清洗后注入 system，不存库；非法当没有）
       responses:
         "200":
           description: 台词＋生效语言
