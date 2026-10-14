@@ -10,12 +10,16 @@ import {
   joinStatusKey,
   parseGamePlayer,
   parseGameRoom,
+  parseGameRound,
   parseJoinRequest,
   parseJoinStatus,
+  parseRoomRules,
   type GamePlayer,
   type GameRoom,
+  type GameRound,
   type JoinRequest,
 } from "@/lib/gameRoom";
+import { V2GameBidPanel } from "@/components/v2/V2GameBidPanel";
 import styles from "./v2.module.css";
 
 type Err = { error?: { code?: string; message?: string } } | null;
@@ -56,6 +60,12 @@ export function V2GameRoomSheet({
   );
   const [room, setRoom] = useState<GameRoom | null>(null);
   const [players, setPlayers] = useState<GamePlayer[]>([]);
+  const [round, setRound] = useState<GameRound | null>(null);
+  const [rules, setRules] = useState<{ mode: "standard" | "deal_only"; minOpenQty: number; zhaiEnabled: boolean }>({
+    mode: "standard",
+    minOpenQty: 2,
+    zhaiEnabled: false,
+  });
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [pendText, setPendText] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -84,6 +94,7 @@ export function V2GameRoomSheet({
       const j = (await res.json().catch(() => null)) as {
         room?: unknown;
         players?: unknown[];
+        round?: unknown;
         error?: { code?: string; message?: string };
       } | null;
       if (!res.ok || j === null) throw new Error(errText(res.status, j));
@@ -97,6 +108,10 @@ export function V2GameRoomSheet({
       ps.sort((a, b) => a.seat - b.seat);
       setRoom(r);
       setPlayers(ps);
+      setRound(parseGameRound(j.round));
+      if (typeof j.room === "object" && j.room !== null) {
+        setRules(parseRoomRules((j.room as Record<string, unknown>).rules));
+      }
       versionRef.current = r.version;
     },
     [errText, t],
@@ -332,8 +347,7 @@ export function V2GameRoomSheet({
                 ))}
               </div>
             )}
-            {room.status === "lobby" ? (
-              <div className="flex gap-2">
+            {room.status === "lobby" ? (              <div className="flex gap-2">
                 <button
                   type="button"
                   disabled={busy || me === null}
@@ -364,6 +378,18 @@ export function V2GameRoomSheet({
                   {t("gameLeave")}
                 </button>
               </div>
+            ) : round !== null ? (
+              <V2GameBidPanel
+                roomId={room.id}
+                dealOnly={rules.mode === "deal_only"}
+                minOpenQty={rules.minOpenQty}
+                zhaiEnabled={rules.zhaiEnabled}
+                round={round}
+                players={players}
+                myUserId={myUserId}
+                expectedVersion={room.version}
+                onDone={() => loadRoom(room.id).then(() => loadRequests(room.id))}
+              />
             ) : (
               <p className="rounded-xl bg-muted p-3 text-center text-sm text-muted-foreground">{t("gamePlayingSoon")}</p>
             )}

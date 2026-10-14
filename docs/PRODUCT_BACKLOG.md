@@ -4129,9 +4129,9 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - web 范围：pills 遊戲 pill＋`V2GamesSheet`（建房面對面／線上＋輸碼加入＋我的房恢復）＋`V2GameRoomSheet`（lobby：成員＋準備＋開始＋離開＋房主審批＋踢人；陌生人 202 輪詢等批）；API 现成（H.1 房間 8 端點＋H.2(a) 審批）。
 - 非目标：叫骰（G.10b）、聊天舉報（G.10c）、好友邀請（另議）、v1。
 
-### UR G.10b　線上叫骰（v2）[]
+### UR G.10b　線上叫骰（v2）[✓]
 - iOS 对标：GameOnlineViews 線上叫骰（bid／challenge／reveal／倒計時）。
-- web 范围：房內叫骰面板（合法性預判＋開盅＋結果＋下一局）；API 现成（H.1 actions）。
+- web 范围：`V2GameBidPanel` 掛房間 Sheet（我的骰＋上一口＋輪次倒數＋叫骰面板＋開盅＋結果＋下一局；deal_only 只亮骰；合法性直引服務端 `isValidBid`）；API 现成（H.1 actions，expected＋幂等鍵＋stale 重拉）。
 - 非目标：面對面搖骰器（兩邊都無此端點，另議）、v1。
 
 ### UR G.10c　房內聊天＋舉報（v2）[]
@@ -4179,7 +4179,9 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - 2026-10-14：G.9 置 [WIP] 開工（A 全做＋上地圖，用戶定案）；实作：0056 遷移（去 FK）＋saves 路由回查 archive（expired:true，service＋代碼門）＋openapi 描述行＋`lib/partyDraft.ts`（草稿／偏好／再開）＋`lib/pinnedPlaces.ts`（10m 去重／100 上限）＋10 單測＋表單草稿偏好重開＋詳情再開一局＋收藏過期灰顯＋我的地點＋地圖 pin 層＋v2 三語 key×10；待 0056 貼跑＋親驗。
 - 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.10）。
 - 2026-10-14：G.10 置 [WIP] 開工（拆三批＋pills 新 pill，用戶定案；本批 G.10a 房間＋審批，G.10b 叫骰／G.10c 聊天舉報另批）；实作：`lib/gameRoom.ts` 純函數（房間／成員／加入分流／審批／房碼／錯誤鍵）＋5 單測＋`V2GamesSheet`（建房雙模式＋輸碼＋恢復）＋`V2GameRoomSheet`（lobby 輪詢＋準備開始離開＋踢＋審批＋202 等批輪詢）＋pills 遊戲 pill（匿名即登入＋`?games=1` 續開）＋v2 三語 key×39；API／migration／yaml 零改动。
-- 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.10b）。---
+- 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.10b）。
+- 2026-10-14：G.10b 置 [WIP] 開工；实作：`lib/gameRoom.ts` 加 round／rules 解析＋2 單測＋`V2GameBidPanel`（骰面＋上一口＋倒數＋叫骰＋開盅＋結果＋下一局＋deal_only 亮骰，合法性直引 `isValidBid`）＋房間 Sheet 接 round 輪詢＋v2 三語 key×19；API／migration／yaml 零改动。
+- 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.10c）。---
 
 UR D.9　iOS 真推送 P1（E1 碰杯＋APNs 通道）[WIP]
 

@@ -6,9 +6,11 @@ import {
   normalizeRoomCode,
   parseGamePlayer,
   parseGameRoom,
+  parseGameRound,
   parseJoinOutcome,
   parseJoinRequest,
   parseJoinStatus,
+  parseRoomRules,
 } from "./gameRoom";
 
 describe("gameRoom", () => {
@@ -42,5 +44,21 @@ describe("gameRoom", () => {
     expect(gameSocialErrorKey("too_many_requests")).toBe("gameErrTooMany");
     expect(gameSocialErrorKey("message_rejected")).toBeNull();
     expect(gameSocialErrorKey(null)).toBeNull();
+  });
+  it("回合解析", () => {
+    expect(parseGameRound(null)).toBeNull();
+    expect(parseRoomRules({ mode: "deal_only", min_open_qty: 3 }).mode).toBe("deal_only");
+    expect(parseRoomRules(null).minOpenQty).toBe(2);
+    const r = parseGameRound({
+      no: 2,
+      status: "bidding",
+      current_turn_user: "u1",
+      turn_deadline: "2026-10-20T20:00:30+08:00",
+      last_bid: { qty: 3, face: 5, zhai: false },
+      my_dice: [1, 2, 3, "x", 5],
+    });
+    expect(r?.last_bid).toEqual({ qty: 3, face: 5, zhai: false });
+    expect(r?.my_dice).toEqual([1, 2, 3, 5]);
+    expect(r?.revealed).toBeNull();
   });
 });

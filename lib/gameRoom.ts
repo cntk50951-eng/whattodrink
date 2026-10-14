@@ -124,6 +124,81 @@ export function normalizeRoomCode(s: string): string | null {
   return t !== "" ? t : null;
 }
 
+export type GameBid = { qty: number; face: number; zhai: boolean };
+
+export type GameRound = {
+  no: number;
+  status: string;
+  starter_id: string | null;
+  current_turn_user: string | null;
+  turn_deadline: string | null;
+  last_bid: GameBid | null;
+  my_dice: number[];
+  revealed: {
+    dice: Record<string, number[]>;
+    challenger_id: string | null;
+    bidder_id: string | null;
+    counted: number | null;
+    bid_met: boolean | null;
+    loser_id: string | null;
+  } | null;
+};
+
+function parseBid(raw: unknown): GameBid | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.qty !== "number" || typeof r.face !== "number") return null;
+  return { qty: Math.floor(r.qty), face: Math.floor(r.face), zhai: r.zhai === true };
+}
+
+/** 房規子集（叫骰面板用；非法回落默认，沿 parseRules 口徑）。 */
+export function parseRoomRules(raw: unknown): { mode: "standard" | "deal_only"; minOpenQty: number; zhaiEnabled: boolean } {
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  const minQ = typeof r.min_open_qty === "number" && Number.isFinite(r.min_open_qty) ? Math.floor(r.min_open_qty) : 2;
+  return {
+    mode: r.mode === "deal_only" ? "deal_only" : "standard",
+    minOpenQty: Math.min(20, Math.max(1, minQ)),
+    zhaiEnabled: r.zhai_enabled === true,
+  };
+}
+/** 回合解析（壞形回 null；iOS 輪詢口徑，壞 round 不炸房）。 */
+export function parseGameRound(raw: unknown): GameRound | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.no !== "number") return null;
+  const dice = Array.isArray(r.my_dice)
+    ? (r.my_dice as unknown[]).filter((x): x is number => typeof x === "number")
+    : [];
+  const rv = typeof r.revealed === "object" && r.revealed !== null ? (r.revealed as Record<string, unknown>) : null;
+  return {
+    no: Math.floor(r.no as number),
+    status: str(r.status) ?? "bidding",
+    starter_id: str(r.starter_id),
+    current_turn_user: str(r.current_turn_user),
+    turn_deadline: str(r.turn_deadline),
+    last_bid: parseBid(r.last_bid),
+    my_dice: dice,
+    revealed:
+      rv !== null
+        ? {
+            dice:
+              typeof rv.dice === "object" && rv.dice !== null
+                ? Object.fromEntries(
+                    Object.entries(rv.dice as Record<string, unknown>)
+                      .filter(([, v]) => Array.isArray(v))
+                      .map(([k, v]) => [k, (v as unknown[]).filter((x): x is number => typeof x === "number")]),
+                  )
+                : {},
+            challenger_id: str(rv.challenger_id),
+            bidder_id: str(rv.bidder_id),
+            counted: num(rv.counted),
+            bid_met: typeof rv.bid_met === "boolean" ? rv.bid_met : null,
+            loser_id: str(rv.loser_id),
+          }
+        : null,
+  };
+}
+
 export type GameSocialError = { key: string; params?: Record<string, string | number> } | null;
 
 /** 社交錯誤人話（null 即透服務端 message；iOS gameSocialErrorText 口徑）。 */
