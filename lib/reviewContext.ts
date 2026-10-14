@@ -249,3 +249,131 @@ export function allowSelfCaseEnabled(env: string | undefined = process.env.ADMIN
   return env === "true";
 }
 
+// ---------- 已處理案件的判定記錄 ----------
+
+export type DecisionEffect = {
+  userId: string;
+  nickname: string;
+  kind: string;
+  delta: number;
+  expiresAt: string | null;
+  createdAt: string | null;
+  reversed: boolean;
+};
+
+export type AuditLine = { action: string; admin: string; at: string; summary: string };
+
+export type DecisionRecord = {
+  status: string;
+  decision: string | null;
+  decidedAt: string | null;
+  decidedBy: string;
+  publicReason: string | null;
+  internalNote: string | null;
+  appealStatus: string | null;
+  appealText: string | null;
+  appealedAt: string | null;
+  effects: DecisionEffect[];
+  audit: AuditLine[];
+  viewCount: number;
+};
+
+/** 判定行為的人話：decide_uphold 之類 → 中文；未知原樣。 */
+export function auditActionLabel(action: string): string {
+  switch (action) {
+    case "decide_attempt": return "提交判定";
+    case "decide_decided": return "判定已執行";
+    case "decide_maintained": return "申訴維持原判";
+    case "decide_rejected": return "判定被拒（狀態不符／並發）";
+    case "view_complaint": return "查看詳情";
+    case "export_csv": return "導出 CSV";
+    default: return action;
+  }
+}
+
+export function decisionLabel(d: string | null): string {
+  return d === "uphold" ? "成立" : d === "dismiss" ? "駁回" : d === "malicious" ? "惡意" : "—";
+}
+
+/** 積分記錄的人話（負＝扣分；:reversed＝申訴改判沖銷）。 */
+export function effectLabel(e: Pick<DecisionEffect, "kind" | "delta" | "reversed">): string {
+  const sign = e.delta > 0 ? `+${e.delta}` : `${e.delta}`;
+  return `${e.reversed ? "沖銷：" : ""}${e.kind.replace(":reversed", "")} ${sign}`;
+}
+
+export function auditSummary(detail: unknown): string {
+  const d = (typeof detail === "object" && detail !== null ? detail : {}) as Record<string, unknown>;
+  const parts: string[] = [];
+  if (typeof d.decision === "string") parts.push(`決定：${decisionLabel(d.decision)}`);
+  if (typeof d.severity === "number") parts.push(`severity ${d.severity}`);
+  if (typeof d.reason === "string") parts.push(`對外理由 ${d.reason}`);
+  if (d.self_review === true) parts.push("⚠ 自審（測試模式）");
+  if (typeof d.error === "string") parts.push(`錯誤 ${d.error}`);
+  if (typeof d.note === "string" && d.note !== "") parts.push(`備註：${d.note}`);
+  return parts.join("；");
+}
+
+export async function loadDecisionRecord(
+  svc: SupabaseClient,
+  c: Record<string, unknown>,
+  publicReasonLabel: (key: unknown) => string,
+): Promise<DecisionRecord> {
+  const id = String(c.id ?? "");
+  const [{ data: ev }, { data: au }] = await Promise.all([
+    svc
+      .from("trust_events")
+      .select("user_id,kind,delta,expires_at,created_at,ref_id")
+      .like("ref_id", `complaint:${id}:%`)
+      .order("created_at", { ascending: true })
+      .limit(50),
+    svc.from("admin_audit_log").select("admin_id,action,detail,at").eq("target", id).order("at", { ascending: true }).limit(200),
+  ]);
+  const events = ((ev ?? []) as unknown[]) as Record<string, unknown>[];
+  const audits = ((au ?? []) as unknown[]) as Record<string, unknown>[];
+  const decidedBy = typeof c.decided_by === "string" ? c.decided_by : "";
+  const ids = new Set<string>();
+  for (const e of events) if (typeof e.user_id === "string") ids.add(e.user_id);
+  for (const a of audits) if (typeof a.admin_id === "string") ids.add(a.admin_id);
+  if (decidedBy.startsWith("human:")) ids.add(decidedBy.slice(6));
+  const { data: users } = ids.size > 0 ? await svc.from("users").select("id,nickname").in("id", [...ids]) : { data: [] };
+  const nick = new Map<string, string>();
+  for (const u of ((users ?? []) as unknown[]) as Record<string, unknown>[]) {
+    if (typeof u.id === "string") nick.set(u.id, typeof u.nickname === "string" && u.nickname !== "" ? u.nickname : "酒友");
+  }
+  const who = (uid: unknown): string => (typeof uid === "string" ? (nick.get(uid) ?? `用戶 ${uid.slice(0, 8)}`) : "—");
+  const decidedByLabel = decidedBy.startsWith("human:")
+    ? `審核員 ${who(decidedBy.slice(6))}`
+    : decidedBy === "ai"
+      ? "AI（自動）"
+      : decidedBy === "" ? "—" : decidedBy;
+  return {
+    status: String(c.status ?? ""),
+    decision: typeof c.decision === "string" ? c.decision : null,
+    decidedAt: typeof c.decided_at === "string" ? c.decided_at : null,
+    decidedBy: decidedByLabel,
+    publicReason: typeof c.public_reason === "string" && c.public_reason !== "" ? publicReasonLabel(c.public_reason) : null,
+    internalNote: typeof c.internal_note === "string" && c.internal_note !== "" ? c.internal_note : null,
+    appealStatus: typeof c.appeal_status === "string" ? c.appeal_status : null,
+    appealText: typeof c.appeal_text === "string" ? c.appeal_text : null,
+    appealedAt: typeof c.appealed_at === "string" ? c.appealed_at : null,
+    effects: events.map((e) => ({
+      userId: String(e.user_id ?? ""),
+      nickname: who(e.user_id),
+      kind: String(e.kind ?? ""),
+      delta: typeof e.delta === "number" ? e.delta : 0,
+      expiresAt: typeof e.expires_at === "string" ? e.expires_at : null,
+      createdAt: typeof e.created_at === "string" ? e.created_at : null,
+      reversed: String(e.ref_id ?? "").endsWith(":reversed"),
+    })),
+    audit: audits
+      .filter((a) => a.action !== "view_complaint")
+      .map((a) => ({
+        action: String(a.action ?? ""),
+        admin: who(a.admin_id),
+        at: typeof a.at === "string" ? a.at : "",
+        summary: auditSummary(a.detail),
+      })),
+    viewCount: audits.filter((a) => a.action === "view_complaint").length,
+  };
+}
+

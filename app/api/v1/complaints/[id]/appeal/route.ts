@@ -1,4 +1,5 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
+import { isAdverseParty } from "@/lib/complaintAppeal";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { TRUST_CONFIG } from "@/lib/trust/config";
 import { parseComplaintText } from "@/lib/complaints";
@@ -59,8 +60,7 @@ export async function POST(
     return apiError("invalid_params", "申诉已截止（结果后 7 天内）", 400);
   }
   // 对自己不利才可申诉：被投 upheld／malicious 的是 target；dismissed 的是 filer。
-  const adverse =
-    (c.status === "upheld" || c.status === "malicious") ? c.target_id === userId : c.filer_id === userId;
+  const adverse = isAdverseParty(c.status, c.filer_id === userId, c.target_id === userId);
   if (!adverse) {
     return apiError("invalid_params", "该结果对你有利，无需申诉", 400);
   }

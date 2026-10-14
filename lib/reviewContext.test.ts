@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { allowSelfCaseEnabled, genderLabel, isSelfCase, pairHistory, selfCaseBlock, tallyComplaints } from "./reviewContext";
+import { allowSelfCaseEnabled, auditActionLabel, auditSummary, decisionLabel, effectLabel, genderLabel, isSelfCase, pairHistory, selfCaseBlock, tallyComplaints } from "./reviewContext";
 
 const rows = [
   { id: "c0", filer_id: "A", target_id: "B", status: "escalated", category: "no_show", created_at: "2026-10-14T10:00:00Z" },
@@ -65,5 +65,28 @@ describe("利益衝突回避（四眼原則）", () => {
     expect(allowSelfCaseEnabled("")).toBe(false);
     expect(allowSelfCaseEnabled("1")).toBe(false);
     expect(allowSelfCaseEnabled("true")).toBe(true);
+  });
+});
+
+describe("判定記錄的人話", () => {
+  it("決定與審計動作", () => {
+    expect(decisionLabel("uphold")).toBe("成立");
+    expect(decisionLabel("dismiss")).toBe("駁回");
+    expect(decisionLabel("malicious")).toBe("惡意");
+    expect(decisionLabel(null)).toBe("—");
+    expect(auditActionLabel("decide_decided")).toBe("判定已執行");
+    expect(auditActionLabel("decide_maintained")).toBe("申訴維持原判");
+    expect(auditActionLabel("weird")).toBe("weird");
+  });
+  it("積分記錄：扣分／加分／沖銷", () => {
+    expect(effectLabel({ kind: "no_show", delta: -10, reversed: false })).toBe("no_show -10");
+    expect(effectLabel({ kind: "no_show:reversed", delta: 10, reversed: true })).toBe("沖銷：no_show +10");
+  });
+  it("審計摘要：決定／severity／自審標記／錯誤", () => {
+    expect(auditSummary({ decision: "uphold", severity: 2, reason: "evidence_confirmed", note: "核對屬實" }))
+      .toBe("決定：成立；severity 2；對外理由 evidence_confirmed；備註：核對屬實");
+    expect(auditSummary({ decision: "dismiss", self_review: true })).toContain("自審");
+    expect(auditSummary({ error: "busy" })).toBe("錯誤 busy");
+    expect(auditSummary(null)).toBe("");
   });
 });

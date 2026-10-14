@@ -1,4 +1,5 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
+import { isAdverseParty } from "@/lib/complaintAppeal";
 import { publicReasonText } from "@/lib/complaintDecision";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { TRUST_CONFIG } from "@/lib/trust/config";
@@ -87,7 +88,7 @@ export async function GET(req: Request): Promise<Response> {
         Number.isFinite(due) &&
         nowMs <= (due as number),
       can_appeal:
-        (r.status === "upheld" || r.status === "dismissed" || r.status === "malicious") &&
+        isAdverseParty(r.status, role === "filed", role === "against") &&
         r.appeal_status !== "pending" &&
         Number.isFinite(decided) &&
         nowMs <= (decided as number) + TRUST_CONFIG.appeal_window_days * 24 * 3600_000,

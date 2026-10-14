@@ -108,6 +108,37 @@ export async function reverseTrustEvent(
   }
 }
 
+/**
+ * 退出者（投诉人）因对方问题退出：投诉成立时退还其该局的退出扣分（固定 ref → 幂等；申诉改判时随原判沖销）。
+ */
+async function refundFilerLeave(
+  svc: SupabaseClient,
+  filerId: string,
+  partyId: string | null,
+  decisionRefId: string,
+  nowMs: number,
+): Promise<void> {
+  if (partyId === null) return;
+  const { data } = await svc
+    .from("trust_events")
+    .select("delta,expires_at")
+    .eq("ref_id", `party:${partyId}:leave:${filerId}`)
+    .eq("user_id", filerId)
+    .maybeSingle();
+  const row = data as { delta?: unknown; expires_at?: unknown } | null;
+  if (row === null || typeof row.delta !== "number" || row.delta >= 0) return;
+  const { error } = await svc.from("trust_events").insert({
+    user_id: filerId,
+    kind: "leave_refund",
+    delta: -row.delta,
+    party_id: partyId,
+    ref_id: `${decisionRefId}:leave_refund`,
+    note: "投訴成立退還退出扣分",
+    expires_at: typeof row.expires_at === "string" ? row.expires_at : new Date(nowMs + 90 * 86400_000).toISOString(),
+  });
+  if (error !== null && error.code !== "23505") throw new Error(`leave refund failed: ${error.code}`);
+}
+
 async function applyPenalty(
   svc: SupabaseClient,
   c: Record<string, unknown>,
@@ -123,6 +154,7 @@ async function applyPenalty(
   const category = c.category as string;
   const ref = decisionRef(id, decision, rev);
   if (decision === "uphold") {
+    await refundFilerLeave(svc, filerId, partyId, ref, nowMs);
     let delta: number = TRUST_CONFIG.upheld_other_delta;
     let expires = 90;
     let kind = "complaint_upheld";
@@ -221,6 +253,7 @@ export async function decideComplaint(
         reason = "appeal_maintained";
       } else {
         await reverseTrustEvent(svc, decisionRef(complaintId, prev, prevRev), nowMs);
+        await reverseTrustEvent(svc, `${decisionRef(complaintId, prev, prevRev)}:leave_refund`, nowMs);
         newRev = prevRev + 1;
         await applyPenalty(svc, c, decision, newRev, opts, nowMs);
         appealStatus = "upheld";

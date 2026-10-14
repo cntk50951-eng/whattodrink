@@ -2336,7 +2336,7 @@ paths:
   /api/v1/users/{id}/trust:
     get:
       operationId: getUserTrust
-      summary: 他人诚信（需登录；只回等级＋统计，不回精确分；拉黑 404，UR E.30）
+      summary: 他人诚信（需登录；回精确分 score＋等级＋统计；拉黑 404，UR E.30）
       security:
         - bearerAuth: []
       parameters:
@@ -2352,7 +2352,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [tier, completed_count, hosted_count, completion_rate, cancel_90d]
+                required: [tier, score, completed_count, hosted_count, completion_rate, cancel_90d]
         "400":
           $ref: "#/components/responses/InvalidParams"
         "401":

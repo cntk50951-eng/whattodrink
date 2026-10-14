@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { after } from "next/server";
 
 import { sweepOverdueResponses } from "@/lib/complaints";
@@ -56,6 +57,9 @@ export default async function ReviewQueuePage() {
   return (
     <main style={{ padding: 24, fontFamily: "system-ui" }}>
       <h1>投訴審核隊列（{list.length}）</h1>
+      <p>
+        只列「待人工」案件；處理完的案件在 <Link href="/innerharbour/review/history">已處理記錄</Link>。
+      </p>
       {openAlerts.length > 0 && (
         <section style={{ border: "2px solid crimson", padding: 12, marginBottom: 16 }} role="alert">
           <strong style={{ color: "crimson" }}>未處理的安全告警（{openAlerts.length}）</strong>

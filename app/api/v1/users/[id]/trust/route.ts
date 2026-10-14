@@ -4,7 +4,7 @@ import { computeTrust, trustTier } from "@/lib/trust/score";
 import { completionRate } from "@/lib/trust/settle";
 
 /**
- * UR E.30 他人诚信（🔒，不回精确分）。
+ * UR E.30 他人诚信（🔒；产品决定 2026-10-14：回精确分 score，供主页一眼可见）。
  * `GET /api/v1/users/:id/trust` —— `{tier, completed_count, hosted_count,
  * completion_rate, cancel_90d}`。拉黑任一方向 404；completion_rate 本期 null
  * （出席确认 C 阶段才有口径，占位）。
@@ -56,6 +56,7 @@ export async function GET(
   }
   return apiOk({
     tier: trustTier(score, completed),
+    score,
     completed_count: completed,
     hosted_count: hostedCount ?? 0,
     completion_rate: await completionRate(svc, id, nowMs),

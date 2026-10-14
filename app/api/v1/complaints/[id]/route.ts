@@ -1,5 +1,6 @@
 import { after } from "next/server";
 
+import { isAdverseParty } from "@/lib/complaintAppeal";
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { TRUST_CONFIG } from "@/lib/trust/config";
@@ -86,7 +87,7 @@ export async function GET(
     can_respond:
       iamTarget && c.status === "awaiting_response" && Number.isFinite(due) && nowMs <= due,
     can_appeal:
-      (c.status === "upheld" || c.status === "dismissed" || c.status === "malicious") &&
+      isAdverseParty(c.status, iamFiler, iamTarget) &&
       c.appeal_status !== "pending" &&
       Number.isFinite(decided) &&
       nowMs <= decided + TRUST_CONFIG.appeal_window_days * 24 * 3600_000,
