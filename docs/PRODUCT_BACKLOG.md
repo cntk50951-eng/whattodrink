@@ -4124,7 +4124,20 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - web 范围：發局表單草稿（localStorage 按帳號分桶）＋收藏過期行（expired 灰顯＋帶我去地圖位置）＋pin 地點本地存；API 现成（/me/saves expired 行，E.22 歸檔口徑）。
 - 非目标：跨裝置同步（iOS 亦本地）、v1。
 
-### UR G.10　酒桌遊戲開放＋房內聊天舉報（v2）[]
+### UR G.10　酒桌遊戲房間＋審批（v2）[✓]
+- iOS 对标：GameOnline／GameSocial 房間部分（iOS 未提交 WIP；叫骰另 G.10b，聊天舉報另 G.10c，用戶定案）。
+- web 范围：pills 遊戲 pill＋`V2GamesSheet`（建房面對面／線上＋輸碼加入＋我的房恢復）＋`V2GameRoomSheet`（lobby：成員＋準備＋開始＋離開＋房主審批＋踢人；陌生人 202 輪詢等批）；API 现成（H.1 房間 8 端點＋H.2(a) 審批）。
+- 非目标：叫骰（G.10b）、聊天舉報（G.10c）、好友邀請（另議）、v1。
+
+### UR G.10b　線上叫骰（v2）[]
+- iOS 对标：GameOnlineViews 線上叫骰（bid／challenge／reveal／倒計時）。
+- web 范围：房內叫骰面板（合法性預判＋開盅＋結果＋下一局）；API 现成（H.1 actions）。
+- 非目标：面對面搖骰器（兩邊都無此端點，另議）、v1。
+
+### UR G.10c　房內聊天＋舉報（v2）[]
+- iOS 对标：GameSocialViews（24 快捷語＋文字 60 字＋舉報五類＋kick 拉黑）。
+- web 范围：房內聊天（快捷語＋文字＋撤回顯示）＋舉報＋踢人；API 现成（H.2(b)）。
+- 非目标：語音／富媒體、v1。
 - iOS 对标：陌生人 202 審批＋房內文字聊天＋舉報踢人（GameOnline／GameSocial，未提交 WIP）。
 - web 范围：v2 遊戲 UI 從零搭（web 現無遊戲 UI；建房／碼加入／審批列表／房內聊天／舉報）；API 现成（H.1／H.2(a)(b)，shared-only 已合入）。
 - 非目标：語音／排行／公開大廳（兩邊都不做）、v1。
@@ -4164,7 +4177,9 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - 2026-10-14：G.8 置 [WIP] 開工（拆兩批＋投訴免證據，用戶定案；本批政策＋徽章＋到場出席，G.8b 投訴＋誠信頁）；实作：`lib/partyUi.ts` 純函數（政策解析／置灰／確認文案／打卡窗口／結算／打卡失敗鍵）＋8 單測＋`V2PartyAttendance`（我到了＋host 標記＋回報發起人＋outcome）＋詳情政策置灰＋退出兩段確認＋host 徽章一行＋v2 三語 key×34（另對齊 G.7 等級文案靠譜／需注意，iOS 口徑）；API／migration／yaml 零改动。
 - 2026-10-14：G.8b 置 [WIP] 開工；实作：`lib/complaintUi.ts` 純函數（五類／窗口／預判／目標過濾／校驗／雙視角狀態／錯誤鍵／等級賬本）＋8 單測＋`V2ComplaintCompose`（詳情內選人＋類別＋200 字）＋`V2ComplaintsSheet`（双籤＋展開＋申辯＋申訴）＋`V2TrustSheet`（分數等級＋四統計＋賬本）＋動態中心加兩行＋詳情傳 myUserId＋v2 三語 key×66；API／migration／yaml 零改动。
 - 2026-10-14：G.9 置 [WIP] 開工（A 全做＋上地圖，用戶定案）；实作：0056 遷移（去 FK）＋saves 路由回查 archive（expired:true，service＋代碼門）＋openapi 描述行＋`lib/partyDraft.ts`（草稿／偏好／再開）＋`lib/pinnedPlaces.ts`（10m 去重／100 上限）＋10 單測＋表單草稿偏好重開＋詳情再開一局＋收藏過期灰顯＋我的地點＋地圖 pin 層＋v2 三語 key×10；待 0056 貼跑＋親驗。
-- 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.10）。---
+- 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.10）。
+- 2026-10-14：G.10 置 [WIP] 開工（拆三批＋pills 新 pill，用戶定案；本批 G.10a 房間＋審批，G.10b 叫骰／G.10c 聊天舉報另批）；实作：`lib/gameRoom.ts` 純函數（房間／成員／加入分流／審批／房碼／錯誤鍵）＋5 單測＋`V2GamesSheet`（建房雙模式＋輸碼＋恢復）＋`V2GameRoomSheet`（lobby 輪詢＋準備開始離開＋踢＋審批＋202 等批輪詢）＋pills 遊戲 pill（匿名即登入＋`?games=1` 續開）＋v2 三語 key×39；API／migration／yaml 零改动。
+- 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.10b）。---
 
 UR D.9　iOS 真推送 P1（E1 碰杯＋APNs 通道）[WIP]
 

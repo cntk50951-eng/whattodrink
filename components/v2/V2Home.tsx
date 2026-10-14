@@ -63,6 +63,8 @@ import { V2ActivitySheet } from "@/components/v2/V2ActivitySheet";
 import { V2NoticesSheet } from "@/components/v2/V2NoticesSheet";
 import { V2FriendRequestsSheet } from "@/components/v2/V2FriendRequestsSheet";
 import { V2ComplaintsSheet } from "@/components/v2/V2ComplaintsSheet";
+import { V2GamesSheet } from "@/components/v2/V2GamesSheet";
+import { V2GameRoomSheet } from "@/components/v2/V2GameRoomSheet";
 import { V2TrustSheet } from "@/components/v2/V2TrustSheet";
 import { useActivityCounts } from "@/hooks/useActivityCounts";
 import { activityBell } from "@/lib/activity";
@@ -395,6 +397,9 @@ export function V2Home() {
   // UR G.8b 投訴＋誠信開關（動態中心兩行＋酒局詳情投訴鍵）。
   const [cplOpen, setCplOpen] = useState(false);
   const [trustOpen, setTrustOpen] = useState(false);
+  // UR G.10a 遊戲開關（pills 遊戲 pill＋房間 Sheet；沿 G.6 口径）。
+  const [gamesOpen, setGamesOpen] = useState(false);
+  const [gameTarget, setGameTarget] = useState<string | null>(null);
   // UR G.1 收藏行点开详情（他人钉 openPin／自家 wantSheet，沿 E.13 深链口径）。
   function openSaved(id: string): void {
     if (apiPins.some((p) => p.id === id)) {
@@ -810,6 +815,19 @@ export function V2Home() {
     if (isAuthed !== true || !resumeMeetRef.current) return;
     resumeMeetRef.current = false;
     setMeetOpen(true);
+  }, [isAuthed]);
+  // UR G.10a：登入續開——mount 讀 ?games=1 記 intent 即清參數（防重觸，沿 G.1 口径）。
+  const resumeGamesRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("games") !== "1") return;
+    window.history.replaceState(null, "", window.location.pathname);
+    resumeGamesRef.current = true;
+  }, []);
+  useEffect(() => {
+    if (isAuthed !== true || !resumeGamesRef.current) return;
+    resumeGamesRef.current = false;
+    setGamesOpen(true);
   }, [isAuthed]);
   // UR D.4：一鍵定位——mount 讀 ?friend=<id> 記 intent 即清參數（列表定位鈕深鏈）。
   // 消費等 liveFriends 首批非空（空即無人在線，不消費不打擾；參數已清不重觸）。
@@ -1998,6 +2016,34 @@ export function V2Home() {
         >
           <Store aria-hidden />
           {t2("nearbyTitle")}
+        </Button>
+        {/* UR G.10a 遊戲 pill（須登入；匿名點即 Google 登入，沿 G.6 口径）。 */}
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0 rounded-full bg-card shadow-md ring-1 ring-foreground/10"
+          onClick={() => {
+            if (isAuthed === true) {
+              setGamesOpen(true);
+              return;
+            }
+            void (async () => {
+              try {
+                const { createClient } = await import("@/lib/supabase/client");
+                const supabase = createClient();
+                await supabase.auth.signInWithOAuth({
+                  provider: "google",
+                  options: {
+                    redirectTo: `${window.location.origin}/auth/callback?next=/v2?games=1`,
+                  },
+                });
+              } catch {}
+            })();
+          }}
+          aria-label={t2("gameTitle")}
+        >
+          <Dices aria-hidden />
+          {t2("gameTitle")}
         </Button>
         {/* UR G.6 遇見 pill（須登入；匿名點即 Google 登入，登後 ?meet=1 續開，沿 G.1 口径）。 */}
         <Button
@@ -3329,7 +3375,26 @@ export function V2Home() {
       {newsOpen && <V2NewsSheet open onClose={() => setNewsOpen(false)} />}
       {/* UR G.3 酒局看板。 */}
       {partyOpen && <V2PartySheet open myUserId={meJson?.id ?? null} onClose={() => setPartyOpen(false)} />}
-      {meetOpen && <V2MeetSheet open onClose={() => setMeetOpen(false)} onChat={goChat} />}      {/* UR E.18 首登＋個人表單（条件挂载，初值新鲜；保存即刷 me）。 */}
+      {meetOpen && <V2MeetSheet open onClose={() => setMeetOpen(false)} onChat={goChat} />}
+      {/* UR G.10a 遊戲入口＋房間。 */}
+      {gamesOpen && (
+        <V2GamesSheet
+          open
+          onClose={() => setGamesOpen(false)}
+          onEnter={(id) => {
+            setGamesOpen(false);
+            setGameTarget(id);
+          }}
+        />
+      )}
+      {gameTarget !== null && (
+        <V2GameRoomSheet
+          open
+          target={gameTarget}
+          myUserId={meJson?.id ?? null}
+          onClose={() => setGameTarget(null)}
+        />
+      )}      {/* UR E.18 首登＋個人表單（条件挂载，初值新鲜；保存即刷 me）。 */}
       {showOnboard && meJson !== null && (
         <OnboardingSheet
           open

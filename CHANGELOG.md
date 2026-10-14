@@ -23,6 +23,9 @@
   - 0056 遷移（去 `checkin_saves.checkin_id` FK，歸檔不再連帶刪收藏）＋saves 路由回查 archive（service＋`canViewCheckin` 代碼門，沿詳情口徑；`expired:true`，內容置空留定位）＋openapi 描述行
   - 表單草稿（改動即存＋回來橫幅＋捨棄＋發布清＋記偏好）＋詳情再開一局＋收藏過期灰顯（點行帶我去）＋我的地點區＋地圖 pin 層（獨立 LayerGroup）
   - `lib/partyDraft.ts`＋`lib/pinnedPlaces.ts` 純函數（iOS 口徑）＋10 單測；v2 三語 key×10
+- **UR G.10a 遊戲房間＋審批（v2-only，[WIP]，待親驗；G.10b 叫骰／G.10c 聊天舉報另批）**
+  - pills 遊戲 pill（匿名即登入＋`?games=1` 續開）＋`V2GamesSheet`（建房面對面／線上＋輸碼加入＋我的房恢復）＋`V2GameRoomSheet`（lobby 3s 輪詢＋準備／開始／離開／踢＋房主審批＋陌生人 202 等批 5s 輪詢）
+  - `lib/gameRoom.ts` 純函數（房間／成員／加入分流／審批／房碼／錯誤鍵，iOS 口徑）＋5 單測；v2 三語 key×39；API／migration／yaml 零改动（H.1／H.2(a) 现成）
 - **UR H.1 游戏房间＋大話骰 POC（纯 API，[WIP]，待 0042＋三批端点）**
   - 第一批：0042 五表（rooms／players／rounds／events／invites；RLS 全锁 service 读写）＋`lib/games/liars.ts` 纯函数（crypto 摇骰／叫骰校验／百搭计数／开盅结算／顺位／房规解析／房间码）＋15 单测（含 6000 颗均匀分布）
   - 第二批：房间 8 端点（建／码加入／active／准备／开始／离开／踢／改规／结束）＋门禁一体 helper（18+／拉黑双表／好友或 joins 交集／同时 1 房／满员／踢禁重进）＋懒过期（2h 续／ended 24h 删）＋openapi 1.27.0＋`GameRoom` schema＋5 单测；11 新错误码一次加齐（三批共用）
