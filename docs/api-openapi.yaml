@@ -81,6 +81,78 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/users/{id}/taste-card:
+    get:
+      operationId: getTasteCard
+      summary: AI 口味卡读取（需登录；id 或 me；只读缓存不触发生成；他人视角：无卡／已隐藏／拉黑→card=null，拉黑 404）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "他人 {card}；本人另带 {visible, ready, stale, refreshes_left}。card 形状见 web lib/tasteCard.ts（persona/traits/flavor/picks/scenes/explore/palette/confidence）"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [card]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 拉黑
+  /api/v1/me/taste-card:
+    post:
+      operationId: generateTasteCard
+      summary: 生成／刷新 AI 口味卡（需登录；同步调模型≤~30s；force=手动重新生成，限 3 次/24h；资料不足 not_ready）
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force:
+                  type: boolean
+      responses:
+        "200":
+          description: "{status: ok|unchanged|not_ready|rate_limited, card, refreshes_left}"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, card, refreshes_left]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "502":
+          description: 模型失败
+    patch:
+      operationId: setTasteCardVisible
+      summary: 对他人隐藏／恢复公开 AI 口味卡
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [visible]
+              properties:
+                visible:
+                  type: boolean
+      responses:
+        "200":
+          description: "{visible, updated}"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /api/v1/me/bar-memory:
     get:
       operationId: getBarMemory

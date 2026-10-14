@@ -51,6 +51,11 @@ const INSTRUCTION_LIKE: RegExp[] = [
   /ignore (all|previous|the above)|system prompt|你是一個|you are now|忽略(以上|之前|所有)|無視(以上|之前)|以後都要|from now on|always (give|do|reply)|必須(免費|贈送)|免費請|reveal|透露.{0,6}(指令|提示)/i,
 ];
 
+/** 文本是否通過敏感／指令過濾（口味卡等其他 AI 輸出也復用這套規則）。 */
+export function isSafeText(t: string): boolean {
+  return !(SENSITIVE.some((r) => r.test(t)) || INSTRUCTION_LIKE.some((r) => r.test(t)));
+}
+
 function clean(v: unknown, max: number): string | null {
   if (typeof v !== "string") return null;
   const t = v.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
