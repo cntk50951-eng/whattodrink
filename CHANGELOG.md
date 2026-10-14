@@ -13,6 +13,8 @@
   - §九發骰器：`rules.mode:deal_only`（非法回落 standard）＋`reveal` 动作（任一 active bidding 中亮骰，不判输赢，已亮重调幂等 200；bid／challenge 在此房 409）＋开局／次局无轮次无倒计时＋`next_round` 照旧（starter 座位最小）＋openapi 1.30.0＋2 单测
   - §十二留守重开：deal_only 房局中剩 <2 人→回 lobby（留守 ready=false＋`back_to_lobby` 事件），standard 不动；`start` 局号顺延（回 lobby 重开不撞 unique）＋openapi 1.31.0
   - §十三停住等房主：deal_only 房开盅后不自动开新局（settle＋集齐确认都不开）＋`next_round` 仅房主可调、调用即开＋openapi 1.32.0（补 403 \(not_host\) 描述）
+- **UR H.2 游戏向陌生人开放＋房内聊天＋举报（纯 API，[WIP]，待 0055＋两批端点）**
+  - (a) 批：0055 四表一列（requests／messages／reports／mutes＋`game_banned_until`；RLS 全锁 service 读写）＋陌生人 join 改 202 建申请（去重／小时 5／房 10／5min 懒过期＋房主通知）＋审批三端点（列表仅昵称头像／approve 入座＋version／reject＋双方通知）＋申请人状态＋取消＋建房／join 禁玩门＋counters `game_requests_pending`（badge 不含）＋openapi 1.54.0＋单测
 
 ### Fixed
 - **UR A.16 隱身重定义（PRIVACY_MODE_MATRIX 定案，iOS 输入，未提交）**

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.53.0
+  version: 1.54.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1849,17 +1849,17 @@ paths:
   /api/v1/me/counters:
     get:
       operationId: getMyCounters
-      summary: 轻量计数（需登录；七数＋badge 同推送口径；陌生人单计＋好友请求＋游戏邀请＋站内通知（后两者不计 badge），UR D.10／B.3／H.1／酒局 A）
+      summary: 轻量计数（需登录；八数＋badge 同推送口径；陌生人单计＋好友请求＋游戏邀请＋站内通知＋入房申请（后三者不计 badge），UR D.10／B.3／H.1／酒局 A／H.2）
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: 计数（badge＝五数和，不含游戏邀请与站内通知）
+          description: 计数（badge＝五数和，不含游戏邀请、站内通知与入房申请）
           content:
             application/json:
               schema:
                 type: object
-                required: [cheers_unread, invites_pending, chat_unread, stranger_unread, friend_requests_pending, game_invites_pending, notices_unread, badge]
+                required: [cheers_unread, invites_pending, chat_unread, stranger_unread, friend_requests_pending, game_invites_pending, notices_unread, game_requests_pending, badge]
                 properties:
                   cheers_unread:
                     type: integer
@@ -1878,6 +1878,9 @@ paths:
                   notices_unread:
                     type: integer
                     description: 站内通知未读（badge 不含，动态红点用，酒局阶段 A）
+                  game_requests_pending:
+                    type: integer
+                    description: 房主待处理入房申请（badge 不含，红点用，UR H.2）
                   badge:
                     type: integer
         "401":
@@ -2739,7 +2742,7 @@ paths:
   /api/v1/games/rooms/join:
     post:
       operationId: joinGameRoom
-      summary: 输码加入（需登录；码大写不敏感；好友或同酒局＋双表拉黑门，UR H.1）
+      summary: 输码加入（需登录；码大写不敏感；好友或同酒局直接入座，陌生人 202 申请＋房主审批，禁玩 403，UR H.2）
       security:
         - bearerAuth: []
       requestBody:
@@ -2765,12 +2768,29 @@ paths:
                   room_id:
                     type: string
                     format: uuid
+        "202":
+          description: 申请已创建（陌生人；同房重复申请幂等同回）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [request_id, status, expires_at]
+                properties:
+                  request_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [pending]
+                  expires_at:
+                    type: string
+                    format: date-time
         "400":
           $ref: "#/components/responses/InvalidParams"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: 未成年／曾被踢／拉黑解友／非好友非同酒局（code=age_restricted|not_allowed）
+          description: 未成年／曾被踢／拉黑解友／禁玩（code=age_restricted|not_allowed|game_banned；陌生人改走 202 不再 403）
           content:
             application/json:
               schema:
@@ -2782,7 +2802,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
         "409":
-          description: 已在房中／已开局／满员（code=already_in_room|room_started|room_full）
+          description: 已在房中／已开局／满员／申请太多（code=already_in_room|room_started|room_full|too_many_requests）
           content:
             application/json:
               schema:
@@ -2793,6 +2813,188 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/games/rooms/{id}/requests:
+    get:
+      operationId: listJoinRequests
+      summary: 入房申请列表（需登录；仅房主；过期先清；只回昵称头像，UR H.2）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: pending 申请（request_id＋对方昵称头像＋时间）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [request_id, user, created_at, expires_at]
+                      properties:
+                        request_id:
+                          type: string
+                          format: uuid
+                        user:
+                          type: object
+                          required: [id, nickname, avatar_url]
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            nickname:
+                              type: string
+                            avatar_url:
+                              type: string
+                              nullable: true
+                        created_at:
+                          type: string
+                          format: date-time
+                        expires_at:
+                          type: string
+                          format: date-time
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非房主（code=not_host）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 房間不存在／非成员（code=room_not_found）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/games/rooms/{id}/requests/{rid}:
+    post:
+      operationId: decideJoinRequest
+      summary: 入房审批（需登录；仅房主；approve 入座＋version+1，满员／开局 409，UR H.2）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: rid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision:
+                  type: string
+                  enum: [approve, reject]
+      responses:
+        "200":
+          description: 已处理（幂等；approve 带 version）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, status]
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非房主（code=not_host）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 房間／申請不存在（code=room_not_found）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 已开局／满员（code=room_started|room_full）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/games/join-requests/{rid}:
+    get:
+      operationId: getJoinRequest
+      summary: 我的申请状态（需登录；申请人；touch 懒过期，UR H.2）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: rid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 申请状态（approve 带 room_id）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 申請不存在（code=not_found）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+    delete:
+      operationId: cancelJoinRequest
+      summary: 取消申请（需登录；申请人；仅 pending，UR H.2）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: rid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 已取消
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cancelled]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/games/rooms/active:

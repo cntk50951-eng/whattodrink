@@ -993,3 +993,64 @@ export async function isStealthUser(svc: SupabaseClient, userId: string): Promis
   const { data } = await svc.from("users").select("mode").eq("id", userId).maybeSingle();
   return (data as { mode?: unknown } | null)?.mode === "stealth";
 }
+
+/** 入房申请 5 分钟未处理自动过期（懒过期，touch 时清）。 */
+export const JOIN_REQUEST_TTL_MS = 5 * 60_000;
+/** 同一用户每小时最多 5 次申请；每房最多 10 条 pending。 */
+export const JOIN_REQUEST_HOURLY_LIMIT = 5;
+export const JOIN_REQUEST_ROOM_LIMIT = 10;
+
+export type JoinRequestStatus = "pending" | "approved" | "rejected" | "expired" | "cancelled";
+
+/** 房主审批 decision 白名单（approve 入座／reject 拒绝）。 */
+export function parseJoinDecision(raw: unknown): { decision: "approve" | "reject" } | { error: string } {
+  if (typeof raw !== "object" || raw === null) return { error: "body 需为对象" };
+  const d = (raw as Record<string, unknown>).decision;
+  if (d !== "approve" && d !== "reject") return { error: "decision 只要 approve|reject" };
+  return { decision: d };
+}
+
+/** 申请是否已过期（纯函数可测；过期由 touch 时改写 status）。 */
+export function isRequestExpired(createdAt: string, nowMs: number): boolean {
+  const t = Date.parse(createdAt);
+  return Number.isFinite(t) && nowMs - t >= JOIN_REQUEST_TTL_MS;
+}
+
+/** 把一房的过期 pending 置 expired（返回置掉的行数；失败记 log 不抛）。 */
+export async function expireJoinRequests(
+  svc: SupabaseClient,
+  roomId: string,
+  nowMs: number,
+): Promise<number> {
+  const cutoff = new Date(nowMs - JOIN_REQUEST_TTL_MS).toISOString();
+  const { data, error } = await svc
+    .from("game_join_requests")
+    .update({ status: "expired" })
+    .eq("room_id", roomId)
+    .eq("status", "pending")
+    .lt("created_at", cutoff)
+    .select("id");
+  if (error !== null) {
+    console.error(`[games/requests] expire error: code=${error.code} message=${error.message}`);
+    return 0;
+  }
+  return ((data ?? []) as unknown[]).length;
+}
+
+/** 房内禁言中（多人举报升级；到本房结束；room 删级联带走）。 */
+export async function isGameMuted(svc: SupabaseClient, roomId: string, userId: string): Promise<boolean> {
+  const { data } = await svc
+    .from("game_mutes")
+    .select("room_id")
+    .eq("room_id", roomId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return data !== null;
+}
+
+/** 被禁玩（users.game_banned_until 未过期）。 */
+export async function isGameBanned(svc: SupabaseClient, userId: string, nowMs: number): Promise<boolean> {
+  const { data } = await svc.from("users").select("game_banned_until").eq("id", userId).maybeSingle();
+  const until = (data as { game_banned_until?: unknown } | null)?.game_banned_until;
+  return typeof until === "string" && Date.parse(until) > nowMs;
+}

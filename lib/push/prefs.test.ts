@@ -69,7 +69,7 @@ describe("fillPushTemplate／collapse／merge", () => {
 });
 
 describe("sumBadge", () => {
-  it("六数相加（游戏邀请只展示；非法钳零）", () => {
+  it("七数相加（游戏邀请只展示；非法钳零）", () => {
     expect(sumBadge(3, 2, 7)).toEqual({
       cheers_unread: 3,
       invites_pending: 2,
@@ -78,6 +78,7 @@ describe("sumBadge", () => {
       friend_requests_pending: 0,
       game_invites_pending: 0,
       notices_unread: 0,
+      game_requests_pending: 0,
       badge: 12,
     });
     expect(sumBadge(3, 2, 7, 1)).toEqual({
@@ -88,6 +89,7 @@ describe("sumBadge", () => {
       friend_requests_pending: 0,
       game_invites_pending: 0,
       notices_unread: 0,
+      game_requests_pending: 0,
       badge: 13,
     });
     expect(sumBadge(-1, NaN, 2.7)).toEqual({
@@ -98,6 +100,7 @@ describe("sumBadge", () => {
       friend_requests_pending: 0,
       game_invites_pending: 0,
       notices_unread: 0,
+      game_requests_pending: 0,
       badge: 2,
     });
   });
@@ -110,6 +113,7 @@ describe("sumBadge", () => {
       friend_requests_pending: 2,
       game_invites_pending: 0,
       notices_unread: 0,
+      game_requests_pending: 0,
       badge: 6,
     });
     expect(sumBadge(0, 0, 0, 0, NaN)).toEqual({
@@ -120,6 +124,7 @@ describe("sumBadge", () => {
       friend_requests_pending: 0,
       game_invites_pending: 0,
       notices_unread: 0,
+      game_requests_pending: 0,
       badge: 0,
     });
   });
@@ -132,6 +137,7 @@ describe("sumBadge", () => {
       friend_requests_pending: 1,
       game_invites_pending: 2,
       notices_unread: 0,
+      game_requests_pending: 0,
       badge: 5,
     });
   });
@@ -144,6 +150,20 @@ describe("sumBadge", () => {
       friend_requests_pending: 0,
       game_invites_pending: 0,
       notices_unread: 4,
+      game_requests_pending: 0,
+      badge: 0,
+    });
+  });
+  it("UR H.2 房主待处理申请只展示不计 badge", () => {
+    expect(sumBadge(0, 0, 0, 0, 0, 0, 0, 3)).toEqual({
+      cheers_unread: 0,
+      invites_pending: 0,
+      chat_unread: 0,
+      stranger_unread: 0,
+      friend_requests_pending: 0,
+      game_invites_pending: 0,
+      notices_unread: 0,
+      game_requests_pending: 3,
       badge: 0,
     });
   });

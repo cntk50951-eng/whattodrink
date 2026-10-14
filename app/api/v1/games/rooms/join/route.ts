@@ -5,18 +5,25 @@ import { ipRateLimit } from "@/lib/rateLimit";
 import {
   appendEvent,
   bumpRoom,
+  expireJoinRequests,
   getActiveMembers,
   getActiveRoomId,
   getPlayerRow,
   hasBlockOrMute,
   isFriend,
+  isGameBanned,
   parseJoinCode,
   purgeExpiredRooms,
   sharesActiveParty,
   toRoomJson,
   isStealthUser,
+  JOIN_REQUEST_HOURLY_LIMIT,
+  JOIN_REQUEST_ROOM_LIMIT,
+  JOIN_REQUEST_TTL_MS,
+  type RoomJson,
 } from "@/lib/games/rooms";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * UR H.1 输码加入（🔒，POC）。
@@ -54,6 +61,9 @@ export async function POST(req: Request): Promise<Response> {
   if (isMinorDob((meRow as { dob?: unknown } | null)?.dob, nowMs)) {
     return apiError("age_restricted", "未滿 18 歲不可玩酒桌遊戲", 403);
   }
+  if (await isGameBanned(svc, userId, nowMs)) {
+    return apiError("game_banned", "你暫時不可玩酒桌遊戲", 403);
+  }
   const existing = await getActiveRoomId(svc, userId);
   if (existing !== null) {
     return apiError("already_in_room", "你已在一個房間裡", 409);
@@ -89,10 +99,11 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
   // 好友或同酒局（只认房主——信任锚；问答定案 joins 交集）。
+  // 陌生人：不再 403，改走入房申请（UR H.2：202 pending，房主审批）。
   const friend = await isFriend(svc, userId, room.host_id);
   const party = friend ? false : await sharesActiveParty(svc, userId, room.host_id, nowMs);
   if (!friend && !party) {
-    return apiError("not_allowed", "只限好友或同酒局成員", 403);
+    return await createJoinRequest(svc, room, userId, nowMs);
   }
   const seat = members.reduce((mx, m) => Math.max(mx, m.seat), -1) + 1;
   if (mine !== null && mine.status === "left") {
@@ -123,4 +134,81 @@ export async function POST(req: Request): Promise<Response> {
     await appendEvent(svc, room.id, version, "member_joined", userId, { seat });
   }
   return apiOk({ room_id: room.id });
+}
+
+/**
+ * UR H.2 陌生人入房申请（join 内联；仍 Anterior 全部校验已过）。
+ * 同一房一条 pending（幂等 202）；每小时 5 次（429）；每房 10 条（409）；
+ * 5 分钟未处理懒过期；通知房主 game_join_request。
+ */
+async function createJoinRequest(
+  svc: SupabaseClient,
+  room: RoomJson,
+  userId: string,
+  nowMs: number,
+): Promise<Response> {
+  await expireJoinRequests(svc, room.id, nowMs);
+  const { data: existing } = await svc
+    .from("game_join_requests")
+    .select("id,created_at")
+    .eq("room_id", room.id)
+    .eq("user_id", userId)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (existing !== null) {
+    const row = existing as { id: string; created_at: string };
+    return apiOk(
+      {
+        request_id: row.id,
+        status: "pending" as const,
+        expires_at: new Date(Date.parse(row.created_at) + JOIN_REQUEST_TTL_MS).toISOString(),
+      },
+      202,
+    );
+  }
+  const hourAgo = new Date(nowMs - 3600_000).toISOString();
+  const [{ count: hourCount }, { count: roomPending }] = await Promise.all([
+    svc.from("game_join_requests").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", hourAgo),
+    svc.from("game_join_requests").select("id", { count: "exact", head: true }).eq("room_id", room.id).eq("status", "pending"),
+  ]);
+  if ((hourCount ?? 0) >= JOIN_REQUEST_HOURLY_LIMIT) {
+    return apiError("rate_limited", "申請太頻繁，稍後再試", 429);
+  }
+  if ((roomPending ?? 0) >= JOIN_REQUEST_ROOM_LIMIT) {
+    return apiError("too_many_requests", "該房申請太多，稍後再試", 409);
+  }
+  const { data: inserted, error: iErr } = await svc
+    .from("game_join_requests")
+    .insert({ room_id: room.id, user_id: userId, status: "pending" })
+    .select("id,created_at")
+    .single();
+  if (iErr !== null || inserted === null) {
+    // 並發撞唯一鍵：重讀走幂等分支。
+    if (iErr?.code === "23505") {
+      return createJoinRequest(svc, room, userId, nowMs);
+    }
+    console.error(`[games/join] request error: code=${iErr?.code} message=${iErr?.message}`);
+    return apiError("internal", "申請失敗", 500);
+  }
+  const req = inserted as { id: string; created_at: string };
+  const { data: meRow } = await svc.from("users").select("nickname").eq("id", userId).maybeSingle();
+  const nick = (meRow as { nickname?: unknown } | null)?.nickname;
+  await svc.from("notifications").insert({
+    user_id: room.host_id,
+    kind: "game_join_request",
+    actor_id: userId,
+    payload: {
+      room_id: room.id,
+      room_code: room.code,
+      nickname: typeof nick === "string" && nick !== "" ? nick : "酒友",
+    },
+  });
+  return apiOk(
+    {
+      request_id: req.id,
+      status: "pending" as const,
+      expires_at: new Date(Date.parse(req.created_at) + JOIN_REQUEST_TTL_MS).toISOString(),
+    },
+    202,
+  );
 }

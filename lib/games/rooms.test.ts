@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isRequestExpired,
   parseActionBody,
   parseCreateBody,
   parseInviteBody,
   parseJoinCode,
+  parseJoinDecision,
   parseKickBody,
   parseReadyBody,
   parseRoomId,
@@ -97,5 +99,23 @@ describe("房间请求体解析", () => {
     expect("error" in parseActionBody({ type: "bid", payload: {}, expected_version: 0, client_action_id: "c" })).toBe(true);
     expect("error" in parseActionBody({ type: "bid", payload: { qty: 1, face: 1 }, expected_version: -1, client_action_id: "c" })).toBe(true);
     expect("error" in parseActionBody({ type: "bid", payload: { qty: 1, face: 1 }, expected_version: 0, client_action_id: "" })).toBe(true);
+  });
+});
+
+describe("入房审批 (UR H.2)", () => {
+  it("parseJoinDecision 白名单", () => {
+    expect(parseJoinDecision({ decision: "approve" })).toEqual({ decision: "approve" });
+    expect(parseJoinDecision({ decision: "reject" })).toEqual({ decision: "reject" });
+    expect(parseJoinDecision({ decision: "maybe" })).toEqual({
+      error: "decision 只要 approve|reject",
+    });
+    expect(parseJoinDecision(null)).toEqual({ error: "body 需为对象" });
+  });
+  it("isRequestExpired 5 分钟界", () => {
+    const now = Date.parse("2026-10-14T12:00:00Z");
+    expect(isRequestExpired("2026-10-14T11:56:00Z", now)).toBe(false);
+    expect(isRequestExpired("2026-10-14T11:55:00Z", now)).toBe(true);
+    expect(isRequestExpired("2026-10-14T11:00:00Z", now)).toBe(true);
+    expect(isRequestExpired("bad", now)).toBe(false);
   });
 });

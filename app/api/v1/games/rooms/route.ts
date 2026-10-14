@@ -10,6 +10,7 @@ import {
   parseCreateBody,
   purgeExpiredRooms,
   toRoomJson,
+  isGameBanned,
   isStealthUser,
 } from "@/lib/games/rooms";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
@@ -45,6 +46,9 @@ export async function POST(req: Request): Promise<Response> {
   const { data: meRow } = await svc.from("users").select("dob").eq("id", userId).maybeSingle();
   if (isMinorDob((meRow as { dob?: unknown } | null)?.dob, nowMs)) {
     return apiError("age_restricted", "未滿 18 歲不可玩酒桌遊戲", 403);
+  }
+  if (await isGameBanned(svc, userId, nowMs)) {
+    return apiError("game_banned", "你暫時不可玩酒桌遊戲", 403);
   }
   const hourAgo = new Date(nowMs - 3600_000).toISOString();
   const { count: hourCount } = await svc

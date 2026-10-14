@@ -24,8 +24,21 @@ export type ComplaintBody = {
 export function evidencePathAllowed(pathname: string, filerId: string | undefined): boolean {
   const m = /^\/storage\/v1\/object\/(?:sign|public)\/chat-images\/([^/]+)\/.+$/.exec(pathname);
   if (m === null) return false;
+  // 解碼後仍含目錄穿越（如 u1/..%2fu2/x）一律拒。
+  if (/(^|\/)\.\.(\/|$)|\/\/|\/\.(\/|$)/.test(pathname)) return false;
   // 沒給 filerId（舊調用／單測）時只校驗 bucket；路由調用一律傳入 → 只能引用自己的上傳。
   return filerId === undefined || m[1] === filerId;
+}
+
+/** 證據 URL → chat-images 內的對象路徑（後台據此現簽短時讀取鏈接；不是合法證據路徑回 null）。 */
+export function evidenceStoragePath(url: string): string | null {
+  try {
+    const m = /^\/storage\/v1\/object\/(?:sign|public)\/chat-images\/(.+)$/.exec(decodeURIComponent(new URL(url).pathname));
+    if (m === null || m[1].includes("..")) return null;
+    return m[1];
+  } catch {
+    return null;
+  }
 }
 
 export function parseComplaintBody(

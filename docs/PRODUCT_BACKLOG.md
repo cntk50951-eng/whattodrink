@@ -4323,3 +4323,27 @@ UR I.1　遇見搜索＋被搜到同意（纯 API，[shared-only]）[WIP]
 - 2026-10-12：遇不见好友修复（WEB_HANDOFF_MEET_FIX，iOS 输入）：好友 bypass discoverable＋声明口味三档＋`taste_keys` 子类＋`stats`／`friends_not_discoverable`＋`match` full 优先＋openapi 1.47.0
 - 2026-10-12：AI 质量（WEB_HANDOFF_MEET_AI_QUALITY，iOS 探针输入）：temperature 0＋噪音護欄＋prompt 硬规则＋少样本＋`notes`＋回歸腳本＋openapi 1.48.0
 - 2026-10-12：测试重置端点（WEB_HANDOFF_MEET_TEST_RESET，iOS 输入）：`DELETE /meet/mine/today`（TEST_ENDPOINTS_ENABLED 门，只动自己）＋openapi 1.49.0
+
+---
+
+UR H.2　游戏向陌生人开放＋房内聊天＋举报（纯 API，无 web UI，[shared-only]）[WIP]
+
+> iOS 需求见 `whattodrink_ios/docs/WEB_HANDOFF_GAMES_OPEN_CHAT.md`（非契约，契约以 yaml 为准）。
+
+### 背景（两问答定案，2026-10-14）
+- 分两批：(a) migration＋join 审批＋counters；(b) 聊天＋举报＋kick-block＋friend origin＋admin 页。
+- Admin 队列页本轮含（沿用 adminGate＋MFA＋审计）。
+
+### 範圍
+1. **數據**：0055（`game_join_requests`＋`game_room_messages`＋`game_reports`＋`game_mutes`＋`users.game_banned_until`；RLS 全开零 policy，service 读写）。
+2. **入房審批**：陌生人 join 改 202 建申请（去重／小时 5 次／房 10 条／5min 懒过期＋房主通知）；房主列表（仅昵称头像）＋审批（approve 入座 version+1／reject＋双方通知）；申请人状态＋取消；`GET /me/counters` 加 `game_requests_pending`（badge 不含）。
+3. **聊天**（b 批）：快捷语枚举 ~24＋文字 1–60＋限频去重＋拉黑过滤＋撤回＋24h 懒删；开关默认关。
+4. **舉報**（b 批）：快照＋AI 复核＋禁言升级＋后台队列；第一版只记录不扣分。
+5. openapi 1.54.0(a)／1.55.0(b)＋單測。
+
+### 非目標
+- 公开房大厅、语音、战绩排行、富媒体、推送新 kind、诚信分扣除、v1 任何文件。
+
+*改動記錄*
+- 2026-10-14：建檔置 [WIP]（WEB_HANDOFF_GAMES_OPEN_CHAT 输入；分两批）
+- 2026-10-14：(a) 批：0055 四表一列＋join 202 申请流＋审批三端点＋counters＋openapi 1.54.0＋单测；tsc 零错＋676 绿＋lint 零错

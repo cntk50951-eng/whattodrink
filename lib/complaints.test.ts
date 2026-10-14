@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  evidenceStoragePath,
   maskSensitive,
   parseComplaintBody,
   parseComplaintText,
@@ -45,9 +46,18 @@ describe("parseComplaintBody", () => {
       "https://x.supabase.co/storage/v1/object/public/chat-voice/u1/a.m4a",
       "https://user:pw@x.supabase.co/storage/v1/object/public/chat-images/u1/a.jpg",
       "https://x.supabase.co/storage/v1/object/public/chat-images/%2e%2e/u2/a.jpg",
+      "https://x.supabase.co/storage/v1/object/public/chat-images/u1/..%2fu2/a.jpg",
     ]) {
       expect(parseComplaintBody({ ...base, evidence: [bad] }, "x.supabase.co", "u1")).toHaveProperty("error");
     }
+  });
+  it("evidenceStoragePath：只從合法證據 URL 取 chat-images 路徑", () => {
+    expect(evidenceStoragePath("https://x.supabase.co/storage/v1/object/sign/chat-images/u1/a.jpg?token=t")).toBe("u1/a.jpg");
+    expect(evidenceStoragePath("https://x.supabase.co/storage/v1/object/public/chat-images/u1/2026-10/a.jpg")).toBe("u1/2026-10/a.jpg");
+    expect(evidenceStoragePath("https://x.supabase.co/storage/v1/object/public/avatars/u1/a.jpg")).toBeNull();
+    // URL 解析會先折疊字面 ..；編碼斜線形式解碼後仍含 .. → 一律拒
+    expect(evidenceStoragePath("https://x.supabase.co/storage/v1/object/public/chat-images/u1/..%2fu2/a.jpg")).toBeNull();
+    expect(evidenceStoragePath("not a url")).toBeNull();
   });
   it("parseComplaintText 上下限", () => {
     expect(parseComplaintText({ text: "  ok " }, "text", 200)).toEqual({ text: "ok" });

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { evidenceStoragePath } from "@/lib/complaints";
 import { decideComplaint, isPublicReasonKey, PUBLIC_REASONS, type Decision, type PublicReasonKey } from "@/lib/complaintDecision";
 import { adminRateLimited, auditOrThrow, auditViewOnce, checkSameOrigin, logAdmin } from "@/lib/ops";
 import { requireAdminPage } from "@/lib/opsPage";
@@ -116,6 +117,17 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
     suggestion?: { recommended?: unknown; severity?: unknown; confidence?: unknown; evidence_strength?: unknown; rationale?: unknown };
     model?: unknown;
   } | null;
+  // 證據在私有桶：審核時現簽 5 分鐘讀取鏈接（原始 URL 不可直接打開；簽名失敗顯示「無法載入」）。
+  const evidenceLinks: (string | null)[] = [];
+  for (const e of Array.isArray(c.evidence) ? (c.evidence as unknown[]) : []) {
+    const path = typeof e === "string" ? evidenceStoragePath(e) : null;
+    if (path === null) {
+      evidenceLinks.push(null);
+      continue;
+    }
+    const { data: signed } = await svc.storage.from("chat-images").createSignedUrl(path, 300);
+    evidenceLinks.push(signed?.signedUrl ?? null);
+  }
   const isAppeal = c.status === "escalated" && c.appeal_status === "pending";
   const canDecide = role === "moderator" && c.status === "escalated";
 
@@ -143,12 +155,16 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
         )}
         <p>
           證據：
-          {Array.isArray(c.evidence) && (c.evidence as unknown[]).length > 0
-            ? (c.evidence as unknown[]).map((e, i) => (
+          {evidenceLinks.length > 0
+            ? evidenceLinks.map((href, i) => (
                 <span key={i}>
-                  <a href={String(e)} target="_blank" rel="noreferrer noopener" referrerPolicy="no-referrer">
-                    圖{i + 1}
-                  </a>{" "}
+                  {href === null ? (
+                    `圖${i + 1}（無法載入）`
+                  ) : (
+                    <a href={href} target="_blank" rel="noreferrer noopener" referrerPolicy="no-referrer">
+                      圖{i + 1}
+                    </a>
+                  )}{" "}
                 </span>
               ))
             : "（無）"}

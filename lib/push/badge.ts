@@ -7,8 +7,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** 七数相加（badge＝前五和；game_invites_pending、notices_unread 只展示不计 badge，免打扰）。 */
-export function sumBadge(cheers: number, invites: number, chat: number, stranger = 0, friendRequests = 0, gameInvites = 0, notices = 0): BadgeCounts {
+/** 七数相加（badge＝前五和；game_invites_pending、notices_unread、game_requests_pending 只展示不计 badge，免打扰）。 */
+export function sumBadge(cheers: number, invites: number, chat: number, stranger = 0, friendRequests = 0, gameInvites = 0, notices = 0, gameRequests = 0): BadgeCounts {
   const c = Number.isFinite(cheers) && cheers > 0 ? Math.floor(cheers) : 0;
   const i = Number.isFinite(invites) && invites > 0 ? Math.floor(invites) : 0;
   const h = Number.isFinite(chat) && chat > 0 ? Math.floor(chat) : 0;
@@ -16,7 +16,8 @@ export function sumBadge(cheers: number, invites: number, chat: number, stranger
   const f = Number.isFinite(friendRequests) && friendRequests > 0 ? Math.floor(friendRequests) : 0;
   const g = Number.isFinite(gameInvites) && gameInvites > 0 ? Math.floor(gameInvites) : 0;
   const n = Number.isFinite(notices) && notices > 0 ? Math.floor(notices) : 0;
-  return { cheers_unread: c, invites_pending: i, chat_unread: h, stranger_unread: s, friend_requests_pending: f, game_invites_pending: g, notices_unread: n, badge: c + i + h + s + f };
+  const gr = Number.isFinite(gameRequests) && gameRequests > 0 ? Math.floor(gameRequests) : 0;
+  return { cheers_unread: c, invites_pending: i, chat_unread: h, stranger_unread: s, friend_requests_pending: f, game_invites_pending: g, notices_unread: n, game_requests_pending: gr, badge: c + i + h + s + f };
 }
 
 export type BadgeCounts = {
@@ -31,6 +32,8 @@ export type BadgeCounts = {
   game_invites_pending: number;
   /** 酒局阶段 A 站内通知未读（badge 不含，动态红点用）。 */
   notices_unread: number;
+  /** UR H.2 房主待处理入房申请（badge 不含，红点用）。 */
+  game_requests_pending: number;
   badge: number;
 };
 
@@ -135,5 +138,20 @@ export async function computeBadge(
     if (isFriend) chat += count ?? 0;
     else stranger += count ?? 0;
   }
-  return sumBadge(cheers ?? 0, invites ?? 0, chat, stranger, friendRequests ?? 0, await countGameInvites(supa, userId), await countNoticesUnread(supa, userId));
+  return sumBadge(cheers ?? 0, invites ?? 0, chat, stranger, friendRequests ?? 0, await countGameInvites(supa, userId), await countNoticesUnread(supa, userId), await countJoinRequests(supa, userId));
+}
+
+/**
+ * UR H.2 房主待处理入房申请（我当房主的房的 pending 数；表缺席 fail-open 计 0）。
+ */
+async function countJoinRequests(supa: SupabaseClient, userId: string): Promise<number> {
+  try {
+    const { data: rooms } = await supa.from("game_rooms").select("id").eq("host_id", userId).neq("status", "ended").limit(20);
+    const ids = (((rooms ?? []) as unknown[]) as { id?: unknown }[]).map((r) => r.id).filter((id): id is string => typeof id === "string");
+    if (ids.length === 0) return 0;
+    const { count } = await supa.from("game_join_requests").select("id", { count: "exact", head: true }).in("room_id", ids).eq("status", "pending");
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
 }
