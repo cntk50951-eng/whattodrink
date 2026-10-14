@@ -4143,7 +4143,10 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - web 范围：v2 遊戲 UI 從零搭（web 現無遊戲 UI；建房／碼加入／審批列表／房內聊天／舉報）；API 现成（H.1／H.2(a)(b)，shared-only 已合入）。
 - 非目标：語音／排行／公開大廳（兩邊都不做）、v1。
 
-### UR G.11　照片編輯器（v2）[]
+### UR G.11　照片編輯器（v2）[✓]
+- iOS 对标：PhotoEdit（調整／裁切／旋轉，iOS-0.108）＋文字烘焙（用戶定案 A 全做；拖拽改三檔位，另議）。
+- web 范围：review 底部模式欄（濾鏡｜調整 4 滑桿｜裁切 3 畫幅＋旋轉｜文字單層三檔位＋7 色三字號）＋`rebake` 管線（旋轉→裁切→調整＋濾鏡→文字，stale 守衛，預覽即成圖）＋撤销（40 步）；`lib/photoEdit.ts` 純數學＋6 單測；原片直存，濾鏡進烘焙（live 預覽不動）。
+- 非目标：拖拽縮放旋轉文字層／多層文字／3D 貼紙（iOS 已刪）、v1。
 - iOS 对标：濾鏡／調色／裁剪／文字烘焙＋撤销（PhotoEditorPanels／iOS 未提交重做）。
 - web 范围：V2CameraSheet 發布前編輯（濾鏡＋裁剪＋文字，canvas 烘焙沿現有壓圖鏈）。
 - 非目标：3D 貼紙（iOS 已刪 mug_effect）、v1。
@@ -4184,7 +4187,9 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - 2026-10-14：G.10b 置 [WIP] 開工；实作：`lib/gameRoom.ts` 加 round／rules 解析＋2 單測＋`V2GameBidPanel`（骰面＋上一口＋倒數＋叫骰＋開盅＋結果＋下一局＋deal_only 亮骰，合法性直引 `isValidBid`）＋房間 Sheet 接 round 輪詢＋v2 三語 key×19；API／migration／yaml 零改动。
 - 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.10c）。
 - 2026-10-14：G.10c 置 [WIP] 開工；实作：`lib/gameChat.ts` 純函數（解析／合并／校驗／舉報類，常量本地鏡像＋單測斷言服務端相等）＋5 單測＋`V2GameChatPanel`（輪詢＋24 快捷語＋文字＋撤回＋逐行舉報）＋房間 Sheet 掛載＋v2 三語 key×42；另修 G.10b 隱患（叫骰合法性改客戶端鏡像 `clientBidCheck`＋fuzz 對齊，不直引 `liars.ts`）；`npm run build` 全過；API／migration／yaml 零改动。
-- 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.11）。---
+- 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.11）。
+- 2026-10-14：G.11 置 [WIP] 開工（A 全做，用戶定案）；实作：`lib/photoEdit.ts` 純數學（調整量綱／居中裁切／旋轉尺寸／CSS 串／換行，iOS 口徑）＋6 單測＋review 底部模式欄四區＋`rebake` 兩 pass 管線＋撤销 40 步＋v2 三語 key×22；`npm run build` 全過；API／migration／yaml 零改动。
+- 2026-10-14：用户亲验通过置 [✓]（提交＋推送；G 系僅剩 G.12 待 iOS 完工）。---
 
 UR D.9　iOS 真推送 P1（E1 碰杯＋APNs 通道）[WIP]
 

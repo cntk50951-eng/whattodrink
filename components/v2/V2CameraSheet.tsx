@@ -21,6 +21,22 @@ import {
 } from "@/lib/camera";
 import type { PhotoFilterId } from "@/lib/photoFilters";
 import { PHOTO_FILTER_IDS, fitPhotoSize, photoFilterCss } from "@/lib/photoFilters";
+import {
+  TEXT_COLORS,
+  TEXT_MAX,
+  adjustCss,
+  blankEdit,
+  blankText,
+  cropRect,
+  rotatedSize,
+  sanitizeEdit,
+  sanitizeText,
+  wrapLines,
+  type PhotoEdit,
+  type PhotoRatio,
+  type TextLayer,
+  type TextPos,
+} from "@/lib/photoEdit";
 
 export type PublishShot = {
   photoDataUrl: string;
@@ -77,6 +93,12 @@ export function V2CameraSheet({
   const [note, setNote] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  // UR G.11 review 編輯（底部模式欄；烘焙輸入單一對象＋历史撤销，上限 40）。
+  const [photoBase, setPhotoBase] = useState<string | null>(null);
+  const [bake, setBake] = useState<{ edit: PhotoEdit; text: TextLayer; filter: PhotoFilterId; beauty: boolean } | null>(null);
+  const [hist, setHist] = useState<{ edit: PhotoEdit; text: TextLayer; filter: PhotoFilterId; beauty: boolean }[]>([]);
+  const [editMode, setEditMode] = useState<"filter" | "adjust" | "crop" | "text">("filter");
+  const bakeIdRef = useRef(0);
 
   const stopTracks = useCallback(() => {
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
@@ -92,6 +114,10 @@ export function V2CameraSheet({
     }
     setKind(null);
     setPhoto(null);
+    setPhotoBase(null);
+    setBake(null);
+    setHist([]);
+    setEditMode("filter");
     setPhotoThumb("");
     setNote("");
     setPublishing(false);
@@ -184,29 +210,124 @@ export function V2CameraSheet({
     canvas.height = h;
     const ctx = canvas.getContext("2d");
     if (ctx === null) return;
-    ctx.filter = photoFilterCss(filterId, beauty);
+    // 原片直存（濾鏡進烘焙管線，review 改濾鏡可重烘；iOS 管線口徑）。
     ctx.drawImage(v, 0, 0, w, h);
-    setPhoto(canvas.toDataURL("image/jpeg", 0.85));
-    // UR E.20 縮圖順手壓（最長邊 96px，jpeg 0.7 約 3–6k；异常即空串回退）。
-    try {
-      const scale = Math.min(1, 96 / Math.max(w, h));
-      const tw = Math.max(1, Math.round(w * scale));
-      const th = Math.max(1, Math.round(h * scale));
-      const tiny = document.createElement("canvas");
-      tiny.width = tw;
-      tiny.height = th;
-      const tctx = tiny.getContext("2d");
-      if (tctx !== null) {
-        tctx.drawImage(canvas, 0, 0, tw, th);
-        setPhotoThumb(tiny.toDataURL("image/jpeg", 0.7));
-      } else {
-        setPhotoThumb("");
-      }
-    } catch {
-      setPhotoThumb("");
-    }
+    const base = canvas.toDataURL("image/jpeg", 0.92);
+    setPhotoBase(base);
+    const init = { edit: blankEdit(), text: blankText(), filter: filterId, beauty };
+    setBake(init);
+    setHist([]);
+    setEditMode("filter");
     setPublishError(null);
     setPhase("review");
+  }
+
+  /**
+   * UR G.11 烘焙（旋轉→裁切→調整＋濾鏡→文字；兩 pass＋文字層，預覽即成圖）。
+   * stale 守衛：連拖滑桿只留最後一次成圖。
+   */
+  const rebake = useCallback(
+    async (base: string, b: { edit: PhotoEdit; text: TextLayer; filter: PhotoFilterId; beauty: boolean }) => {
+      const myId = (bakeIdRef.current += 1);
+      try {
+        const img = new Image();
+        img.src = base;
+        await img.decode();
+        if (bakeIdRef.current !== myId || img.naturalWidth === 0) return;
+        const iw = img.naturalWidth;
+        const ih = img.naturalHeight;
+        const rot = rotatedSize(iw, ih, b.edit.quarterTurns);
+        if (rot.w === 0 || rot.h === 0) return;
+        // pass1 旋轉
+        const c1 = document.createElement("canvas");
+        c1.width = rot.w;
+        c1.height = rot.h;
+        const x1 = c1.getContext("2d");
+        if (x1 === null) return;
+        x1.translate(rot.w / 2, rot.h / 2);
+        x1.rotate(((b.edit.quarterTurns % 4) * Math.PI) / 2);
+        x1.drawImage(img, -iw / 2, -ih / 2);
+        // pass2 裁切＋調整＋濾鏡一次畫出
+        const cr = cropRect(rot.w, rot.h, b.edit.ratio);
+        if (cr.w === 0 || cr.h === 0) return;
+        const c2 = document.createElement("canvas");
+        c2.width = cr.w;
+        c2.height = cr.h;
+        const x2 = c2.getContext("2d");
+        if (x2 === null) return;
+        const css = [photoFilterCss(b.filter, b.beauty), adjustCss(b.edit)].filter((s) => s !== "" && s !== "none").join(" ");
+        if (css !== "") {
+          try {
+            x2.filter = css;
+          } catch {}
+        }
+        x2.drawImage(c1, cr.x, cr.y, cr.w, cr.h, 0, 0, cr.w, cr.h);
+        try {
+          x2.filter = "none";
+        } catch {}
+        // 文字層（描邊＋居中＋三檔位＋自動換行）
+        if (b.text.text.trim() !== "") {
+          const minDim = Math.min(cr.w, cr.h);
+          const px = b.text.size === 1 ? minDim * 0.05 : b.text.size === 3 ? minDim * 0.09 : minDim * 0.07;
+          x2.font = `700 ${Math.max(12, Math.round(px))}px system-ui, sans-serif`;
+          x2.textAlign = "center";
+          x2.textBaseline = "middle";
+          const lines = wrapLines(x2, b.text.text.trim().slice(0, TEXT_MAX), cr.w - 32, 3);
+          const lh = px * 1.25;
+          const blockH = lines.length * lh;
+          const cy = b.text.pos === "top" ? blockH / 2 + 20 : b.text.pos === "center" ? cr.h / 2 : cr.h - blockH / 2 - 20;
+          lines.forEach((ln, i) => {
+            const y = cy - blockH / 2 + lh * (i + 0.5);
+            x2.lineWidth = Math.max(2, Math.round(px / 12));
+            x2.strokeStyle = "rgba(0,0,0,0.75)";
+            x2.strokeText(ln, cr.w / 2, y);
+            x2.fillStyle = b.text.color;
+            x2.fillText(ln, cr.w / 2, y);
+          });
+        }
+        if (bakeIdRef.current !== myId) return;
+        const out = c2.toDataURL("image/jpeg", 0.85);
+        setPhoto(out);
+        try {
+          const scale = Math.min(1, 96 / Math.max(cr.w, cr.h));
+          const tw = Math.max(1, Math.round(cr.w * scale));
+          const th = Math.max(1, Math.round(cr.h * scale));
+          const tiny = document.createElement("canvas");
+          tiny.width = tw;
+          tiny.height = th;
+          const tctx = tiny.getContext("2d");
+          if (tctx !== null) {
+            tctx.drawImage(c2, 0, 0, tw, th);
+            setPhotoThumb(tiny.toDataURL("image/jpeg", 0.7));
+          } else {
+            setPhotoThumb("");
+          }
+        } catch {
+          setPhotoThumb("");
+        }
+      } catch {}
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (phase !== "review" || photoBase === null || bake === null) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 輸入變即重烘屬 props-sync（沿 V2NewsSheet 口径）
+    void rebake(photoBase, bake);
+  }, [phase, photoBase, bake, rebake]);
+
+  /** 烘焙輸入更新（入棧舊值供撤销，上限 40；事件側直寫，updater 內不套 setState）。 */
+  function updateBake(patch: Partial<{ edit: PhotoEdit; text: TextLayer; filter: PhotoFilterId; beauty: boolean }>): void {
+    if (bake === null) return;
+    setHist((h) => [...h.slice(-39), bake]);
+    setBake({ ...bake, ...patch });
+  }
+
+  function undoBake(): void {
+    const last = hist[hist.length - 1];
+    if (last === undefined) return;
+    setBake(last);
+    setHist(hist.slice(0, -1));
   }
 
   // 类型点选即进（每次必选，无默认；滑动只切换不进，防误触）。
@@ -459,6 +580,161 @@ export function V2CameraSheet({
                 </button>
               ))}
             </div>
+            {/* UR G.11 review 底部模式欄（濾鏡｜調整｜裁切｜文字＋撤销重置；改動即重烘，預覽即成圖）。 */}
+            {bake !== null && (
+              <div className="flex shrink-0 flex-col gap-2 rounded-xl border p-2">
+                <div className="flex items-center gap-1" role="tablist" aria-label={t2("camEditTitle")}>
+                  {(["filter", "adjust", "crop", "text"] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      role="tab"
+                      aria-selected={editMode === m}
+                      onClick={() => setEditMode(m)}
+                      className={`flex-1 rounded-full px-2 py-1 text-xs font-bold ${editMode === m ? "bg-foreground text-background" : "text-muted-foreground"}`}
+                    >
+                      {t2(`camEdit_${m}`)}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    disabled={hist.length === 0}
+                    onClick={undoBake}
+                    aria-label={t2("camEditUndo")}
+                    className="rounded-full border p-1.5 disabled:opacity-40"
+                  >
+                    <RotateCcw size={13} aria-hidden />
+                  </button>
+                </div>
+                {editMode === "filter" && (
+                  <div className="flex gap-1.5 overflow-x-auto pb-1">
+                    {PHOTO_FILTER_IDS.map((id) => (
+                      <button
+                        key={id}
+                        type="button"
+                        aria-pressed={bake.filter === id}
+                        onClick={() => updateBake({ filter: id })}
+                        className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold ${bake.filter === id ? "border-primary text-primary" : ""}`}
+                      >
+                        {t2(`camFilter_${id}`)}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      aria-pressed={bake.beauty}
+                      onClick={() => updateBake({ beauty: !bake.beauty })}
+                      className={`flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold ${bake.beauty ? "border-primary text-primary" : ""}`}
+                    >
+                      <Sparkles size={12} aria-hidden />
+                      {t2("camBeauty")}
+                    </button>
+                  </div>
+                )}
+                {editMode === "adjust" && (
+                  <div className="flex flex-col gap-1.5">
+                    {(
+                      [
+                        ["brightness", "camAdjBright"],
+                        ["contrast", "camAdjContrast"],
+                        ["saturation", "camAdjSat"],
+                        ["warmth", "camAdjWarm"],
+                      ] as const
+                    ).map(([k, label]) => (
+                      <label key={k} className="flex items-center gap-2 text-xs">
+                        <span className="w-10 shrink-0 text-muted-foreground">{t2(label)}</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={100}
+                          value={Math.round(bake.edit[k] * 100)}
+                          onChange={(e) => updateBake({ edit: sanitizeEdit({ ...bake.edit, [k]: Number(e.target.value) / 100 }) })}
+                          className="w-full"
+                        />
+                        <span className="w-10 shrink-0 text-right font-bold">{Math.round(bake.edit[k] * 100)}</span>
+                      </label>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => updateBake({ edit: { ...bake.edit, brightness: 0, contrast: 0, saturation: 0, warmth: 0 } })}
+                      className="self-end text-xs text-muted-foreground"
+                    >
+                      {t2("camAdjReset")}
+                    </button>
+                  </div>
+                )}
+                {editMode === "crop" && (
+                  <div className="flex items-center gap-1.5">
+                    {(["original", "square", "portrait"] as PhotoRatio[]).map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        aria-pressed={bake.edit.ratio === r}
+                        onClick={() => updateBake({ edit: sanitizeEdit({ ...bake.edit, ratio: r }) })}
+                        className={`flex-1 rounded-full border px-2 py-1 text-xs font-bold ${bake.edit.ratio === r ? "border-primary text-primary" : ""}`}
+                      >
+                        {t2(`camRatio_${r}`)}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => updateBake({ edit: sanitizeEdit({ ...bake.edit, quarterTurns: bake.edit.quarterTurns + 1 }) })}
+                      aria-label={t2("camRotate")}
+                      className="rounded-full border p-1.5"
+                    >
+                      <RotateCcw size={13} aria-hidden className="-scale-x-100" />
+                    </button>
+                  </div>
+                )}
+                {editMode === "text" && (
+                  <div className="flex flex-col gap-1.5">
+                    <input
+                      value={bake.text.text}
+                      maxLength={TEXT_MAX}
+                      placeholder={t2("camTextPh")}
+                      onChange={(e) => updateBake({ text: sanitizeText({ ...bake.text, text: e.target.value }) })}
+                      className="rounded-xl border px-2.5 py-1.5 text-sm"
+                    />
+                    <div className="flex items-center gap-1.5">
+                      {TEXT_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => updateBake({ text: sanitizeText({ ...bake.text, color: c }) })}
+                          aria-pressed={bake.text.color === c}
+                          aria-label={c}
+                          style={{ backgroundColor: c }}
+                          className={`h-6 w-6 shrink-0 rounded-full border ${bake.text.color === c ? "ring-2 ring-primary ring-offset-1" : "border-border"}`}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {([1, 2, 3] as const).map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => updateBake({ text: sanitizeText({ ...bake.text, size: s }) })}
+                          aria-pressed={bake.text.size === s}
+                          className={`flex-1 rounded-full border px-2 py-1 text-xs font-bold ${bake.text.size === s ? "border-primary text-primary" : ""}`}
+                        >
+                          {t2(`camTextSize_${s}`)}
+                        </button>
+                      ))}
+                      {(["top", "center", "bottom"] as TextPos[]).map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => updateBake({ text: sanitizeText({ ...bake.text, pos: p }) })}
+                          aria-pressed={bake.text.pos === p}
+                          className={`flex-1 rounded-full border px-2 py-1 text-xs font-bold ${bake.text.pos === p ? "border-primary text-primary" : ""}`}
+                        >
+                          {t2(`camTextPos_${p}`)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {/* IG 式图文行：缩略＋配文并排，键盘不再把输入框顶到天边。 */}
             <div className="flex shrink-0 items-start gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}

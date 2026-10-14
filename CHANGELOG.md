@@ -32,6 +32,9 @@
 - **UR G.10c 房內聊天＋舉報（v2-only，[WIP]，待親驗）**
   - `V2GameChatPanel`（4s 輪詢＋合并＋快捷語 24 宮＋文字 60 字＋撤回顯示＋逐行舉報五類）＋房間 Sheet 掛載；`lib/gameChat.ts` 純函數＋5 單測；v2 三語 key×42
   - 另修 G.10b 隱患：叫骰合法性改客戶端鏡像（不直引含 `node:crypto` 的服務端模塊）＋fuzz 對齊單測；`npm run build` 全過；API／migration／yaml 零改动（H.2(b) 现成）
+- **UR G.11 照片編輯器（v2-only，[WIP]，待親驗；G 系最後一批）**
+  - review 底部模式欄（濾鏡｜調整 4 滑桿｜裁切 3 畫幅＋旋轉｜文字單層三檔位＋7 色三字號）＋`rebake` 管線（旋轉→裁切→調整＋濾鏡→文字，預覽即成圖）＋撤销 40 步
+  - `lib/photoEdit.ts` 純數學（iOS 量綱口徑）＋6 單測；v2 三語 key×22；`npm run build` 全過；API／migration／yaml 零改动
 - **UR H.1 游戏房间＋大話骰 POC（纯 API，[WIP]，待 0042＋三批端点）**
   - 第一批：0042 五表（rooms／players／rounds／events／invites；RLS 全锁 service 读写）＋`lib/games/liars.ts` 纯函数（crypto 摇骰／叫骰校验／百搭计数／开盅结算／顺位／房规解析／房间码）＋15 单测（含 6000 颗均匀分布）
   - 第二批：房间 8 端点（建／码加入／active／准备／开始／离开／踢／改规／结束）＋门禁一体 helper（18+／拉黑双表／好友或 joins 交集／同时 1 房／满员／踢禁重进）＋懒过期（2h 续／ended 24h 删）＋openapi 1.27.0＋`GameRoom` schema＋5 单测；11 新错误码一次加齐（三批共用）
