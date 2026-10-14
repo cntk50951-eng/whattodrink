@@ -14,10 +14,22 @@ import {
   partyProgress,
   type PartyJoinState,
 } from "@/lib/api/party";
+import {
+  cancelBlockText,
+  cancelConfirmTitle,
+  leaveConfirmMessage,
+  parseCancelPolicy,
+  parseHostTrust,
+  parseLeavePolicy,
+  type CancelPolicy,
+  type HostTrust,
+  type LeavePolicy,
+} from "@/lib/partyUi";
 import { V2PartyForm } from "./V2PartyForm";
+import { V2PartyAttendance } from "./V2PartyAttendance";
 import styles from "./v2.module.css";
 
-type PartyHost = { user_id: string; nickname: string; avatar_url: string | null };
+type PartyHost = { user_id: string; nickname: string; avatar_url: string | null; trust: HostTrust | null };
 
 type PartyRow = {
   id: string;
@@ -38,6 +50,8 @@ type PartyRow = {
   joined_by_me: boolean;
   is_mine: boolean;
   distance_m: number | null;
+  cancel_policy: CancelPolicy | null;
+  leave_policy: LeavePolicy | null;
 };
 
 type PartyMember = {
@@ -80,10 +94,13 @@ function asPartyRow(r: unknown): PartyRow | null {
       nickname:
         typeof host?.nickname === "string" && host.nickname !== "" ? host.nickname : "酒友",
       avatar_url: typeof host?.avatar_url === "string" ? host.avatar_url : null,
+      trust: parseHostTrust(host?.trust),
     },
     joined_by_me: rec.joined_by_me === true,
     is_mine: rec.is_mine === true,
     distance_m: typeof rec.distance_m === "number" ? rec.distance_m : null,
+    cancel_policy: parseCancelPolicy(rec.cancel_policy),
+    leave_policy: parseLeavePolicy(rec.leave_policy),
   };
 }
 
@@ -103,6 +120,36 @@ function genderMark(g: string | null): string | null {
   if (g === "male") return "♂";
   if (g === "female") return "♀";
   return null;
+}
+
+type TrustTierKey = "trustTierNewbie" | "trustTierTrusted" | "trustTierNormal" | "trustTierWatch" | "trustTierRestricted";
+
+function trustTierKey(tier: string | null): TrustTierKey {
+  switch (tier) {
+    case "trusted":
+      return "trustTierTrusted";
+    case "normal":
+      return "trustTierNormal";
+    case "watch":
+      return "trustTierWatch";
+    case "restricted":
+      return "trustTierRestricted";
+    default:
+      return "trustTierNewbie";
+  }
+}
+
+/** 發起人誠信一行字（iOS hostTrustSummary 口徑；新手不談成局率）。 */
+function hostTrustLine(ht: HostTrust, t: (k: string, p?: Record<string, string | number>) => string): string | null {
+  const parts: string[] = [];
+  if (ht.hosted_count > 0) parts.push(t("partyTrustHosted", { n: ht.hosted_count }));
+  if (ht.completion_rate !== null && ht.hosted_count > 0) {
+    parts.push(t("partyTrustRate", { n: Math.round(Math.min(1, Math.max(0, ht.completion_rate)) * 100) }));
+  }
+  if (ht.hosted_count > 0 || ht.cancel_90d > 0) {
+    parts.push(ht.cancel_90d === 0 ? t("partyTrustZeroCancel") : t("partyTrustCancels", { n: ht.cancel_90d }));
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 /**
@@ -127,6 +174,7 @@ export function V2PartySheet({ open, onClose }: { open: boolean; onClose: () => 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
   // UR E.10：相对时间锚点（render 内禁 Date.now impure，mount 快照一次，沿列表页口径）。
   const [nowMs] = useState(() => Date.now());
 
@@ -178,6 +226,7 @@ export function V2PartySheet({ open, onClose }: { open: boolean; onClose: () => 
     setDetailLoading(true);
     setActionErr(null);
     setConfirmCancel(false);
+    setConfirmLeave(false);
     try {
       const res = await fetch(`/api/v1/parties/${encodeURIComponent(id)}`, {
         credentials: "include",
@@ -211,6 +260,7 @@ export function V2PartySheet({ open, onClose }: { open: boolean; onClose: () => 
     if (res.status === 401) return t("partyNeedLogin");
     if (code === "party_full") return t("partyFull");
     if (code === "gender_full") return t("partyGenderFull");
+    if (code === "too_close_to_start") return t("partyCancelClose");
     if (res.status === 410) return t("partyGone");
     if (res.status === 404) return t("partyTestOff");
     return typeof j?.error?.message === "string" ? j.error.message : fallback;
@@ -363,10 +413,20 @@ export function V2PartySheet({ open, onClose }: { open: boolean; onClose: () => 
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-bold">
                       {t("partyHostTop")}：{d.host.nickname}
+                      {d.host.trust !== null && (
+                        <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-bold text-muted-foreground">
+                          {t(trustTierKey(d.host.trust.tier))}
+                        </span>
+                      )}
                     </span>
                     <span className="block text-xs text-muted-foreground">
                       {d.is_mine ? t("partyHostYouSub") : t("partyHostOtherSub")}
                     </span>
+                    {d.host.trust !== null && hostTrustLine(d.host.trust, t) !== null && (
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {hostTrustLine(d.host.trust, t)}
+                      </span>
+                    )}
                   </span>
                 </div>
                 <div className="flex gap-2">
@@ -428,46 +488,87 @@ export function V2PartySheet({ open, onClose }: { open: boolean; onClose: () => 
                 {actionErr !== null && (
                   <p role="alert" className="text-xs text-destructive">{actionErr}</p>
                 )}
+                <V2PartyAttendance
+                  partyId={d.id}
+                  startAt={d.start_at}
+                  isHost={d.is_mine}
+                  isMember={stateOf(d) === "joined"}
+                />
                 <div className="flex flex-col gap-2">
                   {stateOf(d) === "joined" ? (
-                    <button
-                      type="button"
-                      disabled={busyId !== null}
-                      onClick={() =>
-                        void act(`/api/v1/parties/${encodeURIComponent(d.id)}/joins`, { method: "DELETE" }, async () => {
-                          await openDetail(d.id);
-                          await load(tab);
-                        })
-                      }
-                      className="w-full rounded-xl border px-3 py-2.5 text-sm font-bold disabled:opacity-50"
-                    >
-                      {t("partyLeave")}
-                    </button>
+                    <>
+                      {confirmLeave && (
+                        <p className="rounded-xl bg-muted p-2 text-xs text-muted-foreground">
+                          {(() => {
+                            const m = leaveConfirmMessage(d.leave_policy);
+                            return t(m.key, m.params);
+                          })()}
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        disabled={busyId !== null}
+                        onClick={() => {
+                          if (!confirmLeave) {
+                            setConfirmLeave(true);
+                            return;
+                          }
+                          setConfirmLeave(false);
+                          void act(`/api/v1/parties/${encodeURIComponent(d.id)}/joins`, { method: "DELETE" }, async () => {
+                            await openDetail(d.id);
+                            await load(tab);
+                          });
+                        }}
+                        className="w-full rounded-xl border px-3 py-2.5 text-sm font-bold disabled:opacity-50"
+                      >
+                        {confirmLeave ? t("partyLeaveConfirm") : t("partyLeave")}
+                      </button>
+                    </>
                   ) : (
                     joinButton(d, true)
-                  )}                  {d.is_mine && d.status !== "cancelled" && (
-                    <button
-                      type="button"
-                      disabled={busyId !== null}
-                      onClick={() => {
-                        if (!confirmCancel) {
-                          setConfirmCancel(true);
-                          return;
+                  )}
+                  {d.is_mine && d.status !== "cancelled" && (
+                    <>
+                      {(() => {
+                        const block = d.cancel_policy !== null && !d.cancel_policy.can_cancel
+                          ? cancelBlockText(d.cancel_policy.block_reason)
+                          : null;
+                        if (block !== null) {
+                          return <p className="text-xs text-muted-foreground">{t(block.key)}</p>;
                         }
-                        setConfirmCancel(false);
-                        void act(`/api/v1/parties/${encodeURIComponent(d.id)}`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ action: "cancel" }),
-                        }, async () => {
-                          await openDetail(d.id);
-                          await load(tab);
-                        });
-                      }}
-                      className="w-full rounded-xl border border-destructive px-3 py-2.5 text-sm font-bold text-destructive disabled:opacity-50"
-                    >
-                      {confirmCancel ? t("partyConfirmCancel") : t("partyCancelAction")}
-                    </button>
+                        return null;
+                      })()}
+                      <button
+                        type="button"
+                        disabled={
+                          busyId !== null ||
+                          (d.cancel_policy !== null && !d.cancel_policy.can_cancel)
+                        }
+                        onClick={() => {
+                          if (!confirmCancel) {
+                            setConfirmCancel(true);
+                            return;
+                          }
+                          setConfirmCancel(false);
+                          void act(`/api/v1/parties/${encodeURIComponent(d.id)}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "cancel" }),
+                          }, async () => {
+                            await openDetail(d.id);
+                            await load(tab);
+                          });
+                        }}
+                        className="w-full rounded-xl border border-destructive px-3 py-2.5 text-sm font-bold text-destructive disabled:opacity-50"
+                      >
+                        {confirmCancel
+                          ? (() => {
+                              const c = cancelConfirmTitle(d.cancel_policy?.joiners_count ?? 0);
+                              return t(c.key, c.params);
+                            })()
+                          : t("partyCancelAction")}
+                      </button>
+                    </>
                   )}
                 </div>
                 <p className="flex items-start gap-1.5 rounded-xl bg-muted p-2 text-xs text-muted-foreground">

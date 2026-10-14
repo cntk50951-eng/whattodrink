@@ -4105,10 +4105,11 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - web 范围：統一動態入口（收斂 Cheers／Invite／notifications 三源）＋未讀汇总＋橫幅提醒；API 现成（/me/notifications＋counters notices_unread）。
 - 非目标：改現有信箱逻辑、v1。
 
-### UR G.8　酒局到場出席投訴誠信（v2）[]
+### UR G.8　酒局到場出席投訴誠信（v2）[WIP]
 - iOS 对标：Attendance／Complaint／Trust 全套（階段 A–C；iOS 未提交 WIP）。
-- web 范围：V2PartySheet 扩展（cancel／leave_policy 置灰＋確認文案、到場打卡、出席確認、投訴入口、host 徽章）；API 现成（E.30／E.31 C1／C2，shared-only 已合入）。
-- 非目标：審核後台（已有 admin 頁）、緊急通道（兩邊都不做）、v1。
+- 本批（拆批定案）：政策＋徽章＋到場出席——詳情政策置灰＋確認文案（cancel_policy／leave_policy，服務端為準）＋host 誠信徽章（一行字，新手不談成局率）＋`V2PartyAttendance`（我到了窗口打卡＋host 標記＋成員回報發起人＋結算 outcome）；API 现成（arrive／attendance／policies／trust）。
+- G.8b（另批）：投訴全套（file／list／detail／respond／appeal，免證據）＋我的誠信頁；API 现成（C2／trust）。
+- 非目标：緊急通道（兩邊都不做）、v1。
 
 ### UR G.9　發局草稿＋收藏過期＋我的地點（v2）[]
 - iOS 对标：PartyDraft（草稿 7 天＋記住上次＋再開一局）／SAVES_EXPIRED（過期收藏保留＋Pin 住位置）／PinnedPlace（純本地）。
@@ -4152,7 +4153,7 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - 2026-10-14：用户亲验通过置 [✓]（提交＋部署，继续 G.7）。
 - 2026-10-14：G.7 置 [WIP] 開工（範圍 C＋無橫幅，用戶定案）；实作：`lib/activity.ts` 純函數（notice 解析／標題／副行／圖標／緊急度／iOS bell 四源求和）＋10 單測＋`useActivityCounts`（/me/counters 單次四數）＋`V2ActivitySheet` 四行分流＋`V2NoticesSheet`（列表＋全标已读＋更多）＋`V2FriendRequestsSheet`（收發双籤＋接受拒絕取消，接受沿 D.7 進房）＋右缘信箱鈕改動態入口（統一紅點）＋v2 三語 key×61；API／migration／yaml 零改动。
 - 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.8）。
----
+- 2026-10-14：G.8 置 [WIP] 開工（拆兩批＋投訴免證據，用戶定案；本批政策＋徽章＋到場出席，G.8b 投訴＋誠信頁）；实作：`lib/partyUi.ts` 純函數（政策解析／置灰／確認文案／打卡窗口／結算／打卡失敗鍵）＋8 單測＋`V2PartyAttendance`（我到了＋host 標記＋回報發起人＋outcome）＋詳情政策置灰＋退出兩段確認＋host 徽章一行＋v2 三語 key×34（另對齊 G.7 等級文案靠譜／需注意，iOS 口徑）；API／migration／yaml 零改动。---
 
 UR D.9　iOS 真推送 P1（E1 碰杯＋APNs 通道）[WIP]
 

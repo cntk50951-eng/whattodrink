@@ -13,6 +13,9 @@
 - **UR G.7 動態通知中心（v2-only，[WIP]，待親驗）**
   - 右缘信箱鈕升級為動態入口（統一紅點＝碰杯＋邀約＋好友請求＋通知，iOS bell 口徑）＋`V2ActivitySheet` 四行分流（碰杯沿 CheersMailbox、邀約進聊天頁）＋`V2NoticesSheet`（通知列表＋全标已读＋未知 kind 兜底行）＋`V2FriendRequestsSheet`（收／發双籤＋接受／拒絕／取消，接受後沿 D.7 進房）
   - `lib/activity.ts` 純函數（notice 解析／標題／副行／圖標／緊急度／四源求和，iOS 口徑）＋10 單測＋`useActivityCounts`（/me/counters 單次四數）；v2 三語 key×61；API／migration／yaml 零改动（notifications／requests／counters 现成）
+- **UR G.8 酒局進行時（v2-only，[WIP]，待親驗；G.8b 投訴＋誠信頁另批）**
+  - 詳情政策置灰＋確認文案（cancel_policy／leave_policy；退出兩段確認，臨近開局提示誠信影響；409 沿服務端人話）＋host 誠信徽章（一行字）＋`V2PartyAttendance`（窗口內「我到了」單次定位打卡＋host 標記成員＋成員回報發起人＋結算 outcome）
+  - `lib/partyUi.ts` 純函數（政策／窗口／結算／失敗鍵，iOS 口徑）＋8 單測；v2 三語 key×34；API／migration／yaml 零改动（arrive／attendance／policies／trust 现成）
 - **UR H.1 游戏房间＋大話骰 POC（纯 API，[WIP]，待 0042＋三批端点）**
   - 第一批：0042 五表（rooms／players／rounds／events／invites；RLS 全锁 service 读写）＋`lib/games/liars.ts` 纯函数（crypto 摇骰／叫骰校验／百搭计数／开盅结算／顺位／房规解析／房间码）＋15 单测（含 6000 颗均匀分布）
   - 第二批：房间 8 端点（建／码加入／active／准备／开始／离开／踢／改规／结束）＋门禁一体 helper（18+／拉黑双表／好友或 joins 交集／同时 1 房／满员／踢禁重进）＋懒过期（2h 续／ended 24h 删）＋openapi 1.27.0＋`GameRoom` schema＋5 单测；11 新错误码一次加齐（三批共用）
