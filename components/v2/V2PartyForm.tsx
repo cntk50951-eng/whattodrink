@@ -1,13 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { partySlotStartAt, type PartySlot } from "@/lib/api/party";
+import {
+  applyPrefs,
+  blankDraft,
+  draftKey,
+  draftMeaningful,
+  parseDraft,
+  parsePrefs,
+  prefsFromDraft,
+  prefsKey,
+  type PartyDraft,
+} from "@/lib/partyDraft";
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 3600_000;
+
+/** ms → datetime-local 輸入值（本地時區；iOS 無此層，web 表單專用）。 */
+export function toLocalInput(ms: number): string {
+  const d = new Date(ms);
+  const p = (n: number): string => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 /**
  * UR G.3 发局表单（v2-only；字段对 E.23 POST 校验，客户端先拦一轮，服务端终判）。
@@ -21,6 +39,8 @@ export function V2PartyForm({
   lng,
   onDone,
   onCancel,
+  myUserId,
+  initial,
 }: {
   /** 当前位置（无即禁用提交，提示开定位）。 */
   lat: number | null;
@@ -28,20 +48,44 @@ export function V2PartyForm({
   /** 发局成功（回列表重拉）。 */
   onDone: () => void;
   onCancel: () => void;
+  /** 按帳號分桶（草稿＋偏好）；null 即匿名共用桶。 */
+  myUserId?: string | null;
+  /** 再開一局預填（優先於草稿＋偏好）。 */
+  initial?: PartyDraft | null;
 }) {
   const t = useTranslations("v2");
-  const [place, setPlace] = useState("");
-  const [city, setCity] = useState("");
-  const [slot, setSlot] = useState<PartySlot>("tonight");
-  const [custom, setCustom] = useState("");
-  const [total, setTotal] = useState(6);
-  const [male, setMale] = useState(0);
-  const [female, setFemale] = useState(0);
-  const [bill, setBill] = useState<"host" | "aa" | "flexible">("flexible");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
   // UR E.10：相对时间锚点（render 内禁 Date.now impure，mount 快照一次，沿列表页口径）。
   const [nowMs] = useState(() => Date.now());
+  const uid = myUserId ?? null;
+  // UR G.9：初值＝再開預填＞草稿＞偏好＞空白（mount 一次，沿 hydrate 口徑）。
+  const [boot] = useState(() => {
+    if (initial !== null && initial !== undefined) return { base: initial, resumed: false };
+    let prefs = null;
+    try {
+      prefs = parsePrefs(window.localStorage.getItem(prefsKey(uid)));
+    } catch {}
+    const base = prefs !== null ? applyPrefs(prefs, nowMs) : blankDraft(nowMs);
+    let saved: PartyDraft | null = null;
+    try {
+      saved = parseDraft(window.localStorage.getItem(draftKey(uid)), nowMs);
+    } catch {}
+    if (saved !== null) return { base: saved, resumed: true };
+    return { base, resumed: false };
+  });
+  const [place, setPlace] = useState(boot.base.bar?.name ?? "");
+  const [city, setCity] = useState(boot.base.city);
+  // 草稿時間還有效即回到 custom（iOS restoredStart 口徑；parseDraft 已先過濾）。
+  const [slot, setSlot] = useState<PartySlot>(boot.base.startAt !== null ? "custom" : "tonight");
+  const [custom, setCustom] = useState(boot.base.startAt !== null ? toLocalInput(boot.base.startAt) : "");
+  const [total, setTotal] = useState(boot.base.totalSeats);
+  const [male, setMale] = useState(boot.base.maleSeats);
+  const [female, setFemale] = useState(boot.base.femaleSeats);
+  const [bill, setBill] = useState<"host" | "aa" | "flexible">(
+    boot.base.bill === "host" || boot.base.bill === "aa" ? boot.base.bill : "flexible",
+  );
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [resumed, setResumed] = useState(boot.resumed);
 
   const openTotal = total - male - female;
   const customMs = custom === "" ? NaN : Date.parse(custom);
@@ -49,6 +93,24 @@ export function V2PartyForm({
     slot !== "custom" ||
     (Number.isFinite(customMs) && customMs > nowMs && customMs <= nowMs + FOURTEEN_DAYS_MS);
   const startMs = partySlotStartAt(slot, customMs, nowMs);
+  // UR G.9：改動即存草稿（有意義才寫；退出自動留，發布成功清）。
+  useEffect(() => {
+    try {
+      const d: PartyDraft = {
+        bar: place.trim() !== "" ? { name: place.trim(), lat: null, lng: null } : null,
+        city,
+        startAt: Number.isFinite(startMs) ? startMs : null,
+        totalSeats: total,
+        maleSeats: male,
+        femaleSeats: female,
+        bill,
+        savedAt: Date.now(),
+      };
+      if (!draftMeaningful(d)) return;
+      window.localStorage.setItem(draftKey(uid), JSON.stringify(d));
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 表單欄全量跟（存檔副作用，沿偏好寫透口徑）
+  }, [place, city, slot, custom, total, male, female, bill]);
   const valid =
     place.trim().length >= 1 &&
     place.trim().length <= 30 &&
@@ -92,6 +154,14 @@ export function V2PartyForm({
         const msg = typeof j?.error?.message === "string" ? j.error.message : `${res.status}`;
         throw new Error(msg);
       }
+      // UR G.9：發布成功清草稿＋記偏好（介紹不記，web 表單無此欄）。
+      try {
+        window.localStorage.removeItem(draftKey(uid));
+        window.localStorage.setItem(
+          prefsKey(uid),
+          JSON.stringify(prefsFromDraft({ bar: { name: place.trim(), lat: null, lng: null }, city, startAt: startMs, totalSeats: total, maleSeats: male, femaleSeats: female, bill, savedAt: nowMs }, startMs)),
+        );
+      } catch {}
       onDone();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "bad");
@@ -121,6 +191,23 @@ export function V2PartyForm({
 
   return (
     <div className="flex flex-col gap-3">
+      {resumed && (
+        <p className="flex items-center justify-between gap-2 rounded-xl bg-muted p-2 text-xs text-muted-foreground">
+          <span>{t("partyDraftBack")}</span>
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                window.localStorage.removeItem(draftKey(uid));
+              } catch {}
+              setResumed(false);
+            }}
+            className="shrink-0 rounded-full border px-2 py-0.5 font-bold"
+          >
+            {t("partyDraftDrop")}
+          </button>
+        </p>
+      )}
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-muted-foreground">{t("partyPlace")}</span>
         <input

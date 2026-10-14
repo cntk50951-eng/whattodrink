@@ -2384,7 +2384,7 @@ paths:
             type: string
       responses:
         "200":
-          description: 打卡公开列＋saved_by_me 恒 true
+          description: 打卡公开列＋saved_by_me 恒 true（過期歸檔行加 expired:true，G.9）
           content:
             application/json:
               schema:

@@ -66,6 +66,14 @@ import { V2ComplaintsSheet } from "@/components/v2/V2ComplaintsSheet";
 import { V2TrustSheet } from "@/components/v2/V2TrustSheet";
 import { useActivityCounts } from "@/hooks/useActivityCounts";
 import { activityBell } from "@/lib/activity";
+import {
+  addPinned,
+  findPinned,
+  parsePinnedList,
+  pinnedKey,
+  removePinned,
+  type PinnedPlace,
+} from "@/lib/pinnedPlaces";
 import { OnboardingSheet } from "@/components/v2/OnboardingSheet";
 import { ageOf, shouldOnboard } from "@/lib/api/profile";
 import type { MeJson } from "@/lib/mode";
@@ -427,6 +435,53 @@ export function V2Home() {
       cancelled = true;
     };
   }, [isAuthed, refreshMe]);
+  // UR G.9：pin 地點（localStorage 按帳號分桶；圖層＋收藏共用同一份）。
+  const [pinned, setPinned] = useState<PinnedPlace[]>([]);
+  const pinSeq = useRef(0);
+  const refreshPinned = useCallback(() => {
+    try {
+      const uid = meJson?.id ?? null;
+      setPinned(parsePinnedList(window.localStorage.getItem(pinnedKey(uid))));
+    } catch {
+      setPinned([]);
+    }
+  }, [meJson?.id]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount／帳號翻轉讀 pin 屬 hydrate（沿 V2Comments 口径）
+    refreshPinned();
+  }, [refreshPinned, isAuthed]);
+  function togglePin(p: { name: string; lat: number; lng: number; sourceCheckinId: string | null }): void {
+    const uid = meJson?.id ?? null;
+    try {
+      const cur = parsePinnedList(window.localStorage.getItem(pinnedKey(uid)));
+      const hit =
+        (p.sourceCheckinId !== null && cur.find((x) => x.sourceCheckinId === p.sourceCheckinId)) ||
+        findPinned(cur, p.lat, p.lng);
+      let next: PinnedPlace[];
+      if (hit !== null && hit !== undefined) {
+        next = removePinned(hit.id, cur);
+      } else {
+        pinSeq.current += 1;
+        next = addPinned(
+          {
+            id: `pin-${pinSeq.current}-${p.lat}-${p.lng}`,
+            name: p.name,
+            lat: p.lat,
+            lng: p.lng,
+            createdAt: 0,
+            sourceCheckinId: p.sourceCheckinId,
+          },
+          cur,
+        );
+      }
+      window.localStorage.setItem(pinnedKey(uid), JSON.stringify(next));
+      setPinned(next);
+    } catch {}
+  }
+  function locatePlace(lat: number, lng: number): void {
+    setSavesOpen(false);
+    mapApi.current?.flyTo({ lat, lng }, 15);
+  }
   // UR E.15：切换并敬（pending intent；切完自动补敬，不丢冲动）＋同会话免打扰旗。
   const pendingCheersRef = useRef<string | null>(null);
   const refusedCheersRef = useRef(false);
@@ -1718,6 +1773,11 @@ export function V2Home() {
         onStackClick={(ids) => setStackIds(ids)}
         heatMode={heatMode}
         heatFocusIds={heatMode ? (heatCells[heatIdx]?.ids ?? null) : null}
+        pinned={pinned}
+        onPinnedClick={(id) => {
+          const p = pinned.find((x) => x.id === id);
+          if (p !== undefined) mapApi.current?.flyTo({ lat: p.lat, lng: p.lng }, 15);
+        }}
       />
 
       {/* UR C.17 好友信息卡（點釘先看人，卡內聊天鍵進完整頁；對方離線即自動收卡 fail-closed） */}
@@ -3260,6 +3320,9 @@ export function V2Home() {
           open
           onClose={() => setSavesOpen(false)}
           onOpen={(id) => openSaved(id)}
+          pinned={pinned}
+          onTogglePin={togglePin}
+          onLocate={locatePlace}
         />
       )}
       {/* UR G.2 酒闻列表。 */}

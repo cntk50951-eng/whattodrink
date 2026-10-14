@@ -4116,7 +4116,10 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - web 范围：酒局詳情投訴入口（`V2ComplaintCompose`：成員選人＋五類＋200 字，窗口／類別本機預判＋服務端為準）＋`V2ComplaintsSheet`（filed／against 双籤＋展開詳情＋申辯＋申訴）＋`V2TrustSheet`（分數等級＋四統計＋賬本，新手不露分）＋動態中心加兩行；API 现成（C2 complaints×5／trust×2）。
 - 非目标：證據上傳（二期）、審核後台（已有 admin）、v1。
 
-### UR G.9　發局草稿＋收藏過期＋我的地點（v2）[WIP]
+### UR G.9　發局草稿＋收藏過期＋我的地點（v2）[✓]
+- iOS 对标：PartyDraft（草稿 7 天＋記住上次＋再開一局）／SAVES_EXPIRED（過期保留＋Pin 住）／PinnedPlace（純本地）。
+- web 范围（A 全做＋上地圖，用戶定案）：0056 遷移（去 checkin_saves FK，歸檔不再連帶刪；Dashboard 貼跑）＋saves 路由回查 archive（service＋canViewCheckin，沿詳情口徑；expired:true；openapi 描述行）＋`V2PartyForm` 草稿（改動即存＋回來橫幅＋捨棄＋發布清＋記偏好）＋詳情再開一局（我的＋結束／撤銷）＋`V2SavesSheet` 過期灰顯（點行帶我去＋Pin 住）＋我的地點區＋地圖 pin 層（獨立 LayerGroup，沿 friendLayer）。
+- 非目标：跨裝置同步（iOS 亦本地）、v1。
 - iOS 对标：PartyDraft（草稿 7 天＋記住上次＋再開一局）／SAVES_EXPIRED（過期收藏保留＋Pin 住位置）／PinnedPlace（純本地）。
 - web 范围：發局表單草稿（localStorage 按帳號分桶）＋收藏過期行（expired 灰顯＋帶我去地圖位置）＋pin 地點本地存；API 现成（/me/saves expired 行，E.22 歸檔口徑）。
 - 非目标：跨裝置同步（iOS 亦本地）、v1。
@@ -4159,7 +4162,9 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - 2026-10-14：G.7 置 [WIP] 開工（範圍 C＋無橫幅，用戶定案）；实作：`lib/activity.ts` 純函數（notice 解析／標題／副行／圖標／緊急度／iOS bell 四源求和）＋10 單測＋`useActivityCounts`（/me/counters 單次四數）＋`V2ActivitySheet` 四行分流＋`V2NoticesSheet`（列表＋全标已读＋更多）＋`V2FriendRequestsSheet`（收發双籤＋接受拒絕取消，接受沿 D.7 進房）＋右缘信箱鈕改動態入口（統一紅點）＋v2 三語 key×61；API／migration／yaml 零改动。
 - 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.8）。
 - 2026-10-14：G.8 置 [WIP] 開工（拆兩批＋投訴免證據，用戶定案；本批政策＋徽章＋到場出席，G.8b 投訴＋誠信頁）；实作：`lib/partyUi.ts` 純函數（政策解析／置灰／確認文案／打卡窗口／結算／打卡失敗鍵）＋8 單測＋`V2PartyAttendance`（我到了＋host 標記＋回報發起人＋outcome）＋詳情政策置灰＋退出兩段確認＋host 徽章一行＋v2 三語 key×34（另對齊 G.7 等級文案靠譜／需注意，iOS 口徑）；API／migration／yaml 零改动。
-- 2026-10-14：G.8b 置 [WIP] 開工；实作：`lib/complaintUi.ts` 純函數（五類／窗口／預判／目標過濾／校驗／雙視角狀態／錯誤鍵／等級賬本）＋8 單測＋`V2ComplaintCompose`（詳情內選人＋類別＋200 字）＋`V2ComplaintsSheet`（双籤＋展開＋申辯＋申訴）＋`V2TrustSheet`（分數等級＋四統計＋賬本）＋動態中心加兩行＋詳情傳 myUserId＋v2 三語 key×66；API／migration／yaml 零改动。---
+- 2026-10-14：G.8b 置 [WIP] 開工；实作：`lib/complaintUi.ts` 純函數（五類／窗口／預判／目標過濾／校驗／雙視角狀態／錯誤鍵／等級賬本）＋8 單測＋`V2ComplaintCompose`（詳情內選人＋類別＋200 字）＋`V2ComplaintsSheet`（双籤＋展開＋申辯＋申訴）＋`V2TrustSheet`（分數等級＋四統計＋賬本）＋動態中心加兩行＋詳情傳 myUserId＋v2 三語 key×66；API／migration／yaml 零改动。
+- 2026-10-14：G.9 置 [WIP] 開工（A 全做＋上地圖，用戶定案）；实作：0056 遷移（去 FK）＋saves 路由回查 archive（expired:true，service＋代碼門）＋openapi 描述行＋`lib/partyDraft.ts`（草稿／偏好／再開）＋`lib/pinnedPlaces.ts`（10m 去重／100 上限）＋10 單測＋表單草稿偏好重開＋詳情再開一局＋收藏過期灰顯＋我的地點＋地圖 pin 層＋v2 三語 key×10；待 0056 貼跑＋親驗。
+- 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.10）。---
 
 UR D.9　iOS 真推送 P1（E1 碰杯＋APNs 通道）[WIP]
 

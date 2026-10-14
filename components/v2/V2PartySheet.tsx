@@ -28,6 +28,7 @@ import {
 import { V2PartyForm } from "./V2PartyForm";
 import { V2PartyAttendance } from "./V2PartyAttendance";
 import { V2ComplaintCompose } from "./V2ComplaintCompose";
+import { canReopen, reopenDraft, type PartyDraft } from "@/lib/partyDraft";
 import styles from "./v2.module.css";
 
 type PartyHost = { user_id: string; nickname: string; avatar_url: string | null; trust: HostTrust | null };
@@ -176,6 +177,8 @@ export function V2PartySheet({ open, onClose, myUserId }: { open: boolean; onClo
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // UR G.9：再開一局預填（詳情→表單一次，送出／取消即清）。
+  const [reopen, setReopen] = useState<PartyDraft | null>(null);
   // UR E.10：相对时间锚点（render 内禁 Date.now impure，mount 快照一次，沿列表页口径）。
   const [nowMs] = useState(() => Date.now());
 
@@ -371,11 +374,17 @@ export function V2PartySheet({ open, onClose, myUserId }: { open: boolean; onClo
           <V2PartyForm
             lat={position?.lat ?? null}
             lng={position?.lng ?? null}
+            myUserId={myUserId ?? null}
+            initial={reopen}
             onDone={() => {
               setView({ kind: "list" });
+              setReopen(null);
               void load(tab);
             }}
-            onCancel={() => setView({ kind: "list" })}
+            onCancel={() => {
+              setView({ kind: "list" });
+              setReopen(null);
+            }}
           />
         ) : view.kind === "detail" ? (
           <div className="flex flex-col gap-3">
@@ -503,6 +512,32 @@ export function V2PartySheet({ open, onClose, myUserId }: { open: boolean; onClo
                     members={d.members.map((m) => ({ user_id: m.user_id, nickname: m.nickname, is_host: m.is_host }))}
                     myUserId={myUserId ?? null}
                   />
+                )}
+                {canReopen(d.is_mine, d.status, Date.parse(d.expires_at), nowMs) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReopen(
+                        reopenDraft(
+                          {
+                            place: d.place,
+                            city: d.city,
+                            lat: null,
+                            lng: null,
+                            seats_total: d.seats_total,
+                            seats_male: d.seats_male,
+                            seats_female: d.seats_female,
+                            bill_intent: d.bill_intent,
+                          },
+                          nowMs,
+                        ),
+                      );
+                      setView({ kind: "form" });
+                    }}
+                    className="w-full rounded-xl border px-3 py-2.5 text-sm font-bold"
+                  >
+                    {t("partyReopen")}
+                  </button>
                 )}
                 <div className="flex flex-col gap-2">
                   {stateOf(d) === "joined" ? (

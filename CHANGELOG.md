@@ -19,6 +19,10 @@
 - **UR G.8b 投訴＋誠信頁（v2-only，[WIP]，待親驗；證據免）**
   - 詳情內投訴發起（選人＋五類＋200 字，窗口／類別預判＋服務端為準）＋`V2ComplaintsSheet`（filed／against 双籤＋展開＋申辯＋申訴）＋`V2TrustSheet`（分數等級＋四統計＋賬本，新手不露分）＋動態中心加兩行
   - `lib/complaintUi.ts` 純函數（類別／窗口／預判／狀態／錯誤／等級賬本，iOS 口徑）＋8 單測；v2 三語 key×66；API／migration／yaml 零改动（C2 complaints×5／trust×2 现成）
+- **UR G.9 發局草稿＋收藏過期＋我的地點（v2-only，[WIP]，待 0056 貼跑＋親驗）**
+  - 0056 遷移（去 `checkin_saves.checkin_id` FK，歸檔不再連帶刪收藏）＋saves 路由回查 archive（service＋`canViewCheckin` 代碼門，沿詳情口徑；`expired:true`，內容置空留定位）＋openapi 描述行
+  - 表單草稿（改動即存＋回來橫幅＋捨棄＋發布清＋記偏好）＋詳情再開一局＋收藏過期灰顯（點行帶我去）＋我的地點區＋地圖 pin 層（獨立 LayerGroup）
+  - `lib/partyDraft.ts`＋`lib/pinnedPlaces.ts` 純函數（iOS 口徑）＋10 單測；v2 三語 key×10
 - **UR H.1 游戏房间＋大話骰 POC（纯 API，[WIP]，待 0042＋三批端点）**
   - 第一批：0042 五表（rooms／players／rounds／events／invites；RLS 全锁 service 读写）＋`lib/games/liars.ts` 纯函数（crypto 摇骰／叫骰校验／百搭计数／开盅结算／顺位／房规解析／房间码）＋15 单测（含 6000 颗均匀分布）
   - 第二批：房间 8 端点（建／码加入／active／准备／开始／离开／踢／改规／结束）＋门禁一体 helper（18+／拉黑双表／好友或 joins 交集／同时 1 房／满员／踢禁重进）＋懒过期（2h 续／ended 24h 删）＋openapi 1.27.0＋`GameRoom` schema＋5 单测；11 新错误码一次加齐（三批共用）

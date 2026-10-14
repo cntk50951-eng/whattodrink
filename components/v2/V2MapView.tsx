@@ -72,6 +72,14 @@ export type V2MapApi = {
   spreadStack: (ids: string[]) => void;
 };
 
+/** UR G.9 pin 住的地點（父層 localStorage 直供；純本地，跨裝置另議）。 */
+export type V2PinnedMarker = {
+  id: string;
+  lat: number;
+  lng: number;
+  name: string;
+};
+
 /** UR A.21 好友實時釘模型（父層 `useLiveFriends` 直供；server 已過濾）。 */
 export type V2FriendMarker = {
   /** users.id（server 回顯原樣，點擊原樣交回）。 */
@@ -106,6 +114,9 @@ type V2MapViewProps = {
   heatMode: boolean;
   /** UR E.6 round-4 巡游焦点格成员 id（只渲该格热斑，单格聚焦；null＝全量）。 */
   heatFocusIds: string[] | null;
+  /** UR G.9：pin 地點層（獨立 LayerGroup，沿 friendLayer 口徑）。 */
+  pinned: V2PinnedMarker[];
+  onPinnedClick?: (id: string) => void;
 };
 
 /** HTML 转义（divIcon  innerHTML 拼昵称首字用，用户内容不可信）。 */
@@ -174,7 +185,7 @@ function unmountRootsAsync(roots: Root[]): void {
  * 操作經 ref 暴露（父層按鈕調）。 reduced-motion 讀掛載時一次。
  */
 export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView(
-  { others, wants, trail, self, onPinClick, onWantClick, onReady, onMapTap, presence, friends, onFriendClick, onStackClick, heatMode, heatFocusIds },
+  { others, wants, trail, self, onPinClick, onWantClick, onReady, onMapTap, presence, friends, onFriendClick, onStackClick, heatMode, heatFocusIds, pinned, onPinnedClick },
   ref,
 ) {
   const holderRef = useRef<HTMLDivElement | null>(null);
@@ -195,10 +206,13 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
   // 地理真 pin 摆开显示。切簇即換，點空地／數據失配即清。
   const [spreadIds, setSpreadIds] = useState<string[] | null>(null);
   // 回調 ref 化（marker 點擊閉包讀最新，不重建圖層樹；render 內不許寫 ref）。
-  const cbRef = useRef({ onPinClick, onWantClick, onReady, onMapTap, onFriendClick, onStackClick });
+  const cbRef = useRef({ onPinClick, onWantClick, onReady, onMapTap, onFriendClick, onStackClick, onPinnedClick });
   useEffect(() => {
-    cbRef.current = { onPinClick, onWantClick, onReady, onMapTap, onFriendClick, onStackClick };
+    cbRef.current = { onPinClick, onWantClick, onReady, onMapTap, onFriendClick, onStackClick, onPinnedClick };
   });
+  // UR G.9：pin 地點獨立層（增量增刪改，沿 friendLayer 口徑；主 layer 重建不碰此層）。
+  const pinnedLayerRef = useRef<Leaflet.LayerGroup | null>(null);
+  const pinnedMarksRef = useRef(new Map<string, Leaflet.Marker>());
   // UR A.21 好友常駐層（獨立於主 layer 重建；marker 複用＋setLatLng，
   // CSS 位移過渡即平滑跟隨，不拆層不閃爍）。
   const friendLayerRef = useRef<Leaflet.LayerGroup | null>(null);
@@ -227,6 +241,10 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       friendLayerRef.current = null;
       // eslint-disable-next-line react-hooks/exhaustive-deps
       friendMarksRef.current.clear();
+      pinnedLayerRef.current?.remove();
+      pinnedLayerRef.current = null;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      pinnedMarksRef.current.clear();
       heatLayerRef.current?.remove();
       heatLayerRef.current = null;
       footLayerRef.current?.remove();
@@ -1018,6 +1036,45 @@ export const V2MapView = forwardRef<V2MapApi, V2MapViewProps>(function V2MapView
       marks.delete(id);
     }
   }, [mapReady, friends]);
+
+  // UR G.9 pin 地點層對帳：增量增刪改（marker 複用；沿 friendLayer 口徑）。
+  useEffect(() => {
+    const map = mapRef.current;
+    const L = leafletRef.current;
+    if (!mapReady || map === null || L === null) return;
+    if (pinnedLayerRef.current === null) {
+      pinnedLayerRef.current = L.layerGroup().addTo(map);
+    }
+    const layer = pinnedLayerRef.current;
+    const marks = pinnedMarksRef.current;
+    const seen = new Set<string>();
+    for (const p of pinned) {
+      seen.add(p.id);
+      const hit = marks.get(p.id);
+      if (hit !== undefined) {
+        hit.setLatLng([p.lat, p.lng]);
+        continue;
+      }
+      const mk = L.marker([p.lat, p.lng], {
+        title: p.name,
+        zIndexOffset: 500,
+        icon: L.divIcon({
+          className: "",
+          html: `<div class="${styles.v2pinned}">📌</div>`,
+          iconSize: [36, 36],
+          iconAnchor: [18, 18],
+        }),
+      });
+      mk.on("click", () => cbRef.current.onPinnedClick?.(p.id));
+      mk.addTo(layer);
+      marks.set(p.id, mk);
+    }
+    for (const [id, mk] of marks) {
+      if (seen.has(id)) continue;
+      layer.removeLayer(mk);
+      marks.delete(id);
+    }
+  }, [mapReady, pinned]);
 
   // UR C.13 足跡虛線層（取消腳印動畫，僅保留灰色虛線；关 Sheet 不重建，仿 friendLayer）
   useEffect(() => {

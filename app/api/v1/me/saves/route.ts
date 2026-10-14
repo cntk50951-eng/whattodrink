@@ -1,4 +1,4 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { canViewCheckin, parseMineParams, toMineRow } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
@@ -9,10 +9,15 @@ import { friendIdsOf } from "@/lib/friends";
  * limit 沿 /mine（1–50 默认 30），cursor＝收藏 created_at ISO；
  * 行复用打卡公开列（toMineRow）＋`saved_by_me: true` 恒真；
  * 已删帖（inner 对不上）／不可见帖直接跳过（不泄 404 探针）。
+ * UR G.9 過期保留：現行帖查不到時回頭查 `checkins_archive`（0056 去 FK 後收藏行保留），
+ * 命中且可見即回同列＋`expired: true`（photo／note／audio 置空，位置保留給「帶我去／Pin 住」）。
  */
 
 // 沿 checkins/mine 同列（打卡公开列；归档不联查，收藏只收现行帖）。
 const SAVE_COLUMNS = "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript,beers(id,name,emoji,category,tagline,icon_url)";
+
+// 歸檔镜像同列（photo／note／audio 讀側置空，只留定位＋店名＋時間給過期行）。
+const ARCHIVE_COLUMNS = "id,user_id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at";
 
 export async function GET(req: Request): Promise<Response> {
   const { supabase, userId } = await getAuthedClient(req);
@@ -65,11 +70,39 @@ export async function GET(req: Request): Promise<Response> {
   );
 
   const checkins = [];
+  // G.9：現行缺席的 id 回頭查歸檔（表未遷移／查錯靜默跳過，不炸整頁）。
+  const missingIds = saveRows
+    .map((s) => s.checkin_id as string)
+    .filter((id) => !postById.has(id));
+  const archivedById = new Map<string, Record<string, unknown>>();
+  if (missingIds.length > 0) {
+    try {
+      // 歸檔表 RLS 只 owner 可讀（0026），他人行走 service＋下行 canViewCheckin 代碼門（沿詳情口徑）。
+      const svc = await createServiceClient();
+      const { data: archived } = await svc.from("checkins_archive").select(ARCHIVE_COLUMNS).in("id", missingIds);
+      for (const a of ((archived ?? []) as Record<string, unknown>[])) {
+        if (typeof a.id === "string") archivedById.set(a.id, a);
+      }
+    } catch {
+      // 靜默：歸檔表缺席即當無過期行
+    }
+  }
   for (const s of saveRows) {
     const post = postById.get(s.checkin_id as string) as
       | { user_id?: unknown; visibility?: unknown }
       | undefined;
-    if (post === undefined) continue; // 删帖自动消失
+    if (post === undefined) {
+      // 過期歸檔行：同可見門＋位置保留，內容置空＋expired 旗
+      const arch = archivedById.get(s.checkin_id as string);
+      if (arch === undefined) continue; // 删帖自动消失
+      if (!canViewCheckin(userId, (arch.user_id as string | null) ?? null, arch.visibility, friendIds)) {
+        continue; // 隱私同口徑：private 他人／陌生 friends 仍不顯示
+      }
+      const mapped = toMineRow({ ...arch, photo_url: null, note: "", audio_url: null, audio_seconds: null, transcript: null });
+      if (mapped === null) continue;
+      checkins.push({ ...mapped, saved_by_me: true, expired: true });
+      continue;
+    }
     if (!canViewCheckin(userId, (post.user_id as string | null) ?? null, post.visibility, friendIds)) {
       continue; // 转不可见即消失
     }
