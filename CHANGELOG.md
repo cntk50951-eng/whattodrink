@@ -10,6 +10,9 @@
   - 卡片動作：加好友（可附 50 字留言，沿 B.3）／傾偈（沿 D.7 `setActivePeer`＋`/v2/chat/room`）；主頁資訊行內展（E.27 無 web 頁，另議）
   - `lib/meetUi.ts` 純函數（chips／移除／分數／距離／進度／空態解釋／錯誤映射，iOS 口徑）＋11 單測；v2 三語 key×64；API／migration／yaml 零改动（I.1 现成）
   - 缺口清單：UR G.7–G.12 已建檔（動態中心／酒局BC／草稿收藏地點／遊戲開放／照片編輯器／個人頁口味日曆），逐批完成
+- **UR G.7 動態通知中心（v2-only，[WIP]，待親驗）**
+  - 右缘信箱鈕升級為動態入口（統一紅點＝碰杯＋邀約＋好友請求＋通知，iOS bell 口徑）＋`V2ActivitySheet` 四行分流（碰杯沿 CheersMailbox、邀約進聊天頁）＋`V2NoticesSheet`（通知列表＋全标已读＋未知 kind 兜底行）＋`V2FriendRequestsSheet`（收／發双籤＋接受／拒絕／取消，接受後沿 D.7 進房）
+  - `lib/activity.ts` 純函數（notice 解析／標題／副行／圖標／緊急度／四源求和，iOS 口徑）＋10 單測＋`useActivityCounts`（/me/counters 單次四數）；v2 三語 key×61；API／migration／yaml 零改动（notifications／requests／counters 现成）
 - **UR H.1 游戏房间＋大話骰 POC（纯 API，[WIP]，待 0042＋三批端点）**
   - 第一批：0042 五表（rooms／players／rounds／events／invites；RLS 全锁 service 读写）＋`lib/games/liars.ts` 纯函数（crypto 摇骰／叫骰校验／百搭计数／开盅结算／顺位／房规解析／房间码）＋15 单测（含 6000 颗均匀分布）
   - 第二批：房间 8 端点（建／码加入／active／准备／开始／离开／踢／改规／结束）＋门禁一体 helper（18+／拉黑双表／好友或 joins 交集／同时 1 房／满员／踢禁重进）＋懒过期（2h 续／ended 24h 删）＋openapi 1.27.0＋`GameRoom` schema＋5 单测；11 新错误码一次加齐（三批共用）

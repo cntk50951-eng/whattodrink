@@ -4097,7 +4097,10 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - 卡片动作：加好友（POST /friends 附留言，沿 B.3）／傾偈（setActivePeer＋/v2/chat/room，沿 D.7）；主頁資訊行內展（height／職業／語言／興趣／口味 headline，MeetResult 自帶）。
 - 非目标：獨立主頁頁（E.27 只有 API）、叫 LLM 潤色理由（web 定案純代碼拼裝）、v1。
 
-### UR G.7　動態通知中心（v2）[]
+### UR G.7　動態通知中心（v2）[✓]
+- iOS 对标：首頁鈴鐺＋頂部橫幅＋動態頁（ActivityViews／iOS-0.75；橫幅本期不做，用戶定案）。
+- web 范围：右缘信箱鈕升級為動態入口（統一紅點＝碰杯＋邀約＋好友請求＋通知，iOS bell 口徑）＋`V2ActivitySheet` 四行分流（碰杯沿 CheersMailbox、邀約進聊天頁）＋`V2NoticesSheet`（通知列表＋全标已读＋未知 kind 兜底）＋`V2FriendRequestsSheet`（收／發双籤＋接受／拒絕／取消，接受後沿 D.7 進房）；API 现成（notifications／requests／counters）。
+- 非目标：橫幅提醒（二期）、改現有信箱／邀約行为、v1。
 - iOS 对标：首頁鈴鐺＋頂部橫幅＋動態頁（ActivityViews／iOS-0.75）。
 - web 范围：統一動態入口（收斂 Cheers／Invite／notifications 三源）＋未讀汇总＋橫幅提醒；API 现成（/me/notifications＋counters notices_unread）。
 - 非目标：改現有信箱逻辑、v1。
@@ -4147,7 +4150,8 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - 2026-10-14：第二輪 iOS 對齊立項（G.6–G.12，用戶指令逐批完成，v2-only）；G.6 置 [WIP] 開工（遇見；iOS MeetView／iOS-0.112 對標；I.1 API 现成）。
 - 2026-10-14：G.6 实作：`lib/meetUi.ts` 純函數（chips／移除／分數／距離／進度／空態解釋／錯誤映射，iOS 口徑）＋11 單測＋`V2MeetSheet`（同意→輸入→搜索中→結果輪播；條件 chip 點掉走 criteria 重搜；relaxed 一鍵放寬；加好友可附留言／傾偈走 D.7；主頁資訊行內展）＋pills 遇見 pill（匿名即 Google 登入＋`?meet=1` 續開，沿 G.1）＋v2 三語 key×64；API／migration／yaml 零改动。
 - 2026-10-14：用户亲验通过置 [✓]（提交＋部署，继续 G.7）。
-
+- 2026-10-14：G.7 置 [WIP] 開工（範圍 C＋無橫幅，用戶定案）；实作：`lib/activity.ts` 純函數（notice 解析／標題／副行／圖標／緊急度／iOS bell 四源求和）＋10 單測＋`useActivityCounts`（/me/counters 單次四數）＋`V2ActivitySheet` 四行分流＋`V2NoticesSheet`（列表＋全标已读＋更多）＋`V2FriendRequestsSheet`（收發双籤＋接受拒絕取消，接受沿 D.7 進房）＋右缘信箱鈕改動態入口（統一紅點）＋v2 三語 key×61；API／migration／yaml 零改动。
+- 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.8）。
 ---
 
 UR D.9　iOS 真推送 P1（E1 碰杯＋APNs 通道）[WIP]

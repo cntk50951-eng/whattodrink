@@ -59,6 +59,11 @@ import { V2SavesSheet } from "@/components/v2/V2SavesSheet";
 import { V2NewsSheet } from "@/components/v2/V2NewsSheet";
 import { V2PartySheet } from "@/components/v2/V2PartySheet";
 import { V2MeetSheet } from "@/components/v2/V2MeetSheet";
+import { V2ActivitySheet } from "@/components/v2/V2ActivitySheet";
+import { V2NoticesSheet } from "@/components/v2/V2NoticesSheet";
+import { V2FriendRequestsSheet } from "@/components/v2/V2FriendRequestsSheet";
+import { useActivityCounts } from "@/hooks/useActivityCounts";
+import { activityBell } from "@/lib/activity";
 import { OnboardingSheet } from "@/components/v2/OnboardingSheet";
 import { ageOf, shouldOnboard } from "@/lib/api/profile";
 import type { MeJson } from "@/lib/mode";
@@ -373,6 +378,10 @@ export function V2Home() {
   const [partyOpen, setPartyOpen] = useState(false);
   // UR G.6 遇見開關（pills 遇見 pill＋Sheet 内同意／輸入／搜索／結果，沿 G.2/G.3 口径）。
   const [meetOpen, setMeetOpen] = useState(false);
+  // UR G.7 動態中心開關（右缘統一入口＋通知／好友請求新 Sheet；碰杯／邀約沿現有）。
+  const [actOpen, setActOpen] = useState(false);
+  const [noticesOpen, setNoticesOpen] = useState(false);
+  const [reqOpen, setReqOpen] = useState(false);
   // UR G.1 收藏行点开详情（他人钉 openPin／自家 wantSheet，沿 E.13 深链口径）。
   function openSaved(id: string): void {
     if (apiPins.some((p) => p.id === id)) {
@@ -484,6 +493,9 @@ export function V2Home() {
     flashNote(t2("inviteNew"));
   });
   const bellAll = bellTotal + cheersUnread + invitePending;
+  // UR G.7：動態四源計數（/me/counters 單次；右缘統一紅點＋動態中心行數，iOS bell 口徑）。
+  const { counts: actCounts, refresh: refreshAct } = useActivityCounts(isAuthed === true);
+  const actDot = activityBell(cheersUnread, invitePending, actCounts.requests, actCounts.notices);
   // UR E.14：开自己面板即标已读（fire-and-forget；只清数，名单照看）。
   useEffect(() => {
     if (wantSheetAt === null || isAuthed !== true) return;
@@ -2005,19 +2017,20 @@ export function V2Home() {
       )}
       {/* 右緣工具列 */}
       <div className="absolute top-1/3 right-3 z-[1000] flex flex-col gap-2">
-        {/* UR E.15 信箱入口（登入才挂；未读红点，沿 Bell 角标口径）。 */}
+        {/* UR G.7 動態入口（登入才挂；統一紅點＝碰杯＋邀約＋好友請求＋酒局通知，iOS bell 口徑；
+            點開動態中心分流，碰杯沿現有 CheersMailbox）。 */}
         {isAuthed === true && (
           <span className="relative">
             <Button
               size="icon"
               variant="outline"
-              aria-label={t2("mailTitle")}
+              aria-label={t2("actTitle")}
               className="rounded-full bg-card shadow-md ring-1 ring-foreground/10"
-              onClick={() => setMailOpen(true)}
+              onClick={() => setActOpen(true)}
             >
               <BeerIcon aria-hidden />
             </Button>
-            {cheersUnread > 0 && (
+            {actDot > 0 && (
               <span
                 aria-hidden
                 className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-destructive ring-2 ring-background"
@@ -3191,8 +3204,45 @@ export function V2Home() {
         <CheersMailbox
           open
           stealth={mode === "stealth"}
-          onClose={() => setMailOpen(false)}
+          onClose={() => {
+            setMailOpen(false);
+            refreshAct();
+          }}
           onRead={() => refreshCheers()}
+        />
+      )}
+      {/* UR G.7 動態中心（四行分流；關閉即刷計數）。 */}
+      {actOpen && (
+        <V2ActivitySheet
+          open
+          counts={{ cheers: cheersUnread, invites: invitePending, requests: actCounts.requests, notices: actCounts.notices }}
+          onClose={() => {
+            setActOpen(false);
+            refreshAct();
+          }}
+          onOpenCheers={() => setMailOpen(true)}
+          onOpenInvites={() => router.push(`/${locale}/v2/chat`)}
+          onOpenNotices={() => setNoticesOpen(true)}
+          onOpenRequests={() => setReqOpen(true)}
+        />
+      )}
+      {noticesOpen && (
+        <V2NoticesSheet
+          open
+          onClose={() => {
+            setNoticesOpen(false);
+            refreshAct();
+          }}
+        />
+      )}
+      {reqOpen && (
+        <V2FriendRequestsSheet
+          open
+          onClose={() => {
+            setReqOpen(false);
+            refreshAct();
+          }}
+          onChat={goChat}
         />
       )}
       {/* UR G.1 收藏列表（点行开详情，他人／自家沿现有开卡）。 */}
