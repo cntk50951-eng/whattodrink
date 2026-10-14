@@ -3,6 +3,9 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+/** 每人每日举报上限（滚动 24h）。 */
+const GAME_REPORT_DAILY_CAP = 10;
+
 /**
  * UR H.2 举报玩家（🔒，都曾是该房 active 成员，含已离开／被踢）。
  * `POST /api/v1/games/rooms/:id/report {target_user_id, category, detail?, message_id?}`
@@ -59,6 +62,15 @@ export async function POST(
   );
   if (!found.has(userId) || !found.has(targetId)) {
     return apiError("not_allowed", "雙方須都曾是該房成員", 403);
+  }
+  // 每人每日 ≤10 条（滚动 24h；防刷举报）。
+  const { count: dayCount } = await svc
+    .from("game_reports")
+    .select("id", { count: "exact", head: true })
+    .eq("reporter_id", userId)
+    .gte("created_at", new Date(Date.now() - 24 * 3600_000).toISOString());
+  if ((dayCount ?? 0) >= GAME_REPORT_DAILY_CAP) {
+    return apiError("rate_limited", "今日舉報已達上限（10 條）", 429);
   }
   const { data: inserted, error: iErr } = await svc
     .from("game_reports")

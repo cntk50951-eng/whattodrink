@@ -266,6 +266,19 @@ export async function GET(req: Request): Promise<Response> {
     }
   }
   // E.30 发起人信用徽章（批量 3 查询收敛；service 读，零 policy 表）。
+  // 我是否已到场打卡（party_attendance 零 policy，走 service；只对登录者；供 iOS 跨设备恢复「已打卡」）
+  const arrivedIds = new Set<string>();
+  if (viewerId !== null && ids.length > 0) {
+    const { data: att } = await (await createServiceClient())
+      .from("party_attendance")
+      .select("party_id")
+      .eq("user_id", viewerId)
+      .in("party_id", ids)
+      .not("arrived_at", "is", null);
+    for (const a of ((att ?? []) as unknown[]) as { party_id?: unknown }[]) {
+      if (typeof a.party_id === "string") arrivedIds.add(a.party_id);
+    }
+  }
   const trustMap = await hostTrustMap(await createServiceClient(), hostIds, Date.now());
   const items = list.map((r) => {
     const host = hosts.get(r.host_user_id) ?? { nickname: "酒友", avatar_url: null };
@@ -306,6 +319,7 @@ export async function GET(req: Request): Promise<Response> {
       // 阶段 A 政策欄（服务端时间算；匿名缺席；iOS 置灰＋确认文案用，不在客户端写规则）。
       ...(viewerId !== null
         ? {
+            my_arrived: arrivedIds.has(r.id),
             cancel_policy: cancelPolicy({
               isHost: r.host_user_id === viewerId,
               status: r.status,

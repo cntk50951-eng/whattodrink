@@ -615,7 +615,7 @@ paths:
                   description: 留言正文（去空白後 1–500 字）
       responses:
         "201":
-          description: 發表成功（匿名首評帶 Set-Cookie: wtd-anon）
+          description: "發表成功（匿名首評帶 Set-Cookie: wtd-anon）"
           content:
             application/json:
               schema:
@@ -1347,7 +1347,7 @@ paths:
             type: string
       responses:
         "200":
-          description: 酒局行（含 status／joined_count／male_count／female_count／host／joined_by_me／is_mine／distance_m／purposes＋登录才回 purpose_other／host_intro；登录行加 cancel_policy，参加行加 leave_policy；sync_cursor 服务端 ms，UR E.29）
+          description: 酒局行（含 status／joined_count／male_count／female_count／host／joined_by_me／is_mine／distance_m／purposes＋登录才回 purpose_other／host_intro；登录行加 my_arrived（我是否已到场打卡）／cancel_policy，参加行加 leave_policy；sync_cursor 服务端 ms，UR E.29）
           content:
             application/json:
               schema:
@@ -1363,7 +1363,7 @@ paths:
   /api/v1/parties/{id}:
     get:
       operationId: getParty
-      summary: 局詳情（匿名可看，匿名只回 purposes；members 含性別＋is_host；登录加 cancel_policy／leave_policy，UR E.23）
+      summary: 局詳情（匿名可看，匿名只回 purposes；members 含性別＋is_host；登录加 my_arrived（我是否已到场打卡）／cancel_policy／leave_policy，UR E.23）
       parameters:
         - name: id
           in: path
@@ -2704,7 +2704,7 @@ paths:
                   default: 6
                 rules:
                   type: object
-                  description: 房规（mode: standard|deal_only，非法回落 standard；min_open_qty／ones_wild／ones_break／zhai_enabled／turn_seconds 15|30|60|0；deal_only 房无轮次无倒计时）
+                  description: "房规（mode: standard|deal_only，非法回落 standard；min_open_qty／ones_wild／ones_break／zhai_enabled／turn_seconds 15|30|60|0；deal_only 房无轮次无倒计时）"
       responses:
         "201":
           description: 建房成功（房主 seat 0，ready=false）
@@ -4006,6 +4006,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/beers:
     get:
       operationId: getBeers
       summary: 酒目錄（公開，A.4-1 首條）
@@ -4816,7 +4817,8 @@ components:
           enum: [friend, none, pending_out, pending_in]
     ProfileInfo:
       type: object
-      description: 个人资料新欄（WEB_HANDOFF_PROFILE_FIELDS；全部选填，枚举 key，标签客户端翻）      properties:
+      description: 个人资料新欄（WEB_HANDOFF_PROFILE_FIELDS；全部选填，枚举 key，标签客户端翻）
+      properties:
         height_cm:
           type: integer
           minimum: 140
@@ -5113,7 +5115,7 @@ components:
         photoThumb:
           type: string
           nullable: true
-          description: 他人釘縮影（96px data: URL；舊帖／無圖即 null，UR E.20）
+          description: "他人釘縮影（96px data: URL；舊帖／無圖即 null，UR E.20）"
         kind:
           type: string
           enum: [flash, post]

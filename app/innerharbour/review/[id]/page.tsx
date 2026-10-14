@@ -5,6 +5,10 @@ import { DECIDE_ERR_TEXT, evidenceStoragePath, reviewEventKindLabel } from "@/li
 import { decideComplaint, isPublicReasonKey, PUBLIC_REASONS, type Decision, type PublicReasonKey } from "@/lib/complaintDecision";
 import { adminGate, adminRateLimited, auditOrThrow, auditViewOnce, checkSameOrigin, logAdmin } from "@/lib/ops";
 import { requireAdminPage } from "@/lib/opsPage";
+import { allowSelfCaseEnabled, isSelfCase, loadReviewContext, selfCaseBlock } from "@/lib/reviewContext";
+
+import CaseContext from "./CaseContext";
+import DecideForm from "./DecideForm";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -41,7 +45,7 @@ export default async function ReviewDetailPage({
   async function decide(formData: FormData): Promise<never> {
     "use server";
     const self = `/innerharbour/review/${id}`;
-    const back = (code: string): never => redirect(`${self}?err=${code}`);
+    const back = (code: string): never => redirect(`${self}?err=${code}#err`);
     // 直接用 adminGate（只返回不拋）：need_mfa／need_stepup 去 MFA 頁，其餘失敗回頁顯字。
     const gate = await adminGate({ write: true, stepUp: true });
     if (!gate.ok) {
@@ -85,17 +89,22 @@ export default async function ReviewDetailPage({
       status?: unknown; filer_id?: unknown; target_id?: unknown; party_id?: unknown; decided_by?: unknown; appeal_status?: unknown;
     } | null;
     if (f === null) notFound();
-    // 涉己回避（投訴人／被投訴人／同局成員／局主）。
-    if (f.filer_id === adminId || f.target_id === adminId) back("self_case");
+    // 涉己回避（投訴人／被投訴人／同局成員／局主）。測試／單管理員階段可用 ADMIN_ALLOW_SELF_CASE=true 顯式放行
+    // （默認關；放行時審計會標 self_review:true，頁面頂部也有橫幅）。
+    let partyHostId: unknown = null;
+    let adminInParty = false;
     if (typeof f.party_id === "string") {
       const [{ data: myJoin }, { data: myParty }] = await Promise.all([
         gsvc.from("joins").select("user_id").eq("party_id", f.party_id).eq("user_id", adminId).maybeSingle(),
         gsvc.from("parties").select("host_user_id").eq("id", f.party_id).maybeSingle(),
       ]);
-      if (myJoin !== null || (myParty as { host_user_id?: unknown } | null)?.host_user_id === adminId) {
-        back("same_party");
-      }
+      adminInParty = myJoin !== null;
+      partyHostId = (myParty as { host_user_id?: unknown } | null)?.host_user_id ?? null;
     }
+    const conflict = { adminId, filerId: f.filer_id, targetId: f.target_id, partyHostId, adminInParty };
+    const blocked = selfCaseBlock({ ...conflict, allowSelf: allowSelfCaseEnabled() });
+    if (blocked !== null) back(blocked);
+    const selfReview = allowSelfCaseEnabled() && isSelfCase(conflict);
     // 申訴案：第二人覆核（原判不是本人）。
     const prevBy = typeof f.decided_by === "string" && f.decided_by.startsWith("human:") ? f.decided_by.slice(6) : null;
     if (f.appeal_status === "pending" && prevBy !== null && prevBy === adminId) {
@@ -106,7 +115,7 @@ export default async function ReviewDetailPage({
       admin_id: adminId,
       action: "decide_attempt",
       target: id,
-      detail: { decision, severity, reason: reasonKey, note: note.slice(0, 200) },
+      detail: { decision, severity, reason: reasonKey, note: note.slice(0, 200), self_review: selfReview },
     }).catch(() => back("audit_failed"));
     const r = await decideComplaint(gsvc, id, decision, {
       severity, internalNote: note, publicReason: reasonKey, by: `human:${adminId}`,
@@ -116,7 +125,7 @@ export default async function ReviewDetailPage({
       admin_id: adminId,
       action: r.ok ? `decide_${r.outcome}` : "decide_rejected",
       target: id,
-      detail: r.ok ? { decision } : { error: r.error },
+      detail: r.ok ? { decision, self_review: selfReview } : { error: r.error },
     }).catch(() => undefined);
     if (!r.ok) {
       back(r.error === "busy" ? "busy" : r.error === "not_found" || r.error === "invalid_state" ? "state_changed" : "failed");
@@ -124,6 +133,8 @@ export default async function ReviewDetailPage({
     redirect("/innerharbour/review");
   }
 
+  const ctx = await loadReviewContext(svc, c);
+  const selfCaseMode = allowSelfCaseEnabled();
   const { err } = await searchParams;
   const errMsg =
     typeof err === "string" && err !== "" ? (DECIDE_ERR_TEXT[err] ?? "操作失敗，請刷新再試。") : null;
@@ -192,16 +203,17 @@ export default async function ReviewDetailPage({
         {isAppeal ? " · 申訴中" : ""}
       </h1>
       {errMsg !== null && (
-        <p role="alert" style={{ border: "1px solid crimson", color: "crimson", padding: 8 }}>
+        <p id="err" role="alert" style={{ border: "2px solid crimson", color: "crimson", padding: 10, fontWeight: 700 }}>
           {errMsg}
         </p>
       )}
-      <section>
-        <h2>涉案双方（仅内部可见，不对外）</h2>
-        <p>
-          投訴人：{nameOf(c.filer_id)} · 被投訴：{nameOf(c.target_id)}
+      {selfCaseMode && (
+        <p style={{ border: "1px solid #b58900", color: "#7a5c00", padding: 8 }}>
+          測試模式：已允許審核涉己案件（ADMIN_ALLOW_SELF_CASE=true）。此模式下的判定會在審計裡標記 self_review，
+          正式運營請關閉。
         </p>
-      </section>
+      )}
+      <CaseContext ctx={ctx} />
       <section>
         <h2>雙方陳述（已匿名）</h2>
         <p>甲（投訴人）：{String(c.detail ?? "")}</p>
@@ -289,43 +301,11 @@ export default async function ReviewDetailPage({
               : "此案件目前不可判定（只有「待人工」或申訴中的案件可判）。"}
           </p>
         ) : (
-          <form action={decide}>
-            {isAppeal && <p>申訴案：與原判相同＝維持原判（不動積分）；不同＝沖銷原扣分後按新判執行，且需第二位審核員。</p>}
-            <label>
-              決定：
-              <select name="decision" defaultValue="uphold">
-                <option value="uphold">成立</option>
-                <option value="dismiss">駁回</option>
-                <option value="malicious">惡意</option>
-              </select>
-            </label>{" "}
-            <label>
-              severity（成立·騷擾用）：
-              <select name="severity" defaultValue="1">
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-              </select>
-            </label>{" "}
-            <label>
-              對外理由（用戶可見）：
-              <select name="reason" defaultValue="evidence_confirmed">
-                {MANUAL_REASONS.map((k) => (
-                  <option key={k} value={k}>
-                    {PUBLIC_REASONS[k]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p>
-              <label>
-                內部備註（必填，僅後台可見，不會發給任何用戶）：
-                <br />
-                <textarea name="note" rows={3} cols={60} required maxLength={500} />
-              </label>
-            </p>
-            <button type="submit">執行（需新鮮二次驗證；已判定的案件不可重複執行）</button>
-          </form>
+          <DecideForm
+            action={decide}
+            isAppeal={isAppeal}
+            reasons={MANUAL_REASONS.map((key) => ({ key, label: PUBLIC_REASONS[key] }))}
+          />
         )}
       </section>
     </main>

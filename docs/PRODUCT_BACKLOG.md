@@ -4189,7 +4189,8 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - 2026-10-14：G.10c 置 [WIP] 開工；实作：`lib/gameChat.ts` 純函數（解析／合并／校驗／舉報類，常量本地鏡像＋單測斷言服務端相等）＋5 單測＋`V2GameChatPanel`（輪詢＋24 快捷語＋文字＋撤回＋逐行舉報）＋房間 Sheet 掛載＋v2 三語 key×42；另修 G.10b 隱患（叫骰合法性改客戶端鏡像 `clientBidCheck`＋fuzz 對齊，不直引 `liars.ts`）；`npm run build` 全過；API／migration／yaml 零改动。
 - 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.11）。
 - 2026-10-14：G.11 置 [WIP] 開工（A 全做，用戶定案）；实作：`lib/photoEdit.ts` 純數學（調整量綱／居中裁切／旋轉尺寸／CSS 串／換行，iOS 口徑）＋6 單測＋review 底部模式欄四區＋`rebake` 兩 pass 管線＋撤销 40 步＋v2 三語 key×22；`npm run build` 全過；API／migration／yaml 零改动。
-- 2026-10-14：用户亲验通过置 [✓]（提交＋推送；G 系僅剩 G.12 待 iOS 完工）。---
+- 2026-10-14：用户亲验通过置 [✓]（提交＋推送；G 系僅剩 G.12 待 iOS 完工）。
+- 2026-10-14：G.12 覆核（iOS 側 Profile／Onboarding 仍有未提交 WIP：`MeetView`／`OnboardingFlowView`／`ProfileComponents` 三文件 M，對標靶還在動）→ 維持列而不做，不開工。---
 
 UR D.9　iOS 真推送 P1（E1 碰杯＋APNs 通道）[WIP]
 

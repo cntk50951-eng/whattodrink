@@ -1,5 +1,6 @@
 import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { chatFilterEnabled, filterChatText, parseWordEnv } from "@/lib/games/chatFilter";
 import {
   GAME_MSG_MINUTE_LIMIT,
   GAME_MSG_MIN_MS,
@@ -117,19 +118,8 @@ export async function GET(
   return apiOk({ items, next });
 }
 
-/** 站外联系方式正则（默认关；运营开才拦，纯正则零外部调用）。 */
-const CONTACT_RE = /(https?:\/\/|www\.|\+?\d[\d\s-]{7,}\d|wechat|微信|line\s*id|telegram|tg\s*:)/i;
-
 function blockContactsEnabled(): boolean {
   return process.env.GAME_CHAT_BLOCK_CONTACTS === "true";
-}
-
-function wordList(): string[] {
-  const raw = process.env.GAME_CHAT_WORDLIST ?? "";
-  return raw
-    .split(",")
-    .map((w) => w.trim().toLowerCase())
-    .filter((w) => w !== "");
 }
 
 /**
@@ -137,7 +127,7 @@ function wordList(): string[] {
  * `POST /api/v1/games/rooms/:id/messages` —— 禁言 403／限频 2s·1条＋1min·20条 429／
  * 同内容 10s 内去重（200 同回）／client_msg_id 幂等。
  * 发送路径零外部调用（不断言里测：mock fetch 即炸——见单测）。
- * 可选开关（默认关）：联系方式 422／词表 422。
+ * 本地过滤默认开（lib/games/chatFilter.ts）：严重词 422／一般粗口 ★ 打码；联系方式拦截为可选开关。
  */
 export async function POST(
   req: Request,
@@ -171,15 +161,24 @@ export async function POST(
   if (!ipRateLimit(`game-msg-min:${loaded.room.id}:${userId}`, nowMs, 60_000, GAME_MSG_MINUTE_LIMIT).ok) {
     return apiError("chat_rate_limited", "發得太快，稍後再試", 429);
   }
-  const text = parsed.body.kind === "text" ? parsed.body.body : null;
-  // 可选开关（默认关；开了才拦）。
+  let text = parsed.body.kind === "text" ? parsed.body.body : null;
+  // 本地过滤（默认开；纯本地零外部调用）：严重词拒发 422，一般粗口 ★ 打码后照发；联系方式拦截为可选开关。
   if (text !== null) {
-    if (blockContactsEnabled() && CONTACT_RE.test(text)) {
-      return apiError("message_rejected", "內容含站外聯繫方式", 422);
-    }
-    const wl = wordList();
-    if (wl.length > 0 && wl.some((w) => text.toLowerCase().includes(w))) {
-      return apiError("message_rejected", "內容不合適", 422);
+    if (chatFilterEnabled(process.env.GAME_CHAT_FILTER) || blockContactsEnabled()) {
+      const verdict = filterChatText(text, {
+        extraBlock: parseWordEnv(process.env.GAME_CHAT_WORDLIST),
+        extraMask: parseWordEnv(process.env.GAME_CHAT_MASKLIST),
+        blockContacts: blockContactsEnabled(),
+        wordFilter: chatFilterEnabled(process.env.GAME_CHAT_FILTER),
+      });
+      if (verdict.action === "block") {
+        return apiError(
+          "message_rejected",
+          verdict.reason === "contact" ? "內容含站外聯繫方式" : "訊息含有不當內容，請修改後再發",
+          422,
+        );
+      }
+      if (verdict.action === "mask") text = verdict.text;
     }
     // 同内容 10s 去重（200 同回，不同于幂等键）。
     const since = new Date(nowMs - 10_000).toISOString();

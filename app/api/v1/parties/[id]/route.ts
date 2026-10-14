@@ -92,6 +92,17 @@ export async function GET(
   });
   // E.30 发起人信用徽章（与列表同形；service 读）。
   const detailTrust = await hostTrustMap(await createServiceClient(), [row.host_user_id], nowMs);
+  // 我是否已到场打卡（只对登录者；party_attendance 走 service）
+  let myArrived = false;
+  if (viewerId !== null) {
+    const { data: att } = await (await createServiceClient())
+      .from("party_attendance")
+      .select("arrived_at")
+      .eq("party_id", row.id)
+      .eq("user_id", viewerId)
+      .maybeSingle();
+    myArrived = typeof (att as { arrived_at?: unknown } | null)?.arrived_at === "string";
+  }
   const hostMember = members.find((m) => m.is_host) ?? { user_id: row.host_user_id, nickname: "酒友", avatar_url: null };
   return apiOk({
     id: row.id,
@@ -130,6 +141,7 @@ export async function GET(
     // 阶段 A 政策欄（匿名缺席）。
     ...(viewerId !== null
       ? {
+          my_arrived: myArrived,
           cancel_policy: cancelPolicy({
             isHost: row.host_user_id === viewerId,
             status: row.status,
