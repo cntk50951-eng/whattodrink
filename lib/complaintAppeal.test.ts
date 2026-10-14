@@ -16,3 +16,21 @@ describe("isAdverseParty", () => {
     expect(isAdverseParty("escalated", true, false)).toBe(false);
   });
 });
+
+import { appellantRole } from "./complaintAppeal";
+
+describe("appellantRole", () => {
+  it("pending / maintained: the adverse party appealed", () => {
+    expect(appellantRole("uphold", "pending")).toBe("target");
+    expect(appellantRole("dismiss", "pending")).toBe("filer");
+    expect(appellantRole("malicious", "dismissed")).toBe("filer");
+  });
+  it("revised: appellant is now the favoured party", () => {
+    expect(appellantRole("dismiss", "upheld")).toBe("target"); // 原判成立→被投訴人申訴→改判駁回
+    expect(appellantRole("uphold", "upheld")).toBe("filer"); // 原判駁回→投訴人申訴→改判成立
+  });
+  it("no appeal / no decision → null", () => {
+    expect(appellantRole("uphold", null)).toBeNull();
+    expect(appellantRole(null, "pending")).toBeNull();
+  });
+});

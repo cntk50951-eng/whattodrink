@@ -14,7 +14,7 @@ import { parseComplaintBody } from "@/lib/complaints";
  * （chat_message_ids：我與對方私信裡勾選的消息，≤20；提交時存快照，僅審核員／AI 可見）
  * —— 资格（名单内，退出者以事件记录为准）／局结束（safety 除外）／72h 窗口（safety 除外）／
  * 每局每对一次／每日 5 条／暂停期／late_* 拒／detail 审。201 `{id, status}`。
- * safety 直进人工＋safety_alerts 行；其余 awaiting_response（24h 申辩期）。
+ * safety 直进人工＋safety_alerts 行；其余 awaiting_response（24h 申辩期）。投訴不必等局結束（no_show 須開局後）。
  */
 export async function POST(
   req: Request,
@@ -94,7 +94,7 @@ export async function POST(
     .select("id,host_user_id,status,expires_at,start_at")
     .eq("id", id)
     .maybeSingle();
-  const p = party as { id?: unknown; host_user_id?: unknown; status?: unknown; expires_at?: unknown } | null;
+  const p = party as { id?: unknown; host_user_id?: unknown; status?: unknown; expires_at?: unknown; start_at?: unknown } | null;
   if (p === null || typeof p.id !== "string") return apiError("not_found", "酒局不存在", 404);
   const hostId = typeof p.host_user_id === "string" ? p.host_user_id : "";
   const inRoster = async (uid: string): Promise<boolean> => {
@@ -114,12 +114,15 @@ export async function POST(
     return apiError("not_in_party", "雙方須真實在該局名單", 403);
   }
   const expiresMs = typeof p.expires_at === "string" ? Date.parse(p.expires_at) : NaN;
+  const startMs = typeof p.start_at === "string" ? Date.parse(p.start_at) : NaN;
   const isSafety = parsed.category === "safety";
   if (!isSafety) {
-    if (!Number.isFinite(expiresMs) || nowMs < expiresMs) {
-      return apiError("not_ended", "局結束後才可投訴", 409);
+    // 產品決定（2026-10-14）：任何時候都能投訴，不必等局結束；只保留結束後 72 小時的上限。
+    // 例外：「未到」要開局後才有得判斷。
+    if (parsed.category === "no_show" && Number.isFinite(startMs) && nowMs < startMs) {
+      return apiError("not_ended", "開局後才可因未到投訴", 409);
     }
-    if (nowMs > expiresMs + TRUST_CONFIG.complaint_window_h * 3600_000) {
+    if (Number.isFinite(expiresMs) && nowMs > expiresMs + TRUST_CONFIG.complaint_window_h * 3600_000) {
       return apiError("window_closed", "投訴已截止（結束後 72 小時內）", 409);
     }
     if (p.status === "cancelled" && parsed.category === "no_show") {

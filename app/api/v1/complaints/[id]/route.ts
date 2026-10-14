@@ -1,6 +1,6 @@
 import { after } from "next/server";
 
-import { isAdverseParty } from "@/lib/complaintAppeal";
+import { appellantRole, isAdverseParty } from "@/lib/complaintAppeal";
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { TRUST_CONFIG } from "@/lib/trust/config";
@@ -65,6 +65,8 @@ export async function GET(
       avatar_url: typeof pr?.avatar_url === "string" ? pr.avatar_url : null,
     };
   }
+  const appellant = appellantRole(c.decision, c.appeal_status);
+  const appeal_by_me: boolean | null = appellant === null ? null : appellant === (iamFiler ? "filer" : "target");
   const due = typeof c.response_due_at === "string" ? Date.parse(c.response_due_at) : NaN;
   const decided = typeof c.decided_at === "string" ? Date.parse(c.decided_at) : NaN;
   return apiOk({
@@ -82,6 +84,11 @@ export async function GET(
     // 只回固定枚举文案；管理员内部备注（internal_note）永不外发。
     decision_note: publicReasonText(c.public_reason) || null,
     appeal_status: c.appeal_status ?? null,
+    // 時間軸用：只回時間與「是不是我申訴的」；申訴說明只給申訴方自己
+    responded_at: c.responded_at ?? null,
+    appealed_at: c.appealed_at ?? null,
+    appeal_by_me: appeal_by_me,
+    appeal_text: appeal_by_me === true && typeof c.appeal_text === "string" ? c.appeal_text : null,
     created_at: c.created_at,
     decided_at: c.decided_at ?? null,
     can_respond:

@@ -70,6 +70,20 @@ export async function POST(
   if (existed !== null) {
     return apiOk({ joined: true });
   }
+  // 投訴過這個酒局（沒撤回）就不能再加入：酒局有效期內不該讓投訴人回到被投訴的局裡
+  // （上面已擋掉撤銷／過期的局，所以「有效期間」天然成立；被投訴人與其他人不受影響）。
+  // complaints 表 RLS 無讀策略（只給服務端讀），所以必須走 service client，否則永遠查不到。
+  const svcForComplaint = await createServiceClient();
+  const { data: myComplaint } = await svcForComplaint
+    .from("complaints")
+    .select("id")
+    .eq("party_id", id)
+    .eq("filer_id", userId)
+    .neq("status", "withdrawn")
+    .limit(1);
+  if (Array.isArray(myComplaint) && myComplaint.length > 0) {
+    return apiError("forbidden", "你已投訴過這個酒局，酒局有效期間不能再加入", 403);
+  }
   // 名额判定（读 joins＋joiner 性别；并发超卖由唯一键＋重查收敛，见下）。
   const { data: joins } = await supabase
     .from("joins")

@@ -2084,7 +2084,7 @@ paths:
   /api/v1/parties/{id}/complaints:
     post:
       operationId: fileComplaint
-      summary: 投訴提交（需登录；名单内；局结束＋72h 窗口，safety 除外；每局每对一次；每日 5 条；late_* 拒；说明过审，UR E.31 C2）
+      summary: 投訴提交（需登录；名单内；任何时候可投（no_show 须开局后），局结束后 72h 截止，safety 除外；每局每对一次；每日 5 条；late_* 拒；说明过审，UR E.31 C2）
       security:
         - bearerAuth: []
       parameters:
