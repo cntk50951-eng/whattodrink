@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Beer, ChevronRight, Flag, Martini, UserPlus } from "lucide-react";
+import { Beer, Bell, ChevronRight, Flag, Martini, ShieldCheck, UserPlus } from "lucide-react";
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { ActivityCounts } from "@/hooks/useActivityCounts";
@@ -20,6 +20,8 @@ export function V2ActivitySheet({
   onOpenInvites,
   onOpenNotices,
   onOpenRequests,
+  onOpenComplaints,
+  onOpenTrust,
 }: {
   open: boolean;
   onClose: () => void;
@@ -28,13 +30,17 @@ export function V2ActivitySheet({
   onOpenInvites: () => void;
   onOpenNotices: () => void;
   onOpenRequests: () => void;
+  onOpenComplaints: () => void;
+  onOpenTrust: () => void;
 }) {
   const t = useTranslations("v2");
   const rows = [
     { icon: Beer, label: t("actCheers"), n: counts.cheers, go: onOpenCheers },
     { icon: Martini, label: t("actInvites"), n: counts.invites, go: onOpenInvites },
-    { icon: Flag, label: t("actNotices"), n: counts.notices, go: onOpenNotices },
+    { icon: Bell, label: t("actNotices"), n: counts.notices, go: onOpenNotices },
     { icon: UserPlus, label: t("actRequests"), n: counts.requests, go: onOpenRequests },
+    { icon: Flag, label: t("actComplaints"), n: 0, go: onOpenComplaints },
+    { icon: ShieldCheck, label: t("actTrust"), n: 0, go: onOpenTrust },
   ];
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>

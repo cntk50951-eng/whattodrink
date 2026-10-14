@@ -27,6 +27,7 @@ import {
 } from "@/lib/partyUi";
 import { V2PartyForm } from "./V2PartyForm";
 import { V2PartyAttendance } from "./V2PartyAttendance";
+import { V2ComplaintCompose } from "./V2ComplaintCompose";
 import styles from "./v2.module.css";
 
 type PartyHost = { user_id: string; nickname: string; avatar_url: string | null; trust: HostTrust | null };
@@ -158,7 +159,7 @@ function hostTrustLine(ht: HostTrust, t: (k: string, p?: Record<string, string |
  * （你是发起人／已参加／参加键／满员锁／已撤销）；详情：标题＋成局 badge＋发起人卡＋
  * 地点盒＋时间买单盒＋席位＋成员（皇冠＋♂♀＋入席时间）＋动作（撤局两段确认）＋安全盒。
  */
-export function V2PartySheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function V2PartySheet({ open, onClose, myUserId }: { open: boolean; onClose: () => void; myUserId?: string | null }) {
   const t = useTranslations("v2");
   const { position } = useGeolocation();
   const [tab, setTab] = useState<"all" | "mine">("all");
@@ -494,6 +495,15 @@ export function V2PartySheet({ open, onClose }: { open: boolean; onClose: () => 
                   isHost={d.is_mine}
                   isMember={stateOf(d) === "joined"}
                 />
+                {(d.is_mine || stateOf(d) === "joined") && (
+                  <V2ComplaintCompose
+                    partyId={d.id}
+                    endMs={Date.parse(d.expires_at)}
+                    cancelled={d.status === "cancelled"}
+                    members={d.members.map((m) => ({ user_id: m.user_id, nickname: m.nickname, is_host: m.is_host }))}
+                    myUserId={myUserId ?? null}
+                  />
+                )}
                 <div className="flex flex-col gap-2">
                   {stateOf(d) === "joined" ? (
                     <>

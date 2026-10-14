@@ -62,6 +62,8 @@ import { V2MeetSheet } from "@/components/v2/V2MeetSheet";
 import { V2ActivitySheet } from "@/components/v2/V2ActivitySheet";
 import { V2NoticesSheet } from "@/components/v2/V2NoticesSheet";
 import { V2FriendRequestsSheet } from "@/components/v2/V2FriendRequestsSheet";
+import { V2ComplaintsSheet } from "@/components/v2/V2ComplaintsSheet";
+import { V2TrustSheet } from "@/components/v2/V2TrustSheet";
 import { useActivityCounts } from "@/hooks/useActivityCounts";
 import { activityBell } from "@/lib/activity";
 import { OnboardingSheet } from "@/components/v2/OnboardingSheet";
@@ -382,6 +384,9 @@ export function V2Home() {
   const [actOpen, setActOpen] = useState(false);
   const [noticesOpen, setNoticesOpen] = useState(false);
   const [reqOpen, setReqOpen] = useState(false);
+  // UR G.8b 投訴＋誠信開關（動態中心兩行＋酒局詳情投訴鍵）。
+  const [cplOpen, setCplOpen] = useState(false);
+  const [trustOpen, setTrustOpen] = useState(false);
   // UR G.1 收藏行点开详情（他人钉 openPin／自家 wantSheet，沿 E.13 深链口径）。
   function openSaved(id: string): void {
     if (apiPins.some((p) => p.id === id)) {
@@ -3224,8 +3229,12 @@ export function V2Home() {
           onOpenInvites={() => router.push(`/${locale}/v2/chat`)}
           onOpenNotices={() => setNoticesOpen(true)}
           onOpenRequests={() => setReqOpen(true)}
+          onOpenComplaints={() => setCplOpen(true)}
+          onOpenTrust={() => setTrustOpen(true)}
         />
       )}
+      {cplOpen && <V2ComplaintsSheet open onClose={() => setCplOpen(false)} />}
+      {trustOpen && <V2TrustSheet open onClose={() => setTrustOpen(false)} />}
       {noticesOpen && (
         <V2NoticesSheet
           open
@@ -3256,7 +3265,7 @@ export function V2Home() {
       {/* UR G.2 酒闻列表。 */}
       {newsOpen && <V2NewsSheet open onClose={() => setNewsOpen(false)} />}
       {/* UR G.3 酒局看板。 */}
-      {partyOpen && <V2PartySheet open onClose={() => setPartyOpen(false)} />}
+      {partyOpen && <V2PartySheet open myUserId={meJson?.id ?? null} onClose={() => setPartyOpen(false)} />}
       {meetOpen && <V2MeetSheet open onClose={() => setMeetOpen(false)} onChat={goChat} />}      {/* UR E.18 首登＋個人表單（条件挂载，初值新鲜；保存即刷 me）。 */}
       {showOnboard && meJson !== null && (
         <OnboardingSheet
