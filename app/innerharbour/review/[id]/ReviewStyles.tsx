@@ -52,6 +52,37 @@ export default function ReviewStyles() {
       .rv-tl-title { font-size:14px; font-weight:600; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
       .rv-tl li:not(.major) .rv-tl-title { font-weight:500; color:#334155; }
       .rv-tl-body { font-size:13px; background:#f8fafc; border-radius:6px; padding:6px 10px; margin-top:4px; white-space:pre-wrap; word-break:break-word; }
+      .rv-todo { display:flex; gap:14px; align-items:center; border-radius:12px; padding:14px 16px; margin-bottom:16px; border:2px solid var(--line); background:#fff; }
+      .rv-todo.act { border-color:#f59e0b; background:#fffbeb; } .rv-todo.urgent { border-color:#dc2626; background:#fef2f2; }
+      .rv-todo.done { background:#f8fafc; }
+      .rv-todo b { font-size:16px; display:block; } .rv-todo p { margin:2px 0 0; font-size:13px; color:#475569; }
+      .rv-todo .rv-todo-body { flex:1; min-width:0; }
+      .rv-bell { position:relative; width:14px; height:14px; border-radius:50%; background:#f59e0b; flex:none; }
+      .rv-todo.urgent .rv-bell { background:#dc2626; }
+      .rv-bell::after { content:""; position:absolute; inset:-6px; border-radius:50%; border:2px solid currentColor; color:#f59e0b; animation:rvPulse 1.4s ease-out infinite; }
+      .rv-todo.urgent .rv-bell::after { color:#dc2626; }
+      @keyframes rvPulse { 0% { transform:scale(.6); opacity:.9; } 100% { transform:scale(1.8); opacity:0; } }
+      @media (prefers-reduced-motion: reduce) { .rv-bell::after { animation:none; opacity:.5; } }
+      .rv-cta { background:#dc2626 !important; border-color:#dc2626 !important; font-weight:700; white-space:nowrap; padding:10px 18px !important; }
+      .rv-todo:not(.urgent) .rv-cta { background:#d97706 !important; border-color:#d97706 !important; }
+      details.rv-card > summary { cursor:pointer; font-weight:700; font-size:15px; list-style:none; display:flex; justify-content:space-between; align-items:center; }
+      details.rv-card > summary::-webkit-details-marker { display:none; }
+      details.rv-card > summary::after { content:"展開 ▾"; font-size:12px; color:var(--muted); font-weight:400; }
+      details.rv-card[open] > summary::after { content:"收起 ▴"; }
+      details.rv-card[open] > summary { margin-bottom:12px; }
+      .rv-tl li.todo .rv-dot { border-color:#f59e0b; background:#f59e0b; animation:rvBlink 1.2s ease-in-out infinite; }
+      @keyframes rvBlink { 50% { box-shadow:0 0 0 6px rgba(245,158,11,.25); } }
+      @media (prefers-reduced-motion: reduce) { .rv-tl li.todo .rv-dot { animation:none; } }
+      .rv-tl li.todo .rv-tl-body { background:#fffbeb; border:1px dashed #f59e0b; }
+      .rv-order { margin-left:auto; font-size:12px; font-weight:400; }
+      .rv-chat { display:flex; flex-direction:column; gap:8px; max-height:420px; overflow:auto; }
+      .rv-bubble { max-width:80%; border-radius:12px; padding:8px 12px; font-size:14px; word-break:break-word; }
+      .rv-bubble p { margin:2px 0 0; white-space:pre-wrap; }
+      .rv-bubble.filer { align-self:flex-start; background:#dbeafe; } .rv-bubble.target { align-self:flex-end; background:#fef3c7; }
+      .rv-gauge { position:relative; height:10px; border-radius:6px; background:#e2e8f0; margin-top:6px; }
+      .rv-gauge i { position:absolute; top:0; bottom:0; } .rv-gauge i.lo { left:0; width:15%; background:#bbf7d0; border-radius:6px 0 0 6px; }
+      .rv-gauge i.hi { right:0; width:15%; background:#fecaca; border-radius:0 6px 6px 0; }
+      .rv-gauge b { position:absolute; top:-3px; width:4px; height:16px; background:#0f172a; border-radius:2px; transform:translateX(-2px); }
       .rv-radio { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
       .rv-radio label { border:2px solid var(--line); border-radius:10px; padding:10px 6px; text-align:center; cursor:pointer; font-weight:700; font-size:14px; background:#fff; }
       .rv-radio input { position:absolute; opacity:0; pointer-events:none; width:0; height:0; padding:0; }

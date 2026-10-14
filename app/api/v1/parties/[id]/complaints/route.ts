@@ -3,11 +3,15 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { isMinorDob } from "@/lib/api/cheers";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { TRUST_CONFIG } from "@/lib/trust/config";
+import { after } from "next/server";
+import { directKey } from "@/lib/api/chat";
+import { buildChatEvidence, parseChatMessageIds } from "@/lib/complaintChat";
 import { parseComplaintBody } from "@/lib/complaints";
 
 /**
  * UR E.31 C2 投訴提交（🔒）。
- * `POST /api/v1/parties/:id/complaints {target_user_id, category, detail, evidence?}`
+ * `POST /api/v1/parties/:id/complaints {target_user_id, category, detail, evidence?, chat_message_ids?}`
+ * （chat_message_ids：我與對方私信裡勾選的消息，≤20；提交時存快照，僅審核員／AI 可見）
  * —— 资格（名单内，退出者以事件记录为准）／局结束（safety 除外）／72h 窗口（safety 除外）／
  * 每局每对一次／每日 5 条／暂停期／late_* 拒／detail 审。201 `{id, status}`。
  * safety 直进人工＋safety_alerts 行；其余 awaiting_response（24h 申辩期）。
@@ -61,6 +65,28 @@ export async function POST(
   }
   if (typeof me.complaint_suspended_until === "string" && Date.parse(me.complaint_suspended_until) > nowMs) {
     return apiError("complaint_suspended", `投訴權限暫停至 ${me.complaint_suspended_until}`, 403);
+  }
+  // 聊天記錄證據（可選）：所選消息必須都在我和對方的 1 對 1 私信裡；快照存庫（私信 90 天過期、對方可能刪）。
+  const chatIds = parseChatMessageIds((raw as Record<string, unknown>).chat_message_ids);
+  if (!Array.isArray(chatIds)) return apiError("invalid_params", chatIds.error, 400);
+  let chatEvidence: unknown[] = [];
+  if (chatIds.length > 0) {
+    const { data: conv } = await svc
+      .from("conversations")
+      .select("id")
+      .eq("type", "direct")
+      .eq("direct_key", directKey(userId, parsed.target_user_id))
+      .maybeSingle();
+    const convId = (conv as { id?: unknown } | null)?.id;
+    if (typeof convId !== "string") return apiError("invalid_params", "你和對方沒有私信記錄，無法附聊天記錄", 400);
+    const { data: msgRows } = await svc
+      .from("messages")
+      .select("id,sender_id,kind,body,attachments,created_at")
+      .eq("conversation_id", convId)
+      .in("id", chatIds);
+    const built = buildChatEvidence(chatIds, (msgRows ?? []) as unknown[], userId, parsed.target_user_id);
+    if (!Array.isArray(built)) return apiError("invalid_params", built.error, 400);
+    chatEvidence = built;
   }
   // 局与名单（退出者以 party_events join/leave 记录为准）。
   const { data: party } = await svc
@@ -135,6 +161,7 @@ export async function POST(
       category: parsed.category,
       detail: parsed.detail,
       evidence: parsed.evidence,
+      chat_evidence: chatEvidence,
       status,
       response_due_at: isSafety ? null : new Date(nowMs + TRUST_CONFIG.response_window_h * 3600_000).toISOString(),
     })
@@ -215,6 +242,11 @@ export async function POST(
   });
   if (isSafety) {
     await svc.from("safety_alerts").insert({ complaint_id: cid, party_id: id });
+    // 安全類直進人工；AI 只在後台給審核員一份分析（不判定、不動狀態）
+    after(async () => {
+      const { adviseComplaint } = await import("@/lib/complaintTriage");
+      await adviseComplaint(svc, cid);
+    });
   }
   return apiOk({ id: cid, status }, 201);
 }

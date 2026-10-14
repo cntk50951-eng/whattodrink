@@ -7,13 +7,16 @@ import { adminGate, adminRateLimited, auditOrThrow, auditViewOnce, checkSameOrig
 import { requireAdminPage } from "@/lib/opsPage";
 import { allowSelfCaseEnabled, isSelfCase, loadDecisionRecord, loadReviewContext, selfCaseBlock } from "@/lib/reviewContext";
 
-import { buildCaseTimeline, fmtHK } from "@/lib/reviewTimeline";
+import { buildCaseTimeline, fmtHK, nextAction } from "@/lib/reviewTimeline";
+import { parseStoredChatEvidence } from "@/lib/complaintChat";
+import { ROUTE_REASON_TEXT } from "@/lib/complaintAi";
 import { TRUST_KIND_TEXT } from "@/lib/trust/config";
 import { auditActionLabel } from "@/lib/reviewContext";
 
 import CaseContext, { PeopleCards } from "./CaseContext";
 import DecideForm from "./DecideForm";
 import DecisionRecordView from "./DecisionRecordView";
+import OpenDecideButton from "./OpenDecideButton";
 import ReviewStyles from "./ReviewStyles";
 import Timeline from "./Timeline";
 
@@ -39,7 +42,7 @@ export default async function ReviewDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ err?: string; ok?: string }>;
+  searchParams: Promise<{ err?: string; ok?: string; order?: string }>;
 }) {
   const { id } = await params;
   const { userId, role, svc } = await requireAdminPage({}, `/innerharbour/review/${id}`);
@@ -146,7 +149,7 @@ export default async function ReviewDetailPage({
   const wasDecided = typeof c.decided_at === "string" || ["upheld", "dismissed", "malicious"].includes(String(c.status));
   const rec = wasDecided ? await loadDecisionRecord(svc, c, publicReasonText) : null;
   const selfCaseMode = allowSelfCaseEnabled();
-  const { err, ok } = await searchParams;
+  const { err, ok, order } = await searchParams;
   const errMsg =
     typeof err === "string" && err !== "" ? (DECIDE_ERR_TEXT[err] ?? "操作失敗，請刷新再試。") : null;
 
@@ -201,6 +204,18 @@ export default async function ReviewDetailPage({
     const { data: signed } = await svc.storage.from("chat-images").createSignedUrl(path, 300);
     evidenceLinks.push(signed?.signedUrl ?? null);
   }
+  // 聊天記錄快照（投訴人挑選）；圖片消息現簽 5 分鐘讀取鏈接
+  const chatEv = parseStoredChatEvidence(c.chat_evidence);
+  const chatImageLinks = new Map<string, string | null>();
+  for (const m of chatEv) {
+    if (m.kind === "image" && m.image_path !== null) {
+      const { data: signed } = await svc.storage.from("chat-images").createSignedUrl(m.image_path, 300);
+      chatImageLinks.set(m.id, signed?.signedUrl ?? null);
+    }
+  }
+  const aiMeta = (ai as { route?: { action?: unknown; reason?: unknown; text?: unknown }; inputs?: { chat_n?: unknown; images_n?: unknown; incomplete?: unknown } } | null) ?? null;
+  const aiExtra = (sug ?? {}) as { p_uphold?: unknown; findings?: unknown; caveats?: unknown; image_notes?: unknown; injection_detected?: unknown };
+  const strArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
   const isAppeal = c.status === "escalated" && c.appeal_status === "pending";
   const canDecide = role === "moderator" && c.status === "escalated";
   const timeline = buildCaseTimeline({
@@ -233,10 +248,14 @@ export default async function ReviewDetailPage({
       .filter((a) => a.action !== "view_complaint")
       .map((a) => ({ at: a.at, admin: a.admin, label: auditActionLabel(a.action), summary: a.summary })),
     evidenceCount: evidenceLinks.length,
+    chat: chatEv.map((m) => ({ sender: m.sender, text: m.kind === "text" ? m.body : null, at: m.at })),
     ai: sug !== null && typeof sug.recommended === "string"
       ? { recommended: sug.recommended, rationale: typeof sug.rationale === "string" ? sug.rationale : "" }
       : null,
   });
+  const next = nextAction(c);
+  const oldestFirst = order === "old";
+  const shownTimeline = oldestFirst ? timeline : [...timeline].reverse();
   const statusTone = c.status === "upheld" ? "good" : c.status === "dismissed" || c.status === "malicious" ? "bad" : c.status === "escalated" ? "warn" : "";
 
   return (
@@ -263,6 +282,15 @@ export default async function ReviewDetailPage({
             測試模式：已允許審核涉己案件（ADMIN_ALLOW_SELF_CASE=true）。此模式下的判定會在審計裡標記 self_review，正式運營請關閉。
           </p>
         )}
+        <div className={`rv-todo ${next.needsAdmin ? (next.urgent ? "urgent act" : "act") : next.kind === "done" ? "done" : ""}`} role="status">
+          {next.needsAdmin && <span className="rv-bell" aria-hidden />}
+          <div className="rv-todo-body">
+            <b>{next.title}</b>
+            <p>{next.detail}</p>
+          </div>
+          {next.needsAdmin && canDecide && <OpenDecideButton label={next.kind === "appeal" ? "開始審核申訴" : "開始審核投訴"} />}
+          {next.needsAdmin && !canDecide && <span className="rv-chip">只讀角色，不可判定</span>}
+        </div>
         <PeopleCards ctx={ctx} />
         <div className="rv-grid">
           <div>
@@ -302,56 +330,123 @@ export default async function ReviewDetailPage({
               </div>
             </section>
             <section className="rv-card">
-              <h2>案件時間軸 <small>由早到晚 · 香港時間 · 藍＝投訴人／橙＝被投訴人／紫＝審核／灰＝系統</small></h2>
-              <Timeline items={timeline} />
+              <h2>聊天記錄證據 <small>投訴人自己挑選附上（提交時存的快照）；被投訴人看不到這份附件</small></h2>
+              {chatEv.length === 0 ? (
+                <p className="rv-sub">投訴人沒有附聊天記錄（可能兩人之間沒有私信，或沒有選）。「沒有記錄」本身不能當作對任何一方不利的證據。</p>
+              ) : (
+                <div className="rv-chat">
+                  {chatEv.map((m) => (
+                    <div key={m.id} className={`rv-bubble ${m.sender}`}>
+                      <span className="rv-sub">{m.sender === "filer" ? "投訴人" : "被投訴人"} · {fmtHK(m.at)}</span>
+                      {m.kind === "text" ? (
+                        <p>{m.body}</p>
+                      ) : chatImageLinks.get(m.id) ? (
+                        <a href={chatImageLinks.get(m.id) ?? undefined} target="_blank" rel="noreferrer noopener" referrerPolicy="no-referrer">🖼 查看圖片</a>
+                      ) : (
+                        <p className="rv-sub">（圖片無法載入）</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+            <section className="rv-card">
+              <h2>
+                案件時間軸 <small>{oldestFirst ? "最早在上" : "最新在上"} · 香港時間 · 藍＝投訴人／橙＝被投訴人／紫＝審核／灰＝系統</small>
+                <Link className="rv-order" href={oldestFirst ? `/innerharbour/review/${id}` : `/innerharbour/review/${id}?order=old`}>
+                  {oldestFirst ? "改為最新在上" : "改為最早在上"}
+                </Link>
+              </h2>
+              <Timeline items={shownTimeline} todo={next.needsAdmin ? { title: next.title, detail: next.detail } : null} />
             </section>
             <CaseContext ctx={ctx} />
           </div>
           <aside className="rv-aside">
-            <section className="rv-card">
-              <h2>判定</h2>
-              {!canDecide ? (
-                <p className="rv-sub">
-                  {role === "viewer"
-                    ? "你是只讀角色，不可判定。"
-                    : "此案件目前不可判定（只有「待人工」或申訴中的案件可判）。"}
-                </p>
-              ) : (
+            {canDecide ? (
+              <details id="decide" className="rv-card" open={errMsg !== null}>
+                <summary>{isAppeal ? "判定 · 審核申訴" : "判定 · 審核投訴"}</summary>
                 <DecideForm
                   action={decide}
                   isAppeal={isAppeal}
                   reasons={MANUAL_REASONS.map((key) => ({ key, label: PUBLIC_REASONS[key] }))}
                 />
-              )}
-            </section>
+              </details>
+            ) : (
+              <section className="rv-card">
+                <h2>判定</h2>
+                <p className="rv-sub">
+                  {role === "viewer"
+                    ? "你是只讀角色，不可判定。"
+                    : "此案件目前不可判定（只有「待人工」或申訴中的案件可判）。"}
+                </p>
+              </section>
+            )}
             {rec !== null && <DecisionRecordView rec={rec} />}
             <section className="rv-card">
-              <h2>AI 建議 <small>僅參考</small></h2>
+              <h2>AI 分析 <small>{aiMeta?.route?.action === "uphold" || aiMeta?.route?.action === "dismiss" ? "已自動判定" : "僅供參考"}</small></h2>
               {!hasAi ? (
-                <p className="rv-sub">（無 AI 建議）</p>
+                <p className="rv-sub">（無 AI 分析：還沒跑、沒配置 key，或 AI 失敗）</p>
               ) : (
-                <dl className="rv-kv" style={{ gridTemplateColumns: "72px 1fr" }}>
-                  {sug !== null && (
+                <>
+                  {typeof aiMeta?.route?.reason === "string" && (
+                    <p className={`rv-banner ${aiMeta.route.action === "human" ? "warn" : "ok"}`} style={{ fontSize: 13 }}>
+                      {ROUTE_REASON_TEXT[aiMeta.route.reason] ?? aiMeta.route.reason}
+                    </p>
+                  )}
+                  {aiExtra.injection_detected === true && <p className="rv-banner err" style={{ fontSize: 13 }}>⚠ AI 認為材料裡有提示注入，請特別留意</p>}
+                  {typeof aiExtra.p_uphold === "number" && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div className="rv-sub">成立概率 {Math.round(aiExtra.p_uphold * 100)}%（&lt;15% 自動駁回／&gt;85% 自動成立／中間人工）</div>
+                      <div className="rv-gauge"><i className="lo" /><i className="hi" /><b style={{ left: `${Math.round(aiExtra.p_uphold * 100)}%` }} /></div>
+                    </div>
+                  )}
+                  <dl className="rv-kv" style={{ gridTemplateColumns: "72px 1fr" }}>
+                    {sug !== null && (
+                      <>
+                        <dt>建議</dt>
+                        <dd>{typeof sug.recommended === "string" ? sug.recommended : "—"}</dd>
+                        <dt>嚴重度</dt>
+                        <dd>{typeof sug.severity === "number" ? sug.severity : "—"}</dd>
+                        <dt>信心</dt>
+                        <dd>{typeof sug.confidence === "number" ? sug.confidence : "—"}</dd>
+                        <dt>證據</dt>
+                        <dd>{typeof sug.evidence_strength === "string" ? sug.evidence_strength : "—"}</dd>
+                        <dt>總結</dt>
+                        <dd>{typeof sug.rationale === "string" ? sug.rationale : "—"}</dd>
+                      </>
+                    )}
+                    {ai?.model !== undefined && (
+                      <>
+                        <dt>模型</dt>
+                        <dd>{String(ai.model)}</dd>
+                      </>
+                    )}
+                    {aiMeta?.inputs !== undefined && (
+                      <>
+                        <dt>讀了</dt>
+                        <dd>聊天 {String(aiMeta.inputs.chat_n ?? 0)} 條、圖片 {String(aiMeta.inputs.images_n ?? 0)} 張{aiMeta.inputs.incomplete === true ? "（有圖沒讀到）" : ""}</dd>
+                      </>
+                    )}
+                  </dl>
+                  {strArr(aiExtra.findings).length > 0 && (
                     <>
-                      <dt>建議</dt>
-                      <dd>{typeof sug.recommended === "string" ? sug.recommended : "—"}</dd>
-                      <dt>嚴重度</dt>
-                      <dd>{typeof sug.severity === "number" ? sug.severity : "—"}</dd>
-                      <dt>信心</dt>
-                      <dd>{typeof sug.confidence === "number" ? sug.confidence : "—"}</dd>
-                      <dt>證據</dt>
-                      <dd>{typeof sug.evidence_strength === "string" ? sug.evidence_strength : "—"}</dd>
-                      <dt>理由</dt>
-                      <dd>{typeof sug.rationale === "string" ? sug.rationale : "—"}</dd>
+                      <p className="rv-sub" style={{ margin: "10px 0 2px", fontWeight: 700 }}>依據</p>
+                      <ul className="rv-list">{strArr(aiExtra.findings).map((t, k) => <li key={k}>{t}</li>)}</ul>
                     </>
                   )}
-                  {ai?.model !== undefined && (
+                  {strArr(aiExtra.caveats).length > 0 && (
                     <>
-                      <dt>模型</dt>
-                      <dd>{String(ai.model)}</dd>
+                      <p className="rv-sub" style={{ margin: "10px 0 2px", fontWeight: 700 }}>不確定／缺什麼</p>
+                      <ul className="rv-list">{strArr(aiExtra.caveats).map((t, k) => <li key={k}>{t}</li>)}</ul>
                     </>
                   )}
-                </dl>
+                  {strArr(aiExtra.image_notes).length > 0 && (
+                    <>
+                      <p className="rv-sub" style={{ margin: "10px 0 2px", fontWeight: 700 }}>AI 看圖</p>
+                      <ul className="rv-list">{strArr(aiExtra.image_notes).map((t, k) => <li key={k}>圖{k + 1}：{t}</li>)}</ul>
+                    </>
+                  )}
+                </>
               )}
             </section>
           </aside>

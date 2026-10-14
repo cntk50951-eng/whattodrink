@@ -5,7 +5,6 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { TRUST_CONFIG } from "./trust/config";
 
 export const COMPLAINT_CATEGORIES = ["no_show", "mismatch", "harassment", "safety", "other"] as const;
 export type ComplaintCategory = (typeof COMPLAINT_CATEGORIES)[number];
@@ -101,7 +100,7 @@ export function parseComplaintText(raw: unknown, field: string, max: number): { 
 /** 敏感信息遮罩（手机／邮箱／url；AI 输入用）。 */
 export function maskSensitive(text: string): string {
   return text
-    .replace(/(\+?\d[\d\s-]{7,}\d)/g, "[電話]")
+    .replace(/(\+?\d[\d\s-]{6,}\d)/g, "[電話]")
     .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "[郵箱]")
     .replace(/https?:\/\/\S+/g, "[連結]");
 }
@@ -212,122 +211,15 @@ export async function runTriageLlm(
 export type TriageRoute = { routed: boolean; status: string };
 
 /**
- * 分診執行（pending 案专用；after() 触发，不拦响应）。
- * 流程：组事实（时间线＋到场＋90 天对局数）→ LLM（失败即 ai_error）→ 路由：
- * - ai_auto_decide=false → 一律 escalated（AI 只作参考）；
- * - true 且 confidence≥0.85 且 severity=1 且规则倾向一致 → applyDecision(by ai)；
- *   其余（safety／severity≥2／retaliation／appeal／冲突／AI 失败）→ escalated。
+ * 分診入口（pending 案；after() 觸發，不攔響應）。實作在 complaintTriage.ts（v2：事件＋聊天快照＋圖片＋閾值路由）。
  */
 export async function triageComplaint(
   svc: SupabaseClient,
   complaintId: string,
   nowMs: number = Date.now(),
 ): Promise<TriageRoute> {
-  const { data: cRaw } = await svc.from("complaints").select("*").eq("id", complaintId).maybeSingle();
-  const c = cRaw as Record<string, unknown> | null;
-  if (c === null || c.status !== "pending") return { routed: false, status: typeof c?.status === "string" ? c.status : "" };
-  const partyId = c.party_id as string;
-  const filerId = c.filer_id as string;
-  const targetId = c.target_id as string;
-  const category = c.category as string;
-  const flags = Array.isArray(c.flags) ? (c.flags as unknown[]).filter((x): x is string => typeof x === "string") : [];
-  // 事实组装（匿名甲／乙；不含昵称／聊天／坐标）。
-  const [{ data: party }, { data: atts }, { data: events }, { data: pairCount }] = await Promise.all([
-    svc.from("parties").select("host_user_id,start_at").eq("id", partyId).maybeSingle(),
-    svc.from("party_attendance").select("user_id,arrived_at,host_marked").eq("party_id", partyId).limit(500),
-    svc.from("party_events").select("user_id,kind,created_at").eq("party_id", partyId).order("created_at", { ascending: true }).limit(200),
-    svc.from("complaints").select("id", { count: "exact", head: true }).or(`and(filer_id.eq.${filerId},target_id.eq.${targetId}),and(filer_id.eq.${targetId},target_id.eq.${filerId})`).gte("created_at", new Date(nowMs - 90 * 24 * 3600_000).toISOString()),
-  ]);
-  const hostId = (party as { host_user_id?: unknown } | null)?.host_user_id;
-  const attOf = (uid: string): { arrived: boolean; marked: string } => {
-    const hit = ((atts ?? []) as unknown[]).find((a) => (a as { user_id?: unknown }).user_id === uid) as
-      | { arrived_at?: unknown; host_marked?: unknown }
-      | undefined;
-    return {
-      arrived: typeof hit?.arrived_at === "string",
-      marked: hit?.host_marked === true ? "present" : hit?.host_marked === false ? "absent" : "none",
-    };
-  };
-  const tAtt = attOf(targetId);
-  const fAtt = attOf(filerId);
-  const facts: TriageFacts = {
-    category,
-    filer_role: filerId === hostId ? "host" : "member",
-    target_role: targetId === hostId ? "host" : "member",
-    filer_text: maskSensitive(typeof c.detail === "string" ? c.detail : ""),
-    target_response: typeof c.response_text === "string" ? maskSensitive(c.response_text) : null,
-    facts: {
-      target_arrived: tAtt.arrived,
-      filer_arrived: fAtt.arrived,
-      host_marked_target: tAtt.marked,
-      target_left_before_start: ((events ?? []) as unknown[]).some(
-        (e) => (e as { user_id?: unknown }).user_id === targetId && typeof (e as { kind?: unknown }).kind === "string" && ((e as { kind: string }).kind === "leave" || (e as { kind: string }).kind === "leave_late"),
-      ),
-      complaints_between_pair_90d: pairCount ?? 0,
-      retaliation: flags.includes("retaliation"),
-      repeat_pair: flags.includes("repeat_pair"),
-    },
-  };
-  // 规则倾向（确定性）。
-  let leaning: "uphold" | "dismiss" | null = null;
-  if (category === "no_show" && tAtt.arrived) leaning = "dismiss";
-  else if (category === "no_show" && tAtt.marked === "absent" && !tAtt.arrived && (c.response_text === null || c.response_text === undefined)) leaning = "uphold";
-  // AI 分診。
-  const minimaxKey = process.env.minimaxi_api_key ?? "";
-  let ai: { suggestion: TriageSuggestion; model: string; ms: number } | null = null;
-  let aiError: string | null = null;
-  if (minimaxKey !== "") {
-    ai = await runTriageLlm(facts, minimaxKey);
-    if (ai === null) aiError = "ai-failed";
-  } else {
-    aiError = "no-key";
-  }
-  if (ai !== null) {
-    await svc.from("complaints").update({
-      ai_json: { suggestion: ai.suggestion, model: ai.model, ms: ai.ms },
-    }).eq("id", complaintId);
-  } else {
-    if (aiError !== null) {
-      await svc.from("complaints").update({ ai_error: aiError }).eq("id", complaintId);
-    }
-    await svc.from("complaints").update({ status: "escalated" }).eq("id", complaintId);
-    return { routed: true, status: "escalated" };
-  }
-  const auto = TRUST_CONFIG.ai_auto_decide;
-  const mustHuman =
-    category === "safety" ||
-    flags.includes("retaliation") ||
-    flags.includes("appeal") ||
-    ai === null ||
-    ai.suggestion.severity >= 2 ||
-    (leaning !== null && leaning !== ai.suggestion.recommended);
-  if (!auto || mustHuman) {
-    await svc.from("complaints").update({ status: "escalated" }).eq("id", complaintId);
-    return { routed: true, status: "escalated" };
-  }
-  // 自动分支（本期配置关闭；保留实现供校准后开）。
-  if (ai.suggestion.confidence >= 0.85 && ai.suggestion.severity === 1) {
-    // 判定统一走状态机：先 pending→escalated（条件更新），再 decideComplaint（理由只用枚举，AI 文本只进内部备注）。
-    const rec = ai.suggestion.recommended;
-    if (rec === "dismiss" || rec === "uphold") {
-      const { data: moved } = await svc
-        .from("complaints")
-        .update({ status: "escalated" })
-        .eq("id", complaintId)
-        .eq("status", "pending")
-        .select("id");
-      if (!Array.isArray(moved) || moved.length === 0) return { routed: false, status: "" };
-      const { decideComplaint } = await import("./complaintDecision");
-      const r = await decideComplaint(
-        svc, complaintId, rec,
-        { severity: ai.suggestion.severity, internalNote: ai.suggestion.rationale, publicReason: "system", by: "ai" },
-        nowMs,
-      );
-      return { routed: true, status: r.ok ? (rec === "dismiss" ? "dismissed" : "upheld") : "escalated" };
-    }
-  }
-  await svc.from("complaints").update({ status: "escalated" }).eq("id", complaintId);
-  return { routed: true, status: "escalated" };
+  const { runTriage } = await import("./complaintTriage");
+  return runTriage(svc, complaintId, nowMs);
 }
 
 /**

@@ -29,6 +29,8 @@ export type TimelineInput = {
   /** 審核軌跡（不含 view_complaint） */
   audit: { at: string; admin: string; label: string; summary: string }[];
   evidenceCount: number;
+  /** 投訴人附的私信快照（文字或圖片） */
+  chat?: { sender: "filer" | "target"; text: string | null; at: string }[];
   ai: { recommended: string; rationale: string } | null;
 };
 
@@ -98,6 +100,17 @@ export function buildCaseTimeline(i: TimelineInput): TimelineItem[] {
       push({ at: created, tone: "system", tag: "AI", title: `AI 建議：${i.ai.recommended}（僅參考）`, body: i.ai.rationale || null, major: false });
     }
   }
+  for (const m of i.chat ?? []) {
+    const filer = m.sender === "filer";
+    push({
+      at: m.at,
+      tone: filer ? "filer" : "target",
+      tag: filer ? "投訴人" : "被投訴人",
+      title: m.text === null ? "💬 發了一張圖片（私信）" : `💬 ${m.text.length > 40 ? `${m.text.slice(0, 40)}…` : m.text}`,
+      body: m.text !== null && m.text.length > 40 ? m.text : null,
+      major: false,
+    });
+  }
   const responded = str(c.responded_at);
   if (responded !== null) {
     push({ at: responded, tone: "target", tag: "被投訴人", title: "提交申辯", body: str(c.response_text), major: true });
@@ -130,4 +143,58 @@ export function buildCaseTimeline(i: TimelineInput): TimelineItem[] {
   return out
     .sort((a, b) => Date.parse(a.item.at) - Date.parse(b.item.at) || a.order - b.order)
     .map((x) => x.item);
+}
+
+export type NextAction = {
+  /** review＝審核投訴；appeal＝審核申訴；wait＝等別人；done＝已結案 */
+  kind: "review" | "appeal" | "wait" | "done";
+  /** 需要審核員動手（才閃爍＋顯示按鈕） */
+  needsAdmin: boolean;
+  urgent: boolean;
+  title: string;
+  detail: string;
+};
+
+/** 這案現在輪到誰、下一步是什麼。純函數：頁頂提示條與時間軸置頂待辦共用。 */
+export function nextAction(c: Record<string, unknown>, appealWindowDays = 7): NextAction {
+  const status = String(c.status ?? "");
+  const appealPending = c.appeal_status === "pending";
+  if (status === "escalated" && appealPending) {
+    return {
+      kind: "appeal",
+      needsAdmin: true,
+      urgent: false,
+      title: "待你審核：申訴",
+      detail: "申訴方不服原判。請對照原判、申訴說明與證據：與原判相同＝維持（不動積分）；不同＝沖銷原扣分後改判，且必須由第二位審核員（非原判人）處理。",
+    };
+  }
+  if (status === "escalated") {
+    const safety = c.category === "safety";
+    return {
+      kind: "review",
+      needsAdmin: true,
+      urgent: safety,
+      title: safety ? "待你審核：人身安全投訴（優先）" : "待你審核：投訴",
+      detail: "請看雙方陳述、證據與時間軸，作出「成立／駁回／惡意」判定並寫內部備註；結果與積分變化會通知雙方。",
+    };
+  }
+  if (status === "awaiting_response") {
+    const due = typeof c.response_due_at === "string" ? fmtHK(c.response_due_at) : "—";
+    return { kind: "wait", needsAdmin: false, urgent: false, title: "等待被投訴人申辯", detail: `申辯截止 ${due}（香港時間），逾期自動進入分診。` };
+  }
+  if (status === "pending" || status === "triaged") {
+    return { kind: "wait", needsAdmin: false, urgent: false, title: "系統處理中", detail: "AI 分診或規則處理中，完成後會進入待人工審核。" };
+  }
+  if (status === "upheld" || status === "dismissed" || status === "malicious") {
+    const decided = typeof c.decided_at === "string" ? Date.parse(c.decided_at) : NaN;
+    const open = Number.isFinite(decided) && Date.now() <= decided + appealWindowDays * 86400_000 && c.appeal_status !== "pending";
+    return {
+      kind: "done",
+      needsAdmin: false,
+      urgent: false,
+      title: open ? "已判定 · 申訴期內" : "已結案",
+      detail: open ? `不利一方可在 ${fmtHK(new Date(decided + appealWindowDays * 86400_000).toISOString())} 前申訴一次；有申訴時案件會回到這裡待你們審核。` : "判定已執行，通知已發給雙方。",
+    };
+  }
+  return { kind: "done", needsAdmin: false, urgent: false, title: "已結案", detail: "" };
 }

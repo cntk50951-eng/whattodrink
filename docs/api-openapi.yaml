@@ -2117,6 +2117,13 @@ paths:
                     type: string
                     format: uri
                     description: 本站上传链接
+                chat_message_ids:
+                  type: array
+                  maxItems: 20
+                  description: 我与被投诉人 1 对 1 私信里勾选的文字消息 id（图片不可附，图片证据需现场拍摄；提交时存快照，仅审核员与 AI 可见）。不属于这段私信或无私信 → 400
+                  items:
+                    type: string
+                    format: uuid
       responses:
         "201":
           description: 已受理（safety 直进人工，其余等申辩）
@@ -2183,6 +2190,41 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/complaints/chat-messages:
+    get:
+      operationId: listComplaintChatMessages
+      summary: 投诉附聊天记录的候选（我与 peer 的 1 对 1 私信，仅文字，时间升序；无私信会话 has_conversation=false）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: peer
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: before
+          in: query
+          description: 取更早的消息（上一页 next_before）
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "{has_conversation, messages:[{id, from:me|them, kind:text, body, created_at}], next_before}"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [has_conversation, messages]
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /api/v1/complaints/{id}:
     get:
       operationId: getComplaint

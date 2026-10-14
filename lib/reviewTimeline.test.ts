@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCaseTimeline, fmtHK, type TimelineInput } from "./reviewTimeline";
+import { buildCaseTimeline, fmtHK, nextAction, type TimelineInput } from "./reviewTimeline";
 
 const base = (over: Partial<TimelineInput> = {}): TimelineInput => ({
   complaint: { category: "safety", detail: "騷擾", created_at: "2026-10-14T12:21:00Z", decided_at: "2026-10-14T13:38:00Z", decision: "uphold" },
@@ -35,5 +35,21 @@ describe("buildCaseTimeline", () => {
   it("formats Hong Kong time", () => {
     expect(fmtHK("2026-10-14T16:30:00Z")).toContain("00:30");
     expect(fmtHK(null)).toBe("—");
+  });
+});
+
+describe("nextAction", () => {
+  it("escalated → review (safety urgent)", () => {
+    const a = nextAction({ status: "escalated", category: "safety" });
+    expect(a).toMatchObject({ kind: "review", needsAdmin: true, urgent: true });
+    expect(nextAction({ status: "escalated", category: "other" }).urgent).toBe(false);
+  });
+  it("appeal pending → appeal", () => {
+    expect(nextAction({ status: "escalated", appeal_status: "pending" })).toMatchObject({ kind: "appeal", needsAdmin: true });
+  });
+  it("waiting / done never need admin", () => {
+    for (const status of ["awaiting_response", "pending", "triaged", "upheld", "dismissed", "withdrawn"]) {
+      expect(nextAction({ status }).needsAdmin).toBe(false);
+    }
   });
 });

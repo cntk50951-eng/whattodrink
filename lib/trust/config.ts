@@ -31,8 +31,8 @@ export const TRUST_CONFIG = {
   /** watch：每日最多发局数。restricted：暂停发起天数。 */
   watch_daily_parties: 1,
   restricted_days: 14,
-  /** C 预留：AI 自动判定总开关（初期 false，只建议不处罚）。 */
-  ai_auto_decide: false,
+  /** AI 自动判定（產品決定 2026-10-14：成立／駁回都可自動，靠申訴兜底；閾值見 complaintAi.ts；環境變量 COMPLAINT_AI_AUTO=off 為緊急開關）。 */
+  ai_auto_decide: true,
   /** C1 到场窗口（开局前后分钟）＋半径（米）＋每人每局尝试上限。 */
   arrive_before_min: 30,
   arrive_after_min: 30,
