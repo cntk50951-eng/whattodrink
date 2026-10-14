@@ -66,7 +66,9 @@ async function isAttachmentInMyConversation(
   const { data: msgs, error: mErr } = await svc
     .from("messages")
     .select("conversation_id")
-    .contains("attachments", [{ bucket, path }])
+    // jsonb 包含查詢必須傳 JSON 字符串：傳數組 supabase-js 會序列化成 Postgres 數組字面量（{...}），
+    // 報 22P02 invalid input syntax for type json → 接收方永遠 404（只有發送者自己能看到自己的語音／圖片）。
+    .contains("attachments", JSON.stringify([{ bucket, path }]))
     .limit(50);
   if (mErr !== null) {
     console.error(`[api/v1/uploads/view] msg lookup error: code=${mErr.code} message=${mErr.message}`);
