@@ -161,6 +161,29 @@ export function parseRoomRules(raw: unknown): { mode: "standard" | "deal_only"; 
     zhaiEnabled: r.zhai_enabled === true,
   };
 }
+
+export type ClientBid = { qty: number; face: number; zhai: boolean };
+
+/**
+ * 叫骰合法性客戶端鏡像（只判按鈕可點，最終以服務端 `isValidBid` 為準；
+ * 不直引 `@/lib/games/liars`——其頂層 `node:crypto` 會炸客戶端打包。
+ * 文案與服務端逐字同，單測 fuzz 對齊）。
+ */
+export function clientBidCheck(
+  prev: ClientBid | null,
+  next: { qty: number; face: number },
+  rules: { minOpenQty: number; zhaiEnabled: boolean },
+): { ok: true } | { ok: false; reason: string } {
+  if (!Number.isInteger(next.qty) || next.qty < 1 || next.qty > 200) return { ok: false, reason: "qty 非法" };
+  if (!Number.isInteger(next.face) || next.face < 1 || next.face > 6) return { ok: false, reason: "face 只要 1-6" };
+  if (prev === null) {
+    if (next.qty < rules.minOpenQty) return { ok: false, reason: `开局数量至少 ${rules.minOpenQty}` };
+    return { ok: true };
+  }
+  if (next.qty < prev.qty) return { ok: false, reason: "数量不可减少" };
+  if (next.qty === prev.qty && next.face <= prev.face) return { ok: false, reason: "同数量点数必须更大" };
+  return { ok: true };
+}
 /** 回合解析（壞形回 null；iOS 輪詢口徑，壞 round 不炸房）。 */
 export function parseGameRound(raw: unknown): GameRound | null {
   if (typeof raw !== "object" || raw === null) return null;

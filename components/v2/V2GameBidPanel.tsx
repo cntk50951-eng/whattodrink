@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 
-import { isValidBid } from "@/lib/games/liars";
-import { gameSocialErrorKey, type GamePlayer, type GameRound } from "@/lib/gameRoom";
+import { clientBidCheck, gameSocialErrorKey, type GamePlayer, type GameRound } from "@/lib/gameRoom";
 
 const FACES = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 
@@ -62,7 +61,7 @@ export function V2GameBidPanel({
 
   const myTurn = round.current_turn_user !== null && round.current_turn_user === myUserId;
   const prev = round.last_bid !== null ? { qty: round.last_bid.qty, face: round.last_bid.face, zhai: round.last_bid.zhai } : null;
-  const check = isValidBid(prev, { qty, face }, { mode: "standard", dice_per_player: 5, min_open_qty: minOpenQty, ones_wild: true, ones_break: false, zhai_enabled: zhaiEnabled, turn_seconds: 30 });
+  const check = clientBidCheck(prev, { qty, face }, { minOpenQty, zhaiEnabled });
   const bidReason = check.ok ? null : check.reason;
 
   const deadlineMs = round.turn_deadline !== null ? Date.parse(round.turn_deadline) : NaN;

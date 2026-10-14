@@ -4134,9 +4134,9 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - web 范围：`V2GameBidPanel` 掛房間 Sheet（我的骰＋上一口＋輪次倒數＋叫骰面板＋開盅＋結果＋下一局；deal_only 只亮骰；合法性直引服務端 `isValidBid`）；API 现成（H.1 actions，expected＋幂等鍵＋stale 重拉）。
 - 非目标：面對面搖骰器（兩邊都無此端點，另議）、v1。
 
-### UR G.10c　房內聊天＋舉報（v2）[]
-- iOS 对标：GameSocialViews（24 快捷語＋文字 60 字＋舉報五類＋kick 拉黑）。
-- web 范围：房內聊天（快捷語＋文字＋撤回顯示）＋舉報＋踢人；API 现成（H.2(b)）。
+### UR G.10c　房內聊天＋舉報（v2）[✓]
+- iOS 对标：GameSocialViews（24 快捷語＋文字 60 字＋舉報五類＋kick 拉黑；kick 沿 G.10a 房間 Sheet）。
+- web 范围：`V2GameChatPanel` 掛房間 Sheet（4s 輪詢＋合并＋快捷語 24 宮＋文字＋撤回顯示＋逐行舉報五類）；`lib/gameChat.ts` 純函數（解析／合并／校驗／舉報類，常量本地鏡像＋單測斷言服務端相等）；API 现成（H.2(b)）。
 - 非目标：語音／富媒體、v1。
 - iOS 对标：陌生人 202 審批＋房內文字聊天＋舉報踢人（GameOnline／GameSocial，未提交 WIP）。
 - web 范围：v2 遊戲 UI 從零搭（web 現無遊戲 UI；建房／碼加入／審批列表／房內聊天／舉報）；API 现成（H.1／H.2(a)(b)，shared-only 已合入）。
@@ -4181,7 +4181,9 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - 2026-10-14：G.10 置 [WIP] 開工（拆三批＋pills 新 pill，用戶定案；本批 G.10a 房間＋審批，G.10b 叫骰／G.10c 聊天舉報另批）；实作：`lib/gameRoom.ts` 純函數（房間／成員／加入分流／審批／房碼／錯誤鍵）＋5 單測＋`V2GamesSheet`（建房雙模式＋輸碼＋恢復）＋`V2GameRoomSheet`（lobby 輪詢＋準備開始離開＋踢＋審批＋202 等批輪詢）＋pills 遊戲 pill（匿名即登入＋`?games=1` 續開）＋v2 三語 key×39；API／migration／yaml 零改动。
 - 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.10b）。
 - 2026-10-14：G.10b 置 [WIP] 開工；实作：`lib/gameRoom.ts` 加 round／rules 解析＋2 單測＋`V2GameBidPanel`（骰面＋上一口＋倒數＋叫骰＋開盅＋結果＋下一局＋deal_only 亮骰，合法性直引 `isValidBid`）＋房間 Sheet 接 round 輪詢＋v2 三語 key×19；API／migration／yaml 零改动。
-- 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.10c）。---
+- 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.10c）。
+- 2026-10-14：G.10c 置 [WIP] 開工；实作：`lib/gameChat.ts` 純函數（解析／合并／校驗／舉報類，常量本地鏡像＋單測斷言服務端相等）＋5 單測＋`V2GameChatPanel`（輪詢＋24 快捷語＋文字＋撤回＋逐行舉報）＋房間 Sheet 掛載＋v2 三語 key×42；另修 G.10b 隱患（叫骰合法性改客戶端鏡像 `clientBidCheck`＋fuzz 對齊，不直引 `liars.ts`）；`npm run build` 全過；API／migration／yaml 零改动。
+- 2026-10-14：用户亲验通过置 [✓]（提交＋推送，继续 G.11）。---
 
 UR D.9　iOS 真推送 P1（E1 碰杯＋APNs 通道）[WIP]
 

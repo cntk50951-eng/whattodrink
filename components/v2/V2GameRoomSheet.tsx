@@ -20,6 +20,7 @@ import {
   type JoinRequest,
 } from "@/lib/gameRoom";
 import { V2GameBidPanel } from "@/components/v2/V2GameBidPanel";
+import { V2GameChatPanel } from "@/components/v2/V2GameChatPanel";
 import styles from "./v2.module.css";
 
 type Err = { error?: { code?: string; message?: string } } | null;
@@ -393,6 +394,7 @@ export function V2GameRoomSheet({
             ) : (
               <p className="rounded-xl bg-muted p-3 text-center text-sm text-muted-foreground">{t("gamePlayingSoon")}</p>
             )}
+            {room.status !== "lobby" && <V2GameChatPanel roomId={room.id} myUserId={myUserId} />}
           </div>
         )}
       </SheetContent>

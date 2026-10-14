@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  clientBidCheck,
   gameSocialErrorKey,
   joinStatusKey,
   normalizeRoomCode,
@@ -12,6 +13,7 @@ import {
   parseJoinStatus,
   parseRoomRules,
 } from "./gameRoom";
+import { isValidBid } from "./games/liars";
 
 describe("gameRoom", () => {
   it("房間／成員壞行 null", () => {
@@ -44,6 +46,32 @@ describe("gameRoom", () => {
     expect(gameSocialErrorKey("too_many_requests")).toBe("gameErrTooMany");
     expect(gameSocialErrorKey("message_rejected")).toBeNull();
     expect(gameSocialErrorKey(null)).toBeNull();
+  });
+  it("叫骰鏡像與服務端逐案對齊（zhai 關時；開時另測服務端單測）", () => {
+    const rules = { min_open_qty: 2, zhai_enabled: false };
+    const cases: { prev: { qty: number; face: number; zhai: boolean } | null; next: { qty: number; face: number } }[] = [
+      { prev: null, next: { qty: 2, face: 1 } },
+      { prev: null, next: { qty: 1, face: 6 } },
+      { prev: { qty: 3, face: 5, zhai: false }, next: { qty: 3, face: 5 } },
+      { prev: { qty: 3, face: 5, zhai: false }, next: { qty: 3, face: 6 } },
+      { prev: { qty: 3, face: 5, zhai: false }, next: { qty: 2, face: 6 } },
+      { prev: { qty: 3, face: 5, zhai: false }, next: { qty: 4, face: 1 } },
+      { prev: null, next: { qty: 0, face: 1 } },
+      { prev: null, next: { qty: 2, face: 7 } },
+    ];
+    for (const c of cases) {
+      const server = isValidBid(c.prev, c.next, {
+        mode: "standard",
+        dice_per_player: 5,
+        min_open_qty: rules.min_open_qty,
+        ones_wild: true,
+        ones_break: false,
+        zhai_enabled: false,
+        turn_seconds: 30,
+      });
+      const client = clientBidCheck(c.prev, c.next, { minOpenQty: 2, zhaiEnabled: false });
+      expect(client).toEqual(server);
+    }
   });
   it("回合解析", () => {
     expect(parseGameRound(null)).toBeNull();
