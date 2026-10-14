@@ -4091,6 +4091,42 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - web 范围：v2 聊天页增强（雷达条＋搜索框，本地过滤零新端点，沿 iOS `sortFriends/filterFriends` 口径）。
 - 非目标：新端点、v1。
 
+### UR G.6　遇見 AI 找人（v2）[✓]
+- iOS 对标：同意→一句話搜→10 卡輪播→加好友（帶留言）／傾偈／睇主頁（MeetView／iOS-0.112）。
+- web 范围：pills 遇見 pill（登录门，匿名点即登录）＋`V2MeetSheet`（status→同意→輸入→搜索中→結果卡；條件 chips 可點掉走 criteria 重搜不扣次數；0 結果 relaxed 一鍵放寬＋匿名統計解釋）；API 现成（I.1 search／status／PATCH /me discoverable）。
+- 卡片动作：加好友（POST /friends 附留言，沿 B.3）／傾偈（setActivePeer＋/v2/chat/room，沿 D.7）；主頁資訊行內展（height／職業／語言／興趣／口味 headline，MeetResult 自帶）。
+- 非目标：獨立主頁頁（E.27 只有 API）、叫 LLM 潤色理由（web 定案純代碼拼裝）、v1。
+
+### UR G.7　動態通知中心（v2）[]
+- iOS 对标：首頁鈴鐺＋頂部橫幅＋動態頁（ActivityViews／iOS-0.75）。
+- web 范围：統一動態入口（收斂 Cheers／Invite／notifications 三源）＋未讀汇总＋橫幅提醒；API 现成（/me/notifications＋counters notices_unread）。
+- 非目标：改現有信箱逻辑、v1。
+
+### UR G.8　酒局到場出席投訴誠信（v2）[]
+- iOS 对标：Attendance／Complaint／Trust 全套（階段 A–C；iOS 未提交 WIP）。
+- web 范围：V2PartySheet 扩展（cancel／leave_policy 置灰＋確認文案、到場打卡、出席確認、投訴入口、host 徽章）；API 现成（E.30／E.31 C1／C2，shared-only 已合入）。
+- 非目标：審核後台（已有 admin 頁）、緊急通道（兩邊都不做）、v1。
+
+### UR G.9　發局草稿＋收藏過期＋我的地點（v2）[]
+- iOS 对标：PartyDraft（草稿 7 天＋記住上次＋再開一局）／SAVES_EXPIRED（過期收藏保留＋Pin 住位置）／PinnedPlace（純本地）。
+- web 范围：發局表單草稿（localStorage 按帳號分桶）＋收藏過期行（expired 灰顯＋帶我去地圖位置）＋pin 地點本地存；API 现成（/me/saves expired 行，E.22 歸檔口徑）。
+- 非目标：跨裝置同步（iOS 亦本地）、v1。
+
+### UR G.10　酒桌遊戲開放＋房內聊天舉報（v2）[]
+- iOS 对标：陌生人 202 審批＋房內文字聊天＋舉報踢人（GameOnline／GameSocial，未提交 WIP）。
+- web 范围：v2 遊戲 UI 從零搭（web 現無遊戲 UI；建房／碼加入／審批列表／房內聊天／舉報）；API 现成（H.1／H.2(a)(b)，shared-only 已合入）。
+- 非目标：語音／排行／公開大廳（兩邊都不做）、v1。
+
+### UR G.11　照片編輯器（v2）[]
+- iOS 对标：濾鏡／調色／裁剪／文字烘焙＋撤销（PhotoEditorPanels／iOS 未提交重做）。
+- web 范围：V2CameraSheet 發布前編輯（濾鏡＋裁剪＋文字，canvas 烘焙沿現有壓圖鏈）。
+- 非目标：3D 貼紙（iOS 已刪 mug_effect）、v1。
+
+### UR G.12　個人頁口味日曆（v2）[]
+- iOS 对标：Profile／Taste／Calendar（iOS 自己 WIP 未完）。
+- web 范围：待 iOS 完工再排；本期只列不做。
+- 非目标：本期實作。
+
 *改動記錄*
 - 2026-10-09：立项（双审计＋用户定单 G.1 先行、v2-only）；G.1 置 [WIP] 开工
 - 2026-10-09：G.1 实作：hook `saved_by_me`＋`toggleSave`（乐观翻＋401 举登录旗＋回滚，沿赞口径）＋详情 ★ 键＋行内登录口（Google OAuth 落 /v2）＋`V2SavesSheet`（摘要行＋行内取收＋空态＋骨架）＋右缘入口（登入才挂，沿信箱）＋点行开卡（他人 openPin／自家 wantSheet，沿 E.13）；v2 三语 key×4；`loginCta` 在 v2 无此键，改用新 key（教训：跨命名空间 key 先验存在）。
@@ -4108,6 +4144,9 @@ EPIC G　iOS 功能对齐（web v2-only；2026-10-09 立项）[WIP]
 - 2026-10-09：用户亲验通过置 [✓]。
 - 2026-10-09：G.2 实作：`V2NewsSheet`（HK／大陆双籤＋失败留旧＋toast＋刷新键＋原文外链＋缺图 fail-soft＋骨架空态）＋pills 酒闻 pill（匿名可看）＋v2 三语 key×6；API／migration／yaml 零改动（E.24 现成）。
 - 2026-10-09：用户亲验通过置 [✓]。
+- 2026-10-14：第二輪 iOS 對齊立項（G.6–G.12，用戶指令逐批完成，v2-only）；G.6 置 [WIP] 開工（遇見；iOS MeetView／iOS-0.112 對標；I.1 API 现成）。
+- 2026-10-14：G.6 实作：`lib/meetUi.ts` 純函數（chips／移除／分數／距離／進度／空態解釋／錯誤映射，iOS 口徑）＋11 單測＋`V2MeetSheet`（同意→輸入→搜索中→結果輪播；條件 chip 點掉走 criteria 重搜；relaxed 一鍵放寬；加好友可附留言／傾偈走 D.7；主頁資訊行內展）＋pills 遇見 pill（匿名即 Google 登入＋`?meet=1` 續開，沿 G.1）＋v2 三語 key×64；API／migration／yaml 零改动。
+- 2026-10-14：用户亲验通过置 [✓]（提交＋部署，继续 G.7）。
 
 ---
 

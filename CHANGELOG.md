@@ -5,6 +5,11 @@
 ## [Unreleased]
 
 ### Added
+- **UR G.6 遇見 AI 找人（v2-only，[WIP]，待親驗）**
+  - iOS MeetView（iOS-0.112）對標：pills 遇見 pill（匿名即 Google 登入＋`?meet=1` 續開）＋`V2MeetSheet`（status→同意→輸入→搜索中→結果輪播；條件 chips 點掉走 criteria 重搜不扣次數；0 結果 relaxed 一鍵放寬＋匿名統計解釋）
+  - 卡片動作：加好友（可附 50 字留言，沿 B.3）／傾偈（沿 D.7 `setActivePeer`＋`/v2/chat/room`）；主頁資訊行內展（E.27 無 web 頁，另議）
+  - `lib/meetUi.ts` 純函數（chips／移除／分數／距離／進度／空態解釋／錯誤映射，iOS 口徑）＋11 單測；v2 三語 key×64；API／migration／yaml 零改动（I.1 现成）
+  - 缺口清單：UR G.7–G.12 已建檔（動態中心／酒局BC／草稿收藏地點／遊戲開放／照片編輯器／個人頁口味日曆），逐批完成
 - **UR H.1 游戏房间＋大話骰 POC（纯 API，[WIP]，待 0042＋三批端点）**
   - 第一批：0042 五表（rooms／players／rounds／events／invites；RLS 全锁 service 读写）＋`lib/games/liars.ts` 纯函数（crypto 摇骰／叫骰校验／百搭计数／开盅结算／顺位／房规解析／房间码）＋15 单测（含 6000 颗均匀分布）
   - 第二批：房间 8 端点（建／码加入／active／准备／开始／离开／踢／改规／结束）＋门禁一体 helper（18+／拉黑双表／好友或 joins 交集／同时 1 房／满员／踢禁重进）＋懒过期（2h 续／ended 24h 删）＋openapi 1.27.0＋`GameRoom` schema＋5 单测；11 新错误码一次加齐（三批共用）
@@ -13,7 +18,7 @@
   - §九發骰器：`rules.mode:deal_only`（非法回落 standard）＋`reveal` 动作（任一 active bidding 中亮骰，不判输赢，已亮重调幂等 200；bid／challenge 在此房 409）＋开局／次局无轮次无倒计时＋`next_round` 照旧（starter 座位最小）＋openapi 1.30.0＋2 单测
   - §十二留守重开：deal_only 房局中剩 <2 人→回 lobby（留守 ready=false＋`back_to_lobby` 事件），standard 不动；`start` 局号顺延（回 lobby 重开不撞 unique）＋openapi 1.31.0
   - §十三停住等房主：deal_only 房开盅后不自动开新局（settle＋集齐确认都不开）＋`next_round` 仅房主可调、调用即开＋openapi 1.32.0（补 403 \(not_host\) 描述）
-- **UR H.2 游戏向陌生人开放＋房内聊天＋举报（纯 API，[WIP]，待 0055＋两批端点）**
+- **UR H.2 游戏向陌生人开放＋房内聊天＋举报（纯 API，[WIP]，0055 已跑，两批端点已合入）**
   - (a) 批：0055 四表一列（requests／messages／reports／mutes＋`game_banned_until`；RLS 全锁 service 读写）＋陌生人 join 改 202 建申请（去重／小时 5／房 10／5min 懒过期＋房主通知）＋审批三端点（列表仅昵称头像／approve 入座＋version／reject＋双方通知）＋申请人状态＋取消＋建房／join 禁玩门＋counters `game_requests_pending`（badge 不含）＋openapi 1.54.0＋单测
   - (b) 批：房内聊天（quick 枚举＋限频 2s·1／min·20＋同内容去重＋拉黑过滤＋撤回＋24h 懒删；发送零外部调用静态断言）＋举报（匿名快照＋AI 复核＋禁言升级；只记录不扣分）＋kick `block`（写 cheers_blocks＋被踢通知）＋friend origin `game`（24h 同房校验）＋admin 游戏举报队列页（角色＋审计＋禁玩）＋openapi 1.55.0＋单测
 

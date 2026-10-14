@@ -58,6 +58,7 @@ import { CheersMailbox } from "@/components/v2/CheersMailbox";
 import { V2SavesSheet } from "@/components/v2/V2SavesSheet";
 import { V2NewsSheet } from "@/components/v2/V2NewsSheet";
 import { V2PartySheet } from "@/components/v2/V2PartySheet";
+import { V2MeetSheet } from "@/components/v2/V2MeetSheet";
 import { OnboardingSheet } from "@/components/v2/OnboardingSheet";
 import { ageOf, shouldOnboard } from "@/lib/api/profile";
 import type { MeJson } from "@/lib/mode";
@@ -370,6 +371,8 @@ export function V2Home() {
   const [newsOpen, setNewsOpen] = useState(false);
   // UR G.3 酒局看板开关（pills 酒局 pill＋Sheet 内列表／详情／发局三态）。
   const [partyOpen, setPartyOpen] = useState(false);
+  // UR G.6 遇見開關（pills 遇見 pill＋Sheet 内同意／輸入／搜索／結果，沿 G.2/G.3 口径）。
+  const [meetOpen, setMeetOpen] = useState(false);
   // UR G.1 收藏行点开详情（他人钉 openPin／自家 wantSheet，沿 E.13 深链口径）。
   function openSaved(id: string): void {
     if (apiPins.some((p) => p.id === id)) {
@@ -722,6 +725,19 @@ export function V2Home() {
     if (isAuthed !== true || !resumeSavesRef.current) return;
     resumeSavesRef.current = false;
     setSavesOpen(true);
+  }, [isAuthed]);
+  // UR G.6：登入續開——mount 讀 ?meet=1 記 intent 即清參數（防重觸，沿 G.1 口径）。
+  const resumeMeetRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("meet") !== "1") return;
+    window.history.replaceState(null, "", window.location.pathname);
+    resumeMeetRef.current = true;
+  }, []);
+  useEffect(() => {
+    if (isAuthed !== true || !resumeMeetRef.current) return;
+    resumeMeetRef.current = false;
+    setMeetOpen(true);
   }, [isAuthed]);
   // UR D.4：一鍵定位——mount 讀 ?friend=<id> 記 intent 即清參數（列表定位鈕深鏈）。
   // 消費等 liveFriends 首批非空（空即無人在線，不消費不打擾；參數已清不重觸）。
@@ -1905,6 +1921,34 @@ export function V2Home() {
         >
           <Store aria-hidden />
           {t2("nearbyTitle")}
+        </Button>
+        {/* UR G.6 遇見 pill（須登入；匿名點即 Google 登入，登後 ?meet=1 續開，沿 G.1 口径）。 */}
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0 rounded-full bg-card shadow-md ring-1 ring-foreground/10"
+          onClick={() => {
+            if (isAuthed === true) {
+              setMeetOpen(true);
+              return;
+            }
+            void (async () => {
+              try {
+                const { createClient } = await import("@/lib/supabase/client");
+                const supabase = createClient();
+                await supabase.auth.signInWithOAuth({
+                  provider: "google",
+                  options: {
+                    redirectTo: `${window.location.origin}/auth/callback?next=/v2?meet=1`,
+                  },
+                });
+              } catch {}
+            })();
+          }}
+          aria-label={t2("meetTitle")}
+        >
+          <Sparkles aria-hidden />
+          {t2("meetTitle")}
         </Button>
       </div>
       {/* 足跡浮條（頂部容器內流式排布，永不與 pills 重疊） */}
@@ -3163,7 +3207,7 @@ export function V2Home() {
       {newsOpen && <V2NewsSheet open onClose={() => setNewsOpen(false)} />}
       {/* UR G.3 酒局看板。 */}
       {partyOpen && <V2PartySheet open onClose={() => setPartyOpen(false)} />}
-      {/* UR E.18 首登＋個人表單（条件挂载，初值新鲜；保存即刷 me）。 */}
+      {meetOpen && <V2MeetSheet open onClose={() => setMeetOpen(false)} onChat={goChat} />}      {/* UR E.18 首登＋個人表單（条件挂载，初值新鲜；保存即刷 me）。 */}
       {showOnboard && meJson !== null && (
         <OnboardingSheet
           open
