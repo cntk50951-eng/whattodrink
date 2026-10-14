@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DECIDE_ERR_TEXT,
   evidenceStoragePath,
   maskSensitive,
   parseComplaintBody,
   parseComplaintText,
   parseTriageReply,
+  reviewEventKindLabel,
 } from "./complaints";
 
 describe("parseComplaintBody", () => {
@@ -85,5 +87,25 @@ describe("maskSensitive／parseTriageReply", () => {
     expect(parseTriageReply('{"category":"no_show"}')).toBeNull();
     expect(parseTriageReply('{"category":"no_show","severity":9,"evidence_strength":"medium","recommended":"escalate","confidence":0.7,"rationale":"x"}')).toBeNull();
     expect(parseTriageReply("唔明")).toBeNull();
+  });
+});
+
+describe("後台展示（DEF-20261014-001／002）", () => {
+  it("reviewEventKindLabel：已知中文＋未知回落原文", () => {
+    expect(reviewEventKindLabel("join")).toBe("加入酒局");
+    expect(reviewEventKindLabel("leave")).toBe("離開");
+    expect(reviewEventKindLabel("leave_late")).toBe("遲到早退");
+    expect(reviewEventKindLabel("leave_after_start")).toBe("開局後離開");
+    expect(reviewEventKindLabel("cancel_no_joiners")).toBe("取消（無人加入）");
+    expect(reviewEventKindLabel("whatever_new")).toBe("whatever_new");
+  });
+  it("DECIDE_ERR_TEXT：頁面用到的碼全有文案", () => {
+    for (const code of [
+      "session_expired", "forbidden", "csrf", "invalid_input", "note_required",
+      "rate_limited", "self_case", "same_party", "second_review", "audit_failed",
+      "state_changed", "busy", "failed",
+    ]) {
+      expect(typeof DECIDE_ERR_TEXT[code] === "string" && DECIDE_ERR_TEXT[code] !== "").toBe(true);
+    }
   });
 });

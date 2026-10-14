@@ -22,6 +22,8 @@
 ---
 
 | ID | 标题 | 状态 | 严重度 | 发现日期 / 报告人 | 关联 UR | 确诊根因 |
+| DEF-20261014-001 | 投诉详情时间线／AI 建议裸 JSON＋不见双方身份 | Fixing | P1 | 2026-10-14 / @yuki | UR E.31 | 时间线／AI 两段 `JSON.stringify` 直出（review/[id]/page:175／181），见详情 |
+| DEF-20261014-002 | 投诉详情点执行跳 404，判定无效 | Fixing | P0 | 2026-10-14 / @yuki | UR E.31 | 守门失败裸 notFound（opsPage:26），见详情 |
 | DEF-20261010-001 | 好友发消息被当陌生人（3 条＋禁图音） | Fixing | P0 | 2026-10-10 / @iOS | UR D.10 | 成员表 RLS 只读己行，peerIds 恒空→isFriend 恒 false，见详情 |
 | DEF-20261009-001 | /mine 看不到已归档旧快贴（足迹断代） | Fixing | P1 | 2026-10-09 / @iOS(0.68) | UR E.22 | 归档 embed beers 无 FK 即 PGRST200 整段静默跳过＋slice 切旧行，见详情 |
 | DEF-20261009-002 | 主页 nights/places 恒 0（week 连带） | Fixing | P1 | 2026-10-09 / @iOS | UR E.27 | 扫描查询漏解构 data＋1000 行静默截断，见详情 |
@@ -902,3 +904,29 @@
 - **修复**：成员读改 service（建会话 POST 的 friendships 读沿用 authed，该表可读）；peerIds 为空即 500（fail-closed，不静默按陌生人限流）；`peerIdsOf` 提纯＋单测（含空集）
 - **修复验证**：AC1 好友 4 条全过＋quota null；AC2 好友图音过；AC3 陌生人 3＋1 拒＋回复清零；AC4 对方隐身 403；AC5 `peerIdsOf` 空集用例（真 RLS 集成限本地／staging 手工验）
 - **回归范围**：发消息、会话列表；建会话（friendships 可读，不动）
+
+### DEF-20261014-001 投诉详情时间线／AI 建议裸 JSON＋不见双方身份
+
+- **状态**：Fixing（2026-10-14：已落条即修，待用户浏览器复验转 Verified）
+- **严重度**：P1（审核可看但无法结构化判案；判定链本身另见 DEF-20261014-002）
+- **发现日期 / 报告人**：2026-10-14 / @yuki
+- **复现步骤**：开 `/innerharbour/review` → 点任一 `safety · escalated` 案件 →「時間線／到場」「AI 建議」两段为整块 JSON；全页不见投诉人／被投诉人身份；无证据时只见「證據：（無）」
+- **期望 vs 实际**：期望时间线按人＋事件＋时间列表、AI 建议分字段、双方身份（昵称）内部可见、有无截图一眼可知；实际两段 `JSON.stringify` 直出、无身份区
+- **确诊根因**：`app/innerharbour/review/[id]/page.tsx:175-177` 时间线、`181` AI 建议直接 `<pre>{JSON.stringify}</pre>`；页面从未查 `users` 表，`filer_id／target_id` 只躺在行里不展示。证据：用户截图原文＋上述三行
+- **关联 UR**：UR E.31
+- **修复**：新增「涉案双方（仅内部）」区（service 查昵称；陈述仍保持甲乙匿名）；时间线按 `kind` 中文标签＋昵称＋时间列表（未知 kind 回落原文）；到场显示昵称＋到达时间＋房主标记；AI 建议分字段（空即「无 AI 建议」）；证据区保留签名链接，空时明示「投诉人未上传截图」
+- **修复验证**：`npm run build` 过＋用户浏览器亲验（本案：甲乙身份可见、时间线 1 事件 2 到场逐条、AI 显示无建议）
+- **回归范围**：`/innerharbour/review` 队列页不动；判定动作不动（另案修）
+
+### DEF-20261014-002 投诉详情点执行跳 404，判定无效
+
+- **状态**：Fixing（2026-10-14：已落条即修，待用户浏览器复验转 Verified；待用户补一句 404 时地址栏 URL 做最终定界）
+- **严重度**：P0（审核执行链完全不可用：点执行无判定、无反馈）
+- **发现日期 / 报告人**：2026-10-14 / @yuki
+- **复现步骤**：moderator 开 `safety · escalated` 案件详情 → 填内部备注 → 点「執行」→ 跳 404 页，案件状态不变
+- **期望 vs 实际**：期望判定成功回队列（或明确报错如需二次验证／涉己回避）；实际裸 404，原因零信息
+- **初判根因**：`decide` 内守门失败走 `requireAdminPage` → `opsPage.ts:26 notFound()`（`reason none`：动作时刻会话过期／admin 行不可见；或 `forbidden_role`），以及复查空行 `page:68 notFound()`；用户阅读 JSON 耗时越长，会话过期命中率越高。`need_stepup／need_mfa` 本应去 MFA 页（存在），故 404 只可能来自上述裸 notFound 分支。证据：`lib/ops.ts:56-64`＋`opsPage.ts:23-26`＋`page:60-68`
+- **关联 UR**：UR E.31
+- **修复**：`decide` 所有失败改走 `redirect(.../review/:id?err=<码>)` 并在页顶显中文横幅（会话过期／无权限／状态已变／涉己回避／需第二人／操作频繁／执行失败等）；`notFound()` 仅保留给案件行真不存在；成功仍回队列。任何分支不再裸 404
+- **修复验证**：`npm run build` 过＋用户浏览器亲验（正常执行成功；另请用户确认之前是否会话过期／停留过久）
+- **回归范围**：判定成功路径（decideComplaint 不动）；MFA／step-up 跳转不动
