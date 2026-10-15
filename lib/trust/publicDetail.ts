@@ -40,14 +40,14 @@ function num(v: unknown): number {
 }
 
 /** 按類型聚合「還在有效期內」的事件（`:reversed` 沖銷行抵消原事件的次數與分值）。 */
-export function trustBreakdown(rows: LedgerRow[], nowMs: number): TrustBreakdownItem[] {
+export function trustBreakdown(rows: LedgerRow[], nowMs: number, includeHidden = false): TrustBreakdownItem[] {
   const acc = new Map<string, { count: number; points: number }>();
   for (const r of rows) {
     const rawKind = str(r.kind);
     if (rawKind === "") continue;
     const reversed = rawKind.endsWith(":reversed");
     const kind = reversed ? rawKind.slice(0, -":reversed".length) : rawKind;
-    if (HIDDEN_KINDS.has(kind)) continue;
+    if (!includeHidden && HIDDEN_KINDS.has(kind)) continue;
     const expires = ms(r.expires_at);
     if (!Number.isFinite(expires) || nowMs >= expires) continue;
     const cur = acc.get(kind) ?? { count: 0, points: 0 };
@@ -119,7 +119,8 @@ export function upheld180d(rows: LedgerRow[], nowMs: number): number {
   return Math.max(0, n);
 }
 
-export function buildPublicTrustDetail(rows: LedgerRow[], nowMs: number): PublicTrustDetail {
+/** includeHidden＝本人視角（自己能看到投訴未成立／惡意投訴／退還記錄）；他人視角恒 false。 */
+export function buildPublicTrustDetail(rows: LedgerRow[], nowMs: number, includeHidden = false): PublicTrustDetail {
   return {
     tier_lines: {
       trusted: TRUST_CONFIG.tier_trusted,
@@ -127,7 +128,7 @@ export function buildPublicTrustDetail(rows: LedgerRow[], nowMs: number): Public
       watch: TRUST_CONFIG.tier_watch,
       newbie_completed: TRUST_CONFIG.newbie_completed,
     },
-    breakdown: trustBreakdown(rows, nowMs),
+    breakdown: trustBreakdown(rows, nowMs, includeHidden),
     trend: trustTrend(rows, nowMs),
     monthly_attend: monthlyAttend(rows, nowMs),
     upheld_180d: upheld180d(rows, nowMs),

@@ -2498,7 +2498,7 @@ paths:
   /api/v1/me/trust:
     get:
       operationId: getMyTrust
-      summary: 本人诚信（需登录；分数＋等级＋完成数＋账本倒序＋keyset；UR E.30）
+      summary: 本人诚信（需登录；分数＋等级＋完成数＋账本倒序＋keyset；UR E.30；另带 member_since、detail 聚合明细（与他人详情同形，本人含投诉未成立／惡意／退還），2026-10-15）
       security:
         - bearerAuth: []
       parameters:

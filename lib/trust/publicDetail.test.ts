@@ -34,6 +34,15 @@ describe("trustBreakdown", () => {
   });
 });
 
+describe("includeHidden（本人視角）", () => {
+  it("shows filer-side and refund kinds only to the owner", () => {
+    const rows = [row("complaint_dismissed", -2, 2), row("leave_refund", 6, 2), row("attend", 2, 1)];
+    expect(trustBreakdown(rows, NOW).map((x) => x.kind)).toEqual(["attend"]);
+    expect(trustBreakdown(rows, NOW, true).map((x) => x.kind).sort()).toEqual(["attend", "complaint_dismissed", "leave_refund"]);
+    expect(buildPublicTrustDetail(rows, NOW, true).breakdown).toHaveLength(3);
+  });
+});
+
 describe("trend / monthly / upheld", () => {
   it("trend has 8 weekly points ending at the current score and reflects when events happened", () => {
     const rows = [row("leave_late", -6, 3), row("attend", 2, 40, 180), row("attend", 2, 30, 180), row("attend", 2, 20, 180)];

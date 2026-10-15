@@ -3,6 +3,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { TRUST_CONFIG, TRUST_KIND_TEXT } from "@/lib/trust/config";
 import { computeTrust, trustTier } from "@/lib/trust/score";
 import { completionRate } from "@/lib/trust/settle";
+import { buildPublicTrustDetail } from "@/lib/trust/publicDetail";
 
 /**
  * UR E.30 本人诚信（🔒）。
@@ -52,6 +53,8 @@ export async function GET(req: Request): Promise<Response> {
     if (e.kind === "cancel") cancel90d += 1;
     if (e.kind === "leave_late") leaveLate90d += 1;
   }
+  const { data: meRow } = await svc.from("users").select("created_at").eq("id", userId).maybeSingle();
+  const memberSince = typeof (meRow as { created_at?: unknown } | null)?.created_at === "string" ? (meRow as { created_at: string }).created_at : null;
   let page = ledger;
   if (Number.isFinite(cursorMs)) {
     page = ledger.filter((r) => {
@@ -114,6 +117,9 @@ export async function GET(req: Request): Promise<Response> {
     completion_rate: await completionRate(svc, userId, nowMs),
     cancel_90d: cancel90d,
     leave_late_90d: leaveLate90d,
+    member_since: memberSince,
+    // 與他人詳情同一套聚合（本人視角含投訴未成立／惡意／退還；逐條記錄仍在 ledger）
+    detail: buildPublicTrustDetail(ledger, nowMs, true),
     restricted_until: tier === "restricted" ? new Date(nowMs + TRUST_CONFIG.restricted_days * 24 * 3600_000).toISOString() : null,
     ledger: items,
     nextCursor,
