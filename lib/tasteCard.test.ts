@@ -8,7 +8,7 @@ const NOW = "2026-10-14T12:00:00.000Z";
 const empty: TasteInputs = { preferences: null, checkins: null, memory: null };
 const prefs = { favorites: ["japanese_whisky"], likes: ["gin_tonic"], dislikes: ["lager"] };
 const checkins = { sample_count: 8, groups: [{ key: "whisky", strength: 1, items: ["japanese_whisky"] }] };
-const memory = { likes: ["梅酒"], dislikes: [], drink_types: [], abv: "mid", style: { tone: "輕鬆", formality: "", emoji: "some", length: "short" } };
+const memory = { likes: ["梅酒"], dislikes: [], drink_types: [], abv: "mid", style: { tone: "輕鬆", formality: "", emoji: "some", length: "short" }, updated_at: NOW };
 
 const good = {
   persona: { title: "夜色威士忌旅人", emoji: "🥃", tagline: "先猜一猜：愛慢慢品的人", blurb: "你喜歡把一晚慢慢喝成一個故事，偏愛有層次的酒。" },
@@ -40,10 +40,12 @@ describe("readiness", () => {
 describe("refresh policy", () => {
   const day = 24 * 3600_000;
   const now = Date.parse(NOW);
-  it("no card → generate; same inputs → no; changed inputs only after 24h", () => {
+  it("no card → generate; same inputs → no; changed inputs only after 30 min", () => {
     expect(tasteCardNeedsRefresh(null, "h", now)).toBe(true);
     expect(tasteCardNeedsRefresh({ inputs_hash: "h", computed_at: new Date(now - 30 * day).toISOString() }, "h", now)).toBe(false);
-    expect(tasteCardNeedsRefresh({ inputs_hash: "h", computed_at: new Date(now - 2 * 3600_000).toISOString() }, "h2", now)).toBe(false);
+    // 輸入變了：30 分鐘內不連刷，之後即可（剛和酒保聊完回主頁要能更新）
+    expect(tasteCardNeedsRefresh({ inputs_hash: "h", computed_at: new Date(now - 5 * 60_000).toISOString() }, "h2", now)).toBe(false);
+    expect(tasteCardNeedsRefresh({ inputs_hash: "h", computed_at: new Date(now - 31 * 60_000).toISOString() }, "h2", now)).toBe(true);
     expect(tasteCardNeedsRefresh({ inputs_hash: "h", computed_at: new Date(now - 25 * 3600_000).toISOString() }, "h2", now)).toBe(true);
   });
   it("manual refresh limit is 3 per 24h and old entries expire", () => {
@@ -101,6 +103,7 @@ describe("prompt", () => {
     const m = buildTasteCardMessages({ preferences: prefs, checkins, memory });
     expect(m[0].content).toContain("絕不引用任何對話原句");
     expect(m[0].content).toContain("不推斷也不提及");
+    expect(m[0].content).toContain("最近的自述");     // 記憶（最新自述）優先於歷史打卡
     expect(JSON.parse(m[1].content).data.preferences.favorites).toEqual(["japanese_whisky"]);
   });
 });

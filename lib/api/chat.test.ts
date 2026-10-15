@@ -366,3 +366,24 @@ describe("peerIdsOfMembers", () => {
     expect(peerIdsOfMembers([{ user_id: 42 } as never], "me")).toEqual([]);
   });
 });
+
+describe("位置分享附件", () => {
+  const base = { kind: "text", body: "📍 我的位置", client_msg_id: "c1" };
+  it("接受合法位置，坐標收斂到 5 位小數、label 清洗截斷", () => {
+    const r = parseCreateMessageBody({ ...base, attachments: [{ location: { lat: 22.2783456789, lng: 114.1747123456, label: "  中環\n蘭桂坊  " } }] });
+    expect(r).toEqual({ kind: "text", body: "📍 我的位置", location: { lat: 22.27835, lng: 114.17471, label: "中環 蘭桂坊" }, client_msg_id: "c1" });
+    const long = parseCreateMessageBody({ ...base, attachments: [{ location: { lat: 1, lng: 2, label: "x".repeat(300) } }] });
+    expect("location" in long && long.location?.label?.length).toBe(120);
+    const noLabel = parseCreateMessageBody({ ...base, attachments: [{ location: { lat: 1, lng: 2 } }] });
+    expect("location" in noLabel && noLabel.location).toEqual({ lat: 1, lng: 2 });
+  });
+  it("拒絕越界／非數字／缺字段", () => {
+    for (const loc of [{ lat: 91, lng: 0 }, { lat: 0, lng: 181 }, { lat: "22", lng: 114 }, { lat: NaN, lng: 1 }, { lat: 1 }, null, "x"]) {
+      expect(parseCreateMessageBody({ ...base, attachments: [{ location: loc }] })).toHaveProperty("error");
+    }
+  });
+  it("位置與打卡分享互斥：附件只能一枚", () => {
+    expect(parseCreateMessageBody({ ...base, attachments: [{ location: { lat: 1, lng: 2 } }, { checkin_id: "a" }] })).toHaveProperty("error");
+  });
+});
+

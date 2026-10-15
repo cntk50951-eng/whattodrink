@@ -194,6 +194,33 @@ export type ChatAttachment = {
 /** 超限错误码（413；调用方据此置状态，普通校验仍 400）。 */
 export type ChatParseError = { error: string; status?: 413 };
 
+/**
+ * 位置分享附件（UR：聊天「分享我的位置」；非文件，当时快照，不是实时追踪）。
+ * 好友和陌生人会话都允许（陌生人计入 3 条上限）；坐标由发送者自己定位得到，服务端只校验范围／形狀。
+ */
+export type LocationShareAttachment = {
+  lat: number;
+  lng: number;
+  /** 展示名（逆地理的地名／地址，纯文本；缺省空） */
+  label?: string;
+};
+
+/** 解析 `attachments:[{location:{lat,lng,label?}}]`；形狀不對回 null（調用方 400）。坐標收斂到 5 位小數（約 1m）。 */
+export function parseLocationAttachment(first: unknown): LocationShareAttachment | null {
+  if (typeof first !== "object" || first === null) return null;
+  const loc = (first as Record<string, unknown>).location;
+  if (typeof loc !== "object" || loc === null) return null;
+  const { lat, lng, label } = loc as Record<string, unknown>;
+  if (typeof lat !== "number" || typeof lng !== "number" || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  const clean = typeof label === "string" ? label.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 120) : "";
+  return {
+    lat: Math.round(lat * 1e5) / 1e5,
+    lng: Math.round(lng * 1e5) / 1e5,
+    ...(clean === "" ? {} : { label: clean }),
+  };
+}
+
 /** 站内打卡分享附件（非文件，无 path／bucket；可见性由路由验）。 */
 export type CheckinShareAttachment = {
   checkin_id: string;
@@ -204,7 +231,7 @@ export type CheckinShareAttachment = {
 export function parseCreateMessageBody(
   raw: unknown,
 ):
-  | { kind: "text"; body: string; share?: CheckinShareAttachment; client_msg_id: string }
+  | { kind: "text"; body: string; share?: CheckinShareAttachment; location?: LocationShareAttachment; client_msg_id: string }
   | { kind: "image"; body: string | null; attachments: ChatAttachment[]; client_msg_id: string }
   | { kind: "audio"; attachments: ChatAttachment[]; client_msg_id: string }
   | ChatParseError {
@@ -222,6 +249,12 @@ export function parseCreateMessageBody(
       return { error: "分享附件只要 1 個" };
     }
     const first = raw.attachments[0] as Record<string, unknown> | null;
+    // 位置卡：{location:{lat,lng,label?}}（與打卡分享二選一）
+    if (typeof first === "object" && first !== null && first.location !== undefined) {
+      const location = parseLocationAttachment(first);
+      if (location === null) return { error: "location 非法（lat／lng 范围或形状）" };
+      return { kind: "text", body, location, client_msg_id };
+    }
     const checkinId = typeof first === "object" && first !== null ? first.checkin_id : null;
     if (typeof checkinId !== "string" || checkinId === "" || checkinId.length > 64 || !/^[A-Za-z0-9-]+$/.test(checkinId)) {
       return { error: "checkin_id 非法" };

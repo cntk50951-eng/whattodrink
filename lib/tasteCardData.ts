@@ -58,6 +58,7 @@ export async function loadTasteInputs(svc: SupabaseClient, userId: string): Prom
   const memory: TasteInputs["memory"] = doc === null ? null : {
     likes: doc.taste.likes, dislikes: doc.taste.dislikes, drink_types: doc.taste.drink_types, abv: doc.taste.abv,
     style: { tone: doc.style.tone, formality: doc.style.formality, emoji: doc.style.emoji, length: doc.style.length },
+    updated_at: doc.updated_at,
   };
   return { preferences, checkins, memory };
 }

@@ -36,6 +36,8 @@ export type TasteInputs = {
   memory: {
     likes: string[]; dislikes: string[]; drink_types: string[]; abv: string;
     style: { tone: string; formality: string; emoji: string; length: string };
+    /** 記憶最後更新時間（ISO）：最近的自述，與舊偏好衝突時以它為準 */
+    updated_at: string;
   } | null;
 };
 
@@ -61,7 +63,10 @@ export function tasteInputsHash(i: TasteInputs): string {
   return createHash("sha1").update(JSON.stringify(i)).digest("hex").slice(0, 20);
 }
 
-/** 是否該（自動）重算：沒有卡，或輸入變了且距上次 ≥ 24h。手動刷新另走限額。 */
+/** 輸入變了後，自動重算的最短間隔（30 分鐘：剛和酒保聊完改了口味，回主頁就該更新；仍防連續狂刷）。 */
+export const TASTE_AUTO_MIN_INTERVAL_MS = 30 * 60_000;
+
+/** 是否該（自動）重算：沒有卡，或輸入變了且距上次 ≥ 30 分鐘。手動刷新另走限額。 */
 export function tasteCardNeedsRefresh(
   cached: { inputs_hash: string; computed_at: string } | null,
   newHash: string,
@@ -70,7 +75,7 @@ export function tasteCardNeedsRefresh(
   if (cached === null) return true;
   if (cached.inputs_hash === newHash) return false;
   const t = Date.parse(cached.computed_at);
-  return !Number.isFinite(t) || nowMs - t >= 24 * 3600_000;
+  return !Number.isFinite(t) || nowMs - t >= TASTE_AUTO_MIN_INTERVAL_MS;
 }
 
 /** 手動重新生成限額：近 24h 內最多 3 次；返回剩餘次數（≥1 才可刷新）。 */
@@ -94,6 +99,7 @@ export function tasteCardSystemPrompt(): string {
     "你是一位幽默、溫暖的酒類品味分析師，為酒局社交 App 的用戶寫一張公開的「口味卡」。只輸出一個 JSON 對象，不要任何其他文字。",
     "輸入是用戶的口味設定（keys 為酒類代碼）、公開打卡的酒類統計、以及從他與 AI 酒保相處中整理出的口味與說話風格摘要。依此推斷他的口味與大致性格（愛冒險／念舊／社交型／獨處型…），寫得生動有趣、像朋友在講，用繁體中文（香港用字，可帶少量口語）。",
     "必守規則：",
+    "0. 來源優先級與時效：酒保記憶是用戶最近的自述（有 updated_at），口味設定是他自己填的標籤，公開打卡統計是歷史行為。三者衝突時以「記憶裡最近的自述」為主：例如記憶說他最近改喝清酒，而歷史打卡多是啤酒，人設與 picks 要反映清酒，舊的啤酒偏好寫成「也愛」或放進 scenes；不要被歷史打卡的數量壓過他剛說的話。picks 至少有一杯直接對應記憶裡的 likes／drink_types。",
     "1. 只講正面、有趣的描述；不貼負面標籤；不評價人品。",
     "2. 公開卡片：絕不引用任何對話原句，不透露資料來自聊天或私密打卡，不寫日期、地點、人名、聯絡方式。",
     "3. 不推斷也不提及：健康／醫療、性取向、宗教、政治、年齡、職業收入、家庭狀況。",

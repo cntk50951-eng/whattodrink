@@ -4515,7 +4515,7 @@ paths:
           $ref: "#/components/responses/Internal"
     post:
       operationId: sendMessage
-      summary: 發送（text／image／audio；需登录；限流＋冪等；E.13 text 可帶分享附件一枚；D.8 image caption＋文件存在性＋413；D.10 陌生人配额＋kind 门＋quota；隐身不拦，UR D.10）
+      summary: 發送（text／image／audio；需登录；限流＋冪等；E.13 text 可帶分享附件一枚（{checkin_id,place?}）或位置卡附件一枚（{location:{lat,lng,label?}}，UR 聊天分享我的位置：發送者定位快照，好友／陌生人都可，陌生人計入 3 條上限；lat∈[-90,90]、lng∈[-180,180]，坐標收斂 5 位小數，label ≤120）；D.8 image caption＋文件存在性＋413；D.10 陌生人配额＋kind 门＋quota；隐身不拦，UR D.10）
       security:
         - bearerAuth: []
       parameters:
