@@ -2578,7 +2578,7 @@ paths:
   /api/v1/me/saves:
     get:
       operationId: listMySaves
-      summary: 我的收藏列表（需登录；本人、收藏时间倒序；删帖／不可见自动消失，UR E.26）
+      summary: 我的收藏列表（需登录；本人、收藏时间倒序；删帖／不可见自动消失，UR E.26）；行另带 author_id／author_nickname／author_avatar_url（作者公开两列，2026-10-15；Pin 回顾用）
       security:
         - bearerAuth: []
       parameters:

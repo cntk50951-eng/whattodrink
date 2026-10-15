@@ -14,7 +14,8 @@ import { friendIdsOf } from "@/lib/friends";
  */
 
 // 沿 checkins/mine 同列（打卡公开列；归档不联查，收藏只收现行帖）。
-const SAVE_COLUMNS = "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript,beers(id,name,emoji,category,tagline,icon_url)";
+// 帶 user_id：可見性判定要用作者 id（以前沒選，owner 恒為 null → 自己的私密／好友可見帖與好友的 friends 帖被誤丟），同時給作者信息 join 用。
+const SAVE_COLUMNS = "id,user_id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript,beers(id,name,emoji,category,tagline,icon_url)";
 
 // 歸檔镜像同列（photo／note／audio 讀側置空，只留定位＋店名＋時間給過期行）。
 const ARCHIVE_COLUMNS = "id,user_id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at";
@@ -110,5 +111,35 @@ export async function GET(req: Request): Promise<Response> {
     if (mapped === null) continue;
     checkins.push({ ...mapped, saved_by_me: true });
   }
-  return apiOk({ checkins });
+  // 作者信息（頭像＋暱稱＋id；收藏／Pin 回顧時看得出是誰的打卡）。只取公開兩列；查不到就缺席，不炸整頁
+  const authorIds = new Set<string>();
+  for (const s of saveRows) {
+    const id = s.checkin_id as string;
+    const owner = ((postById.get(id) ?? archivedById.get(id)) as { user_id?: unknown } | undefined)?.user_id;
+    if (typeof owner === "string") authorIds.add(owner);
+  }
+  const authorById = new Map<string, { nickname: string | null; avatar_url: string | null }>();
+  if (authorIds.size > 0) {
+    try {
+      const svc = await createServiceClient();
+      const { data: us } = await svc.from("users").select("id,nickname,avatar_url").in("id", [...authorIds]);
+      for (const u of ((us ?? []) as Record<string, unknown>[])) {
+        if (typeof u.id === "string") {
+          authorById.set(u.id, {
+            nickname: typeof u.nickname === "string" && u.nickname !== "" ? u.nickname : null,
+            avatar_url: typeof u.avatar_url === "string" ? u.avatar_url : null,
+          });
+        }
+      }
+    } catch {
+      // 靜默：沒有作者信息就當缺席
+    }
+  }
+  const withAuthor = checkins.map((c) => {
+    const src = (postById.get(c.id) ?? archivedById.get(c.id)) as { user_id?: unknown } | undefined;
+    const owner = typeof src?.user_id === "string" ? src.user_id : null;
+    const a = owner === null ? undefined : authorById.get(owner);
+    return owner === null ? c : { ...c, author_id: owner, author_nickname: a?.nickname ?? null, author_avatar_url: a?.avatar_url ?? null };
+  });
+  return apiOk({ checkins: withAuthor });
 }
