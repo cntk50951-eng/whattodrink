@@ -2562,6 +2562,7 @@ paths:
               schema:
                 type: object
                 required: [tier, score, completed_count, hosted_count, completion_rate, cancel_90d]
+                description: "另有 leave_late_90d、leave_90d、member_since、detail{tier_lines, breakdown[{kind,label,count,points,positive}], trend[{at,score}]（8 周）, monthly_attend[{month,count}]（6 月）, upheld_180d}（聚合明细，不含逐条事件／投诉内容；2026-10-15）"
         "400":
           $ref: "#/components/responses/InvalidParams"
         "401":

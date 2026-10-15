@@ -2,9 +2,10 @@ import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { computeTrust, trustTier } from "@/lib/trust/score";
 import { completionRate } from "@/lib/trust/settle";
+import { buildPublicTrustDetail } from "@/lib/trust/publicDetail";
 
 /**
- * UR E.30 他人诚信（🔒；产品决定 2026-10-14：回精确分 score，供主页一眼可见）。
+ * UR E.30 他人诚信（🔒；产品决定 2026-10-14：回精确分 score，供主页一眼可见；2026-10-15 起带 `detail` 聚合明细供详情页）。
  * `GET /api/v1/users/:id/trust` —— `{tier, completed_count, hosted_count,
  * completion_rate, cancel_90d}`。拉黑任一方向 404；completion_rate 本期 null
  * （出席确认 C 阶段才有口径，占位）。
@@ -51,9 +52,15 @@ export async function GET(
     svc.from("party_events").select("kind").eq("user_id", id).gte("created_at", since90).limit(2000),
   ]);
   let cancel90d = 0;
+  let leaveLate90d = 0;
+  let leave90d = 0;
   for (const e of ((ev90 ?? []) as unknown[]) as { kind?: unknown }[]) {
     if (e.kind === "cancel") cancel90d += 1;
+    if (e.kind === "leave_late") leaveLate90d += 1;
+    if (e.kind === "leave" || e.kind === "leave_late") leave90d += 1;
   }
+  const { data: u } = await svc.from("users").select("created_at").eq("id", id).maybeSingle();
+  const memberSince = typeof (u as { created_at?: unknown } | null)?.created_at === "string" ? (u as { created_at: string }).created_at : null;
   return apiOk({
     tier: trustTier(score, completed),
     score,
@@ -61,5 +68,10 @@ export async function GET(
     hosted_count: hostedCount ?? 0,
     completion_rate: await completionRate(svc, id, nowMs),
     cancel_90d: cancel90d,
+    // 詳情頁（點主頁誠信小格進入）：聚合明細，不含逐條事件與投訴內容
+    leave_late_90d: leaveLate90d,
+    leave_90d: leave90d,
+    member_since: memberSince,
+    detail: buildPublicTrustDetail(ledger, nowMs),
   });
 }
