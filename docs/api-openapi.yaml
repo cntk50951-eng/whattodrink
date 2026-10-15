@@ -81,6 +81,73 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/users/{id}/trail:
+    get:
+      operationId: getUserTrail
+      summary: 足跡回放（他人視角；需登录；id 或 me）。state=hidden 對方沒開放／locked 開放給好友但你不是好友（不給點位）／visible 好友（stops：公開或好友可見、最近 30 天、延遲 24h、坐標模糊約 100 米、無照片文字 id）／self（本人，只回設置）。拉黑 404
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "{state: hidden|locked|visible|self, stops?: [{at, lat, lng, place_name, emoji}], trail_visibility?}"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [state]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 拉黑
+  /api/v1/me/trail:
+    get:
+      operationId: getMyTrailVisibility
+      summary: 足跡回放公開設置（本人）
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "{trail_visibility: off|friends}"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [trail_visibility]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      operationId: setMyTrailVisibility
+      summary: 修改足跡回放公開設置（off 不公開／friends 好友可見；需先跑 0060）
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [trail_visibility]
+              properties:
+                trail_visibility:
+                  type: string
+                  enum: [off, friends]
+      responses:
+        "200":
+          description: "{trail_visibility}"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [trail_visibility]
+        "400":
+          description: 參數非法
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /api/v1/users/{id}/taste-card:
     get:
       operationId: getTasteCard
