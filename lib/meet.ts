@@ -442,13 +442,13 @@ export function dropNoisyGroups(c: MeetCriteria): { criteria: MeetCriteria; drop
   return { criteria: next, droppedGroups };
 }
 
-/** LLM 系統提示（固定流水線①：只翻條件，不寫 SQL；规则写死＋少样本，防模型自悟）。 */
-export function meetParsePrompt(): { system: string } {
+/** 白名單字段說明（遇見找人與智能搜索計劃共用）。 */
+export function meetCriteriaSchemaText(): string {
   const subMap = TASTE_GROUP_KEYS.map((g) => {
     const subs = (TASTE_GROUPS[g as TasteGroupKey] as readonly string[]).join(",");
     return `${g}(${subs})`;
   }).join("\n");
-  const enums = [
+  return [
     `gender: male|female`,
     `age_min/age_max: 18-99 整数`,
     `height_min/height_max: 140-220 整数`,
@@ -461,6 +461,11 @@ export function meetParsePrompt(): { system: string } {
     `online_only: true（明确说只要在线才给）`,
     `大类→子类：\n${subMap}`,
   ].join("\n");
+}
+
+/** LLM 系統提示（固定流水線①：只翻條件，不寫 SQL；规则写死＋少样本，防模型自悟）。 */
+export function meetParsePrompt(): { system: string } {
+  const enums = meetCriteriaSchemaText();
   const shots = [
     `输入：我想找一個女生\n输出：{"criteria": {"gender": "female"}, "ignored": []}`,
     `输入：30 歲左右嘅女仔\n输出：{"criteria": {"gender": "female", "age_min": 27, "age_max": 33}, "ignored": []}`,

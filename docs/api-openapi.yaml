@@ -141,6 +141,82 @@ paths:
           description: "{deleted}"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /api/v1/search/plan:
+    post:
+      operationId: searchPlan
+      summary: 遇見智能搜索·計劃（需登录）。一句话（≤120 字）→ LLM 拆成 1–4 类意图 people／places／parties／posts（字段白名单校验，每类最多一个）；扣遇见每日次数（解析成功才扣），审核同 meet。真正查询由客户端用既有接口／高德执行
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  maxLength: 120
+      responses:
+        "200":
+          description: "{intents:[{type:people,criteria}|{type:places,keywords,near_me,radius_m,open_24h,open_now}|{type:parties,keywords,when,near_me,radius_m}|{type:posts,tags,hashtags,keywords,near_me,radius_m,within_hours}], ignored, remaining_today}"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [intents, ignored, remaining_today]
+        "400":
+          description: query 缺失／过长
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 内容未通过审核
+        "429":
+          description: 今日次数已用完
+        "503":
+          description: AI／审核暂不可用
+  /api/v1/search/posts:
+    post:
+      operationId: searchPosts
+      summary: 遇见智能搜索·帖子（需登录；不扣次数）。只查 public、时效内；文字条件（酒类 tags／#hashtags／关键词）任一命中，给了经纬度按半径过滤并按距离排；返回同地图釘口径（街区级模糊座标、缩图）＋tags／hashtags／distance_m，≤20 条
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tags:
+                  type: array
+                  items:
+                    type: string
+                hashtags:
+                  type: array
+                  items:
+                    type: string
+                keywords:
+                  type: array
+                  items:
+                    type: string
+                lat:
+                  type: number
+                lng:
+                  type: number
+                radius_m:
+                  type: integer
+                within_hours:
+                  type: integer
+      responses:
+        "200":
+          description: "{posts:[PinJson＋tags＋hashtags＋distance_m?]}"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [posts]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /api/v1/users/{id}/trail:
     get:
       operationId: getUserTrail
