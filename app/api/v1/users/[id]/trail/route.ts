@@ -9,6 +9,7 @@ import { buildReplayStops, parseTrailVisibility, TRAIL_WINDOW_MS } from "@/lib/t
  *  - hidden：對方沒開放（或 0060 未跑）→ App 不顯示卡
  *  - locked：對方開放給好友，你還不是好友 → 鎖定預告卡，**不給任何點位**
  *  - visible：好友 → `stops`（公開／好友可見、最近 30 天、延遲 24h、坐標模糊約 100 米、無照片／文字／id）
+ *    0062：對方設 public 時，陌生人也 visible，但只含 public 打卡（好友仍是 public＋friends）
  * 拉黑雙向 404。
  */
 export async function GET(
@@ -45,16 +46,19 @@ export async function GET(
     .select("user_id,friend_id,status")
     .or(`and(user_id.eq.${userId},friend_id.eq.${targetId}),and(user_id.eq.${targetId},friend_id.eq.${userId})`)
     .limit(4);
-  if (!areFriends(userId, targetId, ((fs ?? []) as unknown[]) as { user_id: unknown; friend_id: unknown; status: unknown }[])) {
+  const isFriend = areFriends(userId, targetId, ((fs ?? []) as unknown[]) as { user_id: unknown; friend_id: unknown; status: unknown }[]);
+  if (!isFriend && setting !== "public") {
     return apiOk({ state: "locked" });
   }
+  // 好友 public＋friends；陌生人（僅 setting=public 才到這裡）只給 public。
+  const allowedVis = isFriend ? ["public", "friends"] : ["public"];
 
   const nowMs = Date.now();
   const since = new Date(nowMs - TRAIL_WINDOW_MS).toISOString();
   const cols = "visibility,lat,lng,place_name,created_at,beer_id";
   const [{ data: mainRows }, { data: archRows }] = await Promise.all([
-    svc.from("checkins").select(cols).eq("user_id", targetId).in("visibility", ["public", "friends"]).gte("created_at", since).limit(500),
-    svc.from("checkins_archive").select(cols).eq("user_id", targetId).in("visibility", ["public", "friends"]).gte("created_at", since).limit(500),
+    svc.from("checkins").select(cols).eq("user_id", targetId).in("visibility", allowedVis).gte("created_at", since).limit(500),
+    svc.from("checkins_archive").select(cols).eq("user_id", targetId).in("visibility", allowedVis).gte("created_at", since).limit(500),
   ]);
   const rows = [...((mainRows ?? []) as unknown[]), ...((archRows ?? []) as unknown[])] as Record<string, unknown>[];
   const beerIds = [...new Set(rows.map((r) => r.beer_id).filter((x): x is string => typeof x === "string" && x !== ""))];

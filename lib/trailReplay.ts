@@ -7,10 +7,11 @@
 export const TRAIL_WINDOW_MS = 30 * 24 * 3600 * 1000;
 export const TRAIL_DELAY_MS = 24 * 3600 * 1000;
 
-export type TrailVisibility = "off" | "friends";
+/** off 不公開／friends 好友可見／public 所有人可見（0062；陌生人只看到 public 打卡）。 */
+export type TrailVisibility = "off" | "friends" | "public";
 
 export function parseTrailVisibility(v: unknown): TrailVisibility {
-  return v === "friends" ? "friends" : "off";
+  return v === "friends" || v === "public" ? v : "off";
 }
 
 /** 小數 3 位≈110 米（緯度方向）。 */

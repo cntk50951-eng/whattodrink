@@ -3,6 +3,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { canViewCheckin, parseMineParams, toMineRow } from "@/lib/api/checkins";
 import { parseCheckinIdParam } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
+import { parseSavesVisibility, savesAccess } from "@/lib/api/privacy";
 
 /**
  * 看别人收藏（WEB_HANDOFF_USER_SAVES，iOS 别人主页「收藏」标签）。
@@ -10,7 +11,9 @@ import { friendIdsOf } from "@/lib/friends";
  * （`{checkins:[...]}`，收藏时间倒序，keyset cursor＝收藏 created_at ISO；
  * 行复用打卡公开列＋`saved_by_me` 为**查看者**是否收藏）。
  * 隐私（web 定）：
- * - 本人随便看；他人只限互好友（accepted），陌生人 403（iOS 藏标签）；
+ * - 本人随便看；他人默认只限互好友（accepted），陌生人 403（iOS 藏标签）；
+ *   0062 `users.saves_visibility`：public＝任何人可看；private＝好友也只得空列表（不暴露设置）；
+ *   列未建／读取出错一律当 friends（旧行为）。
  *   拉黑任一方向 404（不泄存在，沿 profile）。
  * - 只回查看者看得到的帖（private／看不到的 friends 帖过滤，删帖消失）；
  *   过滤在 limit 取行后做（与 /me/saves 同口径，页内不足下页补）。
@@ -49,9 +52,20 @@ export async function GET(
         `and(user_id.eq.${userId},friend_id.eq.${targetId}),and(user_id.eq.${targetId},friend_id.eq.${userId})`,
       )
       .limit(2);
-    if (!Array.isArray(relRows) || relRows.length === 0) {
+    const isFriend = Array.isArray(relRows) && relRows.length > 0;
+    const { data: setRow, error: setErr } = await svc
+      .from("users")
+      .select("saves_visibility")
+      .eq("id", targetId)
+      .maybeSingle();
+    const setting = parseSavesVisibility(
+      setErr === null ? (setRow as { saves_visibility?: unknown } | null)?.saves_visibility : null,
+    );
+    const access = savesAccess(setting, false, isFriend);
+    if (access === "forbidden") {
       return apiError("forbidden", "只限好友查看收藏", 403);
     }
+    if (access === "empty") return apiOk({ checkins: [] });
   }
   const q = new URL(req.url).searchParams;
   const parsed = parseMineParams(q);

@@ -6,9 +6,10 @@ const iso = (agoMs: number) => new Date(NOW - agoMs).toISOString();
 const H = 3600 * 1000;
 
 describe("trailReplay", () => {
-  it("parseTrailVisibility：只認 friends，其餘一律 off", () => {
+  it("parseTrailVisibility：認 friends／public（0062），其餘一律 off", () => {
     expect(parseTrailVisibility("friends")).toBe("friends");
-    expect(parseTrailVisibility("public")).toBe("off");
+    expect(parseTrailVisibility("public")).toBe("public");
+    expect(parseTrailVisibility("everyone")).toBe("off");
     expect(parseTrailVisibility(null)).toBe("off");
   });
   it("fuzzCoord 取 3 位小數", () => {

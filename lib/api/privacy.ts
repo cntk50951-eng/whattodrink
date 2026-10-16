@@ -8,10 +8,44 @@ import { canViewCheckin } from "./checkins";
 export type CheckinVisibility = "public" | "friends" | "private";
 
 /** 矩阵 D：新打卡的可见性由发布时的模式定格（切换模式不追溯旧帖）。 */
-export function checkinVisibilityFor(mode: string | null | undefined): CheckinVisibility {
+export function checkinVisibilityFor(
+  mode: string | null | undefined,
+  override?: unknown,
+): CheckinVisibility {
+  // 隐身永远 private（压过用户设置）；其余：用户设了默认可见性就用它，没设跟随模式（0062）。
   if (mode === "stealth") return "private";
+  const o = parseVisibility(override);
+  if (o !== null) return o;
   if (mode === "friends") return "friends";
   return "public";
+}
+
+/** 白名单解析；非法／缺省回 null（调用方决定回退）。 */
+export function parseVisibility(v: unknown): CheckinVisibility | null {
+  return v === "public" || v === "friends" || v === "private" ? v : null;
+}
+
+/** 收藏可见性（0062）：缺省／非法＝friends（与旧行为一致：仅互为好友）。 */
+export function parseSavesVisibility(v: unknown): CheckinVisibility {
+  return parseVisibility(v) ?? "friends";
+}
+
+/**
+ * 看别人收藏列表的门（0062）：
+ * - allow：本人；public（任何人）；friends（好友）
+ * - forbidden：陌生人且对方没设 public（沿旧 403，iOS 对陌生人本来就藏标签）
+ * - empty：对方设 private 但查看者是好友——回空列表，不暴露「对方设置了不公开」
+ * 返回 allow 后，列表仍只给查看者本来就看得到的帖（canViewCheckin），不因被收藏而暴露。
+ */
+export function savesAccess(
+  setting: CheckinVisibility,
+  isOwner: boolean,
+  isFriend: boolean,
+): "allow" | "forbidden" | "empty" {
+  if (isOwner) return "allow";
+  if (setting === "public") return "allow";
+  if (!isFriend) return "forbidden";
+  return setting === "private" ? "empty" : "allow";
 }
 
 /**

@@ -3,7 +3,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseTrailVisibility } from "@/lib/trailReplay";
 
 /**
- * 足跡回放公開設置（🔒，本人）。`GET` 讀、`PATCH {trail_visibility:"off"|"friends"}` 寫。
+ * 足跡回放公開設置（🔒，本人）。`GET` 讀、`PATCH {trail_visibility:"off"|"friends"|"public"}` 寫（public＝0062）。
  * 0060 沒跑（列不存在）→ GET 回 off；PATCH 回 500（App 顯示保存失敗）。
  */
 export async function GET(req: Request): Promise<Response> {
@@ -24,8 +24,8 @@ export async function PATCH(req: Request): Promise<Response> {
   } catch {
     return apiError("invalid_params", "body 需为 JSON", 400);
   }
-  if (body.trail_visibility !== "off" && body.trail_visibility !== "friends") {
-    return apiError("invalid_params", "trail_visibility 需为 off 或 friends", 400);
+  if (body.trail_visibility !== "off" && body.trail_visibility !== "friends" && body.trail_visibility !== "public") {
+    return apiError("invalid_params", "trail_visibility 需为 off、friends 或 public", 400);
   }
   const svc = await createServiceClient();
   const { error } = await svc.from("users").update({ trail_visibility: body.trail_visibility }).eq("id", userId);

@@ -143,7 +143,18 @@ export async function POST(req: Request): Promise<Response> {
       // 兜底命中記錄（驗證時可分清誰審的；日常乾淨請求不打日誌）。
       console.info("[api/v1/checkins] moderation pass via minimax（主審下沉）");
     }
-    const visibility = checkinVisibilityFor(mode);
+    // 0062：用戶設了「打卡默認可見性」就用它（隱身仍強制 private）。單獨查、出錯（列未建）一律當沒設，
+    // 回退按模式——不能併進上面的 mode 查詢，否則 0062 未跑會讓所有人落到 public 回退。
+    let visibilityOverride: unknown = null;
+    try {
+      const { data: ov, error: ovErr } = await supabase
+        .from("users")
+        .select("checkin_visibility")
+        .eq("id", userId)
+        .maybeSingle();
+      if (!ovErr) visibilityOverride = (ov as { checkin_visibility?: unknown } | null)?.checkin_visibility ?? null;
+    } catch {}
+    const visibility = checkinVisibilityFor(mode, visibilityOverride);
     const expiresAt = kind === "flash" ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
 
     // 先校验 beer_id 是否存在（無酒纯照片打卡跳过；FK 不存在会 500，提前转 400 更友好；并发竞态下仍可能落 FK，故容错两路）

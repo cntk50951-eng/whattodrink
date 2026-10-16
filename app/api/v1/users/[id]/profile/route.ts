@@ -1,7 +1,7 @@
 import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseCheckinIdParam, parseMineParams } from "@/lib/api/checkins";
-import { friendsOnlyCountOf, visibleRowsFor } from "@/lib/api/privacy";
+import { friendsOnlyCountOf, parseSavesVisibility, savesAccess, visibleRowsFor } from "@/lib/api/privacy";
 import { friendIdsOf } from "@/lib/friends";
 import { hkAge, collectNightStats, infoVisibilityOf, weekNights, weekStreak } from "@/lib/api/profile";
 import { aggregateTaste, TAXONOMY_VERSION } from "@/lib/api/taste";
@@ -365,6 +365,20 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
     // 本人全集；好友 public＋friends；陌生人 public（private 永不计入）。
     const visForStats =
       self || relationship === "friend" ? ["public", "friends", ...(self ? ["private"] : [])] : ["public"];
+    // 0062：收藏可见性（列未建／出错＝friends，旧行为）；与 /users/{id}/saves 的门同口径。
+    const { data: savesSetRow, error: savesSetErr } = await supa
+      .from("users")
+      .select("saves_visibility")
+      .eq("id", targetId)
+      .maybeSingle();
+    const savesCountVisible =
+      savesAccess(
+        parseSavesVisibility(
+          savesSetErr === null ? (savesSetRow as { saves_visibility?: unknown } | null)?.saves_visibility : null,
+        ),
+        self,
+        relationship === "friend",
+      ) === "allow";
     const [{ count: mainCount }, { count: archCount }, { count: savesCount }, { count: cheersCount }] =
       await Promise.all([
         supa.from("checkins").select("id", { count: "exact", head: true }).eq("user_id", targetId).in("visibility", visForStats),
@@ -407,7 +421,7 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
       checkins_total: (mainCount ?? 0) + (archCount ?? 0),
       friends_total: self ? myFriendIds.length : targetFriendIds.length,
       // WEB_HANDOFF_USER_SAVES：陌生人看不到收藏列表，计数也回 0（与可见集一致）。
-      saves_total: self || relationship === "friend" ? (savesCount ?? 0) : 0,
+      saves_total: savesCountVisible ? (savesCount ?? 0) : 0,
       cheers_total: cheersCount ?? 0,
       week_streak: weekStreak(nights, nowMs),
       nights_this_week: weekNights(nights, nowMs),
