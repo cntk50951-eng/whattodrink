@@ -15,7 +15,7 @@ import { friendIdsOf } from "@/lib/friends";
 
 // 沿 checkins/mine 同列（打卡公开列；归档不联查，收藏只收现行帖）。
 // 帶 user_id：可見性判定要用作者 id（以前沒選，owner 恒為 null → 自己的私密／好友可見帖與好友的 friends 帖被誤丟），同時給作者信息 join 用。
-const SAVE_COLUMNS = "id,user_id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript,beers(id,name,emoji,category,tagline,icon_url)";
+const SAVE_COLUMNS = "id,user_id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript,hashtags,beers(id,name,emoji,category,tagline,icon_url)";
 
 // 歸檔镜像同列（photo／note／audio 讀側置空，只留定位＋店名＋時間給過期行）。
 const ARCHIVE_COLUMNS = "id,user_id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at";

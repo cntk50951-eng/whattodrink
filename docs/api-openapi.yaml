@@ -81,6 +81,66 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/me/hashtags:
+    get:
+      operationId: listMyHashtags
+      summary: 我的自定義標籤庫（最近使用在前，≤100；0061 未跑回空）
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "{hashtags:[{tag,uses,last_used_at}]}"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [hashtags]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      operationId: renameMyHashtag
+      summary: 標籤庫改名（只改標籤庫，已發打卡不變；新名已存在則合併次數）
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tag, rename_to]
+              properties:
+                tag:
+                  type: string
+                rename_to:
+                  type: string
+      responses:
+        "200":
+          description: "{tag}"
+        "400":
+          description: 參數非法
+        "404":
+          description: 標籤不存在
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      operationId: deleteMyHashtag
+      summary: 從標籤庫移除（只影響聯想，已發打卡不變）
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tag]
+              properties:
+                tag:
+                  type: string
+      responses:
+        "200":
+          description: "{deleted}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /api/v1/users/{id}/trail:
     get:
       operationId: getUserTrail
@@ -568,6 +628,12 @@ paths:
                   type: array
                   maxItems: 5
                   description: UR E.28 打卡标签（taxonomy key；非法 400；缺席即无）
+                  items:
+                    type: string
+                hashtags:
+                  type: array
+                  maxItems: 5
+                  description: 自定義標籤（#微醺；每个 1-12 字，仅文字／数字／_-·，去重；非法 400；缺席即无；与审核同过；0061 未跑时静默忽略）
                   items:
                     type: string
       responses:
@@ -5503,6 +5569,11 @@ components:
           description: UR E.28 打卡标签（无即 []）
           items:
             type: string
+        hashtags:
+          type: array
+          description: 自定義標籤（#微醺；≤5，每個 ≤12 字；不進口味推測；無即 []；需先跑 0061）
+          items:
+            type: string
     MineRow:
       type: object
       required: [id, beer_id, lat, lng, place_name, kind, visibility, expires_at, created_at, beers]
@@ -5556,6 +5627,11 @@ components:
         tags:
           type: array
           description: UR E.28 打卡标签（无即 []）
+          items:
+            type: string
+        hashtags:
+          type: array
+          description: 自定義標籤（#微醺；≤5，每個 ≤12 字；不進口味推測；無即 []；需先跑 0061）
           items:
             type: string
     MinePage:
@@ -5863,6 +5939,10 @@ components:
               like_count:
                 type: integer
               tags:
+                type: array
+                items:
+                  type: string
+              hashtags:
                 type: array
                 items:
                   type: string

@@ -7,6 +7,7 @@
 import type { Beer } from "../beers";
 import type { LatLng } from "../geo";
 import type { WantRecord } from "../wantRecord";
+import { parseHashtags, readHashtags } from "../hashtags";
 import { parseTags } from "./taste";
 
 export const CHECKINS_MINE_LIMIT = 30;
@@ -29,6 +30,8 @@ export type CreateCheckinBody = {
   transcript?: string | null;
   /** UR E.28 打卡标签（taxonomy key，≤5；缺席即无）。 */
   tags?: string[];
+  /** UR 自定義標籤（#微醺；≤5，每個 ≤12 字；不進口味推測）。 */
+  hashtags?: string[];
 };
 
 /** E.2 上限（body 肥大即 400；抓幀 ≤1024 jpeg 約 200–400k，60s 語音約 1M 內）。 */
@@ -71,6 +74,8 @@ export type MineRowJson = {
   transcript: string | null;
   /** UR E.28 打卡标签（taxonomy key 数组；无即 []，旧行缺列回 []）。 */
   tags: string[];
+  /** 自定義標籤（#微醺；無即 []，旧行缺列回 []）。 */
+  hashtags: string[];
   beers: {
     id: string;
     name: string;
@@ -218,6 +223,8 @@ export function parseCreateCheckinBody(
   // （parseTags 在 taste.ts；checkins.ts 引 taste，taste 零本地 import，无循环。）
   const tagParsed = parseTags(r.tags);
   if (tagParsed !== null && "error" in tagParsed) return tagParsed;
+  const hashParsed = parseHashtags(r.hashtags);
+  if (hashParsed !== null && "error" in hashParsed) return hashParsed;
   return {
     body: {
       beer_id,
@@ -232,6 +239,7 @@ export function parseCreateCheckinBody(
       ...(audioSeconds !== null ? { audio_seconds: audioSeconds } : {}),
       ...(transcript !== null ? { transcript } : {}),
       ...(tagParsed !== null ? { tags: tagParsed.tags } : {}),
+      ...(hashParsed !== null ? { hashtags: hashParsed.hashtags } : {}),
     },
   };
 }
@@ -335,6 +343,7 @@ export function toMineRow(raw: unknown): MineRowJson | null {
   const tags = Array.isArray(raw.tags)
     ? (raw.tags as unknown[]).filter((x): x is string => typeof x === "string")
     : [];
+  const hashtags = readHashtags(raw.hashtags);
   if (
     photoUrl === undefined ||
     note === undefined ||
@@ -360,6 +369,7 @@ export function toMineRow(raw: unknown): MineRowJson | null {
     audio_seconds: audioSeconds,
     transcript,
     tags,
+    hashtags,
     beers,
   };
 }

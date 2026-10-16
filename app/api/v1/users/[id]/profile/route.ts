@@ -430,13 +430,13 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
   {
     const { data: mainRows } = await supa
       .from("checkins")
-      .select("id,kind,visibility,place_name,lat,lng,created_at,expires_at,note,photo_thumb,beer_id,tags")
+      .select("id,kind,visibility,place_name,lat,lng,created_at,expires_at,note,photo_thumb,beer_id,tags,hashtags")
       .eq("user_id", targetId)
       .order("created_at", { ascending: false })
       .limit(200);
     const { data: archRows } = await supa
       .from("checkins_archive")
-      .select("id,kind,visibility,place_name,lat,lng,created_at,expires_at,note,photo_thumb,beer_id,tags")
+      .select("id,kind,visibility,place_name,lat,lng,created_at,expires_at,note,photo_thumb,beer_id,tags,hashtags")
       .eq("user_id", targetId)
       .order("created_at", { ascending: false })
       .limit(200);
@@ -508,6 +508,9 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
         like_count: likeById.get(r.id as string) ?? 0,
         tags: Array.isArray(r.tags)
           ? (r.tags as unknown[]).filter((x): x is string => typeof x === "string")
+          : [],
+        hashtags: Array.isArray(r.hashtags)
+          ? (r.hashtags as unknown[]).filter((x): x is string => typeof x === "string")
           : [],
       };
       if (self) {

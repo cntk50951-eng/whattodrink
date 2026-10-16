@@ -1,6 +1,7 @@
 import { getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseCreateCheckinBody } from "@/lib/api/checkins";
+import { recordUserHashtags } from "@/lib/hashtagLibrary";
 import { checkinVisibilityFor } from "@/lib/api/privacy";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 
@@ -40,6 +41,7 @@ export async function POST(req: Request): Promise<Response> {
   const audioSeconds = parsed.body.audio_seconds ?? null;
   const transcriptText = parsed.body.transcript ?? null;
   const tags = parsed.body.tags ?? [];
+  const hashtags = parsed.body.hashtags ?? [];
 
   try {
     // 防御：若 public.users 缺行（0006 触发器未执行或旧库），先补行再落库，避免 FK 23503
@@ -90,7 +92,7 @@ export async function POST(req: Request): Promise<Response> {
     // UR E.2 發送工作流：即時在線審核（圖＋文＋轉錄一次調過；語音本體兩邊
     // 都不支援，走 transcript；鏈：OpenAI 主審 → Minimax 兜底 → 全掛放行＋warn）。
     const modText =
-      [noteText, transcriptText]
+      [noteText, transcriptText, hashtags.length > 0 ? hashtags.map((h) => `#${h}`).join(" ") : null]
         .filter((s): s is string => s !== null)
         .join("\n") || undefined;
     const verdict = await moderateCheckin(
@@ -164,9 +166,7 @@ export async function POST(req: Request): Promise<Response> {
 
     let inserted: Record<string, unknown> | null = null;
     {
-      const { data, error } = await supabase
-        .from("checkins")
-        .insert({
+      const fullRow = {
           user_id: userId,
           beer_id,
           lat,
@@ -183,9 +183,18 @@ export async function POST(req: Request): Promise<Response> {
           audio_seconds: audioSeconds,
           transcript: transcriptText ?? "",
           tags,
-        })
+      };
+      const rowWithHashtags = { ...fullRow, hashtags };
+      let { data, error } = await supabase
+        .from("checkins")
+        .insert(hashtags.length > 0 ? rowWithHashtags : fullRow)
         .select(CHECKIN_SELECT)
         .single();
+      // 0061 沒跑（hashtags 列不存在）：去掉自定義標籤照常落庫，不要掉進下面「0007 未遷移」的私密回退
+      if (error?.code === "42703" && /hashtags/.test(error.message ?? "")) {
+        console.warn("[api/v1/checkins] 0061 未遷移，hashtags 略過");
+        ({ data, error } = await supabase.from("checkins").insert(fullRow).select(CHECKIN_SELECT).single());
+      }
       if (error === null && data !== null) {
         inserted = data as unknown as Record<string, unknown>;
       } else {
@@ -246,6 +255,8 @@ export async function POST(req: Request): Promise<Response> {
       }
     }
     const row = inserted as Record<string, unknown>;
+    // 記進我的標籤庫（下次聯想／複用）；失敗不影響打卡
+    if (hashtags.length > 0) void recordUserHashtags(supabase, userId, hashtags);
     return apiOk(
       {
         checkin: {
@@ -264,6 +275,7 @@ export async function POST(req: Request): Promise<Response> {
           audio_seconds: (row.audio_seconds as number | null) ?? null,
           transcript: (row.transcript as string | null) ?? null,
           tags: Array.isArray(row.tags) ? (row.tags as unknown[]).filter((x): x is string => typeof x === "string") : [],
+          hashtags,
         },
       },
       201,
