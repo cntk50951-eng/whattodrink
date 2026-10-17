@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cancelPolicy, countGenders, hkDayStartISO, leavePolicy, mineOrCondition, minutesBeforeStart, parsePartyBody, partyExpiresAt, partyJoinState, partyMixLine, partyMixText, partyProgress, partyRemainText, partySlotStartAt, seatFor } from "./party";
+import { cancelPolicy, countGenders, hkDayStartISO, isAllowedPoiCoverUrl, leavePolicy, partyCoverUploadPath, mineOrCondition, minutesBeforeStart, parsePartyBody, partyExpiresAt, partyJoinState, partyMixLine, partyMixText, partyProgress, partyRemainText, partySlotStartAt, seatFor } from "./party";
 
 describe("parsePartyBody", () => {
   const NOW = Date.parse("2026-10-08T00:00:00Z");
@@ -184,5 +184,45 @@ describe("cancelPolicy／leavePolicy（階段 A）", () => {
     expect(leavePolicy({ joined: true, startAtMs: NOW + 59 * 60_000, nowMs: NOW }).late).toBe(true);
     expect(leavePolicy({ joined: false, startAtMs: NOW + 2 * H, nowMs: NOW }).can_leave).toBe(false);
     expect(minutesBeforeStart(NOW - 30 * 60_000, NOW)).toBe(-30);
+  });
+});
+
+describe("封面 cover_url／cover_source", () => {
+  const base = {
+    place: "Bar", lat: 22.28, lng: 114.15, start_at: new Date(Date.now() + 3600_000).toISOString(),
+    seats_total: 4, min_members: 2, bill_intent: "aa", purposes: ["social"], host_intro: "想搵朋友慢慢傾偈，唔使飲太多",
+  };
+  it("可选：不传照样通过，body 不带封面字段", () => {
+    const r = parsePartyBody(base);
+    expect("body" in r && r.body.cover_url === undefined && r.body.cover_source === undefined).toBe(true);
+  });
+  it("成对：只传一个、source 非法、url 空或过长都 error", () => {
+    expect(parsePartyBody({ ...base, cover_url: "https://x.amap.com/a.jpg" })).toHaveProperty("error");
+    expect(parsePartyBody({ ...base, cover_source: "poi" })).toHaveProperty("error");
+    expect(parsePartyBody({ ...base, cover_url: "https://x/a.jpg", cover_source: "other" })).toHaveProperty("error");
+    expect(parsePartyBody({ ...base, cover_url: "", cover_source: "poi" })).toHaveProperty("error");
+    expect(parsePartyBody({ ...base, cover_url: "https://a.amap.com/" + "x".repeat(600), cover_source: "poi" })).toHaveProperty("error");
+    const ok = parsePartyBody({ ...base, cover_url: "https://a.amap.com/a.jpg", cover_source: "poi" });
+    expect("body" in ok && ok.body.cover_source === "poi").toBe(true);
+  });
+  it("POI 白名单：https＋后缀匹配；http／他域／口令／伪后缀拒", () => {
+    expect(isAllowedPoiCoverUrl("https://store.is.autonavi.com/a.jpg")).toBe(true);
+    expect(isAllowedPoiCoverUrl("https://amap.com/a.jpg")).toBe(true);
+    expect(isAllowedPoiCoverUrl("http://store.is.autonavi.com/a.jpg")).toBe(false);
+    expect(isAllowedPoiCoverUrl("https://evilamap.com/a.jpg")).toBe(false);
+    expect(isAllowedPoiCoverUrl("https://amap.com.evil.io/a.jpg")).toBe(false);
+    expect(isAllowedPoiCoverUrl("https://u:p@amap.com/a.jpg")).toBe(false);
+    expect(isAllowedPoiCoverUrl("not a url")).toBe(false);
+    expect(isAllowedPoiCoverUrl("https://cdn.x.io/a.jpg", ["x.io"])).toBe(true);
+  });
+  it("upload：必须自家桶＋首段是自己；他人文件／他域／带 query／.. 都 null", () => {
+    const sb = "https://abc.supabase.co";
+    const mk = (p: string) => `${sb}/storage/v1/object/public/party-covers/${p}`;
+    expect(partyCoverUploadPath(mk("u1/2026-10/a.jpg"), sb, "u1")).toBe("u1/2026-10/a.jpg");
+    expect(partyCoverUploadPath(mk("u2/a.jpg"), sb, "u1")).toBeNull();
+    expect(partyCoverUploadPath("https://evil.io/storage/v1/object/public/party-covers/u1/a.jpg", sb, "u1")).toBeNull();
+    expect(partyCoverUploadPath(mk("u1/a.jpg") + "?x=1", sb, "u1")).toBeNull();
+    expect(partyCoverUploadPath(mk("u1/../u2/a.jpg"), sb, "u1")).toBeNull();
+    expect(partyCoverUploadPath(`${sb}/storage/v1/object/public/avatars/u1/a.jpg`, sb, "u1")).toBeNull();
   });
 });

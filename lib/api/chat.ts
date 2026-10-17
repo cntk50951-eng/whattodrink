@@ -344,23 +344,25 @@ function parseAttachments(
 
 /** `POST /uploads/sign {purpose, ext, bytes}`（D.6 直傳簽名）。 */
 export const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+/** 酒局封面直传上限（客户端压缩后通常 <1MB；留 8MB 余量）。 */
+export const COVER_MAX_BYTES = 8 * 1024 * 1024;
 export const AVATAR_EXTS = ["jpg", "jpeg", "png", "webp"] as const;
 
 export function parseSignBody(
   raw: unknown,
-): { purpose: "image" | "voice" | "avatar"; ext: string; bytes: number; sha256: string | null } | { error: string; status?: 413 } {
+): { purpose: "image" | "voice" | "avatar" | "cover"; ext: string; bytes: number; sha256: string | null } | { error: string; status?: 413 } {
   if (!isRecord(raw)) return { error: "body 需为对象" };
   const purpose = raw.purpose;
-  if (purpose !== "image" && purpose !== "voice" && purpose !== "avatar") {
-    return { error: "purpose 只要 image|voice|avatar" };
+  if (purpose !== "image" && purpose !== "voice" && purpose !== "avatar" && purpose !== "cover") {
+    return { error: "purpose 只要 image|voice|avatar|cover" };
   }
   const ext = typeof raw.ext === "string" ? raw.ext.toLowerCase() : "";
-  const allow = purpose === "image" ? CHAT_IMAGE_EXTS : purpose === "voice" ? CHAT_VOICE_EXTS : AVATAR_EXTS;
+  const allow = purpose === "image" ? CHAT_IMAGE_EXTS : purpose === "voice" ? CHAT_VOICE_EXTS : AVATAR_EXTS; // cover 与头像同口径（jpg/jpeg/png/webp）
   if (!(allow as readonly string[]).includes(ext)) {
     return { error: `ext 非法（${allow.join("/")}）` };
   }
   const bytes = typeof raw.bytes === "number" && Number.isFinite(raw.bytes) ? raw.bytes : -1;
-  const cap = purpose === "image" ? CHAT_IMAGE_MAX_BYTES : purpose === "voice" ? CHAT_VOICE_MAX_BYTES : AVATAR_MAX_BYTES;
+  const cap = purpose === "image" ? CHAT_IMAGE_MAX_BYTES : purpose === "voice" ? CHAT_VOICE_MAX_BYTES : purpose === "cover" ? COVER_MAX_BYTES : AVATAR_MAX_BYTES;
   if (bytes <= 0 || bytes > cap) return { error: "bytes 非法", status: 413 as const };
   // D.8 sha256 可选（hex64；有即确定性 path，同值重签同址，零新表）。
   let sha256: string | null = null;

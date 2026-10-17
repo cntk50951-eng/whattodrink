@@ -33,7 +33,7 @@ export async function POST(req: Request): Promise<Response> {
     }
     return apiError("invalid_params", parsed.error, 400);
   }
-  const bucket = parsed.purpose === "image" ? "chat-images" : parsed.purpose === "voice" ? "chat-voice" : "avatars";
+  const bucket = parsed.purpose === "image" ? "chat-images" : parsed.purpose === "voice" ? "chat-voice" : parsed.purpose === "cover" ? "party-covers" : "avatars";
   const path =
     parsed.sha256 === null
       ? `${userId}/${crypto.randomUUID()}.${parsed.ext}`
@@ -58,7 +58,7 @@ export async function POST(req: Request): Promise<Response> {
       uploadUrl: data.signedUrl,
       token: data.token,
       expires_at: Date.now() + 2 * 3600_000,
-      ...(parsed.purpose === "avatar" ? { publicUrl: avatarPublicUrl(env.url, bucket, path) } : {}),
+      ...(parsed.purpose === "avatar" || parsed.purpose === "cover" ? { publicUrl: avatarPublicUrl(env.url, bucket, path) } : {}),
     });
   } catch (err) {
     console.error(`[api/v1/uploads/sign] threw: ${err instanceof Error ? err.message : "unknown"}`);

@@ -1700,6 +1700,13 @@ paths:
                   minLength: 10
                   maxLength: 140
                   description: 发起人自我介绍（必填；过审，不过 403 整单不存）
+                cover_url:
+                  type: string
+                  maxLength: 512
+                  description: 可选封面（optional；不传＝客户端用默认图）。与 cover_source 成对。upload＝uploads/sign（purpose=cover）直传后回的 publicUrl，须是自己上传的，发布时过图审（不过 403 code=rejected，并删文件）；poi＝地图 POI 照片 https URL，仅白名单域名，只引用不转存
+                cover_source:
+                  type: string
+                  enum: [upload, poi]
       responses:
         "201":
           description: 發局成功（回 id＋過期＝開始＋3h）
@@ -1763,7 +1770,7 @@ paths:
             type: string
       responses:
         "200":
-          description: 酒局行（含 status／joined_count／male_count／female_count／host／joined_by_me／is_mine／distance_m／purposes＋登录才回 purpose_other／host_intro；登录行加 my_arrived（我是否已到场打卡）／cancel_policy，参加行加 leave_policy；sync_cursor 服务端 ms，UR E.29）
+          description: 酒局行（含 status／joined_count／male_count／female_count／host／joined_by_me／is_mine／distance_m／purposes＋cover_url／cover_source（可空；无封面为 null）＋登录才回 purpose_other／host_intro；登录行加 my_arrived（我是否已到场打卡）／cancel_policy，参加行加 leave_policy；sync_cursor 服务端 ms，UR E.29）
           content:
             application/json:
               schema:
@@ -4890,7 +4897,7 @@ paths:
               properties:
                 purpose:
                   type: string
-                  enum: [image, voice, avatar]
+                  enum: [image, voice, avatar, cover]
                 ext:
                   type: string
                 bytes:
@@ -4900,7 +4907,7 @@ paths:
                   description: 可選 hex64；有即確定性 path，同值重簽同址
       responses:
         "200":
-          description: 簽名成功（path server 生成；uploadUrl 直傳；expires_at 毫秒 epoch，簽名固定 2h 有效；purpose=avatar 另回 publicUrl）
+          description: 簽名成功（path server 生成；uploadUrl 直傳；expires_at 毫秒 epoch，簽名固定 2h 有效；purpose=avatar／cover 另回 publicUrl；cover 走 party-covers 公开桶，≤8MB，jpg/jpeg/png/webp）
           content:
             application/json:
               schema:
@@ -4919,7 +4926,7 @@ paths:
                   publicUrl:
                     type: string
                     format: uri
-                    description: 仅 purpose=avatar 回（avatars 公开读 URL，直接 PATCH /me avatar_url 用，iOS-0.92）
+                    description: 仅 purpose=avatar／cover 回（公开读 URL；avatar 直接 PATCH /me avatar_url 用，iOS-0.92；cover 填进 POST /parties 的 cover_url，cover_source=upload）
         "400":
           $ref: "#/components/responses/InvalidParams"
         "401":

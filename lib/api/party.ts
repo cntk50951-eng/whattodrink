@@ -22,7 +22,51 @@ export type PartyInput = {
   purposes: string[];
   purpose_other: string | null;
   host_intro: string;
+  /** 封面（可选）：upload＝自家 party-covers 桶公开 URL；poi＝地图 POI 照片（白名单域名，不转存） */
+  cover_url?: string;
+  cover_source?: PartyCoverSource;
 };
+
+export type PartyCoverSource = "upload" | "poi";
+export const PARTY_COVER_URL_MAX = 512;
+/** POI 照片域名白名单（后缀匹配；上线前用真机抓到的实际域名核对，env PARTY_POI_IMAGE_HOSTS 逗号分隔可覆盖）。 */
+export const PARTY_POI_IMAGE_HOSTS_DEFAULT = ["amap.com", "autonavi.com", "amap.cn"];
+
+/** POI 封面 URL 合法：https、白名单域名（等于或以 ".域名" 结尾）、无账号口令、长度受限。 */
+export function isAllowedPoiCoverUrl(url: string, hosts: readonly string[] = PARTY_POI_IMAGE_HOSTS_DEFAULT): boolean {
+  if (url.length > PARTY_COVER_URL_MAX) return false;
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== "https:" || u.username !== "" || u.password !== "") return false;
+  const h = u.hostname.toLowerCase();
+  return hosts.some((d) => h === d || h.endsWith(`.${d}`));
+}
+
+/**
+ * upload 封面 URL → 桶内 path；必须是 `<supabaseUrl>/storage/v1/object/public/party-covers/<uid>/…`，
+ * 且首段＝发起人自己（防盗用他人文件）；否则 null。
+ */
+export function partyCoverUploadPath(url: string, supabaseUrl: string, userId: string): string | null {
+  if (url.length > PARTY_COVER_URL_MAX) return null;
+  let u: URL;
+  let base: URL;
+  try {
+    u = new URL(url);
+    base = new URL(supabaseUrl);
+  } catch {
+    return null;
+  }
+  if (u.origin !== base.origin || u.search !== "" || u.hash !== "") return null;
+  const prefix = "/storage/v1/object/public/party-covers/";
+  if (!u.pathname.startsWith(prefix)) return null;
+  const path = decodeURIComponent(u.pathname.slice(prefix.length));
+  if (path === "" || path.includes("..") || path.split("/")[0] !== userId) return null;
+  return path;
+}
 
 /** 酒局目的枚举（WEB_HANDOFF_PARTY_INTRO；标签客户端翻）。 */
 export const PARTY_PURPOSES = [
@@ -99,10 +143,22 @@ export function parsePartyBody(raw: unknown, nowMs: number = Date.now()): { body
   if (intro.length < HOST_INTRO_MIN || intro.length > HOST_INTRO_MAX) {
     return { error: `host_intro 必填（${HOST_INTRO_MIN}–${HOST_INTRO_MAX} 字）` };
   }
+  // 封面（可选；两个字段须成对）。域名／归属校验在路由层（要 env 和 userId）。
+  let cover: { cover_url: string; cover_source: PartyCoverSource } | null = null;
+  const cu = r.cover_url;
+  const cs = r.cover_source;
+  if ((cu !== undefined && cu !== null) || (cs !== undefined && cs !== null)) {
+    if (typeof cu !== "string" || cu === "" || cu.length > PARTY_COVER_URL_MAX) {
+      return { error: `cover_url 非法（1–${PARTY_COVER_URL_MAX} 字）` };
+    }
+    if (cs !== "upload" && cs !== "poi") return { error: "cover_source 只要 upload|poi（与 cover_url 成对）" };
+    cover = { cover_url: cu, cover_source: cs };
+  }
   return {
     body: {
       place,
       ...(typeof poi === "string" ? { poi_id: poi } : {}),
+      ...(cover !== null ? cover : {}),
       city,
       lat,
       lng,

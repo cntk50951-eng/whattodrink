@@ -22,6 +22,8 @@ type PartyRow = {
   purposes: string[];
   purpose_other: string | null;
   host_intro: string | null;
+  cover_url?: string | null;
+  cover_source?: string | null;
   status: string;
   created_at: string;
 };
@@ -41,17 +43,20 @@ export async function GET(
   }
   const { supabase } = await getAuthedClient();
   const viewerId = await getUserId().catch(() => null);
-  const { data: rowRaw, error } = await supabase
+  const BASE_COLS = "id,host_user_id,place,poi_id,city,lat,lng,start_at,expires_at,seats_total,seats_male,seats_female,min_members,bill_intent,purposes,purpose_other,host_intro,status,created_at";
+  let { data: rowRaw, error } = await supabase
     .from("parties")
-    .select(
-      "id,host_user_id,place,poi_id,city,lat,lng,start_at,expires_at,seats_total,seats_male,seats_female,min_members,bill_intent,purposes,purpose_other,host_intro,status,created_at",
-    )
+    .select(BASE_COLS.replace("host_intro,", "host_intro,cover_url,cover_source,"))
     .eq("id", id)
     .maybeSingle();
+  if (error !== null && error.code === "42703") {
+    // 0063 未跑：缺封面列，退回不带封面的旧查询
+    ({ data: rowRaw, error } = await supabase.from("parties").select(BASE_COLS).eq("id", id).maybeSingle());
+  }
   if (error !== null || rowRaw === null) {
     return apiError("not_found", "酒局不存在", 404);
   }
-  const row = rowRaw as PartyRow;
+  const row = rowRaw as unknown as PartyRow;
   const { data: joins } = await supabase
     .from("joins")
     .select("user_id,joined_at")
@@ -126,6 +131,8 @@ export async function GET(
           host_intro: typeof row.host_intro === "string" ? row.host_intro : null,
         }
       : {}),
+    cover_url: typeof row.cover_url === "string" ? row.cover_url : null,
+    cover_source: row.cover_source === "upload" || row.cover_source === "poi" ? row.cover_source : null,
     status: row.status,
     created_at: row.created_at,
     joined_count: jrows.length,

@@ -1,7 +1,7 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { isMinorDob } from "@/lib/api/cheers";
-import { countGenders, cancelPolicy, hkDayStartISO, leavePolicy, mineOrCondition, parsePartyBody, partyExpiresAt } from "@/lib/api/party";
+import { countGenders, cancelPolicy, hkDayStartISO, isAllowedPoiCoverUrl, leavePolicy, mineOrCondition, parsePartyBody, partyCoverUploadPath, partyExpiresAt, PARTY_POI_IMAGE_HOSTS_DEFAULT } from "@/lib/api/party";
 import { hostTrustMap, readTrust } from "@/lib/trust/ledger";
 import { TRUST_CONFIG } from "@/lib/trust/config";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
@@ -90,6 +90,41 @@ export async function POST(req: Request): Promise<Response> {
       return apiError("rejected", "審核服務暫不可用，請稍後再試", 503);
     }
   }
+  // 封面：upload＝必须是自己 party-covers 桶的文件，先过图审（不过即删文件）；poi＝白名单域名 https，不转存不审。
+  let coverPath: string | null = null;
+  if (b.cover_url !== undefined && b.cover_source === "upload") {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+    coverPath = partyCoverUploadPath(b.cover_url, supabaseUrl, userId);
+    if (coverPath === null) {
+      return apiError("invalid_params", "cover_url 須是你自己上傳嘅封面", 400);
+    }
+    const dataUrl = await fetchCoverDataUrl(coverPath);
+    if (dataUrl === null) {
+      return apiError("rejected", "審核服務暫不可用，請稍後再試", 503);
+    }
+    const verdict = await moderateCheckin(
+      { imageDataUrl: dataUrl },
+      {
+        openaiKey: process.env.OPENAI_API_KEY ?? process.env.OPENAI_KEY,
+        minimaxKey: process.env.minimaxi_api_key,
+        minimaxBaseUrl: process.env.MINIMAX_API_BASE,
+      },
+    );
+    const action = moderationAction(verdict);
+    if (action === "reject") {
+      await deleteCoverPath(coverPath);
+      return apiError("rejected", "內容未通過審核（封面），請換一張再發", 403);
+    }
+    if (action === "unavailable") {
+      await deleteCoverPath(coverPath);
+      return apiError("rejected", "審核服務暫不可用，請稍後再試", 503);
+    }
+  } else if (b.cover_url !== undefined && b.cover_source === "poi") {
+    const hosts = (process.env.PARTY_POI_IMAGE_HOSTS ?? "").split(",").map((h) => h.trim().toLowerCase()).filter((h) => h !== "");
+    if (!isAllowedPoiCoverUrl(b.cover_url, hosts.length > 0 ? hosts : PARTY_POI_IMAGE_HOSTS_DEFAULT)) {
+      return apiError("invalid_params", "cover_url 域名不在白名單（或非 https）", 400);
+    }
+  }
   const { data: inserted, error: iErr } = await supabase
     .from("parties")
     .insert({
@@ -109,12 +144,17 @@ export async function POST(req: Request): Promise<Response> {
       purposes: b.purposes,
       purpose_other: b.purpose_other,
       host_intro: b.host_intro,
+      ...(b.cover_url !== undefined ? { cover_url: b.cover_url, cover_source: b.cover_source } : {}),
       status: "open",
     })
     .select("id")
     .single();
   if (iErr !== null || inserted === null) {
     console.error(`[api/v1/parties] insert error: code=${iErr?.code} message=${iErr?.message}`);
+    if (coverPath !== null) await deleteCoverPath(coverPath);
+    if (iErr?.code === "42703") {
+      return apiError("internal", "字段缺失（cover_url／cover_source，請執行 migration 0063）", 500);
+    }
     return apiError("internal", "發局失敗", 500);
   }
   const pid = (inserted as { id: string }).id;
@@ -139,6 +179,8 @@ type PartyListRow = {
   purposes: string[];
   purpose_other: string | null;
   host_intro: string | null;
+  cover_url?: string | null;
+  cover_source?: string | null;
   status: string;
   created_at: string;
 };
@@ -181,40 +223,44 @@ export async function GET(req: Request): Promise<Response> {
   // round-2 撤销保留：box=mine 回我发起＋我参加（含 cancelled／过期，需登录）。
   const box = q.get("box") === "mine" ? "mine" : "all";
 
-  let query = supabase
-    .from("parties")
-    .select(
-      "id,host_user_id,place,city,lat,lng,start_at,expires_at,seats_total,seats_male,seats_female,min_members,bill_intent,purposes,purpose_other,host_intro,status,created_at",
-    )
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (box === "mine") {
-    if (viewerId === null) {
-      return apiError("unauthorized", "未登录", 401);
+  const BASE_COLS = "id,host_user_id,place,city,lat,lng,start_at,expires_at,seats_total,seats_male,seats_female,min_members,bill_intent,purposes,purpose_other,host_intro,status,created_at";
+  let rows: unknown[] | null = null;
+  let error: { code?: string; message?: string } | null = null;
+  for (const cols of [BASE_COLS.replace("host_intro,", "host_intro,cover_url,cover_source,"), BASE_COLS]) {
+    let query = supabase
+      .from("parties")
+      .select(cols)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (box === "mine") {
+      if (viewerId === null) {
+        return apiError("unauthorized", "未登录", 401);
+      }
+      const { data: myJoins } = await supabase
+        .from("joins")
+        .select("party_id")
+        .eq("user_id", viewerId);
+      const joinedIds = ((myJoins ?? []) as { party_id: unknown }[])
+        .map((j) => j.party_id)
+        .filter((id): id is string => typeof id === "string" && id !== "");
+      query = query.or(mineOrCondition(viewerId, joinedIds));
+    } else {
+      query = query.eq("status", "open").gt("expires_at", nowIso);
     }
-    const { data: myJoins } = await supabase
-      .from("joins")
-      .select("party_id")
-      .eq("user_id", viewerId);
-    const joinedIds = ((myJoins ?? []) as { party_id: unknown }[])
-      .map((j) => j.party_id)
-      .filter((id): id is string => typeof id === "string" && id !== "");
-    query = query.or(mineOrCondition(viewerId, joinedIds));
-  } else {
-    query = query.eq("status", "open").gt("expires_at", nowIso);
-  }
-  if (city !== "") query = query.eq("city", city);
-  if (bbox !== null) {
-    query = query
-      .gte("lat", bbox.south)
-      .lte("lat", bbox.north)
-      .gte("lng", bbox.west)
-      .lte("lng", bbox.east);
-  }
-  if (Number.isFinite(cursorMs)) {
-    query = query.lt("created_at", new Date(cursorMs).toISOString());
-  }
-  const { data: rows, error } = await query;
+    if (city !== "") query = query.eq("city", city);
+    if (bbox !== null) {
+      query = query
+        .gte("lat", bbox.south)
+        .lte("lat", bbox.north)
+        .gte("lng", bbox.west)
+        .lte("lng", bbox.east);
+    }
+    if (Number.isFinite(cursorMs)) {
+      query = query.lt("created_at", new Date(cursorMs).toISOString());
+    }
+      ({ data: rows, error } = await query);
+      if (error === null || error.code !== "42703") break; // 0063 未跑：缺封面列，退回不带封面的旧查询
+    }
   if (error !== null) {
     console.error(`[api/v1/parties] list error: code=${error.code} message=${error.message}`);
     return apiError("internal", "酒局讀取失敗", 500);
@@ -305,6 +351,8 @@ export async function GET(req: Request): Promise<Response> {
             host_intro: typeof r.host_intro === "string" ? r.host_intro : null,
           }
         : {}),
+      cover_url: typeof r.cover_url === "string" ? r.cover_url : null,
+      cover_source: r.cover_source === "upload" || r.cover_source === "poi" ? r.cover_source : null,
       status: r.status,
       joined_count: joinCounts.get(r.id) ?? 0,
       male_count: gc.male,
@@ -342,4 +390,35 @@ export async function GET(req: Request): Promise<Response> {
   });
   // UR E.29 同步游标（服务端 ms；changes 的 since 原样回传，与翻页 cursor 区分命名）。
   return apiOk({ items, sync_cursor: Date.now() });
+}
+
+/** 取自家封面文件转 data URL 送图审（取不到／超 8MB 即 null，调用方按不可用处理）。 */
+async function fetchCoverDataUrl(storagePath: string): Promise<string | null> {
+  try {
+    const svc = await createServiceClient();
+    const { data, error } = await svc.storage.from("party-covers").download(storagePath);
+    if (error !== null || data === null) {
+      console.error(`[api/v1/parties] cover fetch error: message=${error?.message}`);
+      return null;
+    }
+    if (data.size > 8 * 1024 * 1024) return null;
+    const buf = Buffer.from(await data.arrayBuffer());
+    const ext = storagePath.split(".").pop()?.toLowerCase() ?? "";
+    const mime = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+    return `data:${mime};base64,${buf.toString("base64")}`;
+  } catch (err) {
+    console.error(`[api/v1/parties] cover fetch threw: ${err instanceof Error ? err.message : "unknown"}`);
+    return null;
+  }
+}
+
+/** 删桶内封面文件（被拒／插入失败；失败只记 log）。 */
+async function deleteCoverPath(storagePath: string): Promise<void> {
+  try {
+    const svc = await createServiceClient();
+    const { error } = await svc.storage.from("party-covers").remove([storagePath]);
+    if (error !== null) console.error(`[api/v1/parties] cover remove error: message=${error.message}`);
+  } catch (err) {
+    console.error(`[api/v1/parties] cover remove threw: ${err instanceof Error ? err.message : "unknown"}`);
+  }
 }

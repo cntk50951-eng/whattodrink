@@ -387,3 +387,11 @@ describe("位置分享附件", () => {
   });
 });
 
+
+describe("parseSignBody purpose=cover", () => {
+  it("cover：与头像同扩展名，上限 8MB，超限 413；gif 拒", () => {
+    expect(parseSignBody({ purpose: "cover", ext: "JPG", bytes: 7 * 1024 * 1024 })).toEqual({ purpose: "cover", ext: "jpg", bytes: 7 * 1024 * 1024, sha256: null });
+    expect(parseSignBody({ purpose: "cover", ext: "jpg", bytes: 9 * 1024 * 1024 })).toMatchObject({ status: 413 });
+    expect(parseSignBody({ purpose: "cover", ext: "gif", bytes: 100 })).toHaveProperty("error");
+  });
+});

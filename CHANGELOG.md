@@ -787,3 +787,9 @@
 - Node 版本要求 22+（`nvm use 22`）
 - `UI style/` 目錄保留 20 張風格探索圖（MiniMax image-01 生成），作為 design system 選型參考
   - 远端 Vercel 连红两单修复（hotfix）：d6063f6 半截提交把未进仓的 `V2Comments` import 带入 main → `TS2307`；删 dangling import（main 内零引用），随 hotfix 合入；待转绿后远端复验
+
+## 酒局封面（可选）API（2026-10-17，未提交）
+- `POST /api/v1/parties` 新增可选 `cover_url`＋`cover_source`（upload｜poi，成对；不传＝无封面）。upload：须是自己 `party-covers` 桶的文件，发布时过图审（不过 403 `rejected` 并删文件）；poi：https＋域名白名单（`PARTY_POI_IMAGE_HOSTS` 可覆盖，默认 amap.com／autonavi.com／amap.cn），只引用不转存。
+- `POST /uploads/sign` 新增 `purpose=cover`（`party-covers` 公开桶，≤8MB，jpg/jpeg/png/webp，回 `publicUrl`）。
+- `GET /parties`、`GET /parties/{id}` 回 `cover_url`／`cover_source`（无则 null）。0063 未跑时读端自动退回不带封面的旧查询，发局带封面会回 500 提示跑 migration。
+- migration `0063_party_cover.sql`：两列＋约束＋`party-covers` 桶＋公开读 policy。openapi／单测（party、chat）已补，全量 888 过，tsc／eslint 干净。
