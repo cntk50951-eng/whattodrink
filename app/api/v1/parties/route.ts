@@ -352,7 +352,7 @@ export async function GET(req: Request): Promise<Response> {
           }
         : {}),
       cover_url: typeof r.cover_url === "string" ? r.cover_url : null,
-      cover_source: r.cover_source === "upload" || r.cover_source === "poi" ? r.cover_source : null,
+      cover_source: r.cover_source === "upload" || r.cover_source === "poi" || r.cover_source === "default" ? r.cover_source : null,
       status: r.status,
       joined_count: joinCounts.get(r.id) ?? 0,
       male_count: gc.male,

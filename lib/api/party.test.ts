@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cancelPolicy, countGenders, hkDayStartISO, isAllowedPoiCoverUrl, leavePolicy, partyCoverUploadPath, mineOrCondition, minutesBeforeStart, parsePartyBody, partyExpiresAt, partyJoinState, partyMixLine, partyMixText, partyProgress, partyRemainText, partySlotStartAt, seatFor } from "./party";
+import { isDefaultCoverRef, cancelPolicy, countGenders, hkDayStartISO, isAllowedPoiCoverUrl, leavePolicy, partyCoverUploadPath, mineOrCondition, minutesBeforeStart, parsePartyBody, partyExpiresAt, partyJoinState, partyMixLine, partyMixText, partyProgress, partyRemainText, partySlotStartAt, seatFor } from "./party";
 
 describe("parsePartyBody", () => {
   const NOW = Date.parse("2026-10-08T00:00:00Z");
@@ -204,6 +204,14 @@ describe("封面 cover_url／cover_source", () => {
     expect(parsePartyBody({ ...base, cover_url: "https://a.amap.com/" + "x".repeat(600), cover_source: "poi" })).toHaveProperty("error");
     const ok = parsePartyBody({ ...base, cover_url: "https://a.amap.com/a.jpg", cover_source: "poi" });
     expect("body" in ok && ok.body.cover_source === "poi").toBe(true);
+  });
+  it("default：cover_url 须为 default:0..19；其他拒", () => {
+    expect(isDefaultCoverRef("default:0") && isDefaultCoverRef("default:19")).toBe(true);
+    expect(isDefaultCoverRef("default:20") || isDefaultCoverRef("default:-1") || isDefaultCoverRef("default:") || isDefaultCoverRef("https://x/default:3")).toBe(false);
+    const ok = parsePartyBody({ ...base, cover_url: "default:7", cover_source: "default" });
+    expect("body" in ok && ok.body.cover_source === "default").toBe(true);
+    expect(parsePartyBody({ ...base, cover_url: "default:20", cover_source: "default" })).toHaveProperty("error");
+    expect(parsePartyBody({ ...base, cover_url: "https://a.amap.com/a.jpg", cover_source: "default" })).toHaveProperty("error");
   });
   it("POI 白名单：https＋后缀匹配；http／他域／口令／伪后缀拒", () => {
     expect(isAllowedPoiCoverUrl("https://store.is.autonavi.com/a.jpg")).toBe(true);

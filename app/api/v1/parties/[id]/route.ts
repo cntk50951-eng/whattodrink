@@ -132,7 +132,7 @@ export async function GET(
         }
       : {}),
     cover_url: typeof row.cover_url === "string" ? row.cover_url : null,
-    cover_source: row.cover_source === "upload" || row.cover_source === "poi" ? row.cover_source : null,
+    cover_source: row.cover_source === "upload" || row.cover_source === "poi" || row.cover_source === "default" ? row.cover_source : null,
     status: row.status,
     created_at: row.created_at,
     joined_count: jrows.length,

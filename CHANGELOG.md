@@ -793,3 +793,4 @@
 - `POST /uploads/sign` 新增 `purpose=cover`（`party-covers` 公开桶，≤8MB，jpg/jpeg/png/webp，回 `publicUrl`）。
 - `GET /parties`、`GET /parties/{id}` 回 `cover_url`／`cover_source`（无则 null）。0063 未跑时读端自动退回不带封面的旧查询，发局带封面会回 500 提示跑 migration。
 - migration `0063_party_cover.sql`：两列＋约束＋`party-covers` 桶＋公开读 policy。openapi／单测（party、chat）已补，全量 888 过，tsc／eslint 干净。
+- 追加：`cover_source=default`（`cover_url=default:0..19`，客户端预置 20 张默认封面；发布时无上传无 POI 照片就随机选一张落库，各端一致）。migration `0064_party_cover_default.sql`（改 check 约束）。

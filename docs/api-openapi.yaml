@@ -1703,10 +1703,10 @@ paths:
                 cover_url:
                   type: string
                   maxLength: 512
-                  description: 可选封面（optional；不传＝客户端用默认图）。与 cover_source 成对。upload＝uploads/sign（purpose=cover）直传后回的 publicUrl，须是自己上传的，发布时过图审（不过 403 code=rejected，并删文件）；poi＝地图 POI 照片 https URL，仅白名单域名，只引用不转存
+                  description: 可选封面（optional；不传＝客户端用默认图）。与 cover_source 成对。upload＝uploads/sign（purpose=cover）直传后回的 publicUrl，须是自己上传的，发布时过图审（不过 403 code=rejected，并删文件）；poi＝地图 POI 照片 https URL，仅白名单域名，只引用不转存；default＝客户端预置的 20 张默认封面之一（无上传、无 POI 照片时发布随机选一张），cover_url 形如 default:0..default:19（非 URL，读端原样回）
                 cover_source:
                   type: string
-                  enum: [upload, poi]
+                  enum: [upload, poi, default]
       responses:
         "201":
           description: 發局成功（回 id＋過期＝開始＋3h）

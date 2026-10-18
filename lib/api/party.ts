@@ -27,7 +27,13 @@ export type PartyInput = {
   cover_source?: PartyCoverSource;
 };
 
-export type PartyCoverSource = "upload" | "poi";
+export type PartyCoverSource = "upload" | "poi" | "default";
+/** 默认封面：客户端预置 20 张（0..19），发布时随机选一张写进库，让不同端看到同一张。cover_url 形如 `default:7`，不是 URL。 */
+export const PARTY_DEFAULT_COVER_COUNT = 20;
+export function isDefaultCoverRef(ref: string): boolean {
+  const m = /^default:(\d{1,2})$/.exec(ref);
+  return m !== null && Number(m[1]) < PARTY_DEFAULT_COVER_COUNT;
+}
 export const PARTY_COVER_URL_MAX = 512;
 /** POI 照片域名白名单（后缀匹配；上线前用真机抓到的实际域名核对，env PARTY_POI_IMAGE_HOSTS 逗号分隔可覆盖）。 */
 export const PARTY_POI_IMAGE_HOSTS_DEFAULT = ["amap.com", "autonavi.com", "amap.cn"];
@@ -151,7 +157,8 @@ export function parsePartyBody(raw: unknown, nowMs: number = Date.now()): { body
     if (typeof cu !== "string" || cu === "" || cu.length > PARTY_COVER_URL_MAX) {
       return { error: `cover_url 非法（1–${PARTY_COVER_URL_MAX} 字）` };
     }
-    if (cs !== "upload" && cs !== "poi") return { error: "cover_source 只要 upload|poi（与 cover_url 成对）" };
+    if (cs !== "upload" && cs !== "poi" && cs !== "default") return { error: "cover_source 只要 upload|poi|default（与 cover_url 成对）" };
+    if (cs === "default" && !isDefaultCoverRef(cu)) return { error: `cover_url 须为 default:0..${PARTY_DEFAULT_COVER_COUNT - 1}` };
     cover = { cover_url: cu, cover_source: cs };
   }
   return {
