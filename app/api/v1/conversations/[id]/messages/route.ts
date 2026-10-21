@@ -216,10 +216,25 @@ export async function POST(
   // 陌生人拿別人的 path 發即 400，會話成員校验在下）。
   // UR E.13 站内分享（非文件附件，无 path）：仅自家帖可分享＋对方须可见；
   // 跳过归属校验，原样存 [{checkin_id}]。
-  let attachments: { path: string; mime: string; bytes: number; secs?: number }[] | { checkin_id: string; place?: string }[] | { location: { lat: number; lng: number; label?: string } }[] = [];
+  let attachments: { path: string; mime: string; bytes: number; secs?: number }[] | { checkin_id: string; place?: string }[] | { location: { lat: number; lng: number; label?: string } }[] | { party: { party_id: string; place?: string } }[] = [];
   if (parsed.kind === "text" && parsed.location !== undefined) {
     // 位置卡：發送者自己的定位快照，無需可見性判定；好友／陌生人都可（陌生人計入配額，見下）
     attachments = [{ location: parsed.location }];
+  } else if (parsed.kind === "text" && parsed.party !== undefined) {
+    // 酒局卡：公开酒局本就匿名可看，只验存在且未撤销（撤销的局不让再往外发）。
+    const { data: partyRaw } = await supabase
+      .from("parties")
+      .select("id,status")
+      .eq("id", parsed.party.party_id)
+      .maybeSingle();
+    const party = partyRaw as { id: string; status: unknown } | null;
+    if (party === null) {
+      return apiError("not_found", "酒局不存在", 404);
+    }
+    if (party.status === "cancelled") {
+      return apiError("forbidden", "酒局已撤銷，不能分享", 403);
+    }
+    attachments = [{ party: parsed.party }];
   } else if (parsed.kind === "text" && parsed.share !== undefined) {
     const { data: postRaw } = await supabase
       .from("checkins")

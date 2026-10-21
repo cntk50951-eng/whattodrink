@@ -5,6 +5,7 @@ import { updateSession } from "@/lib/supabase/middleware";
 import { parseHomeUi, resolveHomeTarget } from "@/lib/home";
 import { routing } from "./i18n/routing";
 import { isOpsPath } from "./lib/opsPath";
+import { isSharePath } from "./lib/share/partyPage";
 
 const intlMiddleware = createMiddleware(routing);
 
@@ -30,6 +31,8 @@ export default async function proxy(request: NextRequest) {
       return plain;
     }
   }
+  // 酒局分享落地頁 /p/<id>（app/p，不在 [locale] 樹下）：跳過 intl 改寫，匿名可看，不刷會話。
+  if (isSharePath(request.nextUrl.pathname)) return NextResponse.next();
   // UR C.7：首頁版本開關先行——裸 `/`＋v2 檔明跳 `/v2`；
   // 其餘（含 v1 深鏈）原樣進 intl＋session 鏈，v1 一個字節不動。
   const homeTarget = resolveHomeTarget(

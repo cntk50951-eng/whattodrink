@@ -4472,6 +4472,52 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/nearby/people:
+    get:
+      operationId: getNearbyPeople
+      summary: 附近的人（需登录；心跳窗內在線的陌生人＋好友，隱身者互不可見；只回距離檔不回坐標；本次上線新→舊再距離近→遠，最多 50）
+      description: |
+        查看者位置＝自己 5 分鐘內心跳的 live 坐標，沒有則 `needs_location: true`。
+        查看者隱身回 `people: []`。排除：自己、隱身、未成年、雙向拉黑／聊天屏蔽、超出半徑、超出心跳窗。
+        `online_since` 由 0065 遷移加列，窗內連續心跳不變、斷開超過 5 分鐘才重置；舊行回退為 `last_seen_at`。
+        打招呼＝開聊天（陌生人 3 條限制沿現有）；約酒走 `POST /invites {to_user_id}`。
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: radius_km
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 3
+            minimum: 0.1
+            maximum: 10
+      responses:
+        "200":
+          description: 附近在線的人
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [people, radius_km, needs_location]
+                properties:
+                  people:
+                    type: array
+                    maxItems: 50
+                    items:
+                      $ref: "#/components/schemas/NearbyPerson"
+                  radius_km:
+                    type: number
+                  needs_location:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 未完成性別／生日（onboarding_required）或未成年（age_restricted）
+        "500":
+          $ref: "#/components/responses/Internal"
   /api/v1/beers:
     get:
       operationId: getBeers
@@ -4772,7 +4818,7 @@ paths:
           $ref: "#/components/responses/Internal"
     post:
       operationId: sendMessage
-      summary: 發送（text／image／audio；需登录；限流＋冪等；E.13 text 可帶分享附件一枚（{checkin_id,place?}）或位置卡附件一枚（{location:{lat,lng,label?}}，UR 聊天分享我的位置：發送者定位快照，好友／陌生人都可，陌生人計入 3 條上限；lat∈[-90,90]、lng∈[-180,180]，坐標收斂 5 位小數，label ≤120）；D.8 image caption＋文件存在性＋413；D.10 陌生人配额＋kind 门＋quota；隐身不拦，UR D.10）
+      summary: 發送（text／image／audio；需登录；限流＋冪等；E.13 text 可帶分享附件一枚（{checkin_id,place?}）或酒局卡附件一枚（{party:{party_id,place?}}：公开酒局只验存在且未撤销，已撤销 403，不存在 404；好友／陌生人都可，陌生人計入 3 條上限；place 仅展示店名≤60，不放坐标；读端 attachments 原样回）或位置卡附件一枚（{location:{lat,lng,label?}}，UR 聊天分享我的位置：發送者定位快照，好友／陌生人都可，陌生人計入 3 條上限；lat∈[-90,90]、lng∈[-180,180]，坐標收斂 5 位小數，label ≤120）；D.8 image caption＋文件存在性＋413；D.10 陌生人配额＋kind 门＋quota；隐身不拦，UR D.10）
       security:
         - bearerAuth: []
       parameters:
@@ -5523,6 +5569,45 @@ components:
           type: integer
         expires_at:
           type: string
+    NearbyPerson:
+      type: object
+      required: [user_id, nickname, avatar_url, gender, online_since, last_seen_at, distance_band_m, taste_groups, shared_taste_groups, relationship]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        gender:
+          type: string
+          enum: [male, female]
+          nullable: true
+        online_since:
+          type: integer
+          description: 本次上線起點（epoch ms）
+        last_seen_at:
+          type: integer
+          description: 最近一次心跳（epoch ms）
+        distance_band_m:
+          type: integer
+          enum: [200, 500, 1000, 2000, 3000, 5000, 10000]
+          description: 距離檔（米，向上取整）。不回精確距離與坐標，防三角定位
+        taste_groups:
+          type: array
+          items:
+            type: string
+          description: 對方口味大類 key（TASTE_GROUPS），最多 4 個
+        shared_taste_groups:
+          type: array
+          items:
+            type: string
+          description: 與查看者相同的口味大類（taste_groups 的子集）
+        relationship:
+          type: string
+          enum: [none, friend, pending_out, pending_in]
     LiveFriend:
       type: object
       required: [user_id, nickname, avatar_url, lat, lng, updated_at]

@@ -221,6 +221,25 @@ export function parseLocationAttachment(first: unknown): LocationShareAttachment
   };
 }
 
+/**
+ * 酒局分享附件（聊天里发一张酒局卡；非文件）。公开酒局本来就匿名可看，所以只验存在且未撤销；
+ * 好友和陌生人会话都允许（陌生人计入 3 条上限）。place 仅展示用纯文本（店名），永不放坐标。
+ */
+export type PartyShareAttachment = {
+  party_id: string;
+  place?: string;
+};
+
+export function parsePartyAttachment(first: unknown): PartyShareAttachment | null {
+  if (typeof first !== "object" || first === null) return null;
+  const p = (first as Record<string, unknown>).party;
+  if (typeof p !== "object" || p === null) return null;
+  const { party_id, place } = p as Record<string, unknown>;
+  if (typeof party_id !== "string" || party_id === "" || party_id.length > 64 || !/^[A-Za-z0-9-]+$/.test(party_id)) return null;
+  const clean = typeof place === "string" ? place.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60) : "";
+  return clean === "" ? { party_id } : { party_id, place: clean };
+}
+
 /** 站内打卡分享附件（非文件，无 path／bucket；可见性由路由验）。 */
 export type CheckinShareAttachment = {
   checkin_id: string;
@@ -231,7 +250,7 @@ export type CheckinShareAttachment = {
 export function parseCreateMessageBody(
   raw: unknown,
 ):
-  | { kind: "text"; body: string; share?: CheckinShareAttachment; location?: LocationShareAttachment; client_msg_id: string }
+  | { kind: "text"; body: string; share?: CheckinShareAttachment; location?: LocationShareAttachment; party?: PartyShareAttachment; client_msg_id: string }
   | { kind: "image"; body: string | null; attachments: ChatAttachment[]; client_msg_id: string }
   | { kind: "audio"; attachments: ChatAttachment[]; client_msg_id: string }
   | ChatParseError {
@@ -254,6 +273,12 @@ export function parseCreateMessageBody(
       const location = parseLocationAttachment(first);
       if (location === null) return { error: "location 非法（lat／lng 范围或形状）" };
       return { kind: "text", body, location, client_msg_id };
+    }
+    // 酒局卡：{party:{party_id,place?}}
+    if (typeof first === "object" && first !== null && first.party !== undefined) {
+      const party = parsePartyAttachment(first);
+      if (party === null) return { error: "party 非法（party_id 形状）" };
+      return { kind: "text", body, party, client_msg_id };
     }
     const checkinId = typeof first === "object" && first !== null ? first.checkin_id : null;
     if (typeof checkinId !== "string" || checkinId === "" || checkinId.length > 64 || !/^[A-Za-z0-9-]+$/.test(checkinId)) {

@@ -14,6 +14,7 @@ import {
   parseReadBody,
   peerIdsOfMembers,
   parseSignBody,
+  parsePartyAttachment,
   parseViewBody,
   strangerQuotaJson,
   toChatMessage,
@@ -393,5 +394,24 @@ describe("parseSignBody purpose=cover", () => {
     expect(parseSignBody({ purpose: "cover", ext: "JPG", bytes: 7 * 1024 * 1024 })).toEqual({ purpose: "cover", ext: "jpg", bytes: 7 * 1024 * 1024, sha256: null });
     expect(parseSignBody({ purpose: "cover", ext: "jpg", bytes: 9 * 1024 * 1024 })).toMatchObject({ status: 413 });
     expect(parseSignBody({ purpose: "cover", ext: "gif", bytes: 100 })).toHaveProperty("error");
+  });
+});
+
+describe("酒局卡附件 {party}", () => {
+  const base = { kind: "text", body: "一齊嚟？", client_msg_id: "c1" };
+  it("parsePartyAttachment：形状／id 字符／place 清洗截断", () => {
+    expect(parsePartyAttachment({ party: { party_id: "ab-12" } })).toEqual({ party_id: "ab-12" });
+    expect(parsePartyAttachment({ party: { party_id: "ab-12", place: "  Bar\nLeone  " } })).toEqual({ party_id: "ab-12", place: "Bar Leone" });
+    expect(parsePartyAttachment({ party: { party_id: "x".repeat(65) } })).toBeNull();
+    expect(parsePartyAttachment({ party: { party_id: "a/b" } })).toBeNull();
+    expect(parsePartyAttachment({ party: { party_id: "" } })).toBeNull();
+    expect(parsePartyAttachment({})).toBeNull();
+    expect(parsePartyAttachment({ party: { party_id: "a", place: "x".repeat(100) } })?.place?.length).toBe(60);
+  });
+  it("parseCreateMessageBody：text＋party 附件通过；坏形状 400；与其他附件互斥（只认第一枚的类型）", () => {
+    const ok = parseCreateMessageBody({ ...base, attachments: [{ party: { party_id: "p1", place: "Ping Pong" } }] });
+    expect(ok).toMatchObject({ kind: "text", party: { party_id: "p1", place: "Ping Pong" } });
+    expect(parseCreateMessageBody({ ...base, attachments: [{ party: { party_id: "../x" } }] })).toHaveProperty("error");
+    expect(parseCreateMessageBody({ ...base, attachments: [{ party: { party_id: "p1" } }, { party: { party_id: "p2" } }] })).toHaveProperty("error");
   });
 });

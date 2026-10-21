@@ -794,3 +794,7 @@
 - `GET /parties`、`GET /parties/{id}` 回 `cover_url`／`cover_source`（无则 null）。0063 未跑时读端自动退回不带封面的旧查询，发局带封面会回 500 提示跑 migration。
 - migration `0063_party_cover.sql`：两列＋约束＋`party-covers` 桶＋公开读 policy。openapi／单测（party、chat）已补，全量 888 过，tsc／eslint 干净。
 - 追加：`cover_source=default`（`cover_url=default:0..19`，客户端预置 20 张默认封面；发布时无上传无 POI 照片就随机选一张落库，各端一致）。migration `0064_party_cover_default.sql`（改 check 约束）。
+
+## 酒局分享：公开落地页＋聊天酒局卡（2026-10-17，未提交）
+- 新页面 `/p/<id>`（`app/p`，proxy 跳过 intl）：匿名可看，只用公开酒局匿名本就可见的字段（酒吧、时间、席位、目的、买单、发起人暱称、upload/poi 封面），不含自填介绍、坐标；OG／twitter meta（WhatsApp 预览）；`robots: noindex`。「在 App 打开」＝`whattodrink://party/<id>`（iOS 自动尝试一次），未安装显示下载连结（env `APP_STORE_URL`，仅收 https 的 apps.apple.com／testflight.apple.com；未上架则显示"即将上架"）。通用链接（Associated Domains）等付费账号后再叠加。
+- 聊天新附件 `{party:{party_id,place?}}`（text＋酒局卡）：只验存在且未撤销（撤销 403、不存在 404）；好友／陌生人都可，陌生人计入 3 条上限；读端原样回。openapi／单测已补，全量 898 过，tsc／eslint 干净。
