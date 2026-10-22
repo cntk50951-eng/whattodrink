@@ -4,6 +4,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { directKey } from "@/lib/api/chat";
 import { areFriends, friendIdsOf, parseAddFriendBody, parseRequestMessage, parseRequestOrigin, toFriendListItem } from "@/lib/friends";
 import { sendFriendPush } from "@/lib/push/send";
+import { isDeletionPending } from "@/lib/accountDeletion";
 
 /**
  * DEF-20260926-009＋UR A.19：最小好友邀請（🔒，V1 無接受 UI）。
@@ -31,7 +32,8 @@ async function ensureUserRow(
       .select("id")
       .eq("id", userId)
       .maybeSingle();
-    if (ensured !== null) return;
+    // UR I.3：恢复期内不自建空行（会撞上恢复）
+    if (ensured !== null || (await isDeletionPending(userId))) return;
     await supabase
       .from("users")
       .insert({ id: userId, nickname: "酒友", gender: "secret" });

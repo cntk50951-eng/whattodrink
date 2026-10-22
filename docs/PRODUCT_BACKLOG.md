@@ -4456,3 +4456,14 @@ UR H.2　游戏向陌生人开放＋房内聊天＋举报（纯 API，无 web UI
 - 2026-10-14：建檔置 [WIP]（WEB_HANDOFF_GAMES_OPEN_CHAT 输入；分两批）
 - 2026-10-14：(a) 批：0055 四表一列＋join 202 申请流＋审批三端点＋counters＋openapi 1.54.0＋单测；tsc 零错＋676 绿＋lint 零错
 - 2026-10-14：(b) 批：房内聊天（quick 24＋限频去重＋拉黑过滤＋撤回＋24h 懒删，发送零外部调用可测）＋举报（快照匿名＋AI 复核＋禁言升级）＋kick-block＋friend origin game（24h 同房）＋admin 队列页（viewer 只读／moderator 标记＋禁玩）＋openapi 1.55.0＋单测
+
+UR I.3　账号注销（立即永久删除／30 天可恢复）（App Store 5.1.1(v)，纯 API，[shared-only]）[WIP]
+作为用户，我能在 App 内自己注销账号：立即永久删除，或 30 天内可恢复。
+*范围*：`DELETE /me {mode:now|grace, confirm:true}`、`POST /me/restore`、`GET /me/deletion`；`account_deletions` 表（0066，无 FK，快照＋到期时间）；
+  GET /me 对恢复期账号回 403 `account_pending_deletion`；排程 `/api/internal/purge-accounts`（Vercel Cron，每日，`CRON_SECRET`）清到期账号的文件＋登录账号。
+*决定*（用户 2026-10-22）：快照后立即删实际数据（对所有人自动消失，不改 46 个路由）；恢复范围＝个人资料＋自己发的内容（帖子／评论／收藏／评分／赞／心情／酒吧记忆／口味卡／标签），好友／聊天／碰杯／酒局不恢复；永久删除时别人对该用户的投诉记录一并删除。
+*非目标*：Apple 登录 token 撤销（Apple 登录未做）；注销成功邮件；后台管理界面。
+*用户必须做*：Supabase SQL Editor 执行 `0066_account_deletions.sql`；Vercel 配 `CRON_SECRET`（≥16 字符）。
+*改动记录*
+- 2026-10-22：建档置 [WIP]；web 侧：0066＋`lib/accountDeletion.ts`（纯函数＋service IO）＋三端点＋排程路由＋vercel.json＋openapi 1.57.0＋10 条单测；tsc 零错＋930 绿＋lint 零错（`npm run build` 未跑；清除／恢复的 IO 路径只在测试账号上验证，未跑真库）
+

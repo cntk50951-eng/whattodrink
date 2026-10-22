@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.56.0
+  version: 1.57.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -2330,6 +2330,12 @@ paths:
                 properties:
                   me:
                     $ref: "#/components/schemas/Me"
+        "403":
+          description: 账号已申请注销且在恢复期内（code=account_pending_deletion）。客户端应弹「恢复账号／永久删除」，用 GET /me/deletion 取到期日，用 POST /me/restore 恢复（UR I.3）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
@@ -2431,6 +2437,108 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+    delete:
+      operationId: deleteMyAccount
+      summary: 注销账号（需登录，UR I.3）。mode=now 立即永久删除（清文件＋数据＋登录账号，无法恢复）；mode=grace 快照后立即删除实际数据（对所有人自动消失），30 天内同账号登录可恢复，到期由排程清文件＋登录账号。恢复范围＝个人资料＋自己发的内容，好友／聊天／碰杯／酒局不恢复。恢复期内重复 grace 幂等（回原到期日）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode, confirm]
+              properties:
+                mode:
+                  type: string
+                  enum: [now, grace]
+                confirm:
+                  type: boolean
+                  description: 必须为 true（防误触）
+      responses:
+        "200":
+          description: 已注销
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted, mode, purge_at]
+                properties:
+                  deleted:
+                    type: boolean
+                  mode:
+                    type: string
+                    enum: [now, grace]
+                  purge_at:
+                    type: [string, "null"]
+                    format: date-time
+                    description: grace 时为到期清除时间（申请后 30 天）；now 时为 null
+        "400":
+          description: body 非法／缺 confirm:true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/me/restore:
+    post:
+      operationId: restoreMyAccount
+      summary: 恢复账号（需登录，UR I.3）。恢复期（30 天）内回填快照：个人资料＋自己发的内容；好友／聊天／碰杯／酒局不恢复
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 已恢复
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [restored, skipped]
+                properties:
+                  restored:
+                    type: boolean
+                  skipped:
+                    type: integer
+                    description: 插不进的行数（如引用的别人帖子已不存在），不影响恢复成功
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 没有可恢复的账号（未申请注销／已过期／已清除）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/me/deletion:
+    get:
+      operationId: getMyDeletionState
+      summary: 注销状态（需登录，UR I.3）。恢复期内回 pending=true＋purge_at，否则 pending=false
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 注销状态
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pending]
+                properties:
+                  pending:
+                    type: boolean
+                  purge_at:
+                    type: string
+                    format: date-time
+                    description: 仅 pending=true 时有
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/me/notifications:

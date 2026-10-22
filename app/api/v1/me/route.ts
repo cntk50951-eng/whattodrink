@@ -1,4 +1,5 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
+import { isDeletionPending, parseDeleteBody, requestDeletion } from "@/lib/accountDeletion";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parsePatchModeBody, toMeJson } from "@/lib/mode";
 import { NICKNAME_DAILY_LIMIT, parseProfileBody, parseProfileInfoBody } from "@/lib/api/profile";
@@ -29,7 +30,8 @@ async function ensureUserRow(
       .select("id")
       .eq("id", userId)
       .maybeSingle();
-    if (ensured !== null) return;
+    // UR I.3：恢复期内（行已被快照后删除）不自建空行，否则恢复会撞上它
+    if (ensured !== null || (await isDeletionPending(userId))) return;
     let nickname = "酒友";
     let avatar: string | null = null;
     try {
@@ -56,6 +58,10 @@ export async function GET(req: Request): Promise<Response> {
     return apiError("unauthorized", "未登录", 401);
   }
   try {
+    // UR I.3：已申请注销（恢复期内）→ 403，客户端据此弹「恢复账号／永久删除」，再调 GET /me/deletion 取到期日
+    if (await isDeletionPending(userId)) {
+      return apiError("account_pending_deletion", "账号已申请注销，可在恢复期内恢复", 403);
+    }
     await ensureUserRow(supabase, userId);
     const { data, error } = await supabase
       .from("users")
@@ -352,5 +358,37 @@ async function deleteAvatarPath(storagePath: string): Promise<void> {
     }
   } catch (err) {
     console.error(`[api/v1/me] avatar remove threw: ${err instanceof Error ? err.message : "unknown"}`);
+  }
+}
+
+/**
+ * UR I.3 账号注销（🔒）。`DELETE /api/v1/me {mode:"now"|"grace", confirm:true}`：
+ * - now：立即永久删除（清文件＋数据＋登录账号），无法恢复。
+ * - grace：快照后立即删除实际数据（对所有人自动消失），30 天内同账号登录可 `POST /me/restore` 恢复；
+ *   到期由排程清文件＋登录账号。恢复范围＝个人资料＋自己发的内容。
+ * 回 `{deleted:true, mode, purge_at}`（now 时 purge_at=null）。幂等：恢复期内重复 grace 回原到期日。
+ */
+export async function DELETE(req: Request): Promise<Response> {
+  const { userId } = await getAuthedClient(req);
+  if (userId === null) {
+    return apiError("unauthorized", "未登录", 401);
+  }
+  let raw: unknown = null;
+  try {
+    raw = await req.json();
+  } catch {
+    return apiError("invalid_params", "body 需为 JSON", 400);
+  }
+  const parsed = parseDeleteBody(raw);
+  if ("error" in parsed) {
+    return apiError("invalid_params", parsed.error, 400);
+  }
+  try {
+    const svc = await createServiceClient();
+    const r = await requestDeletion(svc, userId, parsed.mode, new Date());
+    return apiOk({ deleted: true, mode: r.mode, purge_at: r.purgeAt });
+  } catch (err) {
+    console.error(`[api/v1/me] delete error: ${err instanceof Error ? err.message : "unknown"}`);
+    return apiError("internal", "注销失败，请稍后重试", 500);
   }
 }

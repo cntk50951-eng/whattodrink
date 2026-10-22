@@ -4,6 +4,7 @@ import { parseCreateCheckinBody } from "@/lib/api/checkins";
 import { recordUserHashtags } from "@/lib/hashtagLibrary";
 import { checkinVisibilityFor } from "@/lib/api/privacy";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
+import { isDeletionPending } from "@/lib/accountDeletion";
 
 /**
  * UR A.12 打卡雙類型（🔒，承 A.10）。
@@ -47,7 +48,8 @@ export async function POST(req: Request): Promise<Response> {
     // 防御：若 public.users 缺行（0006 触发器未执行或旧库），先补行再落库，避免 FK 23503
     try {
       const { data: ensured } = await supabase.from("users").select("id").eq("id", userId).maybeSingle();
-      if (ensured === null) {
+      // UR I.3：恢复期内不自建空行（会撞上恢复）
+      if (ensured === null && !(await isDeletionPending(userId))) {
         // 尝试从 auth 取昵称/头像，失败则兜底
         let nickname = "酒友";
         let avatar: string | null = null;

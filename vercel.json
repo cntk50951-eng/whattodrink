@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/internal/purge-accounts", "schedule": "0 20 * * *" }
+  ]
+}

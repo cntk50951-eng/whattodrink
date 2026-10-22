@@ -43,6 +43,7 @@ export type ApiErrorCode =
   | "mfa_required"
   | "ai_unavailable"
   | "onboarding_required"
+  | "account_pending_deletion"
   | "internal";
 
 export function apiError(
