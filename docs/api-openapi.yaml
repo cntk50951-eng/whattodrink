@@ -157,6 +157,9 @@ paths:
                 query:
                   type: string
                   maxLength: 120
+                stream:
+                  type: boolean
+                  description: "true（或请求头 Accept: application/x-ndjson）→ 200 回 application/x-ndjson 逐行事件，用于显示进度：{event:stage,stage:moderating|understanding}（审核中／理解并拆分中）→ 最后一行 {event:result,data:{同下面的 200 回包}} 或 {event:error,code,message,status}（失败，code/status 同非流式的 403/429/503）。401／400 在开流前用普通 HTTP 状态返回。不带则与原来完全一致"
       responses:
         "200":
           description: "{intents:[{type:people,criteria}|{type:places,keywords,near_me,radius_m,open_24h,open_now}|{type:parties,keywords,when,near_me,radius_m}|{type:posts,tags,hashtags,keywords,near_me,radius_m,within_hours}], ignored, remaining_today}"
@@ -3809,6 +3812,138 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/games/rooms/{id}/bump-token:
+    post:
+      operationId: issueGameBumpToken
+      summary: 蓝牙碰一碰：房主取凭证（需登录；仅房主；仅 lobby；凭证 60 秒过期，无状态签名不落库）
+      description: |
+        房主 App 打开「碰一碰」面板后调用，每 30 秒换一枚，通过 BLE 特征值只给贴近的手机读（协议见 docs/GAME_BUMP_BLE.md）。
+        凭证不含房间码和个人信息。
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 凭证
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, expires_at]
+                properties:
+                  token:
+                    type: string
+                    description: "`<room_id>.<exp_ms>.<sig>`，约 100 字符，客户端当不透明串"
+                  expires_at:
+                    type: string
+                    format: date-time
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非房主（not_host）／隐身（forbidden）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 房间不存在或已结束
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 对局已开始（wrong_phase）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "503":
+          description: 暂时未能开启碰一碰（服务端未配置密钥）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/v1/games/rooms/bump-join:
+    post:
+      operationId: bumpJoinGameRoom
+      summary: 蓝牙碰一碰加入（需登录；凭证有效即直接入座，不看好友／同酒局，不走房主审批；每人每分钟 20 次）
+      description: |
+        与输码加入同一组门：18+、禁玩、同时只能在 1 个房、仅 lobby、被踢过不可进、满员、与在场成员无拉黑解友。
+        凭证无效或过期回 400（invalid_params，message 区分）；本房重复加入幂等 200。
+        成功后房主在房间事件里看到 `member_joined`（`via: bump`），可踢人。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+                  maxLength: 200
+      responses:
+        "200":
+          description: 已入座
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [room_id, nickname, count, max]
+                properties:
+                  room_id:
+                    type: string
+                    format: uuid
+                  nickname:
+                    type: string
+                    description: 房主昵称（用于「已加入阿明的房」提示）
+                  count:
+                    type: integer
+                    description: 加入后在房人数
+                  max:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 未成年／被禁玩／曾被踢／拉黑解友（age_restricted|game_banned|not_allowed）／隐身（forbidden）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 房间不存在或已结束
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 已在房中／已开局／满员（already_in_room|room_started|room_full）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 尝试超限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "503":
+          description: 暂时未能使用碰一碰
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
   /api/v1/games/rooms/{id}/invites:
     post:
       operationId: inviteGameRoomMembers

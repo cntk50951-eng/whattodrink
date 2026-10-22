@@ -165,3 +165,28 @@ export function searchPlanPrompt(peopleSchema: string): { system: string } {
     ].join("\n"),
   };
 }
+
+/**
+ * 計劃接口的「進度流」（可選，向後兼容）：請求帶 `stream:true`（或 Accept: application/x-ndjson）時，
+ * 回包改成逐行 JSON（NDJSON），每行一個事件，讓客戶端能顯示「AI 現在做到哪一步」：
+ *  {"event":"stage","stage":"moderating"}    審核文字中
+ *  {"event":"stage","stage":"understanding"} 理解並拆分條件中（LLM）
+ *  {"event":"result","data":{intents,ignored,remaining_today}}   成功（與非流式的 200 回包同形）
+ *  {"event":"error","code":"rejected|rate_limited|ai_unavailable|…","message":"…","status":403}  失敗
+ * 沒帶 stream 的舊客戶端完全不受影響。校驗類錯誤（401／400）在開流之前就用普通 HTTP 狀態回。
+ */
+export type PlanStage = "moderating" | "understanding";
+
+export type PlanStreamEvent =
+  | { event: "stage"; stage: PlanStage }
+  | { event: "result"; data: unknown }
+  | { event: "error"; code: string; message: string; status: number };
+
+export function planStreamLine(e: PlanStreamEvent): string {
+  return `${JSON.stringify(e)}\n`;
+}
+
+export function wantsPlanStream(body: Record<string, unknown>, accept: string | null): boolean {
+  return body.stream === true || (accept ?? "").toLowerCase().includes("application/x-ndjson");
+}
+

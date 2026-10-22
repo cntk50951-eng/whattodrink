@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePlanReply, sanitizePlan, searchPlanPrompt } from "./searchPlan";
+import { parsePlanReply, planStreamLine, sanitizePlan, searchPlanPrompt, wantsPlanStream } from "./searchPlan";
 
 describe("searchPlan", () => {
   it("用戶例句：女生＋附近 24 小時酒吧 → 兩個意圖", () => {
@@ -40,5 +40,23 @@ describe("searchPlan", () => {
     const p = searchPlanPrompt("gender: male|female").system;
     expect(p).toContain("24小时");
     expect(p).toContain("gender: male|female");
+  });
+});
+
+describe("計劃進度流", () => {
+  it("planStreamLine：每個事件一行 JSON、以換行結尾，能原樣解回來", () => {
+    const line = planStreamLine({ event: "stage", stage: "understanding" });
+    expect(line.endsWith("\n")).toBe(true);
+    expect(line.indexOf("\n")).toBe(line.length - 1);
+    expect(JSON.parse(line)).toEqual({ event: "stage", stage: "understanding" });
+    const err = JSON.parse(planStreamLine({ event: "error", code: "rate_limited", message: "今日搜尋次數已用完", status: 429 }));
+    expect(err).toMatchObject({ event: "error", code: "rate_limited", status: 429 });
+  });
+
+  it("wantsPlanStream：body.stream===true 或 Accept 含 ndjson 才走流；其餘（含舊客戶端）不變", () => {
+    expect(wantsPlanStream({ query: "x" }, null)).toBe(false);
+    expect(wantsPlanStream({ query: "x", stream: "true" }, "application/json")).toBe(false);
+    expect(wantsPlanStream({ query: "x", stream: true }, null)).toBe(true);
+    expect(wantsPlanStream({ query: "x" }, "Application/X-NDJSON")).toBe(true);
   });
 });
