@@ -5,6 +5,10 @@
 ## [Unreleased]
 
 ### Added
+- **首頁介紹頁 `/intro`（裸 `/` 默認落點）**
+  - 全屏自動播放、循環的產品故事線（Remotion Player＋iPhone 真機錄屏截圖進手機框；打卡／AI 搜索／聊天／口味／碰杯／附近酒吧／遊戲／酒保）；右上常駐 App Store／Google Play 按鈕（商店鏈接為占位 `#app-store-todo`／`#google-play-todo`）＋「Open web app」→ `/v2`。
+  - `lib/home.ts`：`HOME_UI` 新增 `intro`（缺省）；裸 `/` 與 locale 根 → `/intro`；`v2`／`v1` 仍可由 env 切回；帶查詢串深鏈不劫持。單測 12 綠。
+  - 手機瀏覽器：容器 `100dvh`＋ResizeObserver（地址欄伸縮不抖）、觸屏 30fps、`viewport-fit=cover`＋安全區、截圖預載、`prefers-reduced-motion` 停在結尾幕；`?t=<秒>` 凍結幀供 QA。內容目前只有英文。
 - **私隱設置 P2（API／migration 0062；openapi 1.56.0；iOS 配合）**
   - `0062_privacy_settings.sql`：`trail_visibility` 加 `public`；新增 `users.checkin_visibility`（NULL＝跟隨模式）、`users.saves_visibility`（默認 friends）。**先跑 0062 再部署**（沒跑也不會壞：新列讀取失敗一律回退舊行為）。
   - `GET|PATCH /me/privacy`（打卡默認可見性／收藏可見性）；`PATCH /me/trail` 接受 `public`；`GET /users/{id}/trail` 對 `public` 陌生人 visible（只含 public 打卡）。
