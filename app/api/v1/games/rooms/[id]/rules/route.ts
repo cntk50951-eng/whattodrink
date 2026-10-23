@@ -1,6 +1,9 @@
 import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseRules } from "@/lib/games/liars";
+import { parseSpyRules } from "@/lib/games/spy";
+import { parseTrainRules } from "@/lib/games/train";
+import { parseShipoRules } from "@/lib/games/shipo";
 import {
   appendEvent,
   bumpRoom,
@@ -41,7 +44,16 @@ export async function POST(
   if (loaded.room.status !== "lobby") {
     return apiError("wrong_phase", "開局後不可改房規", 409);
   }
-  const rules = parseRules((raw as Record<string, unknown>).rules);
+  const rawRules = (raw as Record<string, unknown>).rules;
+  // UR H.3：臥底房的房規是 {spy_count, packs}；其餘走大話骰房規
+  const rules =
+    loaded.room.game === "spy"
+      ? parseSpyRules(rawRules)
+      : loaded.room.game === "last_train"
+        ? parseTrainRules(rawRules)
+        : loaded.room.game === "shipo"
+          ? parseShipoRules(rawRules)
+          : parseRules(rawRules);
   const { error } = await svc.from("game_rooms").update({ rules }).eq("id", loaded.room.id);
   if (error !== null) {
     console.error(`[games/rules] update error: code=${error.code} message=${error.message}`);

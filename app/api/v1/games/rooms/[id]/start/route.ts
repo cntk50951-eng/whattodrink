@@ -10,6 +10,12 @@ import {
   isStealthUser,
 } from "@/lib/games/rooms";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { startSpyRoom } from "@/lib/games/spyRoom";
+import { SPY_MAX_PLAYERS, SPY_MIN_PLAYERS } from "@/lib/games/spy";
+import { startTrainRoom } from "@/lib/games/trainRoom";
+import { startShipoRoom } from "@/lib/games/shipoRoom";
+import { SHIPO_MAX_PLAYERS, SHIPO_MIN_PLAYERS } from "@/lib/games/shipo";
+import { TRAIN_MAX_PLAYERS, TRAIN_MIN_PLAYERS } from "@/lib/games/train";
 
 /**
  * UR H.1 开始（🔒，仅房主）。
@@ -44,6 +50,33 @@ export async function POST(
   }
   if (members.some((m) => !m.ready)) {
     return apiError("invalid_params", "有成員未準備", 400);
+  }
+  // UR H.3 誰是臥底：伺服器派詞派身份、排發言順序（4–8 人）；不走骰局流程。
+  if (room.game === "spy") {
+    if (members.length < SPY_MIN_PLAYERS || members.length > SPY_MAX_PLAYERS) {
+      return apiError("invalid_params", `誰是臥底需要 ${SPY_MIN_PLAYERS}–${SPY_MAX_PLAYERS} 人`, 400);
+    }
+    const started = await startSpyRoom(svc, room, members, userId, Date.now());
+    if ("response" in started) return started.response;
+    return apiOk({ version: started.version });
+  }
+  // 老實人·識破：伺服器抽身份與題卡（4–6 人）。
+  if (room.game === "shipo") {
+    if (members.length < SHIPO_MIN_PLAYERS || members.length > SHIPO_MAX_PLAYERS) {
+      return apiError("invalid_params", `識破需要 ${SHIPO_MIN_PLAYERS}–${SHIPO_MAX_PLAYERS} 人`, 400);
+    }
+    const started = await startShipoRoom(svc, room, members, userId, Date.now());
+    if ("response" in started) return started.response;
+    return apiOk({ version: started.version });
+  }
+  // UR H.4 尾班車：伺服器決定隱藏倒數、題目與第一位拿車的人（3–8 人）。
+  if (room.game === "last_train") {
+    if (members.length < TRAIN_MIN_PLAYERS || members.length > TRAIN_MAX_PLAYERS) {
+      return apiError("invalid_params", `尾班車需要 ${TRAIN_MIN_PLAYERS}–${TRAIN_MAX_PLAYERS} 人`, 400);
+    }
+    const started = await startTrainRoom(svc, room, members, userId, Date.now());
+    if ("response" in started) return started.response;
+    return apiOk({ version: started.version });
   }
   const rules = parseRules(room.rules);
   const nowMs = Date.now();

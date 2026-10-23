@@ -12,6 +12,16 @@ import {
   isStealthUser,
 } from "@/lib/games/rooms";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { viewSpyFor } from "@/lib/games/spy";
+import { settleSpyRoom } from "@/lib/games/spyRoom";
+import { loadSpyState } from "@/lib/games/spyStore";
+import { viewTrainFor } from "@/lib/games/train";
+import { settleTrainRoom } from "@/lib/games/trainRoom";
+import { viewShipoFor } from "@/lib/games/shipo";
+import { settleShipoRoom } from "@/lib/games/shipoRoom";
+import { loadShipoState } from "@/lib/games/shipoStore";
+import { pickShipoLang } from "@/lib/games/shipoCards";
+import { loadTrainState } from "@/lib/games/trainStore";
 
 const ONLINE_WINDOW_MS = 15_000;
 
@@ -60,7 +70,14 @@ export async function GET(
   }
   // 懒超时（只 active 成员触发；旁观 ended 不写）。
   if (room.status === "playing" && mine.status === "active") {
-    const settled = await settleRoom(svc, room, nowMs);
+    const settled =
+      room.game === "spy"
+        ? await settleSpyRoom(svc, room, nowMs)
+        : room.game === "last_train"
+          ? await settleTrainRoom(svc, room, nowMs)
+          : room.game === "shipo"
+            ? await settleShipoRoom(svc, room, nowMs)
+            : await settleRoom(svc, room, nowMs);
     room = settled.room;
   }
   const q = new URL(req.url).searchParams;
@@ -132,5 +149,31 @@ export async function GET(
             : {}),
         };
   const events = await getEventsSince(svc, room.id, Number.isFinite(since) && since > 0 ? since : 0);
-  return apiOk({ room, players, ...(roundJson !== undefined ? { round: roundJson } : {}), events });
+  // UR H.3 誰是臥底：按人裁剪的視圖（只含自己的詞；身份只在出局／結束後公開；server_now 供客戶端校準倒數）
+  let spyJson: ReturnType<typeof viewSpyFor> | undefined;
+  if (room.game === "spy" && room.status === "playing" && mine.status === "active") {
+    const cur = await loadSpyState(svc, room.id);
+    if (cur !== null) spyJson = viewSpyFor(cur.state, userId, nowMs);
+  }
+  // UR H.4 尾班車：公開視圖（熱度 0–4；真實倒數永不下發）
+  let trainJson: ReturnType<typeof viewTrainFor> | undefined;
+  if (room.game === "last_train" && room.status === "playing" && mine.status === "active") {
+    const cur = await loadTrainState(svc, room.id);
+    if (cur !== null) trainJson = viewTrainFor(cur.state, nowMs);
+  }
+  // 老實人·識破：按人裁剪（peek 階段只有老實人拿到真相；他人身份 result 前絕不下發）
+  let shipoJson: ReturnType<typeof viewShipoFor> | undefined;
+  if (room.game === "shipo" && room.status === "playing" && mine.status === "active") {
+    const cur = await loadShipoState(svc, room.id);
+    if (cur !== null) shipoJson = viewShipoFor(cur.state, userId, nowMs, pickShipoLang(req.headers.get("accept-language")));
+  }
+  return apiOk({
+    room,
+    players,
+    ...(roundJson !== undefined ? { round: roundJson } : {}),
+    ...(spyJson !== undefined ? { spy: spyJson } : {}),
+    ...(trainJson !== undefined ? { train: trainJson } : {}),
+    ...(shipoJson !== undefined ? { shipo: shipoJson } : {}),
+    events,
+  });
 }

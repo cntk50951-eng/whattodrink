@@ -18,6 +18,9 @@ import {
   isStealthUser,
 } from "@/lib/games/rooms";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { applySpyAction, settleSpyRoom } from "@/lib/games/spyRoom";
+import { applyTrainAction, settleTrainRoom } from "@/lib/games/trainRoom";
+import { applyShipoAction, settleShipoRoom } from "@/lib/games/shipoRoom";
 
 /**
  * UR H.1 动作（🔒）。
@@ -78,10 +81,72 @@ export async function POST(
     return apiOk({ version: ver, events, replayed: true });
   }
   // 懒超时（自动动作推高 version 即原地生效；expected 对新 version 判）。
-  const settled = await settleRoom(svc, room, nowMs);
+  const settled =
+    room.game === "spy"
+      ? await settleSpyRoom(svc, room, nowMs)
+      : room.game === "last_train"
+        ? await settleTrainRoom(svc, room, nowMs)
+        : room.game === "shipo"
+          ? await settleShipoRoom(svc, room, nowMs)
+          : await settleRoom(svc, room, nowMs);
   room = settled.room;
   if (parsed.expectedVersion !== room.version) {
     return apiError("stale_version", "狀態已更新，請重拉", 409);
+  }
+  // UR H.3 誰是臥底：speak_done／vote／rematch 走臥底引擎；骰局動作在臥底房一律 409（反之亦然）。
+  const isSpyAction = parsed.type === "speak_done" || parsed.type === "vote" || parsed.type === "rematch";
+  if (room.game === "spy") {
+    if (!isSpyAction) return apiError("wrong_phase", "誰是臥底不用叫骰動作", 409);
+    const done = await applySpyAction(
+      svc,
+      room,
+      userId,
+      parsed.type === "vote" ? { type: "vote", target: parsed.target } : { type: parsed.type },
+      nowMs,
+      parsed.clientActionId,
+    );
+    if ("response" in done) return done.response;
+    const events = await getEventsSince(svc, room.id, parsed.expectedVersion);
+    return apiOk({ version: done.version, events });
+  }
+  // UR H.4 尾班車：answer／again／rematch 走尾班車引擎（rematch 臥底與尾班車共用名，按房間遊戲分派）。
+  if (room.game === "last_train") {
+    if (parsed.type !== "answer" && parsed.type !== "again" && parsed.type !== "rematch") {
+      return apiError("wrong_phase", "尾班車不用這個動作", 409);
+    }
+    const members = await getActiveMembers(svc, room.id);
+    const done = await applyTrainAction(
+      svc,
+      room,
+      members,
+      userId,
+      parsed.type === "answer" ? { type: "answer", text: parsed.text } : { type: parsed.type },
+      nowMs,
+      parsed.clientActionId,
+    );
+    if ("response" in done) return done.response;
+    const events = await getEventsSince(svc, room.id, parsed.expectedVersion);
+    return apiOk({ version: done.version, events });
+  }
+  // 老實人·識破：gongsansiao／end_talk／pick／next／rematch 走識破引擎；其他動作 409。
+  if (room.game === "shipo") {
+    const t = parsed.type;
+    if (t === "shipo_gongsansiao" || t === "shipo_pick") {
+      const done = await applyShipoAction(svc, room, userId, { type: t, target: parsed.target }, nowMs, parsed.clientActionId);
+      if ("response" in done) return done.response;
+      const events = await getEventsSince(svc, room.id, parsed.expectedVersion);
+      return apiOk({ version: done.version, events });
+    }
+    if (t === "shipo_end_talk" || t === "shipo_next" || t === "rematch") {
+      const done = await applyShipoAction(svc, room, userId, { type: t }, nowMs, parsed.clientActionId);
+      if ("response" in done) return done.response;
+      const events = await getEventsSince(svc, room.id, parsed.expectedVersion);
+      return apiOk({ version: done.version, events });
+    }
+    return apiError("wrong_phase", "識破不用這個動作", 409);
+  }
+  if (isSpyAction || parsed.type === "answer" || parsed.type === "again" || parsed.type.startsWith("shipo_")) {
+    return apiError("wrong_phase", "骰局不用這個動作", 409);
   }
   const round = await getLatestRound(svc, room.id);
   if (round === null) {

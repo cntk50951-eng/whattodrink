@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.57.0
+  version: 1.60.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -3260,7 +3260,7 @@ paths:
   /api/v1/games/rooms:
     post:
       operationId: createGameRoom
-      summary: 建房（需登录；18+ 403；同时 1 房 409＋调 active 回去；小时 10 房 429，UR H.1）
+      summary: 建房（需登录；18+ 403；同时 1 房 409＋调 active 回去；小时 10 房 429，UR H.1；UR H.3 加 game=spy 誰是臥底）
       security:
         - bearerAuth: []
       requestBody:
@@ -3272,16 +3272,17 @@ paths:
               properties:
                 game:
                   type: string
-                  enum: [liars_dice]
+                  enum: [liars_dice, spy, last_train, shipo]
                   default: liars_dice
                 max_players:
                   type: integer
                   minimum: 2
                   maximum: 8
                   default: 6
+                  description: spy 房 4–8、last_train 房 3–8、shipo 房 4–6（缺省 6）
                 rules:
                   type: object
-                  description: "房规（mode: standard|deal_only，非法回落 standard；min_open_qty／ones_wild／ones_break／zhai_enabled／turn_seconds 15|30|60|0；deal_only 房无轮次无倒计时）"
+                  description: "房规。liars_dice：mode: standard|deal_only，非法回落 standard；min_open_qty／ones_wild／ones_break／zhai_enabled／turn_seconds 15|30|60|0；deal_only 房无轮次无倒计时。spy：spy_count 1|2（2 位臥底要 7 人起，不足退回 1）、packs（tea|hotpot|place|night|culture 的子集，空＝全部）。last_train（UR H.4）：packs（mtr|cha|pot|can|film|dist|cock 的子集，空＝默认 mtr／cha／can／cock）、fuse（short 15–30s｜mid 25–50s｜long 40–80s，真实秒数隐藏）、events（调头／越站／转线／趕車，默认开）。shipo（老实人·识破）：talk_seconds（追问时长秒，60–600，缺省 240，非法回落缺省）"
       responses:
         "201":
           description: 建房成功（房主 seat 0，ready=false）
@@ -3601,7 +3602,7 @@ paths:
   /api/v1/games/rooms/{id}:
     get:
       operationId: getGameRoomState
-      summary: 取状态（需登录；since 追平回 304；按人裁剪，my_dice 只给自己，开盅才有 revealed；懒超时先结算，UR H.1）
+      summary: 取状态（需登录；since 追平回 304；按人裁剪，my_dice 只给自己，开盅才有 revealed；懒超时先结算，UR H.1）。UR H.3 誰是臥底房另回 `spy` 视图：只含自己的词（me.word）；身份只在已出局／结束后公开（players[].role、me.role）；两个词只在 phase=over 公开（words）；`deadline`＋`server_now`（ISO）供客户端校准倒数，`seconds` 为各阶段总长（speak=60）。发言＝房内聊天（POST /messages，伺服器按阶段限发言人并拦截说出自己的词）。UR H.4 尾班車房另回 `train` 视图：phase（run|over）、holder、dir、passes、order、cat{id,name,color,prompt,remaining}、heat（0–4，倒数已走比例的五档量化；**真实倒数与截止时间永不下发**）、loser（over 才有）、log（最近 30 条公开答案，附题库颜色与时间）、event{seq,id,target}（最近一次随机事件，按 seq 只提示一次）、rules 老实人·识破（shipo）房另回 `shipo` 视图：round／rounds_total、phase（peek|talk|pick|result|over）、deadline＋server_now（ISO 校准倒数）、seconds{peek:9,talk,pick:60,result:20}、judge_id（想想）、card{code,difficulty,category}（全员可见；题面只有图＋难度星，标题 result 才给）、me{role＝judge|honest|bluffer, truth?{text,source}（**仅老实人且仅 peek 阶段**）}、accuse{target_id}（公三小打出即公开目标）、picked{target_id}、scores（每人当前总分）、acks、left、result（仅 result|over：honest_id、picked_id、picked_correct、accuse_hit、delta、voided、truth、title）、winners（仅 over）；文案按 Accept-Language 回 zh-Hans／zh-Hant／en（缺省 zh-Hant）；**他人身份与真相在 result 前绝不出现在任何回包／事件**
       security:
         - bearerAuth: []
       parameters:
@@ -3653,6 +3654,9 @@ paths:
                         dice_count:
                           type: integer
                           description: 局中每人骰数（公开信息；骰面只在 my_dice／revealed）
+                  spy:
+                    type: object
+                    description: "仅 spy 房 playing（UR H.3）。字段：round、phase（deal|speak|discuss|vote|result|over）、deadline／server_now（ISO）、seconds（各阶段总长）、me{word,alive,role,my_vote}、players[{id,seat,alive,role}]（role 仅已出局／over 才有）、order、speak_index、current_speaker、votes_in、last_result{counts,leaders,eliminated,votes}（仅 result／over）、winner、words{civilian,spy}（仅 over）"
                   round:
                     type: object
                     description: 仅 playing（lobby／ended 无本字段）
@@ -3725,10 +3729,10 @@ paths:
               properties:
                 type:
                   type: string
-                  enum: [bid, challenge, next_round, reveal]
+                  enum: [bid, challenge, next_round, reveal, speak_done, vote, rematch, answer, again, shipo_gongsansiao, shipo_end_talk, shipo_pick, shipo_next]
                 payload:
                   type: object
-                  description: bid 用 {qty, face, zhai?}；reveal／其余空（reveal 仅 deal_only 房，任一 active 在 bidding 中亮骰，不判输赢）
+                  description: "bid 用 {qty, face, zhai?}；reveal／其余空（reveal 仅 deal_only 房，任一 active 在 bidding 中亮骰，不判输赢）。UR H.3 誰是臥底房只认 speak_done（当前发言者提前结束，下一位从当下起算新的 60 秒）／vote {target}（只能投存活的他人，每人一票，全员投完立即开票）／rematch（仅房主，仅 over 之后，回大厅重开）；骰局动作在臥底房 409，反之亦然。UR H.4 尾班車房只认 answer {text}（拿着车的人，1–40 字；不在题库 422 invalid_answer、重复 409 duplicate、答错不传车、倒数照走）／again（房主，局结束后同一批人再开一局，上局输家先拿车）／rematch（房主，局结束后回大厅）。老实人·识破（shipo）房只认 shipo_gongsansiao {target}（想想，仅 talk，每轮限 1 次，目标不能是想想自己；非想想 403 not_judge、已打过 409 already_accused、目标非法 400 invalid_params）／shipo_end_talk（想想，提前结束追问进入指认）／shipo_pick {target}（想想，仅 pick 阶段，指认老实人并结算）／shipo_next（result 阶段在场者确认，全员确认或 20 秒自动开下一轮）／rematch（房主，over 之后回大厅）；其余动作 409。计分（题面分＝难度星 1–3）：指中老实人→想想＋老实人各 +face；指中瞎掰人→该人 +face；公三小打中瞎掰人→想想 +1、该人 −1；打中老实人→想想 −3；每人起始 3 分，可为负。聊天 POST /messages：peek 全员 409 wrong_phase（闭眼），其余阶段在场者可发（追问走聊天，不限发言人）"
                 expected_version:
                   type: integer
                 client_action_id:

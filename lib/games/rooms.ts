@@ -17,6 +17,12 @@ import {
   rollDice,
   type LiarsRules,
 } from "./liars";
+import { parseSpyRules, type SpyRules } from "./spy";
+import { applySpyLeave } from "./spyStore";
+import { parseTrainRules, type TrainRules } from "./train";
+import { applyTrainLeave } from "./trainStore";
+import { parseShipoRules, SHIPO_MAX_PLAYERS, SHIPO_MIN_PLAYERS, type ShipoRules } from "./shipo";
+import { applyShipoLeave } from "./shipoStore";
 
 export const ROOM_TTL_MS = 2 * 3600_000;
 export const ROOM_DELETE_AFTER_END_MS = 24 * 3600_000;
@@ -43,7 +49,8 @@ export type RoomJson = {
   game: string;
   host_id: string;
   status: GameRoomStatus;
-  rules: LiarsRules;
+  /** liars_dice＝LiarsRules；spy＝SpyRules（UR H.3）；last_train＝TrainRules（UR H.4） */
+  rules: LiarsRules | SpyRules | TrainRules | ShipoRules;
   max_players: number;
   version: number;
   expires_at: string;
@@ -60,13 +67,14 @@ export function toRoomJson(raw: unknown): RoomJson | null {
   if (typeof r.max_players !== "number") return null;
   if (typeof r.version !== "number") return null;
   if (typeof r.expires_at !== "string") return null;
+  const game = typeof r.game === "string" ? r.game : "liars_dice";
   return {
     id: r.id,
     code: r.code,
-    game: typeof r.game === "string" ? r.game : "liars_dice",
+    game,
     host_id: r.host_id,
     status: r.status,
-    rules: parseRules(r.rules),
+    rules: game === "spy" ? parseSpyRules(r.rules) : game === "last_train" ? parseTrainRules(r.rules) : game === "shipo" ? parseShipoRules(r.rules) : parseRules(r.rules),
     max_players: r.max_players,
     version: r.version,
     expires_at: r.expires_at,
@@ -82,17 +90,37 @@ export function parseRoomId(raw: unknown): { id: string } | { error: string } {
 
 export function parseCreateBody(
   raw: unknown,
-): { game: string; maxPlayers: number; rules: LiarsRules } | { error: string } {
+): { game: string; maxPlayers: number; rules: LiarsRules | SpyRules | TrainRules | ShipoRules } | { error: string } {
   if (typeof raw !== "object" || raw === null) return { error: "body 需为对象" };
   const r = raw as Record<string, unknown>;
   const game = typeof r.game === "string" ? r.game : "liars_dice";
-  if (game !== "liars_dice") return { error: "game 只要 liars_dice（POC）" };
+  if (game !== "liars_dice" && game !== "spy" && game !== "last_train" && game !== "shipo") return { error: "game 只要 liars_dice|spy|last_train|shipo" };
   const maxPlayers =
     r.max_players === undefined
       ? 6
       : typeof r.max_players === "number" && Number.isInteger(r.max_players)
         ? r.max_players
         : -1;
+  if (game === "spy") {
+    // 誰是臥底 4–8 人（默認 6）；人數下限在開局時再驗（大廳可以先 2–3 人等人）
+    const spyMax = r.max_players === undefined ? 6 : maxPlayers;
+    if (spyMax < 4 || spyMax > 8) return { error: "spy 的 max_players 只要 4-8" };
+    return { game, maxPlayers: spyMax, rules: parseSpyRules(r.rules) };
+  }
+  if (game === "shipo") {
+    // 老實人·識破 4–6 人（默認 6）；人數下限在開局時再驗
+    const shipoMax = r.max_players === undefined ? SHIPO_MAX_PLAYERS : maxPlayers;
+    if (shipoMax < SHIPO_MIN_PLAYERS || shipoMax > SHIPO_MAX_PLAYERS) {
+      return { error: `shipo 的 max_players 只要 ${SHIPO_MIN_PLAYERS}-${SHIPO_MAX_PLAYERS}` };
+    }
+    return { game, maxPlayers: shipoMax, rules: parseShipoRules(r.rules) };
+  }
+  if (game === "last_train") {
+    // 尾班車 3–8 人（默認 6）；人數下限在開局時再驗
+    const trainMax = r.max_players === undefined ? 6 : maxPlayers;
+    if (trainMax < 3 || trainMax > 8) return { error: "last_train 的 max_players 只要 3-8" };
+    return { game, maxPlayers: trainMax, rules: parseTrainRules(r.rules) };
+  }
   if (maxPlayers < 2 || maxPlayers > 8) return { error: "max_players 只要 2-8" };
   return { game, maxPlayers, rules: parseRules(r.rules) };
 }
@@ -461,6 +489,12 @@ export async function applyDeparture(
       await appendEvent(svc, dep.room.id, version, "room_ended", actorId, { reason: "too_few" });
       return { version };
     }
+    // UR H.3：誰是臥底房離場＝出局（輪到他發言→換人、投票中清票、之後判勝負）。臥底房沒有 game_rounds，下面的骰局順延自然是空操作。
+    if (dep.room.game === "spy") await applySpyLeave(svc, dep.room.id, leaverId, nowMs);
+    // UR H.4：尾班車房離場＝從座位序移除（拿著車的人離場→車交給下一位）
+    if (dep.room.game === "last_train") await applyTrainLeave(svc, dep.room.id, leaverId);
+    // 識破房離場：在場不足 3 人直接結束；老實人／想想離場本輪作廢
+    if (dep.room.game === "shipo") await applyShipoLeave(svc, dep.room.id, leaverId, nowMs);
     // 轮到离场者→顺延（座位次序含离场者本人的环，下一家必为他人）。
     const { data: roundRaw } = await svc
       .from("game_rounds")
@@ -896,21 +930,38 @@ export async function getEventsSince(
   return out;
 }
 
-export type GameActionType = "bid" | "challenge" | "next_round" | "reveal";
+export type GameActionType =
+  | "bid" | "challenge" | "next_round" | "reveal" | "speak_done" | "vote" | "rematch" | "answer" | "again";
 
 export type ParsedAction =
   | { type: "bid"; bid: { qty: number; face: number; zhai: boolean }; expectedVersion: number; clientActionId: string }
   | { type: "challenge"; expectedVersion: number; clientActionId: string }
   | { type: "reveal"; expectedVersion: number; clientActionId: string }
-  | { type: "next_round"; expectedVersion: number; clientActionId: string };
+  | { type: "next_round"; expectedVersion: number; clientActionId: string }
+  // UR H.3 誰是臥底
+  | { type: "speak_done"; expectedVersion: number; clientActionId: string }
+  | { type: "vote"; target: string; expectedVersion: number; clientActionId: string }
+  | { type: "rematch"; expectedVersion: number; clientActionId: string }
+  // UR H.4 尾班車
+  | { type: "answer"; text: string; expectedVersion: number; clientActionId: string }
+  | { type: "again"; expectedVersion: number; clientActionId: string }
+  // 老實人·識破
+  | { type: "shipo_gongsansiao"; target: string; expectedVersion: number; clientActionId: string }
+  | { type: "shipo_end_talk"; expectedVersion: number; clientActionId: string }
+  | { type: "shipo_pick"; target: string; expectedVersion: number; clientActionId: string }
+  | { type: "shipo_next"; expectedVersion: number; clientActionId: string };
 
 /** 动作包解析（形状错 400；语义错各 action 内 409/422）。 */
 export function parseActionBody(raw: unknown): ParsedAction | { error: string } {
   if (typeof raw !== "object" || raw === null) return { error: "body 需为对象" };
   const r = raw as Record<string, unknown>;
   const type = r.type;
-  if (type !== "bid" && type !== "challenge" && type !== "next_round" && type !== "reveal") {
-    return { error: "type 只要 bid|challenge|next_round|reveal" };
+  if (
+    type !== "bid" && type !== "challenge" && type !== "next_round" && type !== "reveal" &&
+    type !== "speak_done" && type !== "vote" && type !== "rematch" && type !== "answer" && type !== "again" &&
+    type !== "shipo_gongsansiao" && type !== "shipo_end_talk" && type !== "shipo_pick" && type !== "shipo_next"
+  ) {
+    return { error: "type 只要 bid|challenge|next_round|reveal|speak_done|vote|rematch|answer|again|shipo_gongsansiao|shipo_end_talk|shipo_pick|shipo_next" };
   }
   if (typeof r.expected_version !== "number" || !Number.isInteger(r.expected_version) || r.expected_version < 0) {
     return { error: "expected_version 非法" };
@@ -920,6 +971,19 @@ export function parseActionBody(raw: unknown): ParsedAction | { error: string } 
     return { error: "client_action_id 非法" };
   }
   const base = { expectedVersion: r.expected_version, clientActionId: cid.trim() };
+  if (type === "answer") {
+    const p = (typeof r.payload === "object" && r.payload !== null ? r.payload : {}) as Record<string, unknown>;
+    const t = typeof p.text === "string" ? p.text.trim() : "";
+    if (t === "" || t.length > 40) return { error: "answer payload 需 text（1–40 字）" };
+    return { type, text: t, ...base };
+  }
+  if (type === "vote" || type === "shipo_gongsansiao" || type === "shipo_pick") {
+    const p = (typeof r.payload === "object" && r.payload !== null ? r.payload : {}) as Record<string, unknown>;
+    if (typeof p.target !== "string" || p.target.trim() === "" || p.target.length > 64) {
+      return { error: `${type} payload 需 target（用戶 id）` };
+    }
+    return { type, target: p.target.trim(), ...base };
+  }
   if (type !== "bid") return { type, ...base };
   const p = (typeof r.payload === "object" && r.payload !== null ? r.payload : {}) as Record<string, unknown>;
   if (typeof p.qty !== "number" || !Number.isInteger(p.qty) || typeof p.face !== "number" || !Number.isInteger(p.face)) {
