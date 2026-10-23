@@ -1,0 +1,114 @@
+/* 首頁介紹動畫（全屏，蓋住 [locale] layout 的 header／footer）。
+ * 變量作用在 .root 上，不碰全局；碰杯幕黑底時 data-dark="1" 反白導航。 */
+.root {
+  --ink: #1b140b;
+  --line: rgba(27, 20, 11, 0.1);
+  --grad: linear-gradient(120deg, #ffb43a, #ff7a4f 58%, #ff5c7a);
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  height: 100dvh;
+  background: #fbf8f1;
+  color: var(--ink);
+  font-family: "Plus Jakarta Sans", -apple-system, "PingFang TC", "PingFang HK", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+.root[data-dark="1"] {
+  --ink: #f4ecdd;
+  --line: rgba(255, 255, 255, 0.1);
+}
+.stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.nav {
+  position: absolute;
+  z-index: 10;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 68px;
+  padding: 0 clamp(16px, 3vw, 36px);
+  padding-top: env(safe-area-inset-top);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+.brand i {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: var(--grad);
+}
+.brand b {
+  font-weight: 700;
+}
+.navr {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.webApp {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  opacity: 0.7;
+  text-decoration: none;
+  padding: 0 8px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.webApp:hover {
+  opacity: 1;
+}
+.store {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--grad);
+  color: #2a1700;
+  font-weight: 700;
+  font-size: 14.5px;
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  box-shadow: 0 6px 18px -8px rgba(255, 92, 60, 0.7);
+  transition: transform 0.2s;
+}
+.store:hover {
+  transform: translateY(-1px);
+}
+@media (max-width: 760px) {
+  .webApp {
+    display: none;
+  }
+}
+@media (max-width: 560px) {
+  .store {
+    padding: 0;
+    width: 44px;
+    justify-content: center;
+  }
+  .store span,
+  .brand b {
+    display: none;
+  }
+}

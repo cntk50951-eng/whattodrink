@@ -3,16 +3,17 @@ import { describe, expect, it } from "vitest";
 import { parseHomeUi, resolveHomeTarget } from "./home";
 
 describe("parseHomeUi (UR C.7)", () => {
-  it("只有字面 v1 才退出 v2", () => {
+  it("字面 v1／v2 各走各的", () => {
     expect(parseHomeUi("v1")).toBe("v1");
     expect(parseHomeUi("v2")).toBe("v2");
+    expect(parseHomeUi("intro")).toBe("intro");
   });
 
-  it("缺省／非法一律 v2（用戶拍板）", () => {
-    expect(parseHomeUi(undefined)).toBe("v2");
-    expect(parseHomeUi(null)).toBe("v2");
-    expect(parseHomeUi("")).toBe("v2");
-    expect(parseHomeUi("V1")).toBe("v2");
+  it("缺省／非法一律 intro（2026-10-23 用戶拍板：主頁默認進介紹頁）", () => {
+    expect(parseHomeUi(undefined)).toBe("intro");
+    expect(parseHomeUi(null)).toBe("intro");
+    expect(parseHomeUi("")).toBe("intro");
+    expect(parseHomeUi("V1")).toBe("intro");
   });
 });
 
@@ -53,5 +54,26 @@ describe("resolveHomeTarget (UR C.7)", () => {
     expect(resolveHomeTarget("/fr", "", "v2", locales)).toBeNull();
     expect(resolveHomeTarget("/zh-Hans/wall", "", "v2", locales)).toBeNull();
     expect(resolveHomeTarget("/zh-Hans", "", "v1", locales)).toBeNull();
+  });
+});
+
+describe("resolveHomeTarget · intro 檔（默認）", () => {
+  const locales = ["zh-Hant", "zh-Hans", "en"];
+
+  it("裸 / 回 /intro", () => {
+    expect(resolveHomeTarget("/", "", "intro")).toBe("/intro");
+  });
+
+  it("locale 根帶語言跳（不丟語言），尾斜杠同規", () => {
+    expect(resolveHomeTarget("/en", "", "intro", locales)).toBe("/en/intro");
+    expect(resolveHomeTarget("/zh-Hans/", "", "intro", locales)).toBe("/zh-Hans/intro");
+  });
+
+  it("深鏈（查詢串）、/intro 自身、/v2 與子路徑都不劫持", () => {
+    expect(resolveHomeTarget("/", "?pick=1", "intro")).toBeNull();
+    expect(resolveHomeTarget("/", "?shoot=1", "intro")).toBeNull();
+    expect(resolveHomeTarget("/intro", "", "intro")).toBeNull();
+    expect(resolveHomeTarget("/v2", "", "intro")).toBeNull();
+    expect(resolveHomeTarget("/zh-Hans/wall", "", "intro", locales)).toBeNull();
   });
 });
