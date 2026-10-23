@@ -11,6 +11,10 @@ import {
   parseRoomId,
 } from "@/lib/games/rooms";
 import { ipRateLimit } from "@/lib/rateLimit";
+import { advanceSpy, canSendText, leaksOwnWord } from "@/lib/games/spy";
+import { loadSpyState } from "@/lib/games/spyStore";
+import { advanceShipo, canSendTextShipo } from "@/lib/games/shipo";
+import { loadShipoState } from "@/lib/games/shipoStore";
 
 /**
  * UR H.2 房内聊天读（🔒，在座成员）。
@@ -160,6 +164,27 @@ export async function POST(
   }
   if (!ipRateLimit(`game-msg-min:${loaded.room.id}:${userId}`, nowMs, 60_000, GAME_MSG_MINUTE_LIMIT).ok) {
     return apiError("chat_rate_limited", "發得太快，稍後再試", 429);
+  }
+  // UR H.3 誰是臥底：發言權限（只有輪到的人／討論階段才能發文字）＋防洩詞（伺服器擋，客戶端不可信）。
+  if (loaded.room.game === "spy" && loaded.room.status === "playing" && parsed.body.kind === "text") {
+    const cur = await loadSpyState(svc, loaded.room.id);
+    if (cur !== null) {
+      const st = advanceSpy(cur.state, nowMs).state;
+      const can = canSendText(st, userId);
+      if (!can.ok) return apiError("not_your_turn", can.reason, 409);
+      if (leaksOwnWord(st, userId, parsed.body.body)) {
+        return apiError("message_rejected", "不可直接說出你自己的詞，請用形容", 422);
+      }
+    }
+  }
+  // 老實人·識破：peek 階段全員閉眼禁言；追問走聊天，其他階段在場者都能發（不做防泄真相過濾）。
+  if (loaded.room.game === "shipo" && loaded.room.status === "playing" && parsed.body.kind === "text") {
+    const cur = await loadShipoState(svc, loaded.room.id);
+    if (cur !== null) {
+      const st = advanceShipo(cur.state, nowMs).state;
+      const can = canSendTextShipo(st, userId);
+      if (!can.ok) return apiError("wrong_phase", can.reason, 409);
+    }
   }
   let text = parsed.body.kind === "text" ? parsed.body.body : null;
   // 本地过滤（默认开；纯本地零外部调用）：严重词拒发 422，一般粗口 ★ 打码后照发；联系方式拦截为可选开关。

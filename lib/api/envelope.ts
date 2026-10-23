@@ -44,6 +44,9 @@ export type ApiErrorCode =
   | "ai_unavailable"
   | "onboarding_required"
   | "account_pending_deletion"
+  | "invalid_answer"
+  | "not_judge"
+  | "already_accused"
   | "internal";
 
 export function apiError(

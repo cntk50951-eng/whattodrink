@@ -94,7 +94,7 @@ describe("房间请求体解析", () => {
       parseActionBody({ type: "reveal", expected_version: 3, client_action_id: "r1" }),
     ).toEqual({ type: "reveal", expectedVersion: 3, clientActionId: "r1" });
     expect(parseActionBody({ type: "dance", expected_version: 0, client_action_id: "c" })).toEqual({
-      error: "type 只要 bid|challenge|next_round|reveal",
+      error: "type 只要 bid|challenge|next_round|reveal|speak_done|vote|rematch|answer|again|shipo_gongsansiao|shipo_end_talk|shipo_pick|shipo_next",
     });
     expect("error" in parseActionBody({ type: "dance", expected_version: 0, client_action_id: "c" })).toBe(true);
     expect("error" in parseActionBody({ type: "bid", payload: {}, expected_version: 0, client_action_id: "c" })).toBe(true);

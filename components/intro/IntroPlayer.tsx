@@ -65,7 +65,9 @@ export default function IntroPlayer() {
     if (frozen !== null) {
       pl.pause();
       pl.seekTo(S(Number(frozen)));
-      setDark(darkAt(Number(frozen)));
+      // setState 不可同步出現在 effect（lint）：microtask 延後，paint 前執行無閃爍
+      const sec = Number(frozen);
+      queueMicrotask(() => setDark(darkAt(sec)));
     } else if (reduce) pl.seekTo(S(END_SEC + 3));
     else if (!pl.isPlaying()) pl.play();
     return () => pl.removeEventListener("frameupdate", onFrame as never);

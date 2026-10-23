@@ -4467,3 +4467,21 @@ UR I.3　账号注销（立即永久删除／30 天可恢复）（App Store 5.1.
 *改动记录*
 - 2026-10-22：建档置 [WIP]；web 侧：0066＋`lib/accountDeletion.ts`（纯函数＋service IO）＋三端点＋排程路由＋vercel.json＋openapi 1.57.0＋10 条单测；tsc 零错＋930 绿＋lint 零错（`npm run build` 未跑；清除／恢复的 IO 路径只在测试账号上验证，未跑真库）
 
+UR H.3　誰是臥底真聯機（纯 API，无 web UI，[shared-only]）[WIP]
+作为玩家，我在大厅选「谁是卧底」→ 创建房间 → 朋友凭房号／邀请加入 → 每人用自己的手机玩；每人发言 60 秒、有倒计时。
+*范围*：`game_rooms.game='spy'`（复用建房／加入／邀请／准备／踢人／房内聊天底座）；`0067 spy_states`（整局秘密状态 jsonb＋rev 乐观锁）；`lib/games/spy.ts` 纯引擎（deal→speak 60s→discuss 45s→vote 30s→result 8s→…→over）＋懒结算（GET／动作前推进，无 cron）；动作 speak_done／vote／rematch；GET 回按人裁剪的 `spy` 视图（只含自己的词，身份仅出局／结束后公开，server_now 校准倒计时）；messages 路由按阶段限发言人＋伺服器拦截说出自己的词；离场＝出局。
+*决定*（用户 2026-10-22）：真人联机；发言可提前结束，到点自动换人；web 先改再改 iOS。
+*非目标*：机械人补位（iOS 单机练习局保留）；尾班车／识破。
+*用户必须做*：Supabase SQL Editor 执行 `0067_spy_states.sql`。
+*改动记录*
+- 2026-10-22：建档置 [WIP]；web 侧：0067＋spy 引擎（23 单测，含「别人的词绝不出现在我的视图」）＋房间整合（建房／开始／动作／离场／messages／rules）＋openapi 1.58.0＋房间层 11 单测；tsc 零错＋961 绿＋lint 零错＋build 通过。多手机真联机未验
+
+UR H.4　尾班車真聯機（纯 API，无 web UI，[shared-only]）[WIP]
+作为玩家，我在大厅选「尾班车」→ 创建房间 → 朋友加入 → 各自手机玩：轮到我就打一个题库里有、没人讲过的答案传给下一位，**隐藏的倒数**归零时拿着车的人罚。
+*范围*：`game_rooms.game='last_train'`（复用房间底座）；`0068 train_states`（整局状态 jsonb＋rev 乐观锁；含隐藏倒数的真实截止时间，绝不下发）；`lib/games/train.ts` 纯引擎＋`trainWords.ts` 题库（7 个题库 13 题约 270 答案，与 POC 同源，**未经本地用户覆核**）；答案验证只在 server（`answer {text}`：不在题库 422 invalid_answer、重复 409 duplicate、答错不传车、倒数照走）；随机事件（调头／越站／转线／趕車，第 3 次传车起 30%）；题目答晒自动转题，全部答晒立即爆；懒结算（GET／动作前推进，无 cron）；GET 回 `train` 视图（量化「热度」0–4，算不出剩余秒数）；动作 answer／again（房主，同一批人再开，上局输家先拿车）／rematch；离场＝从座位序移除（拿着车→交给下一位，剩 <2 人结束）。
+*决定*：真人联机；web 先改再改 iOS；沿用谁是卧底的房间流程与表结构做法（用户 2026-10-22「继续完成」，规则沿用 POC：打字答题＋手机核对）。
+*非目标*：打字自动完成（题库在 server，客户端不下发）、语音答题、简繁自动归一（目前只忽略站／綫／区后缀与大小写空白）。
+*用户必须做*：Supabase SQL Editor 执行 `0068_train_states.sql`。
+*改动记录*
+- 2026-10-22：建档置 [WIP]；0068＋train 引擎（24 单测：比对／传车／四种事件／倒数／视图不洩漏／离场）＋房间整合（建房／开始／动作／rules／GET／离场）＋openapi 1.59.0＋房间层单测；tsc 零错＋991 绿＋lint 零错。多手机真联机未验
+
