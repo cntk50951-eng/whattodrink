@@ -4485,3 +4485,20 @@ UR H.4　尾班車真聯機（纯 API，无 web UI，[shared-only]）[WIP]
 *改动记录*
 - 2026-10-22：建档置 [WIP]；0068＋train 引擎（24 单测：比对／传车／四种事件／倒数／视图不洩漏／离场）＋房间整合（建房／开始／动作／rules／GET／离场）＋openapi 1.59.0＋房间层单测；tsc 零错＋991 绿＋lint 零错。多手机真联机未验
 
+---
+
+EPIC L　上线开关（launch gate，访客向全站封站＋coming soon）[WIP]
+
+> 未上线期间，服务器端一个 boolean flag 随时控制全站开关：关＝访客全站只见 coming soon；开＝行为与现在一致。v1／v2 web 用户侧不再使用，故封站覆盖全部访客路由。
+
+UR L.1　全站开关 `SITE_LIVE`＋coming soon 页 [WIP]
+作为 PM，我希望在服务器端设一个 true/false flag，随时开关全站：关时访客无论进哪个页面都只看到 coming soon；开时一切如常（裸 `/` 照 `HOME_UI` 走）。
+*范围*：
+1. `lib/home.ts`（纯函数加法）：`parseSiteLive`（缺省 true；`0/false/off/no/closed` 大小写不敏感即关）＋`isComingSoonPath`＋`resolveSiteGate`（关站时非 coming-soon 路径回 `/coming-soon`，带 locale 前缀的回 `/<locale>/coming-soon`；coming-soon 本体永远放行方便预览）＋单测。
+2. `proxy.ts`（edge）：`SITE_LIVE=false` 时先行 307 到 coming-soon（沿 C.7 范式）；`/innerharbour` 管理后台永远放行（锁掉就没法管了）；API 路由不在 proxy matcher 内天然不受影响；`SITE_LIVE=true`／缺省零行为变化。
+3. `app/[locale]/coming-soon/page.tsx`（Server Component，纯静态零 JS）：沿 intro 奶油底＋涂鸦品牌语言；COMING SOON 大字＋三语副标（按 locale 直出，不进 messages，避免全局 key 扰动）＋啤酒杯 doodle＋App Store／Google Play 占位（沿 intro `#app-store-todo` 口径）；`robots noindex`（未上线不收录）；响应式（手机单列，桌面居中卡）。
+4. `.env.example` 说明（Vercel 改值后需 redeploy，沿 C.7 proxy 烘焙口径）。
+*非目标*：503 状态码（用 307＋200，保持 proxy 现有范式）；coming-soon 订阅／留资表单（另开 UR）；v1 任何文件。
+*改动记录*
+- 2026-11-02：建档即开工置 [WIP]（用户指令：未上线＋随时开关＋全站锁定＋新增 SITE_LIVE＋设计 coming soon 供选）
+

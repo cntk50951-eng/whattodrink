@@ -1,0 +1,176 @@
+/* UR L.1 coming soon 頁：全屏固定蓋住 [locale] layout 的 header／footer，
+ * 避免關站時露出任何死鏈入口。變量作用在 .root 上，不碰全局。
+ * 奶油底＋墨線＋硬陰影＋手寫體，沿 intro／doodle 品牌語言。 */
+.root {
+  --ink: #1b140b;
+  --paper: #fbf8f1;
+  --grad: linear-gradient(120deg, #ffb43a, #ff7a4f 58%, #ff5c7a);
+  /* BeerMugDoodle 吃的 doodle token（doodle preset 口徑，局部定義不依賴主題） */
+  --border: #1a2530;
+  --card: #f5ecd5;
+  --primary: #d8a838;
+  --secondary: #3a8a8a;
+  --accent: #e8a0a0;
+  --mustard-soft: #e8c878;
+  --teal-soft: #6ababa;
+  --doodle-red: #c4302b;
+  --tape: #f0e0a8;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: none;
+  background-color: var(--paper);
+  /* 筆記本圓點紙紋（沿 UR1.1 地圖塗鴉語言，極淡不搶字） */
+  background-image: radial-gradient(rgba(27, 20, 11, 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+  color: var(--ink);
+  font-family: "Plus Jakarta Sans", -apple-system, "PingFang TC", "PingFang HK", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  height: 68px;
+  padding: 0 clamp(16px, 3vw, 36px);
+  padding-top: env(safe-area-inset-top);
+  display: flex;
+  align-items: center;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.brand i {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: var(--grad);
+}
+
+.brand b {
+  font-weight: 700;
+}
+
+.stage {
+  min-height: calc(100dvh - 68px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px clamp(20px, 5vw, 48px) calc(40px + env(safe-area-inset-bottom));
+  gap: 0;
+}
+
+.mug {
+  width: min(300px, 64vw);
+  /* 輕浮動：有生命力但不暈；reduced-motion 全關 */
+  animation: bob 4s ease-in-out infinite;
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(1deg);
+  }
+}
+
+.eyebrow {
+  margin-top: 8px;
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  padding: 6px 16px;
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: 3px 3px 0 var(--border);
+}
+
+.title {
+  margin: 18px 0 0;
+  font-weight: 700;
+  font-size: clamp(56px, 14vw, 112px);
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+}
+
+/* 手寫大字底下壓一條漸變膠帶，呼應塗鴉語言 */
+.title::after {
+  content: "";
+  display: block;
+  width: min(280px, 60vw);
+  height: 14px;
+  margin: 10px auto 0;
+  background: var(--grad);
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  transform: rotate(-1.5deg);
+}
+
+.lede {
+  margin: 20px 0 0;
+  max-width: 34em;
+  font-size: clamp(15px, 2.4vw, 18px);
+  line-height: 1.7;
+  opacity: 0.85;
+}
+
+.stores {
+  margin-top: 26px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+.store {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 22px;
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 15px;
+  box-shadow: 3px 3px 0 var(--border);
+  opacity: 0.75;
+  cursor: default;
+}
+
+.soon {
+  margin: 14px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  opacity: 0.6;
+}
+
+.foot {
+  margin: 34px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mug {
+    animation: none;
+  }
+}

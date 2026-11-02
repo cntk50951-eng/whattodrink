@@ -5,6 +5,12 @@
 ## [Unreleased]
 
 ### Added
+- **UR L.1 全站開關 `SITE_LIVE`＋coming soon 頁 [WIP，待親驗]**
+  - 服務器端 flag：缺省 `true` 開站（零行為變化）；`false` 關站——訪客無論進哪個頁一律 307 到 `/coming-soon`（locale 前綴保留語言，如 `/zh-Hans/coming-soon`）；coming-soon 本體放行方便預覽；`/innerharbour` 後台永遠放行；API 不在 proxy matcher 內天然不受影響。
+  - `lib/home.ts` 純函數加法：`parseSiteLive`（`0/false/off/no/closed` 大小寫不敏感即關）＋`isComingSoonPath`＋`resolveSiteGate`；`lib/home.test.ts` 新增 12 斷言（開站全 null／關站跳轉／語言保留／本體放行）。
+  - `app/[locale]/coming-soon/page.tsx`（Server Component，零 JS）：intro 奶油底＋圓點紙紋＋塗鴉啤酒杯（`BeerMugDoodle`，乾杯氣泡按 locale）＋COMING SOON 手寫大字＋三語副標（locale 直出，不進 messages）＋App Store／Google Play 佔位（無死鏈，純展示）＋`robots noindex`；`prefers-reduced-motion` 停浮動。
+  - `.env.example` 說明（Vercel 改值後需 redeploy，沿 C.7 烘焙口徑）。
+  - 數據文檔無需更新（純路由門，不新增／改變前端展示數據）。
 - **首頁介紹頁 `/intro`（裸 `/` 默認落點）**
   - 全屏自動播放、循環的產品故事線（Remotion Player＋iPhone 真機錄屏截圖進手機框；打卡／AI 搜索／聊天／口味／碰杯／附近酒吧／遊戲／酒保）；右上常駐 App Store／Google Play 按鈕（商店鏈接為占位 `#app-store-todo`／`#google-play-todo`）＋「Open web app」→ `/v2`。
   - `lib/home.ts`：`HOME_UI` 新增 `intro`（缺省）；裸 `/` 與 locale 根 → `/intro`；`v2`／`v1` 仍可由 env 切回；帶查詢串深鏈不劫持。單測 12 綠。

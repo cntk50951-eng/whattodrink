@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { parseHomeUi, resolveHomeTarget } from "./home";
+import {
+  isComingSoonPath,
+  parseHomeUi,
+  parseSiteLive,
+  resolveHomeTarget,
+  resolveSiteGate,
+} from "./home";
 
 describe("parseHomeUi (UR C.7)", () => {
   it("字面 v1／v2 各走各的", () => {
@@ -14,6 +20,74 @@ describe("parseHomeUi (UR C.7)", () => {
     expect(parseHomeUi(null)).toBe("intro");
     expect(parseHomeUi("")).toBe("intro");
     expect(parseHomeUi("V1")).toBe("intro");
+  });
+});
+
+describe("parseSiteLive (UR L.1)", () => {
+  it("缺省／空／非法一律 true（開站，零行為變化）", () => {
+    expect(parseSiteLive(undefined)).toBe(true);
+    expect(parseSiteLive(null)).toBe(true);
+    expect(parseSiteLive("")).toBe(true);
+    expect(parseSiteLive("   ")).toBe(true);
+    expect(parseSiteLive("yes")).toBe(true);
+    expect(parseSiteLive("1")).toBe(true);
+    expect(parseSiteLive("TRUE")).toBe(true);
+    expect(parseSiteLive("live")).toBe(true);
+  });
+
+  it("關站字面大小写＋空白不敏感", () => {
+    expect(parseSiteLive("false")).toBe(false);
+    expect(parseSiteLive("FALSE")).toBe(false);
+    expect(parseSiteLive(" False ")).toBe(false);
+    expect(parseSiteLive("0")).toBe(false);
+    expect(parseSiteLive("off")).toBe(false);
+    expect(parseSiteLive("OFF")).toBe(false);
+    expect(parseSiteLive("no")).toBe(false);
+    expect(parseSiteLive("closed")).toBe(false);
+  });
+});
+
+describe("isComingSoonPath (UR L.1)", () => {
+  it("本體與 locale 變體放行", () => {
+    expect(isComingSoonPath("/coming-soon")).toBe(true);
+    expect(isComingSoonPath("/en/coming-soon")).toBe(true);
+    expect(isComingSoonPath("/zh-Hans/coming-soon")).toBe(true);
+  });
+
+  it("其他路徑不算", () => {
+    expect(isComingSoonPath("/")).toBe(false);
+    expect(isComingSoonPath("/intro")).toBe(false);
+    expect(isComingSoonPath("/v2")).toBe(false);
+    expect(isComingSoonPath("/coming-soon/extra")).toBe(false);
+  });
+});
+
+describe("resolveSiteGate (UR L.1)", () => {
+  const locales = ["zh-Hant", "zh-Hans", "en"];
+
+  it("開站一律 null（零行為變化，含 coming-soon 本體）", () => {
+    expect(resolveSiteGate("/", true, locales)).toBeNull();
+    expect(resolveSiteGate("/wall", true, locales)).toBeNull();
+    expect(resolveSiteGate("/coming-soon", true, locales)).toBeNull();
+  });
+
+  it("關站：裸 / 與深路徑回 /coming-soon", () => {
+    expect(resolveSiteGate("/", false, locales)).toBe("/coming-soon");
+    expect(resolveSiteGate("/wall", false, locales)).toBe("/coming-soon");
+    expect(resolveSiteGate("/v2", false, locales)).toBe("/coming-soon");
+    expect(resolveSiteGate("/p/abc", false, locales)).toBe("/coming-soon");
+  });
+
+  it("關站：locale 前綴保留語言", () => {
+    expect(resolveSiteGate("/en", false, locales)).toBe("/en/coming-soon");
+    expect(resolveSiteGate("/zh-Hans/", false, locales)).toBe("/zh-Hans/coming-soon");
+    expect(resolveSiteGate("/zh-Hant/wall", false, locales)).toBe("/zh-Hant/coming-soon");
+  });
+
+  it("關站：coming-soon 本體永遠放行（預覽不鎖）", () => {
+    expect(resolveSiteGate("/coming-soon", false, locales)).toBeNull();
+    expect(resolveSiteGate("/coming-soon/", false, locales)).toBeNull();
+    expect(resolveSiteGate("/en/coming-soon", false, locales)).toBeNull();
   });
 });
 
