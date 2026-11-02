@@ -4491,7 +4491,7 @@ EPIC L　上线开关（launch gate，访客向全站封站＋coming soon）[WIP
 
 > 未上线期间，服务器端一个 boolean flag 随时控制全站开关：关＝访客全站只见 coming soon；开＝行为与现在一致。v1／v2 web 用户侧不再使用，故封站覆盖全部访客路由。
 
-UR L.1　全站开关 `SITE_LIVE`＋coming soon 页 [WIP]
+UR L.1　全站开关 `SITE_LIVE`＋coming soon 页 [✓]
 作为 PM，我希望在服务器端设一个 true/false flag，随时开关全站：关时访客无论进哪个页面都只看到 coming soon；开时一切如常（裸 `/` 照 `HOME_UI` 走）。
 *范围*：
 1. `lib/home.ts`（纯函数加法）：`parseSiteLive`（缺省 true；`0/false/off/no/closed` 大小写不敏感即关）＋`isComingSoonPath`＋`resolveSiteGate`（关站时非 coming-soon 路径回 `/coming-soon`，带 locale 前缀的回 `/<locale>/coming-soon`；coming-soon 本体永远放行方便预览）＋单测。
