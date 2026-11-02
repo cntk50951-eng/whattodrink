@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.60.0
+  version: 1.61.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1521,7 +1521,12 @@ paths:
   /api/v1/cheers/reports:
     post:
       operationId: cheersReport
-      summary: 举报（需登录；只存，审核队列另议，UR E.15）
+      summary: >
+        举报用户／帖子／聊天消息（需登录；进后台队列 /innerharbour/user-reports，
+        UR E.15＋Apple 1.2）。用户：传 target_user_id；帖子／消息：target_type＋target_id，
+        作者由服务端反查（不信客户端），并留证据快照（消息含前 5 条上下文）。
+        24h 内同一人对同一对象重复举报不再入库，仍回 reported:true。
+        旧客户端只传 target_user_id＋reason 照旧可用；reason 若形如 `harassment: 说明` 会拆出 reason_code。
       security:
         - cookieAuth: []
       requestBody:
@@ -1530,11 +1535,21 @@ paths:
           application/json:
             schema:
               type: object
-              required: [target_user_id]
               properties:
+                target_type:
+                  type: string
+                  enum: [user, post, message]
+                  default: user
                 target_user_id:
                   type: string
                   format: uuid
+                  description: target_type=user 必填；post／message 忽略
+                target_id:
+                  type: string
+                  description: target_type=post 时为 checkins.id，message 时为 messages.id（须是举报人看得到的）
+                reason_code:
+                  type: string
+                  enum: [harassment, inappropriate, spam, underage, other]
                 reason:
                   type: string
                   maxLength: 200
@@ -1553,6 +1568,8 @@ paths:
           $ref: "#/components/responses/InvalidParams"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/invites:
