@@ -9,4 +9,4 @@
   - 插入策略改成只許 `status='pending'` 且 decided_* 為空，防客戶端直連 PostgREST 自填已處理。
 - 踩坑：tsconfig target 不支持正則 `s` 旗標（TS1501），用 `[\s\S]`；openapi 的長 summary 用 `>` 折疊塊，別寫裸 `: `。
 - 未做／待定：帳號層面處置（停權）要先有政策，現只記處理結果；沒有回覆時限承諾（不得在條款寫 24h，除非 Ops 認領）；通知舉報人處理結果。
-- 未驗：**0070 尚未在 Supabase 執行**（Dashboard SQL Editor 貼跑）；後台頁面未在瀏覽器過目；`npm run build` 未跑。
+- 狀態：0070 已由用戶在 Supabase 執行（2026-11-02）；`tsc`／lint／vitest 1033／`npm run build` 通過；後台頁面還沒在瀏覽器過目，上線後需用有 moderator 權限的帳號走一遍。
