@@ -4,6 +4,7 @@ import {
   messageEvidence,
   parseReportBody,
   REPORT_DEDUPE_MS,
+  REPORT_EVIDENCE_MAX,
   clipSnapshotText,
   type SnapshotLine,
 } from "@/lib/userReports";
@@ -78,6 +79,26 @@ export async function POST(req: Request): Promise<Response> {
 
   if (targetUserId === null) {
     return apiError("invalid_params", "target 非法", 400);
+  }
+
+  // 用戶舉報附聊天記錄：以服務端原文＋發送時間做快照（不信客戶端文字）。
+  // 校驗：消息屬於 conversation_id（RLS 讓舉報人只讀得到自己會話裡的消息）、且是被舉報人發的。
+  if (
+    p.targetType === "user" &&
+    p.evidenceMessageIds !== undefined &&
+    p.evidenceMessageIds.length > 0 &&
+    p.conversationId !== undefined
+  ) {
+    const { data: evRows } = await supabase
+      .from("messages")
+      .select("id,conversation_id,sender_id,kind,body,created_at")
+      .in("id", p.evidenceMessageIds)
+      .eq("conversation_id", p.conversationId)
+      .eq("sender_id", targetUserId)
+      .order("created_at", { ascending: true })
+      .limit(REPORT_EVIDENCE_MAX);
+    const lines = ((evRows ?? []) as MessageRow[]).map((m) => messageEvidence(m, targetUserId, userId));
+    if (lines.length > 0) snapshot = lines;
   }
 
   // 24h 內同一人對同一對象的重複舉報不再入庫（回成功，免洗版；證據以第一次為準）

@@ -48,7 +48,10 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // 對方存在＋模式（陌生人 fail-closed：查無此人按 404，不透露註冊態細節也無妨，POC 取直白）
-  const { data: peer } = await supabase
+  // 讀對方走 service client：users 的 RLS 只放行「自己」與「有公開打卡的人」，沒公開打卡的陌生人
+  // 用登錄身份讀會得到 null → 誤報「找不到该用户」（iOS 陌生人聊天首發失敗的根因之一）。只取 id,mode 兩列。
+  const peerSvc = await createServiceClient();
+  const { data: peer } = await peerSvc
     .from("users")
     .select("id,mode")
     .eq("id", peerId)

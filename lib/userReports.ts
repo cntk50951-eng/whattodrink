@@ -17,6 +17,8 @@ export type ReportStatus = (typeof REPORT_STATUSES)[number];
 export const REPORT_REASON_MAX = 200;
 /** 證據快照每條文字上限（防巨型訊息撐爆行）。 */
 export const REPORT_SNAPSHOT_TEXT_MAX = 500;
+/** 舉報用戶時最多可附幾條對方的聊天記錄（iOS 聊天室舉報頁勾選）。 */
+export const REPORT_EVIDENCE_MAX = 10;
 /** 同一舉報人對同一對象，這段時間內的重複舉報不再入庫（回成功，免洗版）。 */
 export const REPORT_DEDUPE_MS = 24 * 3600_000;
 
@@ -28,6 +30,10 @@ export type ParsedReport = {
   targetRef: string | null;
   reasonCode: ReportReasonCode | null;
   reason: string;
+  /** 舉報用戶時舉報人勾選的對方消息 id（去重、最多 REPORT_EVIDENCE_MAX）；沒附就不出現這個欄。 */
+  evidenceMessageIds?: string[];
+  /** 這些消息所在的會話 id；服務端據此校驗消息確實屬於舉報人所在會話。 */
+  conversationId?: string;
 };
 
 export type ParseResult = { ok: true; value: ParsedReport } | { ok: false; message: string };
@@ -72,10 +78,34 @@ export function parseReportBody(raw: unknown, selfId: string): ParseResult {
 
   if (targetType === "user") {
     if (!idOk(r.target_user_id) || r.target_user_id === selfId) return { ok: false, message: "target_user_id 非法" };
-    return { ok: true, value: { targetType, targetUserId: r.target_user_id, targetRef: null, reasonCode, reason } };
+    const value: ParsedReport = { targetType, targetUserId: r.target_user_id, targetRef: null, reasonCode, reason };
+    const ev = parseEvidenceIds(r.evidence_message_ids);
+    if (ev === null) return { ok: false, message: "evidence_message_ids 非法" };
+    if (ev.length > 0) {
+      // 沒有會話 id 就無法校驗證據屬於誰：直接拒絕，免得客戶端以為附上了其實沒有
+      if (!idOk(r.conversation_id)) return { ok: false, message: "附證據需要 conversation_id" };
+      value.evidenceMessageIds = ev;
+      value.conversationId = r.conversation_id;
+    }
+    return { ok: true, value };
   }
   if (!idOk(r.target_id)) return { ok: false, message: "target_id 非法" };
   return { ok: true, value: { targetType, targetUserId: null, targetRef: r.target_id, reasonCode, reason } };
+}
+
+/**
+ * `evidence_message_ids`：缺席／null → []；不是字串陣列或含非法 id → null（整個請求 400）；
+ * 合法時去重並截到 REPORT_EVIDENCE_MAX（超出的靜默丟棄，客戶端 UI 本來就限 10）。
+ */
+export function parseEvidenceIds(v: unknown): string[] | null {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v)) return null;
+  const out: string[] = [];
+  for (const x of v) {
+    if (!idOk(x)) return null;
+    if (!out.includes(x)) out.push(x);
+  }
+  return out.slice(0, REPORT_EVIDENCE_MAX);
 }
 
 /** 隊列排序：未成年最前，其次騷擾／不當內容，再垃圾訊息，最後其他／未填。數字小＝優先。 */

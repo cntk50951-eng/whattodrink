@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.61.0
+  version: 1.62.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -723,6 +723,14 @@ paths:
                   type: string
                   nullable: true
                   description: UR E.20 他人釘縮影——96px jpeg dataURL（≤32K 字符，拍攝順手壓）
+                photo_urls:
+                  type: array
+                  maxItems: 9
+                  items:
+                    type: string
+                  description: |
+                    多圖貼文（backlog_nov2 #8）——有序全量列表（含封面，[0] 即 photo_url；與 photo_url 不一致時以此為準），
+                    ≥2 張才帶；每張 ≤1M 字符、全部合計 ≤4M 字符。單圖貼文不帶本欄。每張圖都過內容審核。
                 note:
                   type: string
                   nullable: true
@@ -810,6 +818,11 @@ paths:
                       photo_url:
                         type: string
                         nullable: true
+                      photo_urls:
+                        type: array
+                        items:
+                          type: string
+                        description: 多圖貼文有序全量（含封面，[0] 即 photo_url）；單圖貼文為空數組
                       note:
                         type: string
                         nullable: true
@@ -1553,6 +1566,18 @@ paths:
                 reason:
                   type: string
                   maxLength: 200
+                evidence_message_ids:
+                  type: array
+                  maxItems: 10
+                  items:
+                    type: string
+                  description: >
+                    target_type=user 时可选：举报人勾选附上的对方聊天消息 id（最多 10 条，超出只取前 10）。
+                    必须同时带 conversation_id，否则 400。服务端只认「属于该会话、且由被举报人发送」的消息，
+                    并以服务端原文＋发送时间做证据快照（不信客户端文字）。
+                conversation_id:
+                  type: string
+                  description: evidence_message_ids 所在会话 id；服务端据此校验消息归属
       responses:
         "200":
           description: 举报成功
@@ -3910,6 +3935,49 @@ paths:
                     type: integer
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/meet/suggestions:
+    get:
+      operationId: getMeetSuggestions
+      summary: >
+        遇见「想找什么」每日 AI 推荐语（需登录；平台级内容，不含个人资料；按 Accept-Language 取
+        zh-Hant／zh-Hans／en，回最近一批）。排程尚未跑过时 404，客户端据此暂用内置推荐语。
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 最近一批推荐语（3–4 条）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [suggestions, generated_at]
+                properties:
+                  suggestions:
+                    type: array
+                    maxItems: 4
+                    items:
+                      type: object
+                      required: [id, text, icon]
+                      properties:
+                        id:
+                          type: string
+                          description: 形如 YYYY-MM-DD-序号
+                        text:
+                          type: string
+                          maxLength: 30
+                          description: 整句可直接当搜索词
+                        icon:
+                          type: string
+                          description: SF Symbol 名；仅限 person.2.fill／wineglass／party.popper.fill／sparkles／moon.stars.fill／music.note／fork.knife／mappin.and.ellipse
+                  generated_at:
+                    type: integer
+                    description: 生成时间（ms epoch）
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/meet/mine/today:

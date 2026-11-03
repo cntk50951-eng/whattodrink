@@ -6,6 +6,7 @@ import {
   reportPriority,
   reportRank,
   REPORT_REASON_CODES,
+  REPORT_EVIDENCE_MAX,
   REPORT_REASON_MAX,
   REPORT_SNAPSHOT_TEXT_MAX,
   splitLegacyReason,
@@ -93,5 +94,47 @@ describe("messageEvidence", () => {
     expect(messageEvidence({ ...base, sender_id: "x", kind: "image", body: null }, OTHER, ME).text).toBe("[image]");
     const long = messageEvidence({ ...base, sender_id: OTHER, kind: "text", body: "a".repeat(900) }, OTHER, ME);
     expect(long.text.length).toBe(REPORT_SNAPSHOT_TEXT_MAX);
+  });
+});
+
+describe("舉報附聊天記錄（evidence_message_ids）", () => {
+  const CONV = "33333333-3333-3333-3333-333333333333";
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => `m${i + 1}`);
+
+  it("沒附證據：解析結果不帶證據欄（舊行為不變）", () => {
+    const r = parseReportBody({ target_user_id: OTHER, reason_code: "spam" }, ME);
+    expect(r.ok && r.value.evidenceMessageIds).toBeUndefined();
+    expect(r.ok && r.value.conversationId).toBeUndefined();
+  });
+
+  it("附證據＋會話 id：帶出，去重", () => {
+    const r = parseReportBody(
+      { target_user_id: OTHER, reason_code: "harassment", evidence_message_ids: ["a", "b", "a"], conversation_id: CONV },
+      ME,
+    );
+    expect(r.ok && r.value.evidenceMessageIds).toEqual(["a", "b"]);
+    expect(r.ok && r.value.conversationId).toBe(CONV);
+  });
+
+  it("超過上限只留前 10 條", () => {
+    const r = parseReportBody({ target_user_id: OTHER, evidence_message_ids: ids(14), conversation_id: CONV }, ME);
+    expect(r.ok && r.value.evidenceMessageIds?.length).toBe(REPORT_EVIDENCE_MAX);
+    expect(r.ok && r.value.evidenceMessageIds?.[9]).toBe("m10");
+  });
+
+  it("附證據卻沒有會話 id → 400（無法校驗歸屬）", () => {
+    expect(parseReportBody({ target_user_id: OTHER, evidence_message_ids: ["a"] }, ME).ok).toBe(false);
+  });
+
+  it("證據不是字串陣列、含空字串或超長 id → 400", () => {
+    expect(parseReportBody({ target_user_id: OTHER, evidence_message_ids: "a", conversation_id: CONV }, ME).ok).toBe(false);
+    expect(parseReportBody({ target_user_id: OTHER, evidence_message_ids: [""], conversation_id: CONV }, ME).ok).toBe(false);
+    expect(parseReportBody({ target_user_id: OTHER, evidence_message_ids: ["x".repeat(65)], conversation_id: CONV }, ME).ok).toBe(false);
+    expect(parseReportBody({ target_user_id: OTHER, evidence_message_ids: [1], conversation_id: CONV }, ME).ok).toBe(false);
+  });
+
+  it("空陣列／null 視為沒附，不要求會話 id", () => {
+    expect(parseReportBody({ target_user_id: OTHER, evidence_message_ids: [] }, ME).ok).toBe(true);
+    expect(parseReportBody({ target_user_id: OTHER, evidence_message_ids: null }, ME).ok).toBe(true);
   });
 });
