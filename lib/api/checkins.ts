@@ -24,6 +24,11 @@ export type CreateCheckinBody = {
   photo_url?: string | null;
   /** UR E.20 他人釘縮影（96px JPEG data: URL；pins 只回此列，原圖永不進列表）。 */
   photo_thumb?: string | null;
+  /**
+   * 多圖貼文（backlog_nov2 #8）：有序全量列表（含封面，[0] 即 photo_url），≥2 張才帶；
+   * 單圖貼文不帶、DB 列為空陣列，行為與舊版逐字節一致。
+   */
+  photo_urls?: string[];
   note?: string | null;
   audio_url?: string | null;
   audio_seconds?: number | null;
@@ -38,6 +43,9 @@ export type CreateCheckinBody = {
 /** UR E.20 縮圖上限（96px jpeg 約 3–6k；32k 封頂防濫用，沿 photo 口徑）。 */
 export const CHECKIN_PHOTO_MAX_CHARS = 1_000_000;
 export const CHECKIN_PHOTO_THUMB_MAX_CHARS = 32_000;
+/** 多圖：每帖最多張數、所有圖字符總量上限（請求體 ≈ 總字符；留在常見 4.5MB 平台體積限內）。 */
+export const CHECKIN_PHOTOS_MAX_COUNT = 9;
+export const CHECKIN_PHOTOS_TOTAL_MAX_CHARS = 4_000_000;
 export const CHECKIN_AUDIO_MAX_CHARS = 2_000_000;
 export const CHECKIN_NOTE_MAX = 500;
 export const CHECKIN_TRANSCRIPT_MAX = 2000;
@@ -154,6 +162,31 @@ export function parseCreateCheckinBody(
     }
     photoUrl = photoRaw;
   }
+  // 多圖（backlog_nov2 #8）：photo_urls 為有序全量；單張（或缺席）視同舊版。壞值即 400。
+  let photoUrls: string[] | null = null;
+  const photosRaw = r.photo_urls;
+  if (photosRaw !== undefined && photosRaw !== null) {
+    if (!Array.isArray(photosRaw) || photosRaw.length > CHECKIN_PHOTOS_MAX_COUNT) {
+      return { error: `photo_urls 非法：需為 ≤${CHECKIN_PHOTOS_MAX_COUNT} 張的數組` };
+    }
+    let total = 0;
+    for (const p of photosRaw) {
+      if (typeof p !== "string" || !p.startsWith("data:image/") || p.length > CHECKIN_PHOTO_MAX_CHARS) {
+        return { error: "photo_urls 非法：每張要 data:image 且 ≤1M 字符" };
+      }
+      total += p.length;
+    }
+    if (total > CHECKIN_PHOTOS_TOTAL_MAX_CHARS) {
+      return { error: "photo_urls 非法：總量超限，請減少張數或降低畫質" };
+    }
+    if (photosRaw.length >= 2) {
+      photoUrls = photosRaw as string[];
+      // 封面＝第一張，覆蓋 photo_url（兩邊不一致時以全量列表為準）
+      photoUrl = photoUrls[0] ?? photoUrl;
+    } else if (photosRaw.length === 1 && photoUrl === null) {
+      photoUrl = photosRaw[0] as string;
+    }
+  }
   // UR E.20 縮圖（白名單＋上限；壞值即 400，不靜默丟——沿 photo 口徑）。
   const thumbRaw = r.photo_thumb;
   let photoThumb: string | null = null;
@@ -234,6 +267,7 @@ export function parseCreateCheckinBody(
       kind,
       ...(photoUrl !== null ? { photo_url: photoUrl } : {}),
       ...(photoThumb !== null ? { photo_thumb: photoThumb } : {}),
+      ...(photoUrls !== null ? { photo_urls: photoUrls } : {}),
       ...(note !== null ? { note } : {}),
       ...(audioUrl !== null ? { audio_url: audioUrl } : {}),
       ...(audioSeconds !== null ? { audio_seconds: audioSeconds } : {}),

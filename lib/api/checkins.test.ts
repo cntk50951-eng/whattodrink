@@ -9,6 +9,40 @@ import {
   toMineRow,
 } from "./checkins";
 
+describe("parseCreateCheckinBody 多圖貼文 (backlog_nov2 #8)", () => {
+  const base = { beer_id: null, lat: 22.28, lng: 114.15, kind: "post" };
+  const img = (n: number, ch = "a") => "data:image/jpeg;base64," + ch.repeat(n);
+
+  it("≥2 張：photo_urls 原樣保留，封面 photo_url 被第一張覆蓋", () => {
+    const res = parseCreateCheckinBody({ ...base, photo_url: img(10, "z"), photo_urls: [img(10, "a"), img(10, "b")] });
+    expect("body" in res).toBe(true);
+    if ("body" in res) {
+      expect(res.body.photo_urls).toEqual([img(10, "a"), img(10, "b")]);
+      expect(res.body.photo_url).toBe(img(10, "a"));
+    }
+  });
+  it("單張或缺席：不帶 photo_urls（與舊版一致）；只有 photo_urls 一張時補成封面", () => {
+    const one = parseCreateCheckinBody({ ...base, photo_urls: [img(10)] });
+    if ("body" in one) {
+      expect(one.body.photo_urls).toBeUndefined();
+      expect(one.body.photo_url).toBe(img(10));
+    } else throw new Error("應通過");
+    const none = parseCreateCheckinBody({ ...base, photo_url: img(10) });
+    if ("body" in none) expect(none.body.photo_urls).toBeUndefined();
+  });
+  it("壞值 400：超過 9 張／非數組／非 data:image／單張超限／總量超限", () => {
+    const ten = Array.from({ length: 10 }, () => img(5));
+    expect("error" in parseCreateCheckinBody({ ...base, photo_urls: ten })).toBe(true);
+    expect("error" in parseCreateCheckinBody({ ...base, photo_urls: "x" })).toBe(true);
+    expect("error" in parseCreateCheckinBody({ ...base, photo_urls: [img(5), "http://x/y.jpg"] })).toBe(true);
+    expect("error" in parseCreateCheckinBody({ ...base, photo_urls: [img(5), img(1_000_001)] })).toBe(true);
+    const big = Array.from({ length: 5 }, () => img(900_000));
+    expect("error" in parseCreateCheckinBody({ ...base, photo_urls: big })).toBe(true);
+    const nine = Array.from({ length: 9 }, () => img(400_000));
+    expect("body" in parseCreateCheckinBody({ ...base, photo_urls: nine })).toBe(true);
+  });
+});
+
 describe("parseCreateCheckinBody (UR A.10 → A.12 kind)", () => {
   it("合法 want 打卡过（flash）", () => {
     const res = parseCreateCheckinBody({

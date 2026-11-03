@@ -1,4 +1,4 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { friendIdsOf, type FriendshipRow } from "@/lib/friends";
 
@@ -33,7 +33,10 @@ export async function GET(req: Request): Promise<Response> {
   const fromIds = [...new Set(list.map((r) => r.from_user_id).filter((v) => typeof v === "string"))] as string[];
   let peers = new Map<string, { nickname: string; avatar_url: string | null }>();
   if (fromIds.length > 0) {
-    const { data: users } = await supabase
+    // 公開三列走 service client：users 的 RLS 只放行自己與有公開打卡的人，其他陌生人用登錄身份讀會丟失，
+    // 收件箱就只剩「酒友」＋無頭像（iOS 陌生人顯示不全的原因之一）。只取 id,nickname,avatar_url。
+    const svc = await createServiceClient();
+    const { data: users } = await svc
       .from("users")
       .select("id,nickname,avatar_url")
       .in("id", fromIds);

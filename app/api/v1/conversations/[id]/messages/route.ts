@@ -238,16 +238,32 @@ export async function POST(
   } else if (parsed.kind === "text" && parsed.share !== undefined) {
     const { data: postRaw } = await supabase
       .from("checkins")
-      .select("id,user_id,visibility")
+      .select("id,user_id,visibility,kind,expires_at")
       .eq("id", parsed.share.checkin_id)
       .maybeSingle();
-    const post = postRaw as { id: string; user_id: string | null; visibility: unknown } | null;
+    const post = postRaw as {
+      id: string;
+      user_id: string | null;
+      visibility: unknown;
+      kind?: unknown;
+      expires_at?: unknown;
+    } | null;
     if (post === null) {
       return apiError("not_found", "打卡不存在", 404);
     }
     // 矩阵 C/D：私人帖（隐身期间发的）任何人都不能分享——含本人，对方也打不开。
     if (post.visibility === "private") {
       return apiError("forbidden", "私人打卡不可分享", 403);
+    }
+    // 24h 快贴已过期：不可再分享给朋友（backlog_nov2 #4）。仅卡自家分享；他人帖走下方“碰过”放宽，
+    // 那条是陌生人快捷回复带的卡片，卡片过期只显示不可用，不应让整条回复发不出去。
+    if (
+      post.user_id === userId &&
+      post.kind === "flash" &&
+      typeof post.expires_at === "string" &&
+      new Date(post.expires_at).getTime() <= Date.now()
+    ) {
+      return apiError("forbidden", "快貼已過期，不可分享", 403);
     }
     // 仅自家可分享（UR 范围；他人帖分享另议）。
     if (post.user_id === null || post.user_id !== userId) {

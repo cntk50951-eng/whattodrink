@@ -1,5 +1,12 @@
 {
   "crons": [
-    { "path": "/api/internal/purge-accounts", "schedule": "0 20 * * *" }
+    {
+      "path": "/api/internal/purge-accounts",
+      "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/internal/meet-suggestions",
+      "schedule": "0 21 * * *"
+    }
   ]
 }

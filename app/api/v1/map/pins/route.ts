@@ -86,9 +86,9 @@ export async function GET(req: Request): Promise<Response> {
         flashErr?.code === "42703" ||
         postErr?.code === "42703" ||
         msg.includes("kind") ||
-        msg.includes("expires_at") ||
-        msg.includes("column") ||
-        msg.includes("does not exist");
+        msg.includes("expires_at");
+      // 不再因泛泛的 "column"／"does not exist"（例如别的列、关联表缺失）就退回 bbox-only：
+      // 那条回退没有 kind／expires_at 过滤，会把已过期快贴原样端回地图（backlog_nov2 #9）。
       if (isMissing) {
         const firstErr = flashErr ?? postErr;
         console.warn(`[api/v1/map/pins] kind column missing (code=${firstErr?.code}), fallback to bbox-only: ${firstErr?.message}`);

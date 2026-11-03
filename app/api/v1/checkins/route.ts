@@ -37,6 +37,8 @@ export async function POST(req: Request): Promise<Response> {
   const { beer_id, lat, lng, place_name, kind } = parsed.body;
   const photoUrl = parsed.body.photo_url ?? null;  // UR E.20 縮圖隨單（缺即 null；42703 老庫回退鏈不碰此列，見下）。
   const photoThumb = parsed.body.photo_thumb ?? null;
+  // 多圖貼文（≥2 張才有；[0] 即封面 photo_url）。單圖為 null，插入行不帶此列，舊庫不受影響。
+  const photoUrls = parsed.body.photo_urls ?? null;
   const noteText = parsed.body.note ?? null;
   const audioUrl = parsed.body.audio_url ?? null;
   const audioSeconds = parsed.body.audio_seconds ?? null;
@@ -145,6 +147,25 @@ export async function POST(req: Request): Promise<Response> {
       // 兜底命中記錄（驗證時可分清誰審的；日常乾淨請求不打日誌）。
       console.info("[api/v1/checkins] moderation pass via minimax（主審下沉）");
     }
+    // 多圖：封面已隨文字一起審過，其餘每張單獨過一遍圖審（任一張被標記即整帖拒絕）
+    if (photoUrls !== null) {
+      for (const extra of photoUrls.slice(1)) {
+        const extraVerdict = await moderateCheckin(
+          { imageDataUrl: extra },
+          {
+            openaiKey: process.env.OPENAI_API_KEY ?? process.env.OPENAI_KEY,
+            minimaxKey: process.env.minimaxi_api_key,
+            minimaxBaseUrl: process.env.MINIMAX_API_BASE,
+          },
+        );
+        if (moderationAction(extraVerdict) === "unavailable") {
+          return apiError("rejected", "審核服務暫不可用，請稍後再試", 503);
+        }
+        if (moderationAction(extraVerdict) === "reject" && extraVerdict.flagged) {
+          return apiError("rejected", "內容未通過審核（照片），請修改後再發", 403);
+        }
+      }
+    }
     // 0062：用戶設了「打卡默認可見性」就用它（隱身仍強制 private）。單獨查、出錯（列未建）一律當沒設，
     // 回退按模式——不能併進上面的 mode 查詢，否則 0062 未跑會讓所有人落到 public 回退。
     let visibilityOverride: unknown = null;
@@ -197,16 +218,35 @@ export async function POST(req: Request): Promise<Response> {
           transcript: transcriptText ?? "",
           tags,
       };
-      const rowWithHashtags = { ...fullRow, hashtags };
+      // 可選列（0071 photo_urls／0061 hashtags）只在有值時才帶；列不存在（42703）就逐個去掉重試，
+      // 不能讓「新列沒建」把整單打回舊的私密回退
+      const optionalCols: Record<string, unknown> = {
+        ...(hashtags.length > 0 ? { hashtags } : {}),
+        ...(photoUrls !== null ? { photo_urls: photoUrls } : {}),
+      };
       let { data, error } = await supabase
         .from("checkins")
-        .insert(hashtags.length > 0 ? rowWithHashtags : fullRow)
+        .insert({ ...fullRow, ...optionalCols })
         .select(CHECKIN_SELECT)
         .single();
+      if (error?.code === "42703" && /photo_urls/.test(error.message ?? "")) {
+        console.warn("[api/v1/checkins] 0071 未遷移，多圖只存封面");
+        delete optionalCols.photo_urls;
+        ({ data, error } = await supabase
+          .from("checkins")
+          .insert({ ...fullRow, ...optionalCols })
+          .select(CHECKIN_SELECT)
+          .single());
+      }
       // 0061 沒跑（hashtags 列不存在）：去掉自定義標籤照常落庫，不要掉進下面「0007 未遷移」的私密回退
       if (error?.code === "42703" && /hashtags/.test(error.message ?? "")) {
         console.warn("[api/v1/checkins] 0061 未遷移，hashtags 略過");
-        ({ data, error } = await supabase.from("checkins").insert(fullRow).select(CHECKIN_SELECT).single());
+        delete optionalCols.hashtags;
+        ({ data, error } = await supabase
+          .from("checkins")
+          .insert({ ...fullRow, ...optionalCols })
+          .select(CHECKIN_SELECT)
+          .single());
       }
       if (error === null && data !== null) {
         inserted = data as unknown as Record<string, unknown>;
