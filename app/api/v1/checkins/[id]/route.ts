@@ -255,10 +255,21 @@ export async function GET(
         };
       });
   }
+  // 多圖貼文（backlog_nov2 #8，0071）：單獨查、出錯（列未建）一律當單圖，不能拖垮整個詳情
+  let photoUrls: string[] = [];
+  try {
+    const { data: pu, error: puErr } = await supabase.from("checkins").select("photo_urls").eq("id", id).maybeSingle();
+    if (!puErr) {
+      const arr = (pu as { photo_urls?: unknown } | null)?.photo_urls;
+      if (Array.isArray(arr)) photoUrls = arr.filter((x): x is string => typeof x === "string");
+    }
+  } catch {}
   return apiOk({
     checkin: {
       id: row.id as string,
       photo_url: (row.photo_url as string | null) ?? null,
+      // ≥2 張才有；[0] 即 photo_url。單圖帖子為空數組
+      photo_urls: photoUrls.length >= 2 ? photoUrls : [],
       note: (row.note as string | null) ?? null,
       audio_url: (row.audio_url as string | null) ?? null,
       audio_seconds: (row.audio_seconds as number | null) ?? null,
