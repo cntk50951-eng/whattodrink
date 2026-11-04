@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.63.0
+  version: 1.64.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -591,6 +591,107 @@ paths:
                 $ref: "#/components/schemas/BarCredits"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /api/v1/bar/dice/start:
+    post:
+      operationId: barDiceStart
+      summary: 開一局和 Ivy 的大話骰（🔒；每人 3 粒；已有進行中的就接回；每日最多 20 局）。骰子與 Ivy 的叫骰全在服務端，回包只含你自己的骰
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 對局視圖
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BarDiceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          description: 今日開局已滿 20 局
+  /api/v1/bar/dice/active:
+    get:
+      operationId: barDiceActive
+      summary: 接回進行中的一局（🔒；沒有則 view 為 null）；同時結算上次中途失敗或逾時（30 分鐘）的對局
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 進行中的對局視圖或 null
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  view:
+                    nullable: true
+                    allOf:
+                      - $ref: "#/components/schemas/BarDiceView"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/bar/dice/{id}/action:
+    post:
+      operationId: barDiceAction
+      summary: 叫骰或質疑（🔒）。服務端驗證並當場算出 Ivy 的回應；整局結束時結算積分（贏 +3 次、7 天有效；輸扣 1 次）。沒有任何「我贏了」的欄位
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [type, qty, face]
+                  properties:
+                    type: { type: string, enum: [bid] }
+                    qty: { type: integer, minimum: 1 }
+                    face: { type: integer, minimum: 1, maximum: 6 }
+                - type: object
+                  required: [type]
+                  properties:
+                    type: { type: string, enum: [challenge] }
+      responses:
+        "200":
+          description: 新視圖＋這一步發生的開盅（可能 0–2 個）＋結算（整局結束才有）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BarDiceResponse"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 找不到這局
+        "409":
+          description: not_your_turn／wrong_phase／stale_version（多台裝置同時操作）
+  /api/v1/bar/dice/{id}/abandon:
+    post:
+      operationId: barDiceAbandon
+      summary: 認輸離場（🔒；算輸一局，扣 1 次，餘額 0 時不扣）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 結算後的視圖
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BarDiceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 找不到進行中的這一局
   /api/v1/bar/voice:
     post:
       operationId: barVoice
@@ -5488,6 +5589,65 @@ paths:
           $ref: "#/components/responses/Internal"
 components:
   schemas:
+    BarDiceView:
+      type: object
+      required: [match_id, status, rules, round, my_dice, ivy_dice_count, total_dice, bid, turn, can_challenge, log]
+      properties:
+        match_id: { type: string, format: uuid }
+        status: { type: string, enum: [active, won, lost, abandoned] }
+        rules:
+          type: object
+          properties:
+            dice_per_player: { type: integer }
+            min_open_qty: { type: integer }
+            ones_wild: { type: boolean }
+        round: { type: integer }
+        my_dice: { type: array, items: { type: integer } }
+        ivy_dice_count: { type: integer, description: Ivy 手上還有幾粒（點數保密，開盅才亮） }
+        total_dice: { type: integer }
+        bid:
+          nullable: true
+          type: object
+          properties:
+            qty: { type: integer }
+            face: { type: integer }
+            by: { type: string, enum: [me, ivy] }
+        turn: { type: string, enum: [me, ivy] }
+        can_challenge: { type: boolean }
+        log: { type: array, items: { type: object } }
+    BarDiceReveal:
+      type: object
+      properties:
+        challenger: { type: string, enum: [me, ivy] }
+        bidder: { type: string, enum: [me, ivy] }
+        bid: { type: object }
+        counted: { type: integer }
+        bid_met: { type: boolean }
+        loser: { type: string, enum: [me, ivy] }
+        hands:
+          type: object
+          properties:
+            me: { type: array, items: { type: integer } }
+            ivy: { type: array, items: { type: integer } }
+        loser_out: { type: boolean }
+    BarDiceSettlement:
+      type: object
+      nullable: true
+      properties:
+        result: { type: string, enum: [won, lost, abandoned] }
+        delta: { type: integer, description: 贏＝實際入帳的次數（可能因每日 5 局／餘額 45 上限小於 3）；輸／放棄＝實際扣掉的次數（負數） }
+        reason: { type: string, nullable: true, description: 贏局沒（全）入帳的原因 daily_cap／balance_cap／balance_cap_partial／duplicate }
+        credits:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/BarCredits"
+    BarDiceResponse:
+      type: object
+      required: [view, reveals, settlement]
+      properties:
+        view: { $ref: "#/components/schemas/BarDiceView" }
+        reveals: { type: array, items: { $ref: "#/components/schemas/BarDiceReveal" } }
+        settlement: { $ref: "#/components/schemas/BarDiceSettlement" }
     BarCredits:
       type: object
       required: [daily, lots, earned_total, total, wins_today, next_reset_at]
