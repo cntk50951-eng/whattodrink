@@ -47,6 +47,7 @@ export type ApiErrorCode =
   | "invalid_answer"
   | "not_judge"
   | "already_accused"
+  | "credits_exhausted"
   | "internal";
 
 export function apiError(
@@ -62,4 +63,14 @@ export function apiError(
 export function apiOk<T>(data: T, status = 200, headers?: Record<string, string>): Response {
   if (headers === undefined) return Response.json(data, { status });
   return Response.json(data, { status, headers });
+}
+
+/** 帶附加字段的錯誤（例如 402 要把最新額度一起回給客戶端）。 */
+export function apiErrorWith(
+  code: ApiErrorCode,
+  message: string,
+  status: number,
+  extra: Record<string, unknown>,
+): Response {
+  return Response.json({ error: { code, message }, ...extra }, { status });
 }

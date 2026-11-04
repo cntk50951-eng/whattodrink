@@ -1,4 +1,6 @@
-import { apiError, apiOk } from "@/lib/api/envelope";
+import { apiError, apiErrorWith, apiOk } from "@/lib/api/envelope";
+import { getBarCredits, normalizeRequestId, refundChatCredit, spendChatCredit } from "@/lib/barCredits";
+import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import {
   IVY_EVENT_INSTRUCTIONS,
   parseBarLang,
@@ -10,7 +12,9 @@ import { MinimaxError, minimaxChat } from "@/lib/minimax";
 import { ipRateLimit } from "@/lib/rateLimit";
 
 /**
- * POC 酒保对话（公开：bar-room 页本身公开；零写库）。
+ * 酒保对话（🔒 需登入）：每則 message 扣 1 次聊天額度（今日免費＋大話骰積分，見 lib/barCredits.ts），
+ * 額度不夠回 402 credits_exhausted；Ivy 回覆失敗自動退還。event（greet／pat／cheers）不扣次。
+ * 原 POC：公开零写库；現在要登入才能用（AI 按 token 計費，額度必須服務端算）。
  * 台词全部来自 MiniMax（M3＋Ivy 人设）；失败回 502，前端显示系统提示。
  * 可选 `memory`（酒保記憶文檔，見 lib/barMemory；清洗後注入 system，不存庫）。
  * UR F.11：lang 可选（en 缺省／yue／zh，非法回落 en）；按 IP 60s 30 次（防刷额度，
@@ -23,6 +27,7 @@ export async function POST(req: Request): Promise<Response> {
     history?: unknown;
     lang?: unknown;
     memory?: unknown;
+    request_id?: unknown;
   };
   try {
     body = await req.json();
@@ -56,6 +61,10 @@ export async function POST(req: Request): Promise<Response> {
   // 可選：客戶端帶的酒保記憶（清洗後才注入；壞的當沒有，不影響聊天）
   const memory = body.memory === undefined ? undefined : (sanitizeBarMemory(body.memory) ?? undefined);
 
+  // 需登入；用戶 ID 決定額度歸屬
+  const { userId } = await getAuthedClient(req);
+  if (userId === null) return apiError("unauthorized", "请先登录再和 Ivy 聊天。", 401);
+
   // UR F.11 按 IP 限频（公开零写库口，额度被刷光全员失声；超限 429＋Retry-After）。
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -72,10 +81,24 @@ export async function POST(req: Request): Promise<Response> {
     return apiError("internal", "语音服务未配置。", 500);
   }
 
+  // 只有「用戶說的話」才扣次（event 是客戶端內部觸發，不扣）；先扣後調模型，失敗退還
+  const svc = await createServiceClient();
+  const requestId = normalizeRequestId(body.request_id);
+  let credits: Awaited<ReturnType<typeof spendChatCredit>> | null = null;
+  if (message.length > 0) {
+    credits = await spendChatCredit(svc, userId, requestId);
+    if (credits.kind === "error") return apiError("internal", "額度服務暫時不可用，請稍後再試。", 503);
+    if (credits.kind === "exhausted") {
+      return apiErrorWith("credits_exhausted", "今日的聊天次數用完了，玩大話骰贏回來吧。", 402, { credits: credits.credits });
+    }
+  }
+
   try {
     const text = await minimaxChat(toMinimaxMessages(history, { message, event, lang, memory }), { apiKey });
-    return apiOk({ text, lang });
+    const latest = credits?.kind === "ok" ? credits.credits : ((await getBarCredits(svc, userId)) ?? undefined);
+    return apiOk({ text, lang, credits: latest });
   } catch (e) {
+    if (credits?.kind === "ok" && !credits.duplicate) await refundChatCredit(svc, userId, requestId);
     const status = e instanceof MinimaxError ? e.status : 500;
     console.error(`[bar-chat] minimax failed: ${e instanceof Error ? e.message : e}`);
     if (status === 429) {

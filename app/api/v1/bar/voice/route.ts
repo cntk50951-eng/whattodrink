@@ -2,6 +2,7 @@ import { apiError } from "@/lib/api/envelope";
 import { parseBarLang, type BarLang } from "@/lib/bartender";
 import { MinimaxError, minimaxTts } from "@/lib/minimax";
 import { ipRateLimit } from "@/lib/rateLimit";
+import { getAuthedClient } from "@/lib/supabase/server";
 
 /** lang→TTS boost（yue 用 Chinese,Yue；音色沿用 female-shaonv，粤语自然度待收听验收）。 */
 const TTS_BOOST: Record<BarLang, "English" | "Chinese" | "Chinese,Yue"> = {
@@ -11,7 +12,8 @@ const TTS_BOOST: Record<BarLang, "English" | "Chinese" | "Chinese,Yue"> = {
 };
 
 /**
- * POC 酒保语音（公开；输入是上一句台词原文，≤500 字；直接回 MP3 二进制）。
+ * 酒保语音（🔒 需登入；输入是上一句台词原文，≤500 字；直接回 MP3 二进制）。TTS 也花錢：現在要登入並按用戶限頻，
+ * 之後（P5）再加「只合成本人最近回覆」的 voice_token 校驗。
  * UR F.11：lang 可选（缺省按文字自动，非法回落自动）；按 IP 60s 30 次。
  */
 export async function POST(req: Request): Promise<Response> {
@@ -26,6 +28,12 @@ export async function POST(req: Request): Promise<Response> {
   }
   const text = body.text.trim().slice(0, 500);
   const lang = body.lang === undefined || body.lang === null ? null : parseBarLang(body.lang);
+
+  const { userId } = await getAuthedClient(req);
+  if (userId === null) return apiError("unauthorized", "请先登录。", 401);
+  if (!ipRateLimit(`bar-voice-user:${userId}`, Date.now()).ok) {
+    return apiError("rate_limited", "太频了，稍后再试。", 429, { "Retry-After": "60" });
+  }
 
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||

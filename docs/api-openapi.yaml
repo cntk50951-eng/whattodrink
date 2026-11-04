@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.62.0
+  version: 1.63.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -494,7 +494,9 @@ paths:
   /api/v1/bar/chat:
     post:
       operationId: barChat
-      summary: 酒保对话（公开零写库；lang 可选 en 缺省／yue／zh，非法回落 en；按 IP 60s 30 次；上游 429 透传＋Retry-After，UR F.11）
+      summary: 酒保对话（🔒 需登入；每則 message 扣 1 次聊天額度＝今日免費 15 次＋大話骰積分，Ivy 回覆失敗自動退還；event 不扣；lang 可选 en 缺省／yue／zh，非法回落 en；按 IP 60s 30 次；上游 429 透传＋Retry-After，UR F.11）
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -520,21 +522,46 @@ paths:
                 memory:
                   type: object
                   description: 可选，酒保記憶文档（客户端带；服务端清洗后注入 system，不存库；非法当没有）
+                request_id:
+                  type: string
+                  pattern: "^[A-Za-z0-9_-]{8,64}$"
+                  description: 客户端生成的請求 ID（冪等：同一 ID 重送不會重複扣次；缺省服務端生成＝不冪等）
       responses:
         "200":
-          description: 台词＋生效语言
+          description: 台词＋生效语言＋扣次後的額度
           content:
             application/json:
               schema:
                 type: object
-                required: [text, lang]
+                required: [text, lang, credits]
                 properties:
                   text:
                     type: string
                   lang:
                     type: string
+                  credits:
+                    $ref: "#/components/schemas/BarCredits"
         "400":
           $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "402":
+          description: 聊天額度用完（code=credits_exhausted；玩大話骰贏積分可繼續）。回包多帶 credits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [credits_exhausted]
+                      message:
+                        type: string
+                  credits:
+                    $ref: "#/components/schemas/BarCredits"
         "429":
           description: 本机限频或上游限流（Retry-After 秒）
           content:
@@ -549,6 +576,21 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/bar/credits:
+    get:
+      operationId: barCredits
+      summary: 酒保聊天額度（🔒）：今日免費（每天香港 00:00 重置為 15、不累加）＋大話骰贏來的積分批次（每批 7 天過期）
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 額度快照
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BarCredits"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /api/v1/bar/voice:
     post:
       operationId: barVoice
@@ -5446,6 +5488,32 @@ paths:
           $ref: "#/components/responses/Internal"
 components:
   schemas:
+    BarCredits:
+      type: object
+      required: [daily, lots, earned_total, total, wins_today, next_reset_at]
+      properties:
+        daily:
+          type: object
+          required: [limit, used, remaining]
+          properties:
+            limit: { type: integer }
+            used: { type: integer }
+            remaining: { type: integer }
+        lots:
+          type: array
+          description: 未過期且有剩餘的積分批次（按到期時間升序）
+          items:
+            type: object
+            required: [id, amount, remaining, expires_at]
+            properties:
+              id: { type: string, format: uuid }
+              amount: { type: integer }
+              remaining: { type: integer }
+              expires_at: { type: string, format: date-time }
+        earned_total: { type: integer, description: 所有未過期批次剩餘次數合計 }
+        total: { type: integer, description: 現在還可以聊幾次（今日免費剩餘＋積分）}
+        wins_today: { type: integer, description: 今天已計入積分的勝局數（每日上限 5） }
+        next_reset_at: { type: string, format: date-time, description: 下次免費額度重置（香港次日 00:00） }
     WallAuthor:
       type: object
       nullable: true
