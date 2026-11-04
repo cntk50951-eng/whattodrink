@@ -5,12 +5,13 @@
 import type { createServiceClient } from "@/lib/supabase/server";
 
 import {
-  afterStart,
   applyBid,
   applyChallenge,
   BAR_DICE,
+  clampDice,
   cryptoRng,
   newMatch,
+  type Seat,
   toView,
   type Bid,
   type DiceReveal,
@@ -123,8 +124,21 @@ async function activeRow(svc: Svc, userId: string): Promise<MatchRow | null> {
   return (data as MatchRow | null) ?? null;
 }
 
-/** 開局（已有進行中的就接回那局）。 */
-export async function startMatch(svc: Svc, userId: string): Promise<DiceOutcome> {
+/** 下一鋪誰先叫：上一鋪的輸家（用戶贏＝Ivy 輸＝Ivy 先叫；用戶輸或放棄＝用戶先叫；第一鋪用戶先叫）。 */
+async function nextOpener(svc: Svc, userId: string): Promise<Seat> {
+  const { data } = await svc
+    .from("bar_dice_matches")
+    .select("status")
+    .eq("user_id", userId)
+    .in("status", ["won", "lost"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as { status?: string } | null)?.status === "won" ? "ivy" : "me";
+}
+
+/** 開一鋪（已有進行中的就接回那鋪）。`dice`＝每人骰數（3–6，默認 5）。 */
+export async function startMatch(svc: Svc, userId: string, dice?: unknown): Promise<DiceOutcome> {
   await sweep(svc, userId);
   const existing = await activeRow(svc, userId);
   if (existing !== null) return { ok: true, view: toView(existing.id, "active", existing.state), reveals: [], settlement: null };
@@ -134,9 +148,9 @@ export async function startMatch(svc: Svc, userId: string): Promise<DiceOutcome>
     .eq("user_id", userId)
     .gte("created_at", hkDayStartISO(Date.now()));
   if ((count ?? 0) >= BAR_DICE.startsPerDay) {
-    return { ok: false, code: "rate_limited", message: `今日大話骰已開滿 ${BAR_DICE.startsPerDay} 局，明天再來。` };
+    return { ok: false, code: "rate_limited", message: `今日大話骰已玩滿 ${BAR_DICE.startsPerDay} 鋪，明天再來。` };
   }
-  const state = afterStart(newMatch(cryptoRng), cryptoRng);
+  const state = newMatch(clampDice(dice), await nextOpener(svc, userId), cryptoRng);
   const { data, error } = await svc.from("bar_dice_matches").insert({ user_id: userId, status: "active", state }).select(COLS).single();
   if (error !== null || data === null) {
     // 並發開局撞到「一人一局進行中」的唯一索引：接回已存在的那局
@@ -163,7 +177,7 @@ export async function act(svc: Svc, userId: string, matchId: string, action: Dic
   if (row === null) return { ok: false, code: "not_found", message: "找不到這局。" };
   if (row.status !== "active") return { ok: false, code: "wrong_phase", message: "這局已經結束。" };
   const bid: Bid | null = action.type === "bid" ? { qty: action.qty, face: action.face } : null;
-  const step = bid !== null ? applyBid(row.state, bid, cryptoRng) : applyChallenge(row.state, cryptoRng);
+  const step = bid !== null ? applyBid(row.state, bid, cryptoRng) : applyChallenge(row.state);
   if (!step.ok) return { ok: false, code: step.code, message: step.message };
   const status: MatchStatus = step.state.winner === null ? "active" : step.state.winner === "me" ? "won" : "lost";
   // 樂觀並發：只有 rev 沒變、仍是 active 才能寫（兩台裝置同時操作，後到的得到 stale_version）

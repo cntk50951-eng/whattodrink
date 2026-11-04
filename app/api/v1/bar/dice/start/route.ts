@@ -4,9 +4,15 @@ import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 
 import { respond } from "../_respond";
 
-/** 開一局和 Ivy 的大話骰（🔒；已有進行中的就接回；每日最多 20 局）。 */
+/** 開一鋪和 Ivy 的大話骰（🔒；body 可帶 {dice: 3–6}＝每人骰數，默認 5；已有進行中的就接回；每日最多 60 鋪）。 */
 export async function POST(req: Request): Promise<Response> {
   const { userId } = await getAuthedClient(req);
   if (userId === null) return apiError("unauthorized", "未登录", 401);
-  return respond(await startMatch(await createServiceClient(), userId));
+  let dice: unknown;
+  try {
+    dice = ((await req.json()) as { dice?: unknown }).dice;
+  } catch {
+    dice = undefined;   // 沒帶 body 也行
+  }
+  return respond(await startMatch(await createServiceClient(), userId, dice));
 }

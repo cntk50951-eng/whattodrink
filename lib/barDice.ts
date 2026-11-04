@@ -1,7 +1,9 @@
 /**
  * Bar 大話骰（用戶 vs Ivy）：服務端權威的純邏輯（無 IO，可單測）。
- * 規則沿 lib/games/liars.ts：每人 3 粒；叫「數量＋點數」；加注＝數量更多或同量點大；1 點百搭；
- * 質疑時全場亮骰，實際數 ≥ 叫數 → 質疑者輸，否則叫骰者輸；輸家少一粒，歸零出局＝輸整局。
+ * 玩法＝香港酒吧版（Wikipedia「大話骰」）：每人固定 N 粒（默認 5，可選 3–6）、骰數不會減少；
+ * 叫「數量＋點數」；加注＝數量更多或同量點大；1 點百搭；開骰時全場亮骰，實際數 ≥ 叫數 → 質疑者輸，否則叫骰者輸。
+ * **一鋪（一局）定輸贏**：開骰就結束，贏的 +3 次聊天、輸的 −1 次（輸家飲 → 這裡扣一次聊天）；下一鋪從輸家開叫。
+ * （先前誤做成「輸家少一粒、骰光出局」的國際淘汰版 Dudo／Perudo，用戶回報骰越玩越少、積分不變，已改。）
  * 骰子與 Ivy 的叫骰全在服務端：客戶端只送「叫什麼／質疑」，沒有任何「我贏了」的欄位可以偽造。
  * 設計：whattodrink_ios/docs/plans/bar-dice-credits-design.md
  */
@@ -10,19 +12,21 @@ import { randomInt } from "node:crypto";
 import { countMatching, isValidBid, LIARS_RULES_DEFAULT, rollDice, type LiarsRules } from "./games/liars";
 
 export const BAR_DICE = {
-  /** 每人起始骰數 */
-  dicePerPlayer: 3,
-  /** 開局最小叫骰數量 */
+  /** 每人骰數：默認 5（香港酒吧標準），可自選 3–6 */
+  defaultDice: 5,
+  minDice: 3,
+  maxDice: 6,
+  /** 開叫最小數量（兩個人＝至少 2 個） */
   minOpenQty: 2,
-  /** 每日最多開幾局（防刷） */
-  startsPerDay: 20,
+  /** 每日最多開幾鋪（一鋪約半分鐘；防刷） */
+  startsPerDay: 60,
   /** 超過多久沒動作的進行中對局，視為放棄（算輸） */
   staleMinutes: 30,
 } as const;
 
 export const BAR_DICE_RULES: LiarsRules = {
   ...LIARS_RULES_DEFAULT,
-  dice_per_player: BAR_DICE.dicePerPlayer,
+  dice_per_player: BAR_DICE.defaultDice,
   min_open_qty: BAR_DICE.minOpenQty,
   ones_wild: true,
   ones_break: false,
@@ -41,7 +45,6 @@ export type DiceReveal = {
   bid_met: boolean;
   loser: Seat;
   hands: { me: number[]; ivy: number[] };
-  loser_out: boolean;
 };
 
 export type DiceLogEntry = { round: number; who: Seat; act: "bid" | "challenge"; qty?: number; face?: number };
@@ -50,7 +53,10 @@ export type DiceLogEntry = { round: number; who: Seat; act: "bid" | "challenge";
 export type DiceState = {
   v: 1;
   rev: number;
-  round: number;
+  /** 每人骰數（整鋪固定） */
+  dice: number;
+  /** 誰先叫（上一鋪的輸家） */
+  opener: Seat;
   me: number[];
   ivy: number[];
   bid: (Bid & { by: Seat }) | null;
@@ -153,12 +159,18 @@ export function ivyDecide(own: number[], totalDice: number, prev: Bid | null, rn
   return { kind: "bid", bid: best.bid };
 }
 
-// ───────────────────────── 對局狀態機 ─────────────────────────
+// ───────────────────────── 一鋪的狀態機 ─────────────────────────
 
-/** 開新局：兩邊各 3 粒，用戶先叫 */
-export function newMatch(rng: Rng = cryptoRng): DiceState {
-  const roll = (n: number): number[] => rollDice(n, rng.int);
-  return { v: 1, rev: 0, round: 1, me: roll(BAR_DICE.dicePerPlayer), ivy: roll(BAR_DICE.dicePerPlayer), bid: null, turn: "me", winner: null, log: [] };
+export function clampDice(n: unknown): number {
+  const v = typeof n === "number" && Number.isInteger(n) ? n : BAR_DICE.defaultDice;
+  return Math.min(BAR_DICE.maxDice, Math.max(BAR_DICE.minDice, v));
+}
+
+/** 開一鋪：兩邊各 N 粒；`opener` 先叫（第一鋪用戶先叫，之後輸家先叫）。Ivy 先叫時會當場叫出第一手。 */
+export function newMatch(dice: number = BAR_DICE.defaultDice, opener: Seat = "me", rng: Rng = cryptoRng): DiceState {
+  const n = clampDice(dice);
+  const base: DiceState = { v: 1, rev: 0, dice: n, opener, me: rollDice(n, rng.int), ivy: rollDice(n, rng.int), bid: null, turn: opener, winner: null, log: [] };
+  return ivyPlays(base, rng, []);
 }
 
 export function totalDice(s: DiceState): number {
@@ -171,79 +183,73 @@ export type StepResult =
 
 const other = (s: Seat): Seat => (s === "me" ? "ivy" : "me");
 
-function resolve(s: DiceState, challenger: Seat, rng: Rng): { state: DiceState; reveal: DiceReveal } {
+/** 開骰：全場亮骰、定輸贏（一鋪到此結束；骰數不變）。 */
+function resolve(s: DiceState, challenger: Seat): { state: DiceState; reveal: DiceReveal } {
   const bid = s.bid;
   if (bid === null) throw new Error("resolve without bid");
-  const counted = countMatching([...s.me, ...s.ivy], { qty: bid.qty, face: bid.face, zhai: false }, BAR_DICE_RULES);
+  const rules = { ...BAR_DICE_RULES, dice_per_player: s.dice };
+  const counted = countMatching([...s.me, ...s.ivy], { qty: bid.qty, face: bid.face, zhai: false }, rules);
   const met = counted >= bid.qty;
   const loser: Seat = met ? challenger : bid.by;
-  const hands = { me: [...s.me], ivy: [...s.ivy] };
-  const next: DiceState = { ...s, me: [...s.me], ivy: [...s.ivy], log: [...s.log, { round: s.round, who: challenger, act: "challenge" }] };
-  next[loser] = next[loser].slice(0, -1);
-  const out = next[loser].length === 0;
-  const reveal: DiceReveal = { challenger, bidder: bid.by, bid: { qty: bid.qty, face: bid.face }, counted, bid_met: met, loser, hands, loser_out: out };
-  if (out) {
-    next.winner = other(loser);
-    next.bid = null;
-    return { state: next, reveal };
-  }
-  // 下一回合：兩邊按剩餘骰數重新發骰，輸家先叫
-  next.me = rollDice(next.me.length, rng.int);
-  next.ivy = rollDice(next.ivy.length, rng.int);
-  next.bid = null;
-  next.round = s.round + 1;
-  next.turn = loser;
+  const reveal: DiceReveal = {
+    challenger,
+    bidder: bid.by,
+    bid: { qty: bid.qty, face: bid.face },
+    counted,
+    bid_met: met,
+    loser,
+    hands: { me: [...s.me], ivy: [...s.ivy] },
+  };
+  const next: DiceState = { ...s, winner: other(loser), turn: loser, log: [...s.log, { round: 1, who: challenger, act: "challenge" }] };
   return { state: next, reveal };
 }
 
-/** Ivy 連續行動，直到輪到用戶或整局結束（Ivy 輸掉回合時由她開下一回合的第一叫；Ivy 質疑時開盅）。 */
+/** Ivy 的回合：叫或開（輪到用戶或這鋪結束就停）。 */
 function ivyPlays(start: DiceState, rng: Rng, reveals: DiceReveal[]): DiceState {
   let s = start;
   for (let guard = 0; guard < 12 && s.winner === null && s.turn === "ivy"; guard += 1) {
-    const move = ivyDecide(s.ivy, totalDice(s), s.bid === null ? null : { qty: s.bid.qty, face: s.bid.face }, rng);
+    const rules = { ...BAR_DICE_RULES, dice_per_player: s.dice };
+    const move = ivyDecide(s.ivy, totalDice(s), s.bid === null ? null : { qty: s.bid.qty, face: s.bid.face }, rng, rules);
     if (move.kind === "challenge" && s.bid !== null) {
-      const r = resolve(s, "ivy", rng);
+      const r = resolve(s, "ivy");
       reveals.push(r.reveal);
       s = r.state;
     } else {
-      const b = move.kind === "bid" ? move.bid : legalBids(null, totalDice(s))[0];
+      const b = move.kind === "bid" ? move.bid : legalBids(null, totalDice(s), rules)[0];
       if (b === undefined) break;
-      s = { ...s, bid: { ...b, by: "ivy" }, turn: "me", log: [...s.log, { round: s.round, who: "ivy", act: "bid", qty: b.qty, face: b.face }] };
+      s = { ...s, bid: { ...b, by: "ivy" }, turn: "me", log: [...s.log, { round: 1, who: "ivy", act: "bid", qty: b.qty, face: b.face }] };
     }
   }
   return s;
 }
 
-/** 用戶叫骰：校驗 → 記錄 → 輪到 Ivy（她叫或質疑，可能連著開下一回合）。 */
-export function applyBid(state: DiceState, bid: Bid, rng: Rng = cryptoRng): StepResult {
-  if (state.winner !== null) return { ok: false, code: "wrong_phase", message: "這局已經結束。" };
+function validate(state: DiceState): StepResult | null {
+  if (state.winner !== null) return { ok: false, code: "wrong_phase", message: "這鋪已經結束。" };
   if (state.turn !== "me") return { ok: false, code: "not_your_turn", message: "還沒輪到你。" };
-  const v = isValidBid(state.bid === null ? null : { qty: state.bid.qty, face: state.bid.face, zhai: false }, { qty: bid.qty, face: bid.face }, BAR_DICE_RULES);
+  return null;
+}
+
+/** 用戶叫骰：校驗 → 記錄 → 輪到 Ivy（她叫或開盅）。 */
+export function applyBid(state: DiceState, bid: Bid, rng: Rng = cryptoRng): StepResult {
+  const bad = validate(state);
+  if (bad !== null) return bad;
+  const rules = { ...BAR_DICE_RULES, dice_per_player: state.dice };
+  const v = isValidBid(state.bid === null ? null : { qty: state.bid.qty, face: state.bid.face, zhai: false }, { qty: bid.qty, face: bid.face }, rules);
   if (!v.ok) return { ok: false, code: "invalid_bid", message: v.reason };
   if (bid.qty > totalDice(state)) return { ok: false, code: "invalid_bid", message: "數量超過場上骰子總數。" };
   const reveals: DiceReveal[] = [];
-  let s: DiceState = { ...state, bid: { ...bid, by: "me" }, turn: "ivy", log: [...state.log, { round: state.round, who: "me", act: "bid", qty: bid.qty, face: bid.face }] };
+  let s: DiceState = { ...state, bid: { ...bid, by: "me" }, turn: "ivy", log: [...state.log, { round: 1, who: "me", act: "bid", qty: bid.qty, face: bid.face }] };
   s = ivyPlays(s, rng, reveals);
   return { ok: true, state: { ...s, rev: state.rev + 1 }, reveals };
 }
 
-/** 用戶質疑 Ivy 剛才的叫骰。 */
-export function applyChallenge(state: DiceState, rng: Rng = cryptoRng): StepResult {
-  if (state.winner !== null) return { ok: false, code: "wrong_phase", message: "這局已經結束。" };
-  if (state.turn !== "me") return { ok: false, code: "not_your_turn", message: "還沒輪到你。" };
-  if (state.bid === null || state.bid.by !== "ivy") return { ok: false, code: "wrong_phase", message: "現在沒有可以質疑的叫骰。" };
-  const reveals: DiceReveal[] = [];
-  const r = resolve(state, "me", rng);
-  reveals.push(r.reveal);
-  let s = r.state;
-  s = ivyPlays(s, rng, reveals);
-  return { ok: true, state: { ...s, rev: state.rev + 1 }, reveals };
-}
-
-/** 開局後若輪到 Ivy（目前開局用戶先叫，保留給之後調整）。 */
-export function afterStart(state: DiceState, rng: Rng = cryptoRng): DiceState {
-  const reveals: DiceReveal[] = [];
-  return ivyPlays(state, rng, reveals);
+/** 用戶開骰（質疑 Ivy 剛才的叫骰）：這鋪當場結束。 */
+export function applyChallenge(state: DiceState): StepResult {
+  const bad = validate(state);
+  if (bad !== null) return bad;
+  if (state.bid === null || state.bid.by !== "ivy") return { ok: false, code: "wrong_phase", message: "現在沒有可以開的叫骰。" };
+  const r = resolve(state, "me");
+  return { ok: true, state: { ...r.state, rev: state.rev + 1 }, reveals: [r.reveal] };
 }
 
 // ───────────────────────── 給客戶端的視圖 ─────────────────────────
@@ -252,7 +258,6 @@ export type DiceView = {
   match_id: string;
   status: "active" | "won" | "lost" | "abandoned";
   rules: { dice_per_player: number; min_open_qty: number; ones_wild: boolean };
-  round: number;
   my_dice: number[];
   ivy_dice_count: number;
   total_dice: number;
@@ -261,6 +266,8 @@ export type DiceView = {
   /** 輪到你且 Ivy 剛叫過 → 可質疑 */
   can_challenge: boolean;
   log: DiceLogEntry[];
+  /** 這鋪的贏家（結束後才有） */
+  winner: Seat | null;
 };
 
 /** 把完整狀態收斂成客戶端看得到的（隱藏 Ivy 的骰；結束後才揭曉在 reveal 裡）。 */
@@ -268,8 +275,7 @@ export function toView(matchId: string, status: DiceView["status"], s: DiceState
   return {
     match_id: matchId,
     status,
-    rules: { dice_per_player: BAR_DICE.dicePerPlayer, min_open_qty: BAR_DICE.minOpenQty, ones_wild: true },
-    round: s.round,
+    rules: { dice_per_player: s.dice, min_open_qty: BAR_DICE.minOpenQty, ones_wild: true },
     my_dice: s.me,
     ivy_dice_count: s.ivy.length,
     total_dice: totalDice(s),
@@ -277,5 +283,6 @@ export function toView(matchId: string, status: DiceView["status"], s: DiceState
     turn: s.turn,
     can_challenge: s.winner === null && s.turn === "me" && s.bid !== null && s.bid.by === "ivy",
     log: s.log.slice(-12),
+    winner: s.winner,
   };
 }
