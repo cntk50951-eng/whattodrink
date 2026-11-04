@@ -1,6 +1,7 @@
 import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
+import { matchBlockedSearchTerm } from "@/lib/searchQueryGuard";
 import { minimaxChat } from "@/lib/minimax";
 import { MEET_DAILY_LIMIT, MEET_LLM_TIMEOUT_MS, meetCriteriaSchemaText } from "@/lib/meet";
 import { PLAN_QUERY_MAX, type PlanStage, parsePlanReply, planStreamLine, sanitizePlan, searchPlanPrompt, wantsPlanStream } from "@/lib/searchPlan";
@@ -60,6 +61,12 @@ export async function POST(req: Request): Promise<Response> {
 
 async function runPlan(userId: string, query: string, onStage: (s: PlanStage) => void): Promise<PlanOutcome> {
   onStage("moderating");
+  // 本地敏感詞先擋（不依賴外部審核、不扣次數）；外部審核對短關鍵詞常放行
+  const hit = matchBlockedSearchTerm(query);
+  if (hit !== null) {
+    console.warn(`[search/plan] blocked by local guard: ${hit}`);
+    return { ok: false, code: "rejected", message: "內容未通過審核（搜尋描述），請修改後再發", status: 403 };
+  }
   const verdict = await moderateCheckin(
     { text: query },
     {
