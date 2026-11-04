@@ -1,4 +1,4 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { canViewCheckin } from "@/lib/api/checkins";
 import { friendIdsOf, type FriendshipRow } from "@/lib/friends";
@@ -80,7 +80,9 @@ export async function POST(req: Request): Promise<Response> {
   if ((meRow as { mode?: unknown } | null)?.mode === "stealth") {
     return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
   }
-  const { data: peerRow } = await supabase
+  // users RLS 讀不到沒公開打卡的陌生人（會誤報「對方不存在」）：只讀存在與否＋mode，走 service
+  const svc = await createServiceClient();
+  const { data: peerRow } = await svc
     .from("users")
     .select("id,mode")
     .eq("id", toUserId)

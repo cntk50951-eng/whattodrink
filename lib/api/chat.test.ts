@@ -18,6 +18,7 @@ import {
   parseViewBody,
   strangerQuotaJson,
   toChatMessage,
+  listPeerOrFallback,
   toChatPeer,
 } from "./chat";
 
@@ -413,5 +414,29 @@ describe("酒局卡附件 {party}", () => {
     expect(ok).toMatchObject({ kind: "text", party: { party_id: "p1", place: "Ping Pong" } });
     expect(parseCreateMessageBody({ ...base, attachments: [{ party: { party_id: "../x" } }] })).toHaveProperty("error");
     expect(parseCreateMessageBody({ ...base, attachments: [{ party: { party_id: "p1" } }, { party: { party_id: "p2" } }] })).toHaveProperty("error");
+  });
+});
+
+describe("listPeerOrFallback（列表對方簡檔不回 null）", () => {
+  it("正常資料原樣回，只吐公開三列", () => {
+    expect(listPeerOrFallback({ id: "u2", nickname: "阿明", avatar_url: "https://x/a.png" })).toEqual({
+      user_id: "u2",
+      nickname: "阿明",
+      avatar_url: "https://x/a.png",
+    });
+  });
+
+  it("暱稱缺、空白或過長：兜底「酒友」，id 與頭像保留", () => {
+    expect(listPeerOrFallback({ id: "u2", nickname: null, avatar_url: null }).nickname).toBe("酒友");
+    expect(listPeerOrFallback({ id: "u2", nickname: "   ", avatar_url: null }).nickname).toBe("酒友");
+    expect(listPeerOrFallback({ id: "u2", nickname: "x".repeat(200), avatar_url: "https://x/a.png" })).toEqual({
+      user_id: "u2",
+      nickname: "酒友",
+      avatar_url: "https://x/a.png",
+    });
+  });
+
+  it("頭像不是字串時回 null，不洩露奇怪型別", () => {
+    expect(listPeerOrFallback({ id: "u2", nickname: "N", avatar_url: 5 }).avatar_url).toBeNull();
   });
 });

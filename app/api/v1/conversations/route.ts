@@ -7,7 +7,7 @@ import {
   parseChatListParams,
   parseCreateConversationBody,
   toChatMessage,
-  toChatPeer,
+  listPeerOrFallback,
   directKey,
   encodeChatCursor,
   countStrangerSent,
@@ -223,6 +223,7 @@ export async function GET(req: Request): Promise<Response> {
     updated_at: string;
   };
   const items: ConversationJson[] = [];
+  let goneCount = 0;
   // UR D.10 行三字段（RPC 不动，路由拼：好友集一次＋origin 批量＋陌生人行逐查配额）。
   const { data: myFs } = await supabase
     .from("friendships")
@@ -274,6 +275,12 @@ export async function GET(req: Request): Promise<Response> {
             },
             userId,
           );
+    // 對方成員行已不在（多為對方註銷了帳號：conversation_members／messages 都 ON DELETE CASCADE）：
+    // 這個會話沒有對方、也發不出去，從列表隱藏，免得客戶端顯示「用戶不存在或不可見」的幽靈行。
+    if (r.peer_id === null) {
+      goneCount += 1;
+      continue;
+    }
     const updated_at = Date.parse(r.updated_at);
     const rowFriend = r.peer_id !== null && myFids.includes(r.peer_id);
     const rowOrigin = originById.get(r.conv_id) ?? (rowFriend ? "friend" : "direct");
@@ -284,10 +291,7 @@ export async function GET(req: Request): Promise<Response> {
     }
     items.push({
       id: r.conv_id,
-      peer:
-        r.peer_id === null
-          ? null
-          : toChatPeer({ id: r.peer_id, nickname: r.nickname, avatar_url: r.avatar_url }),
+      peer: listPeerOrFallback({ id: r.peer_id, nickname: r.nickname, avatar_url: r.avatar_url }),
       last_message,
       unread: typeof r.unread === "number" ? r.unread : Number(r.unread) || 0,
       muted: r.muted,
@@ -297,6 +301,7 @@ export async function GET(req: Request): Promise<Response> {
       quota: rowQuota,
     });
   }
+  if (goneCount > 0) console.warn(`[api/v1/conversations] hid ${goneCount} conversation(s) whose peer is gone`);
   items.sort((a, b) => b.updated_at - a.updated_at || (a.id < b.id ? -1 : 1));
   // 內存 keyset（cursor 錨末動時間＋id；POC 量級可為，見註）
   let start = 0;

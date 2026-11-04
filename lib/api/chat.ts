@@ -500,6 +500,17 @@ export function toChatPeer(raw: unknown): ChatPeerJson | null {
   return { user_id, nickname, avatar_url: avatar };
 }
 
+/** 列表行的對方簡檔：id 一定有；暱稱缺／空白／過長時兜底「酒友」，不讓客戶端拿到 null（會顯示成「用戶不存在」）。 */
+export function listPeerOrFallback(raw: { id: string; nickname: unknown; avatar_url: unknown }): ChatPeerJson {
+  return (
+    toChatPeer(raw) ?? {
+      user_id: raw.id,
+      nickname: "酒友",
+      avatar_url: typeof raw.avatar_url === "string" ? raw.avatar_url : null,
+    }
+  );
+}
+
 /** 過期判定：`expires_at <= now` 即懶刪（讀時跳過，沿 invites 口徑）。 */
 export function isConversationExpired(expiresAtIso: string, nowMs: number): boolean {
   const t = Date.parse(expiresAtIso);
