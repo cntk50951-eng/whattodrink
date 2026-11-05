@@ -594,9 +594,18 @@ paths:
   /api/v1/bar/dice/start:
     post:
       operationId: barDiceStart
-      summary: 開一局和 Ivy 的大話骰（🔒；每人 3 粒；已有進行中的就接回；每日最多 20 局）。骰子與 Ivy 的叫骰全在服務端，回包只含你自己的骰
+      summary: 開一鋪和 Ivy 的大話骰（🔒；已有進行中的就接回；每日最多 60 鋪）。骰子與 Ivy 的叫骰全在服務端，回包只含你自己的骰。每日前 20 鋪 Ivy 用 AI 叫骰並說話（回包 ivy_say），之後用機率機器人＋客戶端預寫台詞
       security:
         - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dice: { type: integer, minimum: 3, maximum: 6, description: 每人骰數，默認 5 }
+                zhai: { type: boolean, description: 開齋／飛（簡單版：齋＝1 不當百搭；齋轉飛數量至少 +2）。默認關 }
       responses:
         "200":
           description: 對局視圖
@@ -651,6 +660,9 @@ paths:
                     type: { type: string, enum: [bid] }
                     qty: { type: integer, minimum: 1 }
                     face: { type: integer, minimum: 1, maximum: 6 }
+                    zhai: { type: boolean, description: 齋（1 不當百搭）；僅開了齋／飛的鋪可用，叫 1 不可齋 }
+                    said: { type: string, maxLength: 200, description: 用戶剛說的話（語音轉字，僅作 Ivy 這一手 AI 回應的參考，不是指令；服務端截 60 字） }
+                    lang: { type: string, enum: [en, yue, zh], description: Ivy 這一句話的語言，默認 en }
                 - type: object
                   required: [type]
                   properties:
@@ -5601,6 +5613,7 @@ components:
             dice_per_player: { type: integer }
             min_open_qty: { type: integer }
             ones_wild: { type: boolean }
+            zhai_enabled: { type: boolean }
         round: { type: integer }
         my_dice: { type: array, items: { type: integer } }
         ivy_dice_count: { type: integer, description: Ivy 手上還有幾粒（點數保密，開盅才亮） }
@@ -5612,6 +5625,7 @@ components:
             qty: { type: integer }
             face: { type: integer }
             by: { type: string, enum: [me, ivy] }
+            zhai: { type: boolean, description: 這一叫是齋（缺＝飛） }
         turn: { type: string, enum: [me, ivy] }
         can_challenge: { type: boolean }
         log: { type: array, items: { type: object } }
@@ -5648,6 +5662,7 @@ components:
         view: { $ref: "#/components/schemas/BarDiceView" }
         reveals: { type: array, items: { $ref: "#/components/schemas/BarDiceReveal" } }
         settlement: { $ref: "#/components/schemas/BarDiceSettlement" }
+        ivy_say: { type: string, description: Ivy 這一手的話（≤40 字；只有這鋪開了 AI 且 AI 成功才有，缺＝客戶端用預寫台詞） }
     BarCredits:
       type: object
       required: [daily, lots, earned_total, total, wins_today, next_reset_at]

@@ -20,6 +20,8 @@ export const BAR_DICE = {
   minOpenQty: 2,
   /** 每日最多開幾鋪（一鋪約半分鐘；防刷） */
   startsPerDay: 60,
+  /** 每日前幾鋪 Ivy 用 AI 叫骰＋說話（之後退回機率機器人＋預寫台詞；用戶 2026-11-05 定 20） */
+  aiPerDay: 20,
   /** 超過多久沒動作的進行中對局，視為放棄（算輸） */
   staleMinutes: 30,
 } as const;
@@ -34,7 +36,8 @@ export const BAR_DICE_RULES: LiarsRules = {
 };
 
 export type Seat = "me" | "ivy";
-export type Bid = { qty: number; face: number };
+/** zhai＝齋（1 不當百搭、只算該點）；省略／false＝飛（1 百搭，叫 1 本身除外）。僅「開齋飛」的局可用 */
+export type Bid = { qty: number; face: number; zhai?: boolean };
 
 export type DiceReveal = {
   challenger: Seat;
@@ -63,7 +66,16 @@ export type DiceState = {
   turn: Seat;
   winner: Seat | null;
   log: DiceLogEntry[];
+  /** 這鋪開不開齋／飛（開局時用戶選；缺＝關） */
+  zhai_on?: boolean;
+  /** 這鋪 Ivy 是否用 AI 叫骰＋說話（每日前 N 鋪；缺＝關，走機率機器人＋預寫台詞） */
+  ai?: boolean;
 };
+
+/** 這一鋪適用的規則 */
+export function rulesFor(s: DiceState): LiarsRules {
+  return { ...BAR_DICE_RULES, dice_per_player: s.dice, zhai_enabled: s.zhai_on === true };
+}
 
 export type Rng = {
   /** [min, max) 整數 */
@@ -95,8 +107,8 @@ export const IVY_BOT: BotParams = {
   bluffChance: 0.15,
 };
 
-function hitChance(face: number, rules: LiarsRules): number {
-  return rules.ones_wild && face !== 1 ? 1 / 3 : 1 / 6;
+function hitChance(face: number, rules: LiarsRules, zhai = false): number {
+  return rules.ones_wild && face !== 1 && !zhai ? 1 / 3 : 1 / 6;
 }
 
 function binomial(n: number, k: number): number {
@@ -117,16 +129,20 @@ export function probAtLeast(need: number, n: number, p: number): number {
 
 /** 站在持有 `own` 的座位看，這一叫成立的機率 */
 export function successChance(b: Bid, own: number[], totalDice: number, rules: LiarsRules): number {
-  const mine = own.filter((d) => d === b.face || (rules.ones_wild && b.face !== 1 && d === 1)).length;
-  return probAtLeast(b.qty - mine, Math.max(0, totalDice - own.length), hitChance(b.face, rules));
+  const z = b.zhai === true;
+  const mine = own.filter((d) => d === b.face || (rules.ones_wild && b.face !== 1 && !z && d === 1)).length;
+  return probAtLeast(b.qty - mine, Math.max(0, totalDice - own.length), hitChance(b.face, rules, z));
 }
 
 /** 場上所有「合法的下一叫」，由小到大 */
 export function legalBids(prev: Bid | null, totalDice: number, rules: LiarsRules = BAR_DICE_RULES): Bid[] {
   const out: Bid[] = [];
+  const prevForCheck = prev === null ? null : { qty: prev.qty, face: prev.face, zhai: prev.zhai === true };
   for (let q = 1; q <= totalDice; q += 1) {
     for (let f = 1; f <= 6; f += 1) {
-      if (isValidBid(prev === null ? null : { ...prev, zhai: false }, { qty: q, face: f }, rules).ok) out.push({ qty: q, face: f });
+      if (isValidBid(prevForCheck, { qty: q, face: f }, rules).ok) out.push({ qty: q, face: f });
+      // 齋：只在開齋飛的局、且不是叫 1（叫 1 本來就不百搭）
+      if (rules.zhai_enabled && f !== 1 && isValidBid(prevForCheck, { qty: q, face: f, zhai: true }, rules).ok) out.push({ qty: q, face: f, zhai: true });
     }
   }
   return out;
@@ -167,9 +183,13 @@ export function clampDice(n: unknown): number {
 }
 
 /** 開一鋪：兩邊各 N 粒；`opener` 先叫（第一鋪用戶先叫，之後輸家先叫）。Ivy 先叫時會當場叫出第一手。 */
-export function newMatch(dice: number = BAR_DICE.defaultDice, opener: Seat = "me", rng: Rng = cryptoRng): DiceState {
+export function newMatch(dice: number = BAR_DICE.defaultDice, opener: Seat = "me", rng: Rng = cryptoRng, opts: { zhai?: boolean; ai?: boolean } = {}): DiceState {
   const n = clampDice(dice);
-  const base: DiceState = { v: 1, rev: 0, dice: n, opener, me: rollDice(n, rng.int), ivy: rollDice(n, rng.int), bid: null, turn: opener, winner: null, log: [] };
+  const base: DiceState = {
+    v: 1, rev: 0, dice: n, opener, me: rollDice(n, rng.int), ivy: rollDice(n, rng.int), bid: null, turn: opener, winner: null, log: [],
+    ...(opts.zhai === true ? { zhai_on: true } : {}),
+    ...(opts.ai === true ? { ai: true } : {}),
+  };
   return ivyPlays(base, rng, []);
 }
 
@@ -187,14 +207,14 @@ const other = (s: Seat): Seat => (s === "me" ? "ivy" : "me");
 function resolve(s: DiceState, challenger: Seat): { state: DiceState; reveal: DiceReveal } {
   const bid = s.bid;
   if (bid === null) throw new Error("resolve without bid");
-  const rules = { ...BAR_DICE_RULES, dice_per_player: s.dice };
-  const counted = countMatching([...s.me, ...s.ivy], { qty: bid.qty, face: bid.face, zhai: false }, rules);
+  const rules = rulesFor(s);
+  const counted = countMatching([...s.me, ...s.ivy], { qty: bid.qty, face: bid.face, zhai: bid.zhai === true }, rules);
   const met = counted >= bid.qty;
   const loser: Seat = met ? challenger : bid.by;
   const reveal: DiceReveal = {
     challenger,
     bidder: bid.by,
-    bid: { qty: bid.qty, face: bid.face },
+    bid: { qty: bid.qty, face: bid.face, ...(bid.zhai === true ? { zhai: true } : {}) },
     counted,
     bid_met: met,
     loser,
@@ -205,11 +225,13 @@ function resolve(s: DiceState, challenger: Seat): { state: DiceState; reveal: Di
 }
 
 /** Ivy 的回合：叫或開（輪到用戶或這鋪結束就停）。 */
-function ivyPlays(start: DiceState, rng: Rng, reveals: DiceReveal[]): DiceState {
+function ivyPlays(start: DiceState, rng: Rng, reveals: DiceReveal[], forced: BotMove | null = null): DiceState {
   let s = start;
+  let force = forced;
   for (let guard = 0; guard < 12 && s.winner === null && s.turn === "ivy"; guard += 1) {
-    const rules = { ...BAR_DICE_RULES, dice_per_player: s.dice };
-    const move = ivyDecide(s.ivy, totalDice(s), s.bid === null ? null : { qty: s.bid.qty, face: s.bid.face }, rng, rules);
+    const rules = rulesFor(s);
+    const move = force ?? ivyDecide(s.ivy, totalDice(s), s.bid === null ? null : { qty: s.bid.qty, face: s.bid.face, zhai: s.bid.zhai }, rng, rules);
+    force = null;
     if (move.kind === "challenge" && s.bid !== null) {
       const r = resolve(s, "ivy");
       reveals.push(r.reveal);
@@ -230,16 +252,17 @@ function validate(state: DiceState): StepResult | null {
 }
 
 /** 用戶叫骰：校驗 → 記錄 → 輪到 Ivy（她叫或開盅）。 */
-export function applyBid(state: DiceState, bid: Bid, rng: Rng = cryptoRng): StepResult {
+export function applyBid(state: DiceState, bid: Bid, rng: Rng = cryptoRng, forced: BotMove | null = null): StepResult {
   const bad = validate(state);
   if (bad !== null) return bad;
-  const rules = { ...BAR_DICE_RULES, dice_per_player: state.dice };
-  const v = isValidBid(state.bid === null ? null : { qty: state.bid.qty, face: state.bid.face, zhai: false }, { qty: bid.qty, face: bid.face }, rules);
+  const rules = rulesFor(state);
+  const v = isValidBid(state.bid === null ? null : { qty: state.bid.qty, face: state.bid.face, zhai: state.bid.zhai === true }, { qty: bid.qty, face: bid.face, zhai: bid.zhai === true }, rules);
   if (!v.ok) return { ok: false, code: "invalid_bid", message: v.reason };
   if (bid.qty > totalDice(state)) return { ok: false, code: "invalid_bid", message: "數量超過場上骰子總數。" };
   const reveals: DiceReveal[] = [];
-  let s: DiceState = { ...state, bid: { ...bid, by: "me" }, turn: "ivy", log: [...state.log, { round: 1, who: "me", act: "bid", qty: bid.qty, face: bid.face }] };
-  s = ivyPlays(s, rng, reveals);
+  const mine: Bid = { qty: bid.qty, face: bid.face, ...(bid.zhai === true ? { zhai: true } : {}) };
+  let s: DiceState = { ...state, bid: { ...mine, by: "me" }, turn: "ivy", log: [...state.log, { round: 1, who: "me", act: "bid", qty: bid.qty, face: bid.face }] };
+  s = ivyPlays(s, rng, reveals, forced);
   return { ok: true, state: { ...s, rev: state.rev + 1 }, reveals };
 }
 
@@ -257,11 +280,11 @@ export function applyChallenge(state: DiceState): StepResult {
 export type DiceView = {
   match_id: string;
   status: "active" | "won" | "lost" | "abandoned";
-  rules: { dice_per_player: number; min_open_qty: number; ones_wild: boolean };
+  rules: { dice_per_player: number; min_open_qty: number; ones_wild: boolean; zhai_enabled: boolean };
   my_dice: number[];
   ivy_dice_count: number;
   total_dice: number;
-  bid: { qty: number; face: number; by: Seat } | null;
+  bid: { qty: number; face: number; by: Seat; zhai?: boolean } | null;
   turn: Seat;
   /** 輪到你且 Ivy 剛叫過 → 可質疑 */
   can_challenge: boolean;
@@ -275,7 +298,7 @@ export function toView(matchId: string, status: DiceView["status"], s: DiceState
   return {
     match_id: matchId,
     status,
-    rules: { dice_per_player: s.dice, min_open_qty: BAR_DICE.minOpenQty, ones_wild: true },
+    rules: { dice_per_player: s.dice, min_open_qty: BAR_DICE.minOpenQty, ones_wild: true, zhai_enabled: s.zhai_on === true },
     my_dice: s.me,
     ivy_dice_count: s.ivy.length,
     total_dice: totalDice(s),
@@ -285,4 +308,37 @@ export function toView(matchId: string, status: DiceView["status"], s: DiceState
     log: s.log.slice(-12),
     winner: s.winner,
   };
+}
+
+// ───────────────────────── F5：給 AI 叫骰的候選 ─────────────────────────
+
+export type IvyOption = { move: BotMove; chance: number };
+
+/**
+ * 輪到 Ivy 時，服務端算好的「合法候選」：開盅（若可開）＋最穩的前 3 個叫法，各附成功機率。
+ * AI 只能在這裡面選；選的編號不在範圍內就退回機率機器人。
+ */
+export function ivyOptions(own: number[], total: number, prev: Bid | null, rules: LiarsRules): IvyOption[] {
+  const out: IvyOption[] = [];
+  if (prev !== null) out.push({ move: { kind: "challenge" }, chance: 1 - successChance(prev, own, total, rules) });
+  const legal = legalBids(prev, total, rules);
+  const base = prev?.qty ?? rules.min_open_qty;
+  const near = legal.filter((b) => b.qty <= base + 2);
+  const pool = near.length > 0 ? near : legal;
+  const scored = pool
+    .map((b) => ({ bid: b, chance: successChance(b, own, total, rules) }))
+    .sort((a, b) => b.chance - a.chance || a.bid.qty - b.bid.qty || a.bid.face - b.bid.face)
+    .slice(0, 3);
+  for (const c of scored) out.push({ move: { kind: "bid", bid: c.bid }, chance: c.chance });
+  return out;
+}
+
+/** 輪到 Ivy 前的上下文（校驗用戶這一叫是否合法；合法才回，給 AI 叫骰用）。 */
+export function ivyTurnContext(state: DiceState, bid: Bid): { own: number[]; total: number; prev: Bid; rules: LiarsRules } | null {
+  if (validate(state) !== null) return null;
+  const rules = rulesFor(state);
+  const z = bid.zhai === true;
+  const ok = isValidBid(state.bid === null ? null : { qty: state.bid.qty, face: state.bid.face, zhai: state.bid.zhai === true }, { qty: bid.qty, face: bid.face, zhai: z }, rules);
+  if (!ok.ok || bid.qty > totalDice(state)) return null;
+  return { own: state.ivy, total: totalDice(state), prev: { qty: bid.qty, face: bid.face, ...(z ? { zhai: true } : {}) }, rules };
 }

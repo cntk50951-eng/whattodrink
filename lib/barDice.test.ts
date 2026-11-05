@@ -7,6 +7,8 @@ import {
   BAR_DICE_RULES,
   clampDice,
   ivyDecide,
+  ivyOptions,
+  ivyTurnContext,
   legalBids,
   newMatch,
   probAtLeast,
@@ -196,5 +198,83 @@ describe("整鋪模擬", () => {
     for (let i = 0; i < N; i += 1) if (playOne(90_000 + i, 5, i % 2 === 0 ? "me" : "ivy", humanPolicy(0.55, 0.2, 0.3)).winner === "me") wins += 1;
     console.log(`[sim] 隨性玩家勝率 ${((wins / N) * 100).toFixed(1)}%`);
     expect(wins / N).toBeLessThan(0.5);
+  });
+});
+
+describe("F6 齋／飛（簡單版）", () => {
+  const zhaiState = (p: Partial<DiceState> = {}): DiceState => stateWith({ zhai_on: true, ...p });
+
+  it("關著時叫齋非法；開著時合法", () => {
+    const off = applyBid(stateWith({}), { qty: 2, face: 3, zhai: true });
+    expect(off.ok).toBe(false);
+    const on = applyBid(zhaiState(), { qty: 2, face: 3, zhai: true }, seeded(1));
+    expect(on.ok).toBe(true);
+  });
+
+  it("開盅計數：齋不算 1 百搭，飛算", () => {
+    // 場上：me [1,3,3] ivy [3,4,6]；叫 4 個 3
+    const base = { me: [1, 3, 3], ivy: [3, 4, 6] };
+    const fly = applyBid(zhaiState({ ...base, turn: "me" }), { qty: 4, face: 3 }, { ...seeded(2), float: () => 0.99 });
+    expect(fly.ok).toBe(true);
+    // 直接驗 resolve：用 Ivy 叫、我開
+    const ivyBid = zhaiState({ ...base, bid: { qty: 4, face: 3, by: "ivy" }, turn: "me" });
+    const flyRes = applyChallenge(ivyBid);
+    expect(flyRes.ok && flyRes.reveals[0]?.counted).toBe(4);      // 3 的三粒＋1 百搭
+    const zhaiRes = applyChallenge(zhaiState({ ...base, bid: { qty: 4, face: 3, zhai: true, by: "ivy" }, turn: "me" }));
+    expect(zhaiRes.ok && zhaiRes.reveals[0]?.counted).toBe(3);    // 齋：1 不算
+    expect(zhaiRes.ok && zhaiRes.reveals[0]?.bid_met).toBe(false);
+  });
+
+  it("齋轉飛數量至少 +2；飛轉齋照一般加注", () => {
+    const afterZhai = zhaiState({ bid: { qty: 3, face: 4, zhai: true, by: "ivy" }, turn: "me" });
+    expect(applyBid(afterZhai, { qty: 4, face: 2 }).ok).toBe(false);
+    expect(applyBid(afterZhai, { qty: 5, face: 1 }, seeded(3)).ok).toBe(true);
+    const afterFly = zhaiState({ bid: { qty: 3, face: 4, by: "ivy" }, turn: "me" });
+    expect(applyBid(afterFly, { qty: 3, face: 5, zhai: true }, seeded(4)).ok).toBe(true);
+  });
+
+  it("legalBids：開齋才有齋叫法，且不含叫 1 的齋", () => {
+    const off = legalBids(null, 6, { ...BAR_DICE_RULES, zhai_enabled: false });
+    expect(off.some((b) => b.zhai === true)).toBe(false);
+    const on = legalBids(null, 6, { ...BAR_DICE_RULES, zhai_enabled: true });
+    expect(on.some((b) => b.zhai === true)).toBe(true);
+    expect(on.some((b) => b.zhai === true && b.face === 1)).toBe(false);
+  });
+
+  it("view 帶 zhai_enabled 與 bid.zhai", () => {
+    const v = toView("m", "active", zhaiState({ bid: { qty: 2, face: 3, zhai: true, by: "me" } }));
+    expect(v.rules.zhai_enabled).toBe(true);
+    expect(v.bid?.zhai).toBe(true);
+  });
+});
+
+describe("F5 候選與強制手", () => {
+  it("ivyOptions：有上一手時第一個是開盅，叫法都合法，最多 1+3 個", () => {
+    const opts = ivyOptions([2, 5, 5], 6, { qty: 3, face: 4 }, BAR_DICE_RULES);
+    expect(opts[0]?.move.kind).toBe("challenge");
+    expect(opts.length).toBeLessThanOrEqual(4);
+    const legal = legalBids({ qty: 3, face: 4 }, 6, BAR_DICE_RULES);
+    for (const o of opts.slice(1)) {
+      expect(o.move.kind).toBe("bid");
+      const m = o.move;
+      if (m.kind === "bid") expect(legal.some((b) => b.qty === m.bid.qty && b.face === m.bid.face)).toBe(true);
+    }
+  });
+
+  it("開局沒有上一手時沒有開盅候選", () => {
+    const opts = ivyOptions([2, 5, 5], 6, null, BAR_DICE_RULES);
+    expect(opts.every((o) => o.move.kind === "bid")).toBe(true);
+  });
+
+  it("forced 手被採用：強制開盅就當場結束", () => {
+    const s = stateWith({ me: [2, 3, 5], ivy: [1, 4, 6] });
+    const r = applyBid(s, { qty: 2, face: 6 }, seeded(5), { kind: "challenge" });
+    expect(r.ok && r.reveals.length).toBe(1);
+    expect(r.ok && r.state.winner).not.toBeNull();
+  });
+
+  it("ivyTurnContext：合法回上下文，非法回 null", () => {
+    expect(ivyTurnContext(stateWith({}), { qty: 2, face: 3 })).not.toBeNull();
+    expect(ivyTurnContext(stateWith({}), { qty: 1, face: 3 })).toBeNull();
   });
 });

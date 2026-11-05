@@ -6,6 +6,9 @@ import type { createServiceClient } from "@/lib/supabase/server";
 
 import {
   applyBid,
+  ivyOptions,
+  ivyTurnContext,
+  type BotMove,
   applyChallenge,
   BAR_DICE,
   clampDice,
@@ -19,6 +22,7 @@ import {
   type DiceView,
 } from "./barDice";
 import { BAR_CREDIT, parseBarCredits, type BarCredits } from "./barCredits";
+import { ivyAiPick, parseLang, sanitizeSaid } from "./barDiceAi";
 
 type Svc = Awaited<ReturnType<typeof createServiceClient>>;
 type MatchStatus = "active" | "won" | "lost" | "abandoned";
@@ -44,7 +48,7 @@ export type Settlement = {
 };
 
 export type DiceOutcome =
-  | { ok: true; view: DiceView; reveals: DiceReveal[]; settlement: Settlement | null }
+  | { ok: true; view: DiceView; reveals: DiceReveal[]; settlement: Settlement | null; /** Ivy 這一手的話（AI 叫骰時才有；沒有就由客戶端用預寫台詞） */ ivySay?: string }
   | { ok: false; code: "not_found" | "stale_version" | "not_your_turn" | "wrong_phase" | "invalid_bid" | "rate_limited" | "internal"; message: string };
 
 const COLS = "id,user_id,status,state,credits,created_at,updated_at,settled_at";
@@ -138,7 +142,7 @@ async function nextOpener(svc: Svc, userId: string): Promise<Seat> {
 }
 
 /** 開一鋪（已有進行中的就接回那鋪）。`dice`＝每人骰數（3–6，默認 5）。 */
-export async function startMatch(svc: Svc, userId: string, dice?: unknown): Promise<DiceOutcome> {
+export async function startMatch(svc: Svc, userId: string, dice?: unknown, zhai?: unknown): Promise<DiceOutcome> {
   await sweep(svc, userId);
   const existing = await activeRow(svc, userId);
   if (existing !== null) return { ok: true, view: toView(existing.id, "active", existing.state), reveals: [], settlement: null };
@@ -150,7 +154,8 @@ export async function startMatch(svc: Svc, userId: string, dice?: unknown): Prom
   if ((count ?? 0) >= BAR_DICE.startsPerDay) {
     return { ok: false, code: "rate_limited", message: `今日大話骰已玩滿 ${BAR_DICE.startsPerDay} 鋪，明天再來。` };
   }
-  const state = newMatch(clampDice(dice), await nextOpener(svc, userId), cryptoRng);
+  // 每日前 aiPerDay 鋪 Ivy 用 AI 叫骰（count＝今天已開的鋪數）；之後退回機率機器人＋預寫台詞
+  const state = newMatch(clampDice(dice), await nextOpener(svc, userId), cryptoRng, { zhai: zhai === true, ai: (count ?? 0) < BAR_DICE.aiPerDay });
   const { data, error } = await svc.from("bar_dice_matches").insert({ user_id: userId, status: "active", state }).select(COLS).single();
   if (error !== null || data === null) {
     // 並發開局撞到「一人一局進行中」的唯一索引：接回已存在的那局
@@ -169,15 +174,32 @@ export async function getActive(svc: Svc, userId: string): Promise<DiceView | nu
   return row === null ? null : toView(row.id, "active", row.state);
 }
 
-export type DiceAction = { type: "bid"; qty: number; face: number } | { type: "challenge" };
+export type DiceAction = { type: "bid"; qty: number; face: number; zhai?: boolean; said?: unknown; lang?: unknown } | { type: "challenge" };
 
 export async function act(svc: Svc, userId: string, matchId: string, action: DiceAction): Promise<DiceOutcome> {
   const { data } = await svc.from("bar_dice_matches").select(COLS).eq("id", matchId).eq("user_id", userId).maybeSingle();
   const row = data as MatchRow | null;
   if (row === null) return { ok: false, code: "not_found", message: "找不到這局。" };
   if (row.status !== "active") return { ok: false, code: "wrong_phase", message: "這局已經結束。" };
-  const bid: Bid | null = action.type === "bid" ? { qty: action.qty, face: action.face } : null;
-  const step = bid !== null ? applyBid(row.state, bid, cryptoRng) : applyChallenge(row.state);
+  const bid: Bid | null = action.type === "bid" ? { qty: action.qty, face: action.face, ...(action.zhai === true ? { zhai: true } : {}) } : null;
+  // F5：這鋪開了 AI，就請 AI 在服務端算好的候選裡替 Ivy 選一手＋說一句；失敗／逾時＝退回機率機器人
+  let forced: BotMove | null = null;
+  let ivySay: string | undefined;
+  if (bid !== null && row.state.ai === true) {
+    const ctx = ivyTurnContext(row.state, bid);
+    const apiKey = process.env.minimaxi_api_key ?? process.env.MINIMAXI_API_KEY ?? "";
+    if (ctx !== null && apiKey !== "") {
+      const options = ivyOptions(ctx.own, ctx.total, ctx.prev, ctx.rules);
+      const said = action.type === "bid" ? sanitizeSaid(action.said) : "";
+      const r = await ivyAiPick({ apiKey, lang: parseLang(action.type === "bid" ? action.lang : undefined), own: ctx.own, prev: ctx.prev, options, said });
+      const chosen = r === null ? undefined : options[r.pick];
+      if (r !== null && chosen !== undefined) {
+        forced = chosen.move;
+        ivySay = r.say;
+      }
+    }
+  }
+  const step = bid !== null ? applyBid(row.state, bid, cryptoRng, forced) : applyChallenge(row.state);
   if (!step.ok) return { ok: false, code: step.code, message: step.message };
   const status: MatchStatus = step.state.winner === null ? "active" : step.state.winner === "me" ? "won" : "lost";
   // 樂觀並發：只有 rev 沒變、仍是 active 才能寫（兩台裝置同時操作，後到的得到 stale_version）
@@ -191,7 +213,7 @@ export async function act(svc: Svc, userId: string, matchId: string, action: Dic
   const next = ((updated ?? []) as MatchRow[])[0];
   if (next === undefined) return { ok: false, code: "stale_version", message: "畫面已經過期，請重新整理這一局。" };
   const settlement = status === "active" ? null : await settle(svc, next);
-  return { ok: true, view: toView(next.id, status, next.state), reveals: step.reveals, settlement };
+  return { ok: true, view: toView(next.id, status, next.state), reveals: step.reveals, settlement, ...(ivySay !== undefined ? { ivySay } : {}) };
 }
 
 /** 主動放棄＝認輸（算輸一局）。 */
