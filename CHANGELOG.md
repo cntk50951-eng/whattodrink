@@ -5,6 +5,10 @@
 ## [Unreleased]
 
 ### Added
+- **MapPin 加 `authorAge`（服務端足歲，純 API）**
+  - `toPinJson` 用 `ageOf(authorDob, nowMs)` 補 `authorAge: number | null`（缺生日／非法即 null，客戶端藏年齡）；客戶端不必拿生日自算，供帖子詳情作者卡「性別／年齡／在線」用
+  - openapi 1.65.0：MapPin schema 補 `authorAge`；`lib/api/pins.test.ts` 補斷言
+  - 數據文檔無需更新（純 API 欄位加法，前端未有新展示）
 - **UR L.1 全站開關 `SITE_LIVE`＋coming soon 頁 [WIP，待親驗]**
   - 服務器端 flag：缺省 `true` 開站（零行為變化）；`false` 關站——訪客無論進哪個頁一律 307 到 `/coming-soon`（locale 前綴保留語言，如 `/zh-Hans/coming-soon`）；coming-soon 本體放行方便預覽；`/innerharbour` 後台永遠放行；API 不在 proxy matcher 內天然不受影響。
   - `lib/home.ts` 純函數加法：`parseSiteLive`（`0/false/off/no/closed` 大小寫不敏感即關）＋`isComingSoonPath`＋`resolveSiteGate`；`lib/home.test.ts` 新增 12 斷言（開站全 null／關站跳轉／語言保留／本體放行）。

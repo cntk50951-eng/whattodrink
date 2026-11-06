@@ -9,6 +9,7 @@ import { HK_BOUNDS } from "../geo";
 import { parseScope } from "../friends";
 import type { PinsScope } from "../friends";
 import { CHECKIN_PHOTO_THUMB_MAX_CHARS } from "./checkins";
+import { ageOf } from "./profile";
 
 export const PINS_DEFAULT_LIMIT = 100;
 export const PINS_MAX_LIMIT = 200;
@@ -45,6 +46,8 @@ export type PinJson = {
   gender: string | null;
   /** UR E.18 作者生日（面板年齡徽章；YYYY-MM-DD 形，无即 null）。 */
   authorDob: string | null;
+  /** 作者足歲（服務端按 dob 算；客戶端只該用它，不必拿生日自算；dob 缺失／非法即 null，客戶端藏年齡）。 */
+  authorAge: number | null;
   /** UR E.18 作者簽名（完全公開；无即 null）。 */
   authorBio: string | null;
   /** UR E.20 他人釘縮影（96px data: URL；形狀不對即 null，舊帖回退）。 */
@@ -205,6 +208,7 @@ export function toPinJson(raw: unknown, nowMs: number = Date.now()): PinJson | n
     avatarUrl,
     gender,
     authorDob,
+    authorAge: ageOf(authorDob, nowMs),
     authorBio,
     photoThumb,
     note,

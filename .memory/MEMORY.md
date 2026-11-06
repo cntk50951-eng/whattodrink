@@ -16,3 +16,4 @@
 - [UR A.7 prod env bug](2026-09-14-ura7-prod-env-bug.md) — 瀏覽器 client 別 require secret key（Next.js 只 inline `NEXT_PUBLIC_*`），try/catch 不要 silent
 - [首頁默認介紹頁](2026-10-23-home-intro.md) — HOME_UI 缺省改 intro；/intro 自動播放動畫、手機兼容要點、與 iOS 動畫源碼同步
 - [用戶／帖子／訊息舉報進後台隊列](2026-11-02-user-reports-queue.md) — 擴 cheers_reports（0070 待執行）、舊形狀兼容、作者服務端反查、/innerharbour/user-reports
+- [MapPin 加 authorAge](2026-11-06-mappin-author-age.md) — 共享型別加必填欄位要 grep 全 repo fixture，build 才會抓齊

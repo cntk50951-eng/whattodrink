@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.64.0
+  version: 1.65.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -6238,6 +6238,10 @@ components:
         gender:
           type: string
           nullable: true
+        authorAge:
+          type: integer
+          nullable: true
+          description: 作者足歲（服務端按生日算；缺生日／非法即 null＝客戶端藏年齡；帖子詳情作者卡顯示「性別／年齡／在線」用，不論可見度設定）
         photoThumb:
           type: string
           nullable: true
