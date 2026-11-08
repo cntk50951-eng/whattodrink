@@ -5,19 +5,25 @@
 import type { createServiceClient } from "@/lib/supabase/server";
 
 export const BAR_CREDIT = {
-  /** 每日免費聊天次數（香港 00:00 重置，不累加） */
-  dailyLimit: 15,
+  /** 每日免費聊天次數：0＝取消（改成一次性起始積分，之後靠玩骰／發照片貼文賺） */
+  dailyLimit: 0,
+  /** 每個登入帳號一次性起始積分（不過期、不重置、不佔餘額上限） */
+  starterGrant: 50,
   /** 贏一局大話骰得到的聊天次數 */
   winGrant: 3,
   /** 積分有效天數（每批從入帳那一刻起算） */
   lotDays: 7,
   /** 每日最多算贏的局數（超過仍可玩，但不再入帳） */
   winsCapPerDay: 5,
+  /** 發佈一則照片貼文得到的聊天次數 */
+  postGrant: 1,
+  /** 每日最多算幾則貼文（超過仍可發，但不再入帳） */
+  postsCapPerDay: 3,
   /** 同時持有的積分上限 */
   balanceCap: 45,
 } as const;
 
-export type BarCreditLot = { id: string; amount: number; remaining: number; expires_at: string };
+export type BarCreditLot = { id: string; amount: number; remaining: number; expires_at: string; source?: string };
 export type BarCredits = {
   daily: { limit: number; used: number; remaining: number };
   lots: BarCreditLot[];
@@ -43,7 +49,7 @@ export function parseBarCredits(raw: unknown): BarCredits | null {
   for (const l of r.lots) {
     const x = l as Record<string, unknown>;
     if (typeof x.id !== "string" || !isNum(x.amount) || !isNum(x.remaining) || typeof x.expires_at !== "string") return null;
-    lots.push({ id: x.id, amount: x.amount, remaining: x.remaining, expires_at: x.expires_at });
+    lots.push({ id: x.id, amount: x.amount, remaining: x.remaining, expires_at: x.expires_at, ...(typeof x.source === "string" ? { source: x.source } : {}) });
   }
   return {
     daily: { limit: d.limit, used: d.used, remaining: d.remaining },
@@ -55,7 +61,23 @@ export function parseBarCredits(raw: unknown): BarCredits | null {
   };
 }
 
+/** 已確認發過起始積分的用戶（進程內快取，省掉每次聊天多一趟 RPC；重啟後最多多查一次，SQL 本身冪等）。 */
+const starterEnsured = new Set<string>();
+
+/** 登入帳號第一次碰額度時補發起始積分（冪等）。盡力而為：失敗只記日誌，下次再試。 */
+export async function ensureStarterCredit(svc: Svc, userId: string): Promise<void> {
+  if (starterEnsured.has(userId)) return;
+  const { error } = await svc.rpc("bar_credit_ensure_starter", { p_user: userId, p_n: BAR_CREDIT.starterGrant });
+  if (error !== null) {
+    console.error(`[bar-credits] ensure starter failed: ${error.message}`);
+    return;
+  }
+  if (starterEnsured.size > 5000) starterEnsured.clear();
+  starterEnsured.add(userId);
+}
+
 export async function getBarCredits(svc: Svc, userId: string): Promise<BarCredits | null> {
+  await ensureStarterCredit(svc, userId);
   const { data, error } = await svc.rpc("bar_credit_state", { p_user: userId, p_daily_limit: BAR_CREDIT.dailyLimit });
   if (error !== null) {
     console.error(`[bar-credits] state failed: ${error.message}`);
@@ -71,6 +93,7 @@ export type SpendOutcome =
 
 /** 聊天扣 1 次（冪等於 ref）。 */
 export async function spendChatCredit(svc: Svc, userId: string, ref: string): Promise<SpendOutcome> {
+  await ensureStarterCredit(svc, userId);
   const { data, error } = await svc.rpc("bar_credit_spend", {
     p_user: userId,
     p_n: 1,
@@ -108,4 +131,30 @@ export async function refundChatCredit(svc: Svc, userId: string, ref: string): P
 export function normalizeRequestId(raw: unknown): string {
   if (typeof raw === "string" && /^[A-Za-z0-9_-]{8,64}$/.test(raw)) return raw;
   return crypto.randomUUID();
+}
+
+export type PostRewardOutcome = { granted: number; reason: string | null; credits: BarCredits | null };
+
+/** 發佈照片貼文獎勵積分（冪等於貼文 id）。盡力而為：失敗回 null，絕不影響發帖本身。 */
+export async function grantPostCredit(svc: Svc, userId: string, postId: string): Promise<PostRewardOutcome | null> {
+  await ensureStarterCredit(svc, userId);
+  const { data, error } = await svc.rpc("bar_credit_grant_post", {
+    p_user: userId,
+    p_n: BAR_CREDIT.postGrant,
+    p_post: postId,
+    p_lot_days: BAR_CREDIT.lotDays,
+    p_posts_cap: BAR_CREDIT.postsCapPerDay,
+    p_balance_cap: BAR_CREDIT.balanceCap,
+    p_daily_limit: BAR_CREDIT.dailyLimit,
+  });
+  if (error !== null || typeof data !== "object" || data === null) {
+    console.error(`[bar-credits] post grant failed: ${error?.message ?? "bad payload"}`);
+    return null;
+  }
+  const d = data as { granted?: unknown; reason?: unknown; credits?: unknown };
+  return {
+    granted: typeof d.granted === "number" ? d.granted : 0,
+    reason: d.reason === "ok" || typeof d.reason !== "string" ? null : d.reason,
+    credits: parseBarCredits(d.credits),
+  };
 }

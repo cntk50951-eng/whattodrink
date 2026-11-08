@@ -12,7 +12,7 @@ import { MinimaxError, minimaxChat } from "@/lib/minimax";
 import { ipRateLimit } from "@/lib/rateLimit";
 
 /**
- * 酒保对话（🔒 需登入）：每則 message 扣 1 次聊天額度（今日免費＋大話骰積分，見 lib/barCredits.ts），
+ * 酒保对话（🔒 需登入）：每則 message 扣 1 次聊天額度（一次性起始積分＋大話骰／發照片貼文賺的積分，見 lib/barCredits.ts），
  * 額度不夠回 402 credits_exhausted；Ivy 回覆失敗自動退還。event（greet／pat／cheers）不扣次。
  * 原 POC：公开零写库；現在要登入才能用（AI 按 token 計費，額度必須服務端算）。
  * 台词全部来自 MiniMax（M3＋Ivy 人设）；失败回 502，前端显示系统提示。

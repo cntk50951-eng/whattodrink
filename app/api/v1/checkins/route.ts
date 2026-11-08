@@ -1,10 +1,11 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseCreateCheckinBody } from "@/lib/api/checkins";
 import { recordUserHashtags } from "@/lib/hashtagLibrary";
 import { checkinVisibilityFor } from "@/lib/api/privacy";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { isDeletionPending } from "@/lib/accountDeletion";
+import { grantPostCredit, type PostRewardOutcome } from "@/lib/barCredits";
 
 /**
  * UR A.12 打卡雙類型（🔒，承 A.10）。
@@ -310,8 +311,20 @@ export async function POST(req: Request): Promise<Response> {
     const row = inserted as Record<string, unknown>;
     // 記進我的標籤庫（下次聯想／複用）；失敗不影響打卡
     if (hashtags.length > 0) void recordUserHashtags(supabase, userId, hashtags);
+    // 照片貼文（kind=post、有照片、非私密）送 Ivy 聊天積分；酒局類不走這裡。盡力而為，失敗不影響發帖
+    let barReward: PostRewardOutcome | null = null;
+    if (row.kind === "post" && photoUrl !== null && row.visibility !== "private" && typeof row.id === "string") {
+      try {
+        barReward = await grantPostCredit(await createServiceClient(), userId, row.id);
+      } catch (e) {
+        console.error(`[api/v1/checkins] post reward error: ${e instanceof Error ? e.message : "unknown"}`);
+      }
+    }
     return apiOk(
       {
+        ...(barReward !== null
+          ? { bar_reward: { granted: barReward.granted, reason: barReward.reason, credits: barReward.credits } }
+          : {}),
         checkin: {
           id: row.id as string,
           beer_id: (row.beer_id as string | null) ?? null,

@@ -929,6 +929,20 @@ paths:
                 properties:
                   checkin:
                     $ref: "#/components/schemas/Checkin"
+                  bar_reward:
+                    type: object
+                    description: 發佈照片貼文（kind=post、有照片、非私密）獎勵 Ivy 聊天積分的結果；其他情況不帶此欄。每則 +1、每日最多 3 則、沿用 7 天過期
+                    required: [granted, reason, credits]
+                    properties:
+                      granted: { type: integer, description: 本次入帳次數（0＝沒入帳） }
+                      reason:
+                        type: string
+                        nullable: true
+                        description: 沒入帳的原因：daily_cap／balance_cap／duplicate；入帳成功為 null
+                      credits:
+                        nullable: true
+                        allOf:
+                          - $ref: "#/components/schemas/BarCredits"
         "403":
           description: 內容未通過審核（E.2 rejected，發送工作流 fail-closed；隐身可打卡，visibility 定格 private）
           content:
@@ -5669,6 +5683,7 @@ components:
       properties:
         daily:
           type: object
+          description: 每日免費額度；limit=0 表示已取消（改成一次性起始積分），客戶端應隱藏這一塊
           required: [limit, used, remaining]
           properties:
             limit: { type: integer }
@@ -5684,7 +5699,8 @@ components:
               id: { type: string, format: uuid }
               amount: { type: integer }
               remaining: { type: integer }
-              expires_at: { type: string, format: date-time }
+              expires_at: { type: string, format: date-time, description: 起始積分固定 2099-12-31（等同不過期） }
+              source: { type: string, enum: [dice_win, post, starter], description: 來源；starter＝帳號一次性起始積分（不過期、不佔餘額上限）。老服務端沒有此欄 }
         earned_total: { type: integer, description: 所有未過期批次剩餘次數合計 }
         total: { type: integer, description: 現在還可以聊幾次（今日免費剩餘＋積分）}
         wins_today: { type: integer, description: 今天已計入積分的勝局數（每日上限 5） }

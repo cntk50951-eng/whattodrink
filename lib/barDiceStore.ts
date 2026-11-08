@@ -21,7 +21,7 @@ import {
   type DiceState,
   type DiceView,
 } from "./barDice";
-import { BAR_CREDIT, parseBarCredits, type BarCredits } from "./barCredits";
+import { BAR_CREDIT, ensureStarterCredit, parseBarCredits, type BarCredits } from "./barCredits";
 import { ivyAiPick, parseLang, sanitizeSaid } from "./barDiceAi";
 
 type Svc = Awaited<ReturnType<typeof createServiceClient>>;
@@ -62,6 +62,7 @@ function hkDayStartISO(nowMs: number): string {
 
 async function settle(svc: Svc, row: MatchRow): Promise<Settlement | null> {
   if (row.status === "active") return null;
+  await ensureStarterCredit(svc, row.user_id);
   const won = row.status === "won";
   let settlement: Settlement;
   if (won) {
