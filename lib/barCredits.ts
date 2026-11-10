@@ -15,10 +15,10 @@ export const BAR_CREDIT = {
   lotDays: 7,
   /** 每日最多算贏的局數（超過仍可玩，但不再入帳） */
   winsCapPerDay: 5,
-  /** 發佈一則照片貼文得到的聊天次數 */
-  postGrant: 1,
-  /** 每日最多算幾則貼文（超過仍可發，但不再入帳） */
-  postsCapPerDay: 3,
+  /** 發佈一則公開照片貼文得到的聊天次數（2026-11-09：1→5） */
+  postGrant: 5,
+  /** 每日最多算幾則貼文（2026-11-09：3→10；超過仍可發，但不再入帳） */
+  postsCapPerDay: 10,
   /** 同時持有的積分上限 */
   balanceCap: 45,
 } as const;

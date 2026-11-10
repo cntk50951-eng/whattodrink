@@ -39,7 +39,7 @@ describe("normalizeRequestId", () => {
 
 describe("BAR_CREDIT 常量", () => {
   it("和設計稿一致", () => {
-    expect(BAR_CREDIT).toEqual({ dailyLimit: 0, starterGrant: 50, winGrant: 3, lotDays: 7, winsCapPerDay: 5, postGrant: 1, postsCapPerDay: 3, balanceCap: 45 });
+    expect(BAR_CREDIT).toEqual({ dailyLimit: 0, starterGrant: 50, winGrant: 3, lotDays: 7, winsCapPerDay: 5, postGrant: 5, postsCapPerDay: 10, balanceCap: 45 });
   });
 });
 

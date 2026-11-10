@@ -23,6 +23,7 @@ import {
 } from "./barDice";
 import { BAR_CREDIT, ensureStarterCredit, parseBarCredits, type BarCredits } from "./barCredits";
 import { ivyAiPick, parseLang, sanitizeSaid } from "./barDiceAi";
+import { BAR_GAMES, countGamesToday, gamesCapMessage } from "./barGames";
 
 type Svc = Awaited<ReturnType<typeof createServiceClient>>;
 type MatchStatus = "active" | "won" | "lost" | "abandoned";
@@ -53,13 +54,6 @@ export type DiceOutcome =
 
 const COLS = "id,user_id,status,state,credits,created_at,updated_at,settled_at";
 
-/** 香港今天 0 點（UTC ISO；每日開局上限的下界） */
-function hkDayStartISO(nowMs: number): string {
-  const hk = new Date(nowMs + 8 * 3600_000);
-  hk.setUTCHours(0, 0, 0, 0);
-  return new Date(hk.getTime() - 8 * 3600_000).toISOString();
-}
-
 async function settle(svc: Svc, row: MatchRow): Promise<Settlement | null> {
   if (row.status === "active") return null;
   await ensureStarterCredit(svc, row.user_id);
@@ -87,23 +81,22 @@ async function settle(svc: Svc, row: MatchRow): Promise<Settlement | null> {
       credits: parseBarCredits(d.credits),
     };
   } else {
-    const { data, error } = await svc.rpc("bar_credit_spend", {
+    const { data, error } = await svc.rpc("bar_credit_game_loss", {
       p_user: row.user_id,
-      p_n: 1,
       p_kind: "dice_loss",
       p_ref: row.id,
+      p_wins_cap: BAR_CREDIT.winsCapPerDay,
       p_daily_limit: BAR_CREDIT.dailyLimit,
-      p_allow_partial: true,
     });
     if (error !== null) {
       console.error(`[bar-dice] loss spend failed: ${error.message}`);
       return null;
     }
-    const d = data as { spent?: number; credits?: unknown };
+    const d = data as { spent?: number; reason?: string; credits?: unknown };
     settlement = {
       result: row.status === "abandoned" ? "abandoned" : "lost",
       delta: -(typeof d.spent === "number" ? d.spent : 0),
-      reason: null,
+      reason: d.reason === "win_cap" ? "win_cap" : null,
       credits: parseBarCredits(d.credits),
     };
   }
@@ -147,16 +140,11 @@ export async function startMatch(svc: Svc, userId: string, dice?: unknown, zhai?
   await sweep(svc, userId);
   const existing = await activeRow(svc, userId);
   if (existing !== null) return { ok: true, view: toView(existing.id, "active", existing.state), reveals: [], settlement: null };
-  const { count } = await svc
-    .from("bar_dice_matches")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .gte("created_at", hkDayStartISO(Date.now()));
-  if ((count ?? 0) >= BAR_DICE.startsPerDay) {
-    return { ok: false, code: "rate_limited", message: `今日大話骰已玩滿 ${BAR_DICE.startsPerDay} 鋪，明天再來。` };
-  }
-  // 每日前 aiPerDay 鋪 Ivy 用 AI 叫骰（count＝今天已開的鋪數）；之後退回機率機器人＋預寫台詞
-  const state = newMatch(clampDice(dice), await nextOpener(svc, userId), cryptoRng, { zhai: zhai === true, ai: (count ?? 0) < BAR_DICE.aiPerDay });
+  // 每日上限：大話骰＋21點合計 BAR_GAMES.startsPerDay；Ivy 的 AI 額度只算大話骰自己的鋪數（不被 21點擠掉）
+  const today = await countGamesToday(svc, userId);
+  if (today.total >= BAR_GAMES.startsPerDay) return { ok: false, code: "rate_limited", message: gamesCapMessage() };
+  const count = today.dice;
+  const state = newMatch(clampDice(dice), await nextOpener(svc, userId), cryptoRng, { zhai: zhai === true, ai: count < BAR_DICE.aiPerDay });
   const { data, error } = await svc.from("bar_dice_matches").insert({ user_id: userId, status: "active", state }).select(COLS).single();
   if (error !== null || data === null) {
     // 並發開局撞到「一人一局進行中」的唯一索引：接回已存在的那局

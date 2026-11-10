@@ -594,7 +594,7 @@ paths:
   /api/v1/bar/dice/start:
     post:
       operationId: barDiceStart
-      summary: 開一鋪和 Ivy 的大話骰（🔒；已有進行中的就接回；每日最多 60 鋪）。骰子與 Ivy 的叫骰全在服務端，回包只含你自己的骰。每日前 20 鋪 Ivy 用 AI 叫骰並說話（回包 ivy_say），之後用機率機器人＋客戶端預寫台詞
+      summary: 開一鋪和 Ivy 的大話骰（🔒；已有進行中的就接回；大話骰＋21點每日合計最多 25 局）。骰子與 Ivy 的叫骰全在服務端，回包只含你自己的骰。每日前 20 鋪 Ivy 用 AI 叫骰並說話（回包 ivy_say），之後用機率機器人＋客戶端預寫台詞
       security:
         - bearerAuth: []
       requestBody:
@@ -616,7 +616,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "429":
-          description: 今日開局已滿 20 局
+          description: 今日大話骰＋21點合計已滿 25 局
   /api/v1/bar/dice/active:
     get:
       operationId: barDiceActive
@@ -640,7 +640,7 @@ paths:
   /api/v1/bar/dice/{id}/action:
     post:
       operationId: barDiceAction
-      summary: 叫骰或質疑（🔒）。服務端驗證並當場算出 Ivy 的回應；整局結束時結算積分（贏 +3 次、7 天有效；輸扣 1 次）。沒有任何「我贏了」的欄位
+      summary: 叫骰或質疑（🔒）。服務端驗證並當場算出 Ivy 的回應；整局結束時結算積分（贏 +3 次、7 天有效；輸扣 1 次，但今日贏局已達上限 5 時輸局不扣）。沒有任何「我贏了」的欄位
       security:
         - bearerAuth: []
       parameters:
@@ -685,7 +685,7 @@ paths:
   /api/v1/bar/dice/{id}/abandon:
     post:
       operationId: barDiceAbandon
-      summary: 認輸離場（🔒；算輸一局，扣 1 次，餘額 0 時不扣）
+      summary: 認輸離場（🔒；算輸一局，扣 1 次，餘額 0 或今日贏局已滿時不扣）
       security:
         - bearerAuth: []
       parameters:
@@ -700,6 +700,107 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BarDiceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 找不到進行中的這一局
+  /api/v1/bar/blackjack/start:
+    post:
+      operationId: barBlackjackStart
+      summary: 開一鋪和 Ivy 的 21點（🔒；已有進行中的就接回；大話骰＋21點每日合計最多 25 局）。洗牌發牌全在服務端：回包只含你的牌與 Ivy 的明牌，暗牌與牌堆絕不下發。我 Blackjack 時開局即結束並結算
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 對局視圖
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BarBlackjackResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          description: 今日大話骰＋21點合計已滿 25 局
+  /api/v1/bar/blackjack/active:
+    get:
+      operationId: barBlackjackActive
+      summary: 接回進行中的一局（🔒；沒有則 view 為 null）。同時處理：我的回合超過 30 分鐘沒動作＝放棄（輸）；Ivy 回合卡住超過 45 秒＝服務端用機率演算法替她打完並按真實結果結算
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 進行中的對局視圖或 null
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  view:
+                    nullable: true
+                    allOf:
+                      - $ref: "#/components/schemas/BarBlackjackView"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/bar/blackjack/{id}/action:
+    post:
+      operationId: barBlackjackAction
+      summary: 要牌／停牌／加倍（🔒），或 Ivy 回合的一步 ivy_step（一次一步，每步一次 AI：在服務端算好的候選「要牌／停牌」裡選＋說一句；AI 失敗／逾時退回機率最高的候選）。整局結束時結算積分（贏 +3 次、7 天有效；輸扣 1 次，今日贏局已達上限 5 時不扣；和 0）。沒有任何「我贏了」的欄位
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [type]
+                  properties:
+                    type: { type: string, enum: [hit, stand, double] }
+                - type: object
+                  required: [type]
+                  properties:
+                    type: { type: string, enum: [ivy_step] }
+                    said: { type: string, maxLength: 200, description: 用戶剛說的話（僅作 Ivy 這一步 AI 的參考，不是指令；服務端截 60 字） }
+                    lang: { type: string, enum: [en, yue, zh], description: Ivy 這一句話的語言，默認 en }
+      responses:
+        "200":
+          description: 新視圖＋結算（整局結束才有）＋ ivy_step 時 Ivy 這一步的決定與話
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BarBlackjackResponse"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 找不到這局
+        "409":
+          description: wrong_phase（不是你的／Ivy 的回合、或已結束）／stale_version（多台裝置同時操作）
+  /api/v1/bar/blackjack/{id}/abandon:
+    post:
+      operationId: barBlackjackAbandon
+      summary: 離場認輸（🔒；算輸一局，扣 1 次，餘額 0 或今日贏局已滿時不扣）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 結算後的視圖
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BarBlackjackResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -931,7 +1032,7 @@ paths:
                     $ref: "#/components/schemas/Checkin"
                   bar_reward:
                     type: object
-                    description: 發佈照片貼文（kind=post、有照片、非私密）獎勵 Ivy 聊天積分的結果；其他情況不帶此欄。每則 +1、每日最多 3 則、沿用 7 天過期
+                    description: 發佈照片貼文（kind=post、有照片、非私密）獎勵 Ivy 聊天積分的結果；其他情況不帶此欄。每則 +5、每日最多 10 則、沿用 7 天過期（2026-11-09：+1／3 則 → +5／10 則）
                     required: [granted, reason, credits]
                     properties:
                       granted: { type: integer, description: 本次入帳次數（0＝沒入帳） }
@@ -5664,7 +5765,7 @@ components:
       properties:
         result: { type: string, enum: [won, lost, abandoned] }
         delta: { type: integer, description: 贏＝實際入帳的次數（可能因每日 5 局／餘額 45 上限小於 3）；輸／放棄＝實際扣掉的次數（負數） }
-        reason: { type: string, nullable: true, description: 贏局沒（全）入帳的原因 daily_cap／balance_cap／balance_cap_partial／duplicate }
+        reason: { type: string, nullable: true, description: 贏局沒（全）入帳的原因 daily_cap／balance_cap／balance_cap_partial／duplicate；輸局沒扣的原因 win_cap（今日贏局已達上限，輸了不扣） }
         credits:
           nullable: true
           allOf:
@@ -5677,6 +5778,58 @@ components:
         reveals: { type: array, items: { $ref: "#/components/schemas/BarDiceReveal" } }
         settlement: { $ref: "#/components/schemas/BarDiceSettlement" }
         ivy_say: { type: string, description: Ivy 這一手的話（≤40 字；只有這鋪開了 AI 且 AI 成功才有，缺＝客戶端用預寫台詞） }
+    BarBlackjackCard:
+      type: object
+      required: [r, s]
+      properties:
+        r: { type: string, enum: [A, "2", "3", "4", "5", "6", "7", "8", "9", "10", J, Q, K] }
+        s: { type: string, enum: [S, H, D, C], description: 黑桃／紅心／方塊／梅花 }
+    BarBlackjackView:
+      type: object
+      required: [id, status, rev, phase, me, ivy, ivy_count, me_total, ivy_total, can_double, doubled, result]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [active, won, lost, push, abandoned] }
+        rev: { type: integer, description: 狀態版本；多台裝置同時操作時用於偵測過期 }
+        phase: { type: string, enum: [player, ivy, done], description: player＝我的回合；ivy＝Ivy 的回合（客戶端逐步發 ivy_step）；done＝結束 }
+        me: { type: array, items: { $ref: "#/components/schemas/BarBlackjackCard" } }
+        ivy:
+          type: array
+          description: Ivy 的牌。第一張是明牌；第二張是暗牌，只有 phase≠player 才給，之前為 null
+          items:
+            nullable: true
+            allOf:
+              - $ref: "#/components/schemas/BarBlackjackCard"
+        ivy_count: { type: integer }
+        me_total: { type: integer }
+        ivy_total: { type: integer, nullable: true, description: Ivy 的點數，暗牌翻開前為 null }
+        can_double: { type: boolean, description: 只有我的回合且剛好兩張牌才為 true }
+        doubled: { type: boolean }
+        result:
+          nullable: true
+          type: object
+          properties:
+            outcome: { type: string, enum: [win, lose, push] }
+            reason: { type: string, enum: [bust, ivy_bust, blackjack, points, abandoned] }
+    BarBlackjackSettlement:
+      type: object
+      nullable: true
+      properties:
+        result: { type: string, enum: [won, lost, push, abandoned] }
+        delta: { type: integer, description: 贏＝實際入帳的次數（可能因每日 5 局／餘額 45 上限小於 3）；輸／放棄＝實際扣掉的次數（負數）；和＝0；今日贏局已滿的輸局＝0 }
+        reason: { type: string, nullable: true, description: 贏局沒（全）入帳的原因 daily_cap／balance_cap／balance_cap_partial／duplicate；輸局沒扣的原因 win_cap }
+        credits:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/BarCredits"
+    BarBlackjackResponse:
+      type: object
+      required: [view, settlement]
+      properties:
+        view: { $ref: "#/components/schemas/BarBlackjackView" }
+        settlement: { $ref: "#/components/schemas/BarBlackjackSettlement" }
+        ivy_move: { type: string, enum: [hit, stand], description: 只有 ivy_step 才有：Ivy 這一步的決定 }
+        ivy_say: { type: string, description: Ivy 這一步的話（≤40 字；只有這一步真的問了 AI 且成功才有；≤11 點必要牌、≥21 點必停牌這類沒有選擇的步不問 AI；缺＝客戶端用預寫台詞） }
     BarCredits:
       type: object
       required: [daily, lots, earned_total, total, wins_today, next_reset_at]
@@ -5700,7 +5853,7 @@ components:
               amount: { type: integer }
               remaining: { type: integer }
               expires_at: { type: string, format: date-time, description: 起始積分固定 2099-12-31（等同不過期） }
-              source: { type: string, enum: [dice_win, post, starter], description: 來源；starter＝帳號一次性起始積分（不過期、不佔餘額上限）。老服務端沒有此欄 }
+              source: { type: string, enum: [dice_win, blackjack_win, post, starter], description: 來源；starter＝帳號一次性起始積分（不過期、不佔餘額上限）。老服務端沒有此欄 }
         earned_total: { type: integer, description: 所有未過期批次剩餘次數合計 }
         total: { type: integer, description: 現在還可以聊幾次（今日免費剩餘＋積分）}
         wins_today: { type: integer, description: 今天已計入積分的勝局數（每日上限 5） }

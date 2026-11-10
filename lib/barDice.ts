@@ -18,8 +18,7 @@ export const BAR_DICE = {
   maxDice: 6,
   /** 開叫最小數量（兩個人＝至少 2 個） */
   minOpenQty: 2,
-  /** 每日最多開幾鋪（一鋪約半分鐘；防刷） */
-  startsPerDay: 60,
+  /** 每日開局上限已改為與 21點合計，見 lib/barGames.ts（BAR_GAMES.startsPerDay） */
   /** 每日前幾鋪 Ivy 用 AI 叫骰＋說話（之後退回機率機器人＋預寫台詞；用戶 2026-11-05 定 20） */
   aiPerDay: 20,
   /** 超過多久沒動作的進行中對局，視為放棄（算輸） */
