@@ -1,0 +1,872 @@
+{
+  "share.cam.title": {
+    "zh-Hant": "分享今晚",
+    "zh-Hans": "分享今晚",
+    "en": "Share tonight"
+  },
+  "share.cam.note.post": {
+    "zh-Hant": "永久保留在你的足跡",
+    "zh-Hans": "永久保留在你的足迹",
+    "en": "Kept on your trail for good"
+  },
+  "share.mode.post": {
+    "zh-Hant": "帖子",
+    "zh-Hans": "帖子",
+    "en": "Post"
+  },
+  "share.mode.post.sub": {
+    "zh-Hant": "永久",
+    "zh-Hans": "永久",
+    "en": "Permanent"
+  },
+  "share.mode.snapshot": {
+    "zh-Hant": "快照",
+    "zh-Hans": "快照",
+    "en": "Snapshot"
+  },
+  "share.mode.snapshot.sub": {
+    "zh-Hant": "24 小時",
+    "zh-Hans": "24 小时",
+    "en": "24 hours"
+  },
+  "share.cam.placeChip": {
+    "zh-Hant": "加地點",
+    "zh-Hans": "加地点",
+    "en": "Add place"
+  },
+  "share.cam.placeOptional": {
+    "zh-Hant": "選填",
+    "zh-Hans": "选填",
+    "en": "Optional"
+  },
+  "share.flash.auto": {
+    "zh-Hant": "自動",
+    "zh-Hans": "自动",
+    "en": "Auto"
+  },
+  "share.edit.next": {
+    "zh-Hant": "下一步",
+    "zh-Hans": "下一步",
+    "en": "Next"
+  },
+  "share.edit.title.editing": {
+    "zh-Hant": "編輯中",
+    "zh-Hans": "编辑中",
+    "en": "Editing"
+  },
+  "share.edit.filter": {
+    "zh-Hant": "濾鏡",
+    "zh-Hans": "滤镜",
+    "en": "Filter"
+  },
+  "share.edit.adjust": {
+    "zh-Hant": "調整",
+    "zh-Hans": "调整",
+    "en": "Adjust"
+  },
+  "share.edit.crop": {
+    "zh-Hant": "裁切",
+    "zh-Hans": "裁切",
+    "en": "Crop"
+  },
+  "share.edit.text": {
+    "zh-Hant": "文字",
+    "zh-Hans": "文字",
+    "en": "Text"
+  },
+  "share.edit.tags": {
+    "zh-Hant": "酒類標籤",
+    "zh-Hans": "酒类标签",
+    "en": "Drink tags"
+  },
+  "share.edit.place": {
+    "zh-Hant": "地點",
+    "zh-Hans": "地点",
+    "en": "Place"
+  },
+  "share.filter.none": {
+    "zh-Hant": "原色",
+    "zh-Hans": "原色",
+    "en": "Original"
+  },
+  "share.filter.clear": {
+    "zh-Hant": "清爽",
+    "zh-Hans": "清爽",
+    "en": "Fresh"
+  },
+  "share.filter.film": {
+    "zh-Hant": "膠片",
+    "zh-Hans": "胶片",
+    "en": "Film"
+  },
+  "share.filter.mono": {
+    "zh-Hant": "單色",
+    "zh-Hans": "单色",
+    "en": "Mono"
+  },
+  "pubstep.preview": {
+    "zh-Hant": "預覽",
+    "zh-Hans": "预览",
+    "en": "Preview"
+  },
+  "pubstep.expiry.forever": {
+    "zh-Hant": "永久",
+    "zh-Hans": "永久",
+    "en": "Forever"
+  },
+  "pubstep.onmap": {
+    "zh-Hant": "地圖上",
+    "zh-Hans": "地图上",
+    "en": "On the map"
+  },
+  "pubstep.note.post": {
+    "zh-Hant": "永久保留在你的足跡",
+    "zh-Hans": "永久保留在你的足迹",
+    "en": "Kept forever on your trail"
+  },
+  "pubstep.publish.post": {
+    "zh-Hant": "發布帖子",
+    "zh-Hans": "发布帖子",
+    "en": "Publish Post"
+  },
+  "pubstep.tags": {
+    "zh-Hant": "酒類標籤",
+    "zh-Hans": "酒类标签",
+    "en": "Drink tags"
+  },
+  "pubstep.who": {
+    "zh-Hant": "誰看得到",
+    "zh-Hans": "谁能看到",
+    "en": "Who can see"
+  },
+  "pubstep.who.opt.public": {
+    "zh-Hant": "公開",
+    "zh-Hans": "公开",
+    "en": "Public"
+  },
+  "pubstep.who.opt.friends": {
+    "zh-Hant": "好友",
+    "zh-Hans": "好友",
+    "en": "Friends"
+  },
+  "pubstep.who.opt.stealth": {
+    "zh-Hant": "僅自己",
+    "zh-Hans": "仅自己",
+    "en": "Only me"
+  },
+  "pubstep.justnow": {
+    "zh-Hant": "剛剛",
+    "zh-Hans": "刚刚",
+    "en": "Just now"
+  },
+  "post.you": {
+    "zh-Hant": "你",
+    "zh-Hans": "你",
+    "en": "You"
+  },
+  "post.author": {
+    "zh-Hant": "作者",
+    "zh-Hans": "作者",
+    "en": "Author"
+  },
+  "post.like": {
+    "zh-Hant": "讚",
+    "zh-Hans": "赞",
+    "en": "Like"
+  },
+  "post.comments.title": {
+    "zh-Hant": "留言",
+    "zh-Hans": "留言",
+    "en": "Comments"
+  },
+  "post.comments.empty": {
+    "zh-Hant": "還沒有留言",
+    "zh-Hans": "还没有留言",
+    "en": "No comments yet"
+  },
+  "post.cheers.title": {
+    "zh-Hant": "碰杯",
+    "zh-Hans": "碰杯",
+    "en": "Cheers"
+  },
+  "post.navigate": {
+    "zh-Hant": "導航",
+    "zh-Hans": "导航",
+    "en": "Directions"
+  },
+  "map.home.play": {
+    "zh-Hant": "玩樂",
+    "zh-Hans": "玩乐",
+    "en": "Play"
+  },
+  "map.home.dock.party": {
+    "zh-Hant": "約局",
+    "zh-Hans": "约局",
+    "en": "Meetups"
+  },
+  "map.home.shoot": {
+    "zh-Hant": "打卡",
+    "zh-Hans": "打卡",
+    "en": "Check in"
+  },
+  "map.home.dock.nearby": {
+    "zh-Hant": "附近",
+    "zh-Hans": "附近",
+    "en": "Nearby"
+  },
+  "map.home.dock.tonight": {
+    "zh-Hant": "今晚喝什麼",
+    "zh-Hans": "今晚喝什么",
+    "en": "Tonight"
+  },
+  "bar.chat.placeholder": {
+    "zh-Hant": "和 Ivy 說話…",
+    "zh-Hans": "和 Ivy 说话…",
+    "en": "Talk to Ivy…"
+  },
+  "bar.chat.status.idle": {
+    "zh-Hant": "Ivy · 酒保",
+    "zh-Hans": "Ivy · 酒保",
+    "en": "Ivy · Bartender"
+  },
+  "bar.welcome": {
+    "zh-Hant": "歡迎光臨～今晚想飲啲咩？",
+    "zh-Hans": "欢迎光临～今晚想喝点什么？",
+    "en": "Hey, welcome in. What are we drinking tonight?"
+  },
+  "bar.dice.cta": {
+    "zh-Hant": "和 Ivy 玩大話骰　贏 3 次聊天",
+    "zh-Hans": "和 Ivy 玩大话骰　赢 3 次聊天",
+    "en": "Play Liar's Dice with Ivy · win 3 chats"
+  },
+  "bar.bj.cta": {
+    "zh-Hant": "和 Ivy 玩 21 點　贏 3 次聊天",
+    "zh-Hans": "和 Ivy 玩 21 点　赢 3 次聊天",
+    "en": "Play Blackjack with Ivy · win 3 chats"
+  },
+  "bar.dice.title": {
+    "zh-Hant": "大話骰",
+    "zh-Hans": "大话骰",
+    "en": "Liar's Dice"
+  },
+  "bar.dice.perPlayer": {
+    "zh-Hant": "每人 %1$lld 粒骰",
+    "zh-Hans": "每人 %1$lld 粒骰",
+    "en": "%1$lld dice each"
+  },
+  "bar.dice.noBid": {
+    "zh-Hant": "由你開叫",
+    "zh-Hans": "由你开叫",
+    "en": "Open the bidding"
+  },
+  "bar.dice.yourTurn": {
+    "zh-Hant": "輪到你",
+    "zh-Hans": "轮到你",
+    "en": "YOUR TURN"
+  },
+  "bar.dice.peek": {
+    "zh-Hant": "按住偷看",
+    "zh-Hans": "按住偷看",
+    "en": "Hold to peek"
+  },
+  "bar.dice.peek.only": {
+    "zh-Hant": "只有你看到",
+    "zh-Hans": "只有你看到",
+    "en": "Only you"
+  },
+  "bar.dice.voice.hold": {
+    "zh-Hant": "按住說話，叫骰",
+    "zh-Hans": "按住说话，叫骰",
+    "en": "Hold to speak your bid"
+  },
+  "bar.dice.challenge": {
+    "zh-Hant": "開盅",
+    "zh-Hans": "开盅",
+    "en": "Call it"
+  },
+  "bar.dice.bid": {
+    "zh-Hant": "叫骰",
+    "zh-Hans": "叫骰",
+    "en": "Bid"
+  },
+  "bar.dice.zhai.tag": {
+    "zh-Hant": "齋",
+    "zh-Hans": "斋",
+    "en": "Zhai"
+  },
+  "bar.dice.say.start.1": {
+    "zh-Hant": "坐低啦。每人 %lld 粒骰，唔好偷睇。",
+    "zh-Hans": "坐下吧。每人 %lld 粒骰，别偷看。",
+    "en": "Pull up a chair. %lld dice each — don't peek."
+  },
+  "map.home.meet": {
+    "zh-Hant": "遇見",
+    "zh-Hans": "遇见",
+    "en": "Meet"
+  },
+  "map.home.meet.sub": {
+    "zh-Hant": " · 用 AI 找人找酒吧",
+    "zh-Hans": " · 用 AI 找人找酒吧",
+    "en": " · Find people and bars with AI"
+  },
+  "activity.cheers.dir.sent": {
+    "zh-Hant": "送出的",
+    "zh-Hans": "送出的",
+    "en": "Sent"
+  },
+  "profilex.vis.public": {
+    "zh-Hant": "公開可見",
+    "zh-Hans": "公开可见",
+    "en": "Public"
+  },
+  "party.filter.title": {
+    "zh-Hant": "篩選",
+    "zh-Hans": "筛选",
+    "en": "Filters"
+  },
+  "profile.tab.trail": {
+    "zh-Hant": "足跡",
+    "zh-Hans": "足迹",
+    "en": "Trail"
+  },
+  "meet.block.people": {
+    "zh-Hant": "用戶",
+    "zh-Hans": "用户",
+    "en": "Users"
+  },
+  "activity.view.byPerson": {
+    "zh-Hant": "按人",
+    "zh-Hans": "按人",
+    "en": "By person"
+  },
+  "activity.action.chat": {
+    "zh-Hant": "聊天",
+    "zh-Hans": "聊天",
+    "en": "Chat"
+  },
+  "profile.taste.headlineOther": {
+    "zh-Hant": "%1$@派",
+    "zh-Hans": "%1$@派",
+    "en": "Into %1$@"
+  },
+  "party.cond.seat": {
+    "zh-Hant": "還有位",
+    "zh-Hans": "还有位",
+    "en": "Seats open"
+  },
+  "meet.result.why": {
+    "zh-Hant": "為何適合你",
+    "zh-Hans": "为何适合你",
+    "en": "Why it fits"
+  },
+  "meet.quota.left": {
+    "zh-Hant": "今日還剩 %1$lld 次",
+    "zh-Hans": "今日还剩 %1$lld 次",
+    "en": "%1$lld searches left today"
+  },
+  "activity.cheers.detail.on": {
+    "zh-Hant": "在你的打卡 %1$@",
+    "zh-Hans": "在你的打卡 %1$@",
+    "en": "On your check-in %1$@"
+  },
+  "party.map.aa": {
+    "zh-Hant": "AA 制",
+    "zh-Hans": "AA 制",
+    "en": "Split bill"
+  },
+  "累計微醺夜數": {
+    "zh-Hant": "累計微醺夜數",
+    "zh-Hans": "累计微醺夜数",
+    "en": "Total tipsy nights"
+  },
+  "party.board.searchPrompt": {
+    "zh-Hant": "搜尋酒吧、地區、發起人",
+    "zh-Hans": "搜索酒吧、地区、发起人",
+    "en": "Search bars, areas, hosts"
+  },
+  "party.detail.host": {
+    "zh-Hant": "發起人",
+    "zh-Hans": "发起人",
+    "en": "Host"
+  },
+  "profile.taste.card": {
+    "zh-Hant": "我的口味卡",
+    "zh-Hans": "我的口味卡",
+    "en": "My taste card"
+  },
+  "meet.understood": {
+    "zh-Hant": "我理解成",
+    "zh-Hans": "我理解成",
+    "en": "I understood"
+  },
+  "partyx.tab.explore": {
+    "zh-Hant": "探索",
+    "zh-Hans": "探索",
+    "en": "Explore"
+  },
+  "party.hub.group.tonight": {
+    "zh-Hant": "今晚",
+    "zh-Hans": "今晚",
+    "en": "Tonight"
+  },
+  "partyx.tab.mine": {
+    "zh-Hant": "我的約局",
+    "zh-Hans": "我的约局",
+    "en": "My meetups"
+  },
+  "party.detail.cheersTime": {
+    "zh-Hant": "碰杯時間",
+    "zh-Hans": "碰杯时间",
+    "en": "Cheers time"
+  },
+  "activity.cheers.state.mutual": {
+    "zh-Hant": "✓ 互相碰杯",
+    "zh-Hans": "✓ 互相碰杯",
+    "en": "✓ Cheers both ways"
+  },
+  "profile.tab.checkins": {
+    "zh-Hant": "打卡",
+    "zh-Hans": "打卡",
+    "en": "Check-ins"
+  },
+  "reveal.drink.cocktail.tag": {
+    "zh-Hant": "今晚想玩啲特別嘅",
+    "zh-Hans": "今晚想玩点特别的",
+    "en": "Something a little different tonight."
+  },
+  "party.board.title": {
+    "zh-Hant": "約局",
+    "zh-Hans": "约局",
+    "en": "Meetups"
+  },
+  "reveal.nearby": {
+    "zh-Hant": "附近酒吧及便利店",
+    "zh-Hans": "附近酒吧及便利店",
+    "en": "Nearby bars and shops"
+  },
+  "profile.tab.saves": {
+    "zh-Hant": "收藏",
+    "zh-Hans": "收藏",
+    "en": "Saved"
+  },
+  "profile.taste.my": {
+    "zh-Hant": "我的口味",
+    "zh-Hans": "我的口味",
+    "en": "My taste"
+  },
+  "profile.edit.title": {
+    "zh-Hant": "編輯資料",
+    "zh-Hans": "编辑资料",
+    "en": "Edit profile"
+  },
+  "party.board.map": {
+    "zh-Hant": "地圖",
+    "zh-Hans": "地图",
+    "en": "Map"
+  },
+  "meet.score": {
+    "zh-Hant": "%1$lld%% 匹配",
+    "zh-Hans": "%1$lld%% 匹配",
+    "en": "%1$lld%% match"
+  },
+  "最近 12 週 · 每週微醺夜": {
+    "zh-Hant": "最近 12 週 · 每週微醺夜",
+    "zh-Hans": "最近 12 周 · 每周微醺夜",
+    "en": "Last 12 weeks · tipsy nights per week"
+  },
+  "party.board.today": {
+    "zh-Hant": "今日",
+    "zh-Hans": "今天",
+    "en": "Today"
+  },
+  "bar.menu.whisky": {
+    "zh-Hant": "威士忌",
+    "zh-Hans": "威士忌",
+    "en": "Whisky"
+  },
+  "activity.view.newest": {
+    "zh-Hant": "最新在前",
+    "zh-Hans": "最新在前",
+    "en": "Newest first"
+  },
+  "meet.card.add": {
+    "zh-Hant": "加好友",
+    "zh-Hans": "加好友",
+    "en": "Add friend"
+  },
+  "meet.card.chat": {
+    "zh-Hant": "聊天",
+    "zh-Hans": "聊天",
+    "en": "Chat"
+  },
+  "party.filter.bill": {
+    "zh-Hant": "買單",
+    "zh-Hans": "买单",
+    "en": "Bill"
+  },
+  "party.board.start": {
+    "zh-Hant": "發起約局",
+    "zh-Hans": "发起约局",
+    "en": "Start meetup"
+  },
+  "足跡地圖": {
+    "zh-Hant": "足跡地圖",
+    "zh-Hans": "足迹地图",
+    "en": "Trail map"
+  },
+  "activity.cheers.dir.received": {
+    "zh-Hant": "收到的",
+    "zh-Hans": "收到的",
+    "en": "Received"
+  },
+  "我的微醺足跡": {
+    "zh-Hant": "我的微醺足跡",
+    "zh-Hans": "我的微醺足迹",
+    "en": "My tipsy trail"
+  },
+  "party.seatsLeft": {
+    "zh-Hant": "尚餘 %1$lld 席",
+    "zh-Hans": "尚余 %1$lld 席",
+    "en": "%1$lld seats left"
+  },
+  "party.detail.joinBtn": {
+    "zh-Hant": "參加酒局",
+    "zh-Hans": "参加酒局",
+    "en": "Join meetup"
+  },
+  "party.board.tonightSummary": {
+    "zh-Hant": "今晚有 **%1$lld** 個公開酒局，只約認證酒吧",
+    "zh-Hans": "今晚有 **%1$lld** 个公开酒局，只约认证酒吧",
+    "en": "**%1$lld** open meetups tonight, verified bars only"
+  },
+  "回放": {
+    "zh-Hant": "回放",
+    "zh-Hans": "回放",
+    "en": "Replay"
+  },
+  "activity.view.byTime": {
+    "zh-Hant": "時間線",
+    "zh-Hans": "时间线",
+    "en": "Timeline"
+  },
+  "activity.view.cheersSub": {
+    "zh-Hant": "收到與送出的碰杯",
+    "zh-Hans": "收到与送出的碰杯",
+    "en": "Cheers you received and sent"
+  },
+  "profile.stat.friends": {
+    "zh-Hant": "好友",
+    "zh-Hans": "好友",
+    "en": "Friends"
+  },
+  "reveal.drink.cocktail.name": {
+    "zh-Hant": "雞尾酒",
+    "zh-Hans": "鸡尾酒",
+    "en": "Cocktail"
+  },
+  "party.hub.seg.all": {
+    "zh-Hant": "全部",
+    "zh-Hans": "全部",
+    "en": "All"
+  },
+  "party.hint.gathering": {
+    "zh-Hant": "組局中",
+    "zh-Hans": "组局中",
+    "en": "Gathering"
+  },
+  "activity.kind.cheers": {
+    "zh-Hant": "碰杯",
+    "zh-Hans": "碰杯",
+    "en": "Cheers"
+  },
+  "activity.cheers.line.received": {
+    "zh-Hant": "碰了你一杯 🍻",
+    "zh-Hans": "碰了你一杯 🍻",
+    "en": "Cheered you 🍻"
+  },
+  "reveal.again": {
+    "zh-Hant": "再抽一次",
+    "zh-Hans": "再抽一次",
+    "en": "Draw again"
+  },
+  "activity.action.cheersBack": {
+    "zh-Hant": "回敬",
+    "zh-Hans": "回敬",
+    "en": "Cheers back"
+  },
+  "profile.tab.overview": {
+    "zh-Hant": "總覽",
+    "zh-Hans": "总览",
+    "en": "Overview"
+  },
+  "meet.composer.again": {
+    "zh-Hant": "再搜一次，例如「只看好友」",
+    "zh-Hans": "再搜一次，例如「只看好友」",
+    "en": "Search again, e.g. “friends only”"
+  },
+  "全部": {
+    "zh-Hant": "全部",
+    "zh-Hans": "全部",
+    "en": "All"
+  },
+  "晚": {
+    "zh-Hant": "晚",
+    "zh-Hans": "晚",
+    "en": "night"
+  },
+  "連續週數": {
+    "zh-Hant": "連續週數",
+    "zh-Hans": "连续周数",
+    "en": "Streak (weeks)"
+  },
+  "activity.view.badge.new": {
+    "zh-Hant": "新",
+    "zh-Hans": "新",
+    "en": "New"
+  },
+  "party.detail.quitAnytime": {
+    "zh-Hant": "開局前可隨時退出",
+    "zh-Hans": "开局前可随时退出",
+    "en": "Leave any time before it starts"
+  },
+  "reveal.invite": {
+    "zh-Hant": "約人同飲",
+    "zh-Hans": "约人同饮",
+    "en": "Invite friends"
+  },
+  "party.detail.seats": {
+    "zh-Hant": "席位",
+    "zh-Hans": "席位",
+    "en": "Seats"
+  },
+  "profile.trail.setting.off": {
+    "zh-Hant": "目前只有你自己能看",
+    "zh-Hans": "目前只有你自己能看",
+    "en": "Only you can see it for now"
+  },
+  "profile.view.mine": {
+    "zh-Hant": "我的",
+    "zh-Hans": "我的",
+    "en": "Me"
+  },
+  "cocktail.tools.shake": {
+    "zh-Hant": "搖酒壺、量杯、隔冰器",
+    "zh-Hans": "摇酒壶、量杯、滤冰器",
+    "en": "Shaker, jigger, strainer"
+  },
+  "cocktail.strength.1": {
+    "zh-Hant": "酒感輕",
+    "zh-Hans": "酒感轻",
+    "en": "Light"
+  },
+  "cocktail.hub.search": {
+    "zh-Hant": "搜尋酒名或材料",
+    "zh-Hans": "搜索酒名或材料",
+    "en": "Search drinks or ingredients"
+  },
+  "cocktail.method.shake": {
+    "zh-Hant": "搖",
+    "zh-Hans": "摇和",
+    "en": "Shaken"
+  },
+  "cocktail.steps.ivyTip": {
+    "zh-Hant": "Ivy 提提你",
+    "zh-Hans": "Ivy 小提示",
+    "en": "Ivy's tip"
+  },
+  "cocktail.chip.mins": {
+    "zh-Hant": "%lld 分鐘",
+    "zh-Hans": "%lld 分钟",
+    "en": "%lld min"
+  },
+  "cocktail.hub.count": {
+    "zh-Hant": "%lld 款",
+    "zh-Hans": "%lld 款",
+    "en": "%lld drinks"
+  },
+  "cocktail.hub.shakeHint": {
+    "zh-Hant": "搖一搖換一張",
+    "zh-Hans": "摇一摇换一张",
+    "en": "Shake to draw"
+  },
+  "cocktail.recipe.owned": {
+    "zh-Hant": "已有",
+    "zh-Hans": "已有",
+    "en": "Got it"
+  },
+  "profilex.priv.trail": {
+    "zh-Hant": "足跡回放",
+    "zh-Hans": "足迹回放",
+    "en": "Trail replay"
+  },
+  "cocktail.done.postHint": {
+    "zh-Hant": "公開相片貼文可得 5 次 Ivy 聊天額度（每日最多 10 則）。",
+    "zh-Hans": "公开照片帖子可得 5 次 Ivy 聊天额度（每天最多 10 则）。",
+    "en": "A public photo post earns 5 Ivy chat credits (up to 10 posts a day)."
+  },
+  "cocktail.amount.top": {
+    "zh-Hant": "加滿",
+    "zh-Hans": "加满",
+    "en": "Top up"
+  },
+  "cocktail.recipe.own": {
+    "zh-Hant": "家中有",
+    "zh-Hans": "家里有",
+    "en": "Have it"
+  },
+  "cocktail.step.shake.body": {
+    "zh-Hant": "搖酒壺加滿冰粒，蓋好，大力搖大約 12 秒，搖到壺身結霜。",
+    "zh-Hans": "摇酒壶加满冰块，盖紧，用力摇大约 12 秒，摇到壶身结霜。",
+    "en": "Fill the shaker with ice, seal it and shake hard for about 12 seconds, until the outside frosts over."
+  },
+  "cocktail.safety": {
+    "zh-Hant": "未滿 18 歲不可飲酒 · 切勿酒後駕駛",
+    "zh-Hans": "未满 18 岁不得饮酒 · 切勿酒后驾驶",
+    "en": "No alcohol under 18 · Never drink and drive"
+  },
+  "cocktail.recipe.tools": {
+    "zh-Hant": "工具",
+    "zh-Hans": "工具",
+    "en": "TOOLS"
+  },
+  "cocktail.hub.title": {
+    "zh-Hant": "整一杯",
+    "zh-Hans": "调一杯",
+    "en": "Mix a Drink"
+  },
+  "cocktail.ask.open": {
+    "zh-Hant": "問 Ivy",
+    "zh-Hans": "问 Ivy",
+    "en": "Ask Ivy"
+  },
+  "cocktail.series.iba": {
+    "zh-Hant": "IBA 經典",
+    "zh-Hans": "IBA 经典",
+    "en": "IBA CLASSIC"
+  },
+  "cocktail.recipe.start": {
+    "zh-Hant": "跟住做",
+    "zh-Hans": "跟着做",
+    "en": "Start making"
+  },
+  "cocktail.base.gin": {
+    "zh-Hant": "金酒",
+    "zh-Hans": "金酒",
+    "en": "Gin"
+  },
+  "cocktail.recipe.unit": {
+    "zh-Hant": "單位",
+    "zh-Hans": "单位",
+    "en": "Units"
+  },
+  "cocktail.hub.start": {
+    "zh-Hant": "整這杯",
+    "zh-Hans": "调这杯",
+    "en": "Make this one"
+  },
+  "cocktail.chip.sec": {
+    "zh-Hant": "%lld 秒",
+    "zh-Hans": "%lld 秒",
+    "en": "%lld sec"
+  },
+  "cocktail.hub.all": {
+    "zh-Hant": "全部酒譜",
+    "zh-Hans": "全部酒谱",
+    "en": "All recipes"
+  },
+  "cocktail.recipe.servings": {
+    "zh-Hant": "份量",
+    "zh-Hans": "份量",
+    "en": "Servings"
+  },
+  "cocktail.step.shake.title": {
+    "zh-Hant": "加冰搖勻",
+    "zh-Hans": "加冰摇匀",
+    "en": "Shake with ice"
+  },
+  "cocktail.done.title": {
+    "zh-Hant": "整好了！",
+    "zh-Hans": "调好了！",
+    "en": "Cheers, it's ready!"
+  },
+  "cocktail.done.ivy": {
+    "zh-Hant": "睇落好正喎！趁靚影張相，等大家都睇下你嘅手勢。",
+    "zh-Hans": "看起来很不错！趁好看拍张照，让大家看看你的手艺。",
+    "en": "That looks great! Snap a photo and show everyone what you made."
+  },
+  "cocktail.recipe.half": {
+    "zh-Hant": "半杯",
+    "zh-Hans": "半杯",
+    "en": "½"
+  },
+  "cocktail.done.post": {
+    "zh-Hant": "影相發貼文",
+    "zh-Hans": "拍照发帖子",
+    "en": "Take a photo and post"
+  },
+  "cocktail.recipe.have": {
+    "zh-Hant": "已有 %1$lld／%2$lld",
+    "zh-Hans": "已有 %1$lld／%2$lld",
+    "en": "%1$lld of %2$lld at home"
+  },
+  "cocktail.done.another": {
+    "zh-Hant": "再整一杯",
+    "zh-Hans": "再调一杯",
+    "en": "Mix another"
+  },
+  "cocktail.hub.eyebrow": {
+    "zh-Hant": "COCKTAIL BOOK",
+    "zh-Hans": "COCKTAIL BOOK",
+    "en": "COCKTAIL BOOK"
+  },
+  "cocktail.tip.shake": {
+    "zh-Hant": "搖到手凍、壺身起霜，就差唔多。",
+    "zh-Hans": "摇到手冰、壶身起霜，就差不多了。",
+    "en": "When your hands are cold and the shaker frosts, you are there."
+  },
+  "cocktail.recipe.ingredients": {
+    "zh-Hant": "材料",
+    "zh-Hans": "材料",
+    "en": "Ingredients"
+  },
+  "cocktail.recipe.cups": {
+    "zh-Hant": "%lld 杯",
+    "zh-Hans": "%lld 杯",
+    "en": "×%lld"
+  },
+  "cocktail.ask.cost": {
+    "zh-Hant": "每問扣 1 次聊天額度",
+    "zh-Hans": "每问扣 1 次聊天额度",
+    "en": "1 chat credit per question"
+  },
+  "cocktail.steps.next": {
+    "zh-Hant": "下一步",
+    "zh-Hans": "下一步",
+    "en": "Next"
+  },
+  "cocktail.steps.progress": {
+    "zh-Hant": "第 %1$lld 步，共 %2$lld 步",
+    "zh-Hans": "第 %1$lld 步，共 %2$lld 步",
+    "en": "Step %1$lld of %2$lld"
+  },
+  "intro.trail.station": {
+    "zh-Hant": "第 %1$lld／%2$lld 站 · %3$@",
+    "zh-Hans": "第 %1$lld／%2$lld 站 · %3$@",
+    "en": "Stop %1$lld of %2$lld · %3$@"
+  },
+  "intro.trail.week": {
+    "zh-Hant": "近 7 天",
+    "zh-Hans": "近 7 天",
+    "en": "Last 7 days"
+  },
+  "intro.trail.night": {
+    "zh-Hant": "11/14 晚",
+    "zh-Hans": "11/14 晚",
+    "en": "11/14 night"
+  },
+  "intro.trail.area": {
+    "zh-Hant": "香港 · 中環",
+    "zh-Hans": "香港 · 中环",
+    "en": "Central · Hong Kong"
+  }
+}

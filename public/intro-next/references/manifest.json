@@ -1,0 +1,32 @@
+[
+  {
+    "file": "cocktail-book-report.jpg",
+    "source": "E2E測試報告-批次1-完整稿.html",
+    "case": "TC-CKT-01-01",
+    "step": 2,
+    "sha256": "773c50d6ddf3281e1e48bced16be560cbb6c620ef86fcfc838e8b98b31fbf58c",
+    "note": "Untouched report image."
+  },
+  {
+    "file": "cocktail-recipe-attempt-report.jpg",
+    "source": "E2E測試報告-批次1-完整稿.html",
+    "case": "TC-CKT-02-01",
+    "step": 3,
+    "sha256": "f1aafe3213252758ac7f0a2b3c5883a511e450afb42aeed582b090c16b37ad09",
+    "note": "Untouched report image; recipe attempt remains on the cocktail book."
+  },
+  {
+    "file": "trail-stations-report.jpg",
+    "source": "E2E測試報告-批次1-完整稿.html",
+    "case": "TC-TRAIL-04-01",
+    "step": 3,
+    "sha256": "1130973aad598870e37e3bab872018048b7761112bdceeb96ea6fc581e904f5c",
+    "note": "Untouched report image."
+  },
+  {
+    "file": "trail-replay-user.png",
+    "source": "User attachment IMG_9315.PNG",
+    "sha256": "f9bf8ed961d7c472f4d0168c690c75d54effbe82d24082ab159921a89c28609f",
+    "note": "Actual footprint replay reference; test route replaced in promotional artwork."
+  }
+]

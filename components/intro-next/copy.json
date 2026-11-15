@@ -1,0 +1,407 @@
+{
+  "zh-Hant": {
+    "tagline": "發帖分享 × AI 酒吧",
+    "title": "WhatToDrink — 發帖分享，和 Ivy 玩大話骰",
+    "description": "拍照發帖，分享你的微醺日常；走進 3D 酒吧，與 AI 酒保 Ivy 聊天、玩大話骰和 21 點。",
+    "nav": "產品介紹",
+    "compare": "查看原版",
+    "language": "切換語言",
+    "soon": "即將推出",
+    "downloadSoon": "下載即將開放",
+    "play": "播放介紹",
+    "pause": "暫停介紹",
+    "gallery": "查看整套圖片",
+    "screenshotNote": "依實際功能設計 · 示範內容",
+    "responsible": "18+ · 理性飲酒，切勿酒後駕駛",
+    "hero": {
+      "eyebrow": "WHAT TODRINK · 今晚喝什麼",
+      "title": "照片，發成帖子。",
+      "accent": "再和 Ivy 玩一局。",
+      "sub": "拍照、發帖，留下你的微醺日常。\n走進 3D 酒吧，和 AI 酒保 Ivy 聊天、玩大話骰。",
+      "post": "拍照發帖",
+      "ivy": "Ivy · AI 酒保"
+    },
+    "end": {
+      "eyebrow": "WHAT TODRINK",
+      "title": "你的微醺日常。",
+      "accent": "Ivy 隨時奉陪。",
+      "sub": "發帖分享、酒吧聊天、大話骰。打開 App，就是今晚的開始。"
+    },
+    "scenes": {
+      "capture": {
+        "eyebrow": "發布照片",
+        "title": "今晚，值得拍下來。",
+        "accent": "從一張照片開始。",
+        "sub": "拍下眼前的一杯，或從相簿選圖。\n在「分享今晚」選擇帖子，把這個片刻留下。",
+        "detail": "拍照或從相簿選圖 · 帖子永久保留",
+        "focus": "帖子 · 永久"
+      },
+      "edit": {
+        "eyebrow": "發布照片",
+        "title": "調好照片。",
+        "accent": "寫下今晚的心情。",
+        "sub": "用濾鏡、調整和裁切整理畫面。\n加上文字、酒類標籤與地點，讓照片說得更多。",
+        "detail": "濾鏡 · 調整 · 裁切 · 文字 · 酒類標籤 · 地點",
+        "focus": "照片編輯工具"
+      },
+      "publish": {
+        "eyebrow": "發布照片",
+        "title": "預覽這一刻。",
+        "accent": "準備好，就發布。",
+        "sub": "確認照片、地點和酒類標籤。\n選擇誰看得到，再按「發布帖子」。",
+        "detail": "公開 · 好友 · 僅自己",
+        "focus": "確認可見範圍，發布帖子"
+      },
+      "map": {
+        "eyebrow": "發布照片",
+        "title": "一張照片。",
+        "accent": "成為地圖上的故事。",
+        "sub": "帖子出現在地圖上，也留在你的足跡。\n打開詳情，回看照片，與酒友交流。",
+        "detail": "地圖上的帖子 · 照片詳情 · 碰杯與留言",
+        "focus": "從地圖打開帖子"
+      },
+      "ivy": {
+        "eyebrow": "主打功能 / IVY",
+        "title": "一間 3D 酒吧。",
+        "accent": "一位 AI 酒保。",
+        "sub": "走進 What to Drink Bar，和 Ivy 說話。\n聊聊今晚想喝什麼，或直接邀她玩一局。",
+        "detail": "與 Ivy 聊天 · 大話骰 · 21 點",
+        "focus": "酒吧內的真實遊戲入口"
+      },
+      "cocktail": {
+        "eyebrow": "整一杯 / 跟著調酒",
+        "title": "從一份酒譜開始。",
+        "accent": "每一步，都有提示。",
+        "sub": "選酒譜、確認材料與份量，再一步步跟著做。\n每步都有配圖和 Ivy 提示；有疑問可以問 Ivy，完成再拍照分享。",
+        "detail": "選酒譜 → 看配方 → 跟住做 → 完成分享",
+        "focus": "材料、步驟、Ivy 提示與完成入口"
+      },
+      "dice": {
+        "eyebrow": "和 IVY 玩大話骰",
+        "title": "搖骰，偷看。",
+        "accent": "輪到你叫骰。",
+        "sub": "每人 5 粒骰，按住偷看自己的骰子。\n叫骰、開盅，和 Ivy 比一比誰更會唬。",
+        "detail": "按住說話，叫骰　／　按住偷看　／　開盅",
+        "focus": "實際對局：偷看與叫骰"
+      },
+      "party": {
+        "eyebrow": "約局 / 一起出發",
+        "title": "今晚的酒局。",
+        "accent": "先看清，再參加。",
+        "sub": "按日期、空位和 AA 制篩選。\n打開詳情，確認時間、地點和發起人，再決定是否加入。",
+        "detail": "探索 → 酒局詳情 → 參加酒局",
+        "focus": "時間、席位和買單意向"
+      },
+      "trail": {
+        "eyebrow": "足跡 / 留下回憶",
+        "title": "走過的地方。",
+        "accent": "成為自己的足跡。",
+        "sub": "按日期回看照片和地點，再打開足跡地圖。\n預覽各站，跟著腳印回放；可以暫停、切換站點和調整速度。",
+        "detail": "日期篩選 → 照片記錄 → 地圖預覽 → 腳印回放",
+        "focus": "地圖站點、腳印路徑與播放控制"
+      },
+      "meet": {
+        "eyebrow": "遇見 / 用一句話搜尋",
+        "title": "說出你想找的。",
+        "accent": "讓遇見幫你找。",
+        "sub": "找用戶、酒吧、酒局或帖子。\n用文字或語音描述，查看理解的條件與搜尋結果。",
+        "detail": "描述需求 → 確認條件 → 查看結果",
+        "focus": "搜尋條件與匹配原因"
+      },
+      "tonight": {
+        "eyebrow": "今晚喝什麼 / 一點靈感",
+        "title": "還未決定？",
+        "accent": "抽一杯，找靈感。",
+        "sub": "揭曉今晚的酒類，再抽一次也可以。\n接著找附近酒吧及便利店，或約人同飲。",
+        "detail": "抽選 → 揭曉 → 附近去處／約人",
+        "focus": "抽選之後，下一步就在這裡"
+      },
+      "cheers": {
+        "eyebrow": "碰杯 / 開啟交流",
+        "title": "喜歡這個片刻。",
+        "accent": "碰一杯，打個招呼。",
+        "sub": "在帖子上向酒友碰杯。\n查看收到與送出的碰杯，回敬一杯，再聊聊。",
+        "detail": "帖子碰杯 → 收到回應 → 回敬／聊天",
+        "focus": "收到、送出和回敬各有記錄"
+      },
+      "home": {
+        "eyebrow": "主頁 / 你的今晚",
+        "title": "從地圖出發。",
+        "accent": "把今晚留在主頁。",
+        "sub": "地圖連起帖子、約局和附近。\n個人主頁整理你的打卡、足跡、收藏與口味。",
+        "detail": "主地圖 → 個人主頁 → 打卡／足跡／收藏",
+        "focus": "你的資料與口味，一處整理"
+      }
+    }
+  },
+  "zh-Hans": {
+    "tagline": "发帖分享 × AI 酒吧",
+    "title": "WhatToDrink — 发帖分享，和 Ivy 玩大话骰",
+    "description": "拍照发帖，分享你的微醺日常；走进 3D 酒吧，与 AI 酒保 Ivy 聊天、玩大话骰和 21 点。",
+    "nav": "产品介绍",
+    "compare": "查看原版",
+    "language": "切换语言",
+    "soon": "即将推出",
+    "downloadSoon": "下载即将开放",
+    "play": "播放介绍",
+    "pause": "暂停介绍",
+    "gallery": "查看整套图片",
+    "screenshotNote": "基于实际功能设计 · 示例内容",
+    "responsible": "18+ · 理性饮酒，切勿酒后驾驶",
+    "hero": {
+      "eyebrow": "WHAT TODRINK · 今晚喝什么",
+      "title": "照片，发成帖子。",
+      "accent": "再和 Ivy 玩一局。",
+      "sub": "拍照、发帖，留下你的微醺日常。\n走进 3D 酒吧，和 AI 酒保 Ivy 聊天、玩大话骰。",
+      "post": "拍照发帖",
+      "ivy": "Ivy · AI 酒保"
+    },
+    "end": {
+      "eyebrow": "WHAT TODRINK",
+      "title": "你的微醺日常。",
+      "accent": "Ivy 随时奉陪。",
+      "sub": "发帖分享、酒吧聊天、大话骰。打开 App，就是今晚的开始。"
+    },
+    "scenes": {
+      "capture": {
+        "eyebrow": "发布照片",
+        "title": "今晚，值得拍下来。",
+        "accent": "从一张照片开始。",
+        "sub": "拍下眼前的一杯，或从相册选图。\n在“分享今晚”选择帖子，把这个片刻留下。",
+        "detail": "拍照或从相册选图 · 帖子永久保留",
+        "focus": "帖子 · 永久"
+      },
+      "edit": {
+        "eyebrow": "发布照片",
+        "title": "调好照片。",
+        "accent": "写下今晚的心情。",
+        "sub": "用滤镜、调整和裁切整理画面。\n加上文字、酒类标签与地点，让照片说得更多。",
+        "detail": "滤镜 · 调整 · 裁切 · 文字 · 酒类标签 · 地点",
+        "focus": "照片编辑工具"
+      },
+      "publish": {
+        "eyebrow": "发布照片",
+        "title": "预览这一刻。",
+        "accent": "准备好，就发布。",
+        "sub": "确认照片、地点和酒类标签。\n选择谁能看到，再按“发布帖子”。",
+        "detail": "公开 · 好友 · 仅自己",
+        "focus": "确认可见范围，发布帖子"
+      },
+      "map": {
+        "eyebrow": "发布照片",
+        "title": "一张照片。",
+        "accent": "成为地图上的故事。",
+        "sub": "帖子出现在地图上，也留在你的足迹。\n打开详情，回看照片，与酒友交流。",
+        "detail": "地图上的帖子 · 照片详情 · 碰杯与留言",
+        "focus": "从地图打开帖子"
+      },
+      "ivy": {
+        "eyebrow": "主打功能 / IVY",
+        "title": "一间 3D 酒吧。",
+        "accent": "一位 AI 酒保。",
+        "sub": "走进 What to Drink Bar，和 Ivy 说话。\n聊聊今晚想喝什么，或直接邀她玩一局。",
+        "detail": "与 Ivy 聊天 · 大话骰 · 21 点",
+        "focus": "酒吧内的真实游戏入口"
+      },
+      "cocktail": {
+        "eyebrow": "整一杯 / 跟着调酒",
+        "title": "从一份酒谱开始。",
+        "accent": "每一步，都有提示。",
+        "sub": "选酒谱、确认材料与份量，再一步步跟着做。\n每步都有配图和 Ivy 提示；有疑问可以问 Ivy，完成再拍照分享。",
+        "detail": "选酒谱 → 看配方 → 跟着做 → 完成分享",
+        "focus": "材料、步骤、Ivy 提示与完成入口"
+      },
+      "dice": {
+        "eyebrow": "和 IVY 玩大话骰",
+        "title": "摇骰，偷看。",
+        "accent": "轮到你叫骰。",
+        "sub": "每人 5 粒骰，按住偷看自己的骰子。\n叫骰、开盅，和 Ivy 比一比谁更会唬。",
+        "detail": "按住说话，叫骰　／　按住偷看　／　开盅",
+        "focus": "实际对局：偷看与叫骰"
+      },
+      "party": {
+        "eyebrow": "约局 / 一起出发",
+        "title": "今晚的酒局。",
+        "accent": "先看清，再参加。",
+        "sub": "按日期、空位和 AA 制筛选。\n打开详情，确认时间、地点和发起人，再决定是否加入。",
+        "detail": "探索 → 酒局详情 → 参加酒局",
+        "focus": "时间、席位和买单意向"
+      },
+      "trail": {
+        "eyebrow": "足迹 / 留下回忆",
+        "title": "走过的地方。",
+        "accent": "成为自己的足迹。",
+        "sub": "按日期回看照片和地点，再打开足迹地图。\n预览各站，跟着脚印回放；可以暂停、切换站点和调整速度。",
+        "detail": "日期筛选 → 照片记录 → 地图预览 → 脚印回放",
+        "focus": "地图站点、脚印路径与播放控制"
+      },
+      "meet": {
+        "eyebrow": "遇见 / 用一句话搜索",
+        "title": "说出你想找的。",
+        "accent": "让遇见帮你找。",
+        "sub": "找用户、酒吧、酒局或帖子。\n用文字或语音描述，查看理解的条件与搜索结果。",
+        "detail": "描述需求 → 确认条件 → 查看结果",
+        "focus": "搜索条件与匹配原因"
+      },
+      "tonight": {
+        "eyebrow": "今晚喝什么 / 一点灵感",
+        "title": "还没决定？",
+        "accent": "抽一杯，找灵感。",
+        "sub": "揭晓今晚的酒类，再抽一次也可以。\n接着找附近酒吧及便利店，或约人同饮。",
+        "detail": "抽选 → 揭晓 → 附近去处／约人",
+        "focus": "抽选之后，下一步就在这里"
+      },
+      "cheers": {
+        "eyebrow": "碰杯 / 开启交流",
+        "title": "喜欢这个片刻。",
+        "accent": "碰一杯，打个招呼。",
+        "sub": "在帖子上向酒友碰杯。\n查看收到与送出的碰杯，回敬一杯，再聊聊。",
+        "detail": "帖子碰杯 → 收到回应 → 回敬／聊天",
+        "focus": "收到、送出和回敬各有记录"
+      },
+      "home": {
+        "eyebrow": "主页 / 你的今晚",
+        "title": "从地图出发。",
+        "accent": "把今晚留在主页。",
+        "sub": "地图连起帖子、约局和附近。\n个人主页整理你的打卡、足迹、收藏与口味。",
+        "detail": "主地图 → 个人主页 → 打卡／足迹／收藏",
+        "focus": "你的资料与口味，一处整理"
+      }
+    }
+  },
+  "en": {
+    "tagline": "Share your night × AI bar",
+    "title": "WhatToDrink — Share your night. Play Liar’s Dice with Ivy.",
+    "description": "Share your night with photo posts. Step into a 3D bar to chat and play Liar’s Dice or blackjack with Ivy, your AI bartender.",
+    "nav": "Product introduction",
+    "compare": "View original",
+    "language": "Choose language",
+    "soon": "Coming soon",
+    "downloadSoon": "Downloads coming soon",
+    "play": "Play introduction",
+    "pause": "Pause introduction",
+    "gallery": "View all artwork",
+    "screenshotNote": "App feature illustrations · Demo content",
+    "responsible": "18+ · Enjoy responsibly. Never drink and drive.",
+    "hero": {
+      "eyebrow": "WHAT TODRINK",
+      "title": "Your photo. Your post.",
+      "accent": "Play a round with Ivy.",
+      "sub": "Share your night in photo posts.\nChat and play Liar’s Dice with Ivy, your AI bartender, in a 3D bar.",
+      "post": "Photo posts",
+      "ivy": "Ivy · AI bartender"
+    },
+    "end": {
+      "eyebrow": "WHAT TODRINK",
+      "title": "A night to share.",
+      "accent": "A round with Ivy.",
+      "sub": "Photo posts. Bar conversations. Liar’s Dice. Your night starts here."
+    },
+    "scenes": {
+      "capture": {
+        "eyebrow": "PHOTO POSTS",
+        "title": "A night worth a photo.",
+        "accent": "Start with a moment.",
+        "sub": "Take a photo or choose one from your library.\nSelect Post in Share Tonight to keep the moment.",
+        "detail": "Camera or photo library · Permanent posts",
+        "focus": "Post · Permanent"
+      },
+      "edit": {
+        "eyebrow": "PHOTO POSTS",
+        "title": "Make it your photo.",
+        "accent": "Put the night in words.",
+        "sub": "Filter, adjust and crop your photo.\nAdd your words, drink tags and a place.",
+        "detail": "Filter · Adjust · Crop · Text · Drink tags · Place",
+        "focus": "The photo editing tools"
+      },
+      "publish": {
+        "eyebrow": "PHOTO POSTS",
+        "title": "One last look.",
+        "accent": "Then share your night.",
+        "sub": "Check your photo, place and drink tags.\nChoose who can see it, then tap Publish Post.",
+        "detail": "Public · Friends · Only me",
+        "focus": "Choose your audience and publish"
+      },
+      "map": {
+        "eyebrow": "PHOTO POSTS",
+        "title": "A photo becomes",
+        "accent": "a story on the map.",
+        "sub": "Your post appears on the map and stays in your trail.\nOpen it to revisit the photo and connect with others.",
+        "detail": "Posts on the map · Photo details · Cheers and comments",
+        "focus": "Open the photo post from the map"
+      },
+      "ivy": {
+        "eyebrow": "MEET IVY",
+        "title": "A 3D bar.",
+        "accent": "Your AI bartender.",
+        "sub": "Step into What to Drink Bar and talk to Ivy.\nChat about your next drink, or invite her to a game.",
+        "detail": "Chat with Ivy · Liar’s Dice · Blackjack",
+        "focus": "Actual game entries inside the bar"
+      },
+      "cocktail": {
+        "eyebrow": "MAKE A COCKTAIL / FOLLOW ALONG",
+        "title": "Start with a recipe.",
+        "accent": "A little help at every step.",
+        "sub": "Choose a recipe, check ingredients and servings, then follow along.\nEach step has an illustration and an Ivy tip. Ask Ivy, then photograph your creation.",
+        "detail": "Choose → Prepare → Follow along → Share",
+        "focus": "Ingredients, illustrated steps, Ivy tips and sharing"
+      },
+      "dice": {
+        "eyebrow": "PLAY LIAR’S DICE WITH IVY",
+        "title": "Shake. Peek.",
+        "accent": "Make your call.",
+        "sub": "Five dice each. Hold to peek at your own dice.\nMake a bid or call the bluff. Can you outplay Ivy?",
+        "detail": "Voice bidding · Hold to peek · Call the bluff",
+        "focus": "Actual gameplay: peeking and bidding"
+      },
+      "party": {
+        "eyebrow": "PARTIES / MAKE A PLAN",
+        "title": "A plan for tonight.",
+        "accent": "Know the details first.",
+        "sub": "Filter by date, open seats and split bills.\nCheck the time, place and host before joining.",
+        "detail": "Explore → Party details → Join",
+        "focus": "Time, seats and bill preference"
+      },
+      "trail": {
+        "eyebrow": "YOUR TRAIL / KEEP THE MOMENTS",
+        "title": "Places you’ve been.",
+        "accent": "Nights you can revisit.",
+        "sub": "Revisit photos and places by date, then open the trail map.\nPreview the stops and replay the footprints. Pause, skip stops or change speed.",
+        "detail": "Dates → Photos → Map preview → Footprint replay",
+        "focus": "Map stops, footprint paths and playback controls"
+      },
+      "meet": {
+        "eyebrow": "MEET / SEARCH IN YOUR WORDS",
+        "title": "Say what you’re after.",
+        "accent": "Let Meet help you find it.",
+        "sub": "Find people, bars, parties or posts.\nSpeak or type, then review the criteria and results.",
+        "detail": "Describe → Review criteria → Explore results",
+        "focus": "Your criteria and reasons to connect"
+      },
+      "tonight": {
+        "eyebrow": "WHAT TO DRINK / A LITTLE INSPIRATION",
+        "title": "Can’t decide?",
+        "accent": "Draw a drink idea.",
+        "sub": "Reveal a drink category, or draw again.\nThen find nearby bars and shops, or invite someone.",
+        "detail": "Draw → Reveal → Find a place or invite",
+        "focus": "A drink idea with somewhere to go"
+      },
+      "cheers": {
+        "eyebrow": "CHEERS / START A CONVERSATION",
+        "title": "Like the moment?",
+        "accent": "Send a little cheers.",
+        "sub": "Toast someone’s post.\nSee received and sent cheers, toast back and chat.",
+        "detail": "Toast a post → Receive → Toast back or chat",
+        "focus": "A record of every toast and reply"
+      },
+      "home": {
+        "eyebrow": "HOME / YOUR NIGHT TOGETHER",
+        "title": "Start on the map.",
+        "accent": "Keep it on your profile.",
+        "sub": "The map connects posts, parties and nearby places.\nYour profile brings check-ins, trails, saves and taste together.",
+        "detail": "Home map → Your profile → Your memories",
+        "focus": "Your profile, memories and taste in one place"
+      }
+    }
+  }
+}

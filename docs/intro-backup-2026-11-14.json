@@ -1,0 +1,111 @@
+{
+  "date": "2026-11-14",
+  "gitTag": "backup/intro-2026-11-14",
+  "sourceCommit": "c89f7fb5cb623b674b542793e8f2c85fa6ff66b0",
+  "originalPage": {
+    "path": "app/[locale]/intro/page.tsx",
+    "sha256": "641a75f218e6c159e027042d90e8e549c49e1286415faa275e64fa8c94ecca2a"
+  },
+  "backupPage": {
+    "path": "app/[locale]/intro-backup/page.tsx",
+    "sha256": "828f2d5375d526b3024094f4132e727e79e3c9a0a4721911228dc6de08f97399"
+  },
+  "files": [
+    {
+      "path": "components/intro/IntroClient.tsx",
+      "sha256": "d9cf3149cbf1606c35c2e6c1ea556155e5bf9061073e0c56dd90dad8612fa478"
+    },
+    {
+      "path": "components/intro/IntroPlayer.tsx",
+      "sha256": "eeb1f996eb79d443c2daef7dc5a4f0a028c305e305d28d4f3f1a98c29bd5fde2"
+    },
+    {
+      "path": "components/intro/intro.module.css",
+      "sha256": "aca0f0da75a487b2e28385abbc904b8aa6df44ef55fac0ccc581da1d33168230"
+    },
+    {
+      "path": "components/intro/kit.tsx",
+      "sha256": "4b14ac6ee0c47628eceeb02129ccb15600326f062861d3314faec9e35844769e"
+    },
+    {
+      "path": "components/intro/story.tsx",
+      "sha256": "f00fcc27447b0e4ddd4a3f3bba0c1a36158d92e93afc53743e1039533db75599"
+    },
+    {
+      "path": "public/intro/shots/01-map-home.jpg",
+      "sha256": "556d88355f9beaca439c1d9bcd525bb44f5f68a84453c560ed2ffe34b1983102"
+    },
+    {
+      "path": "public/intro/shots/04-ai-thinking.jpg",
+      "sha256": "3cf38bc8a58b199156e94aa818a8ff17ff63eda9371ada0af510d59329644f7e"
+    },
+    {
+      "path": "public/intro/shots/05-ai-results.jpg",
+      "sha256": "572e4dbc9ce4082a54196b48c21a76cfd53658409ab7980b193f4afadf00c77c"
+    },
+    {
+      "path": "public/intro/shots/07-chat.jpg",
+      "sha256": "91acd87e716cd212b53c7953aecc050b1fe353f73319b37804ff4e51f2e2d4d8"
+    },
+    {
+      "path": "public/intro/shots/08-match-profile.jpg",
+      "sha256": "9be56e5b0df2b14ffd54382720eb312221add9c79fdcea59ac5248c70baa1bdb"
+    },
+    {
+      "path": "public/intro/shots/09-taste-card.jpg",
+      "sha256": "1709154932bf5221d1637680edac53ae104be2b509c866880dc4c0fb253ce8db"
+    },
+    {
+      "path": "public/intro/shots/10-taste-radar.jpg",
+      "sha256": "51dd55d59001a658d64d759bcf6203a59266fb1b214d726c3ec07fe2ed0b06fa"
+    },
+    {
+      "path": "public/intro/shots/11-cheers-smoke.jpg",
+      "sha256": "716d01bfa6c986c70a7313eb0ac4cd08382e52293426f64adb379ec9a1bbdf9e"
+    },
+    {
+      "path": "public/intro/shots/12-cheers-bottle.jpg",
+      "sha256": "c371da2281e9a2fed4eb353c6c2f3cecaec0082c41b687180b7af095bb18433e"
+    },
+    {
+      "path": "public/intro/shots/13-nearby-bars.jpg",
+      "sha256": "3c179211f127cee35b42543ed15e36b712735b418a6fdb1c526ab5584bd5bdd3"
+    },
+    {
+      "path": "public/intro/shots/14-walk-route.jpg",
+      "sha256": "568dc2351592d8ad2df8115ab736b57066d130186a437557fc57de7d9722353c"
+    },
+    {
+      "path": "public/intro/shots/15-ivy-bartender.jpg",
+      "sha256": "75b66ca6c585a0436e942638d6e3371aaa7fe6205bb0cd94b9e6591ca0a01439"
+    },
+    {
+      "path": "public/intro/shots/16-my-profile.jpg",
+      "sha256": "5656589104a20947ed0b8adfff8ce20330686a2c3ecf8b34fee1847c5f888bb7"
+    },
+    {
+      "path": "public/intro/shots/17-games-hub.jpg",
+      "sha256": "5b0ceb8a800bd9088b4c163b28bbc9c564028948a2c083d11ce314f2587955f1"
+    },
+    {
+      "path": "public/intro/shots/18-bump-to-join.jpg",
+      "sha256": "135448bde947ef0cfe6a735d33cf370229cc6a48bd58f6d60a87998905820381"
+    },
+    {
+      "path": "public/intro/shots/19-checkin-camera.jpg",
+      "sha256": "5a4050bdadfe131842b4b31a8e76445959b69e162e926944df2d404e193dadc8"
+    },
+    {
+      "path": "public/intro/shots/21-checkin-editor.jpg",
+      "sha256": "8bcb0ae693b7efdd560a6076163d90c327cc161813a3fdc5ae9e1bbb303d5628"
+    },
+    {
+      "path": "public/intro/shots/23-checkin-preview.jpg",
+      "sha256": "6c2f3a3b137f511f570586adb57ab9b4c916145f7b589f5f3636a4401e913db5"
+    },
+    {
+      "path": "public/intro/shots/24-checkin-published-map.jpg",
+      "sha256": "ffe84ca9aa9d6749654b6c4f630e7a76baeb332ed3958b552c20a2a8e6b07dee"
+    }
+  ]
+}

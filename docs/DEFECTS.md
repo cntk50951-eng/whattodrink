@@ -22,6 +22,8 @@
 ---
 
 | ID | 标题 | 状态 | 严重度 | 发现日期 / 报告人 | 关联 UR | 确诊根因 |
+| DEF-20261114-001 | `/intro-next` 從簡中／英文切不回繁體 | Verified | P1 | 2026-11-14 / @user | UR M.2 | 繁體入口未帶 locale，next-intl 沿用 NEXT_LOCALE cookie；12 路 HTTP＋瀏覽器點擊通過，待用戶確認 |
+| DEF-20261114-002 | `/intro-next` 首次載入無法開啟播放 | Verified | P1 | 2026-11-14 / @user | UR M.3／M.4 | 有界預載、掛載後初始化；8 項慢載單測及三語實際播放回歸，隨 M.4 發布 |
 | DEF-20261014-001 | 投诉详情时间线／AI 建议裸 JSON＋不见双方身份 | Fixing | P1 | 2026-10-14 / @yuki | UR E.31 | 时间线／AI 两段 `JSON.stringify` 直出（review/[id]/page:175／181），见详情 |
 | DEF-20261014-002 | 投诉详情点执行跳 404，判定无效 | Fixing | P0 | 2026-10-14 / @yuki | UR E.31 | 守门失败裸 notFound（opsPage:26），见详情 |
 | DEF-20261010-001 | 好友发消息被当陌生人（3 条＋禁图音） | Fixing | P0 | 2026-10-10 / @iOS | UR D.10 | 成员表 RLS 只读己行，peerIds 恒空→isFriend 恒 false，见详情 |
@@ -930,3 +932,21 @@
 - **修复**：`decide` 所有失败改走 `redirect(.../review/:id?err=<码>)` 并在页顶显中文横幅（会话过期／无权限／状态已变／涉己回避／需第二人／操作频繁／执行失败等）；`notFound()` 仅保留给案件行真不存在；成功仍回队列。任何分支不再裸 404
 - **修复验证**：`npm run build` 过＋用户浏览器亲验（正常执行成功；另请用户确认之前是否会话过期／停留过久）
 - **回归范围**：判定成功路径（decideComplaint 不动）；MFA／step-up 跳转不动
+
+### DEF-20261114-001 — 介紹頁切不回繁體
+- 狀態流轉：Open → Investigating → Fixing → Fixed → Verified；待用戶親驗後 Closed。
+- 嚴重度：P1；發現日期／報告人：2026-11-14／@user。關聯 UR M.2。
+- 復現：先選英文或簡中，再點「繁」；預期內容與圖片切繁體，實際 `/intro-next` 被舊 NEXT_LOCALE cookie 307 回英文／簡中。
+- 根因：`introHref(zh-Hant)` 輸出裸路徑適合普通導航，卻不能作覆蓋既有 cookie 的語言選擇入口。HTTP 已重現 Cookie=en＋裸路徑→/en/intro-next。
+- 修復：獨立 `introLanguageHref` 三語一律明確前綴，語言切換用原生 a 避免預取與舊客戶端路由快取；既有 next-intl 收到 zh-Hant 後 Set-Cookie，再正規化回裸路徑。故事與預覽同步；proxy／routing 全無修改。
+- 驗證：舊 en／zh-Hans × 新三語 × 故事／預覽共 12 路，cookie、翻譯、16 圖完整均通過；實際瀏覽器由英文點繁體正確到繁中。單元測試覆蓋兩頁三語入口。
+
+### DEF-20261114-002 — 介紹頁首次載入無法播放
+- 狀態流轉：Open → Investigating → Fixing → Fixed → Verified（修復隨 UR M.4 用戶授權提交 main；8 項慢載及三語播放回歸通過，待用戶確認後 Closed）。
+- 嚴重度：P1；發現日期／報告人：2026-11-14／@user。關聯 UR M.3。
+- 復現：首次直接開啟 `/intro-next`，等待頁面載入並嘗試播放。
+- 期望 vs 實際：預期介紹自動開始且播放按鈕可用；實際首次載入無法開啟播放。
+- 確診根因：所有 22 張圖片 decode 的 Promise.all 沒有等待上限，loadedLocale 未完成時 Player 不掛載、按鈕 disabled。冷啟動的大量圖片請求可令入口長時間不可用；原 effect 只依 ready，不依 Player ref 的實際掛載狀態。暖快取重新載入可以自動播放，無應用錯誤，因此需覆蓋慢載／掛載時序而非只驗暖快取。
+- 修復：開場三張高優先，最多等 1.8 秒即放行；其餘兩張併發背景預載，單張 8 秒逾時不阻塞後續。Player callback ref 同步至 state，掛載後綁事件及啟動；手動 toggle 傳點擊事件；離頁／換語言清理，遲到圖片不重啟。
+- 修復驗證：8 項測試模擬全部圖片懸置、失敗、遲到、背景逾時、取消與響應式來源；瀏覽器繁中／簡中／英文自動播放及暫停／恢復成功；`?t=8` 保持凍結且可主動播放，控制台無應用錯誤。減少動態的停結尾分支沿用，未修改系統偏好。build 132 頁；117 檔／1,234 tests；lint 零錯／12 個既有 warnings。
+- 回歸範圍：僅新版介紹頁播放器；原 `/intro`、v1／v2、圖片素材與全站路由不變。

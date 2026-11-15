@@ -1,35 +1,34 @@
 import type { Metadata, Viewport } from "next";
+import { notFound } from "next/navigation";
+import type { ReactElement } from "react";
 
-import { IntroClient } from "@/components/intro/IntroClient";
+import { INTRO_COPY } from "@/components/intro-next/copy";
+import { IntroClient } from "@/components/intro-next/IntroClient";
+import { routing, type AppLocale } from "@/i18n/routing";
 
-/**
- * 首頁介紹頁（裸 `/` 的默認落點，見 lib/home.ts）。
- * 全屏自動播放、循環的產品故事線（Remotion Player＋真機截圖）；右上常駐 App Store／Google Play。
- * 內容為英文（對齊 iOS 目錄 en 措辭）；三語待 messages 接入。
- */
-export const metadata: Metadata = {
-  title: "WhatToDrink — What to drink tonight?",
-  description:
-    "Discover bars, follow friends’ trails and meet over a drink. Get the WhatToDrink app on iOS and Android.",
-};
+type Props = { params: Promise<{ locale: string }> };
 
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  viewportFit: "cover",
-  themeColor: "#FBF8F1",
-};
+function getLocale(raw: string): AppLocale {
+  if (!routing.locales.includes(raw as AppLocale)) notFound();
+  return raw as AppLocale;
+}
 
-export default function IntroPage() {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const copy = INTRO_COPY[getLocale((await params).locale)];
+  return { title: copy.title, description: copy.description, robots: { index: true, follow: true } };
+}
+
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#090f14" };
+
+export default async function IntroPage({ params }: Props): Promise<ReactElement> {
+  const locale = getLocale((await params).locale);
+  const copy = INTRO_COPY[locale];
   return (
     <>
-      {/* 動畫由 JS 渲染；這段文字供搜索引擎、讀屏與無 JS 環境 */}
-      <h1 className="sr-only">WhatToDrink — What to drink tonight?</h1>
-      <p className="sr-only">
-        Discover bars, follow friends’ trails and meet over a drink. Check in with a snapshot, search people in one
-        sentence, chat, raise a glass, find nearby bars and play drinking games. Available on iOS and Android.
-      </p>
-      <IntroClient />
+      <h1 className="sr-only">{copy.title}</h1>
+      <p className="sr-only">{copy.description}</p>
+      <div className="sr-only">{Object.values(copy.scenes).map((scene, i) => <section key={i}><h2>{scene.title} {scene.accent}</h2><p>{scene.sub}</p></section>)}</div>
+      <IntroClient locale={locale} basePath="intro" />
     </>
   );
 }

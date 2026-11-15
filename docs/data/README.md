@@ -11,6 +11,7 @@ UI 定稿前只记录、不建表；EPIC 3.0 按 `future-schema.md` 落表。
 | `photo-mood.md` | 拍照推荐＋心情推荐 | 拍照他人 WIP，心情 stub |
 | `app-shell.md` | 顶栏／菜单／页脚／主题／语言／设备 | 已落＋已知缺口 |
 | `future-schema.md` | 整体回顾：未来表草图＋EPIC 映射＋替换清单 | 草图，UI 定稿后细化 |
+| `intro-marketing.md` | `/intro`／`/intro-next` 三語介紹、圖片、播放狀態與原版備份 | UR M.1／M.4，全部不進庫 |
 
 ## 标注约定（四列）
 

@@ -1,0 +1,22 @@
+{
+  "intro.trail.station": {
+    "source": "WhatToDrink/Features/Map/TrailMapView.swift:topBar/label (hardcoded Swift UI strings)",
+    "localization": "Traditional Chinese follows actual Swift literals; Simplified Chinese and English translated for this promotional set.",
+    "demoFields": "Station 3/4, selected 11/14 and Central are curated demo values."
+  },
+  "intro.trail.week": {
+    "source": "WhatToDrink/Features/Map/TrailMapView.swift:topBar/label (hardcoded Swift UI strings)",
+    "localization": "Traditional Chinese follows actual Swift literals; Simplified Chinese and English translated for this promotional set.",
+    "demoFields": "Station 3/4, selected 11/14 and Central are curated demo values."
+  },
+  "intro.trail.night": {
+    "source": "WhatToDrink/Features/Map/TrailMapView.swift:topBar/label (hardcoded Swift UI strings)",
+    "localization": "Traditional Chinese follows actual Swift literals; Simplified Chinese and English translated for this promotional set.",
+    "demoFields": "Station 3/4, selected 11/14 and Central are curated demo values."
+  },
+  "intro.trail.area": {
+    "source": "WhatToDrink/Features/Map/TrailMapView.swift:StopCard(area:geo)",
+    "localization": "Curated Central place value, translated into Simplified Chinese and English for this promotional set.",
+    "demoFields": "Station 3/4, selected 11/14 and Central are curated demo values."
+  }
+}
