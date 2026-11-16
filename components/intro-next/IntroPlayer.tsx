@@ -1,19 +1,24 @@
 "use client";
 
 import { Player, type PlayerRef } from "@remotion/player";
+import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactElement } from "react";
 
 import type { AppLocale } from "@/i18n/routing";
 
 import { FPS, S } from "../intro/kit";
 import { previewFrame } from "./playback";
+import { browseIndexAt, completeSwipe, isHorizontalIntent, seekBrowseStop } from "./browse";
 import { preloadIntroArtwork } from "./preload";
 import { INTRO_COPY, introHref, introLanguageHref, type IntroBasePath, type IntroCopy } from "./copy";
-import { CAPTURE_NAMES, captureImageProps, END_SEC, Story, TOTAL_FRAMES } from "./story";
+import { INTRO_BRAND } from "./brand";
+import { BRAND_IMAGE_PROPS, BROWSE_STOPS, CAPTURE_NAMES, captureImageProps, END_SEC, Story, TOTAL_FRAMES } from "./story";
 import s from "./intro-next.module.css";
 
 const OPENING_CAPTURES = ["ivy-bar", "detail", "camera"] as const;
+const BROWSE_CHAPTERS = BROWSE_STOPS.filter((stop) => stop.kind !== "screen" || stop.shotIndex === 0);
+type Swipe = { pointerId: number; x: number; y: number; width: number; wasPlaying: boolean; paused: boolean };
 
 function StoreBadge({ platform, copy }: { platform: "apple" | "google"; copy: IntroCopy }): ReactElement {
   const apple = platform === "apple";
@@ -36,7 +41,59 @@ export default function IntroPlayer({ locale, basePath }: { locale: AppLocale; b
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [loadedLocale, setLoadedLocale] = useState<AppLocale | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [announcement, setAnnouncement] = useState("");
+  const swipe = useRef<Swipe | null>(null);
+  const keyboardPaused = useRef(false);
   const ready = size.w > 0 && size.h > 0 && loadedLocale === locale;
+  const inputProps = useMemo(() => ({ w: size.w, h: size.h, locale }), [size.w, size.h, locale]);
+  const activeStop = BROWSE_STOPS[activeIndex];
+  const stopLabel = (stop: typeof activeStop): string => stop.kind === "screen" ? copy.scenes[stop.sceneId].eyebrow : copy.browse[stop.kind];
+
+  const goTo = (index: number): void => {
+    if (!ready || !player) return;
+    const target = seekBrowseStop(player, index, BROWSE_STOPS);
+    setActiveIndex(target);
+    setAnnouncement(`${stopLabel(BROWSE_STOPS[target])} · ${target + 1} / ${BROWSE_STOPS.length} · ${copy.browse.paused}`);
+  };
+  const goBy = (direction: -1 | 1): void => {
+    if (player) goTo(browseIndexAt(player.getCurrentFrame(), BROWSE_STOPS) + direction);
+  };
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.target instanceof HTMLElement && event.target.closest("a, input, select, textarea, [contenteditable=true]")) return;
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      goBy(event.key === "ArrowLeft" ? -1 : 1);
+    } else if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      goTo(event.key === "Home" ? 0 : BROWSE_STOPS.length - 1);
+    }
+  };
+  const onPointerDown = (event: PointerEvent<HTMLDivElement>): void => {
+    if (!player || !ready || !event.isPrimary || event.pointerType === "mouse") return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    // Leave the system's edge-back gesture and multi-touch zoom to the browser.
+    if (event.clientX - bounds.left < 20 || bounds.right - event.clientX < 20) return;
+    swipe.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, width: bounds.width, wasPlaying: player.isPlaying(), paused: false };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const onPointerMove = (event: PointerEvent<HTMLDivElement>): void => {
+    const gesture = swipe.current;
+    if (!gesture || gesture.pointerId !== event.pointerId || gesture.paused) return;
+    if (isHorizontalIntent(event.clientX - gesture.x, event.clientY - gesture.y)) {
+      gesture.paused = true;
+      player?.pause();
+    }
+  };
+  const finishSwipe = (event: PointerEvent<HTMLDivElement>, cancelled = false): void => {
+    const gesture = swipe.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    swipe.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    const result = completeSwipe(event.clientX - gesture.x, event.clientY - gesture.y, gesture.width, cancelled, gesture.paused, gesture.wasPlaying);
+    if (result.direction !== null) goBy(result.direction);
+    else if (result.resume) player?.play(event);
+  };
 
   useEffect(() => {
     const element = stage.current;
@@ -54,7 +111,7 @@ export default function IntroPlayer({ locale, basePath }: { locale: AppLocale; b
 
   useEffect(() => {
     return preloadIntroArtwork({
-      opening: OPENING_CAPTURES.map((name) => captureImageProps(name, locale)),
+      opening: [BRAND_IMAGE_PROPS, ...OPENING_CAPTURES.map((name) => captureImageProps(name, locale))],
       remaining: CAPTURE_NAMES.filter((name) => !OPENING_CAPTURES.some((opening) => opening === name)).map((name) => captureImageProps(name, locale)),
       onReady: () => setLoadedLocale(locale),
     });
@@ -64,31 +121,44 @@ export default function IntroPlayer({ locale, basePath }: { locale: AppLocale; b
     const current = player;
     if (!current || !ready) return;
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const onPlay = (): void => setPlaying(true);
-    const onPause = (): void => setPlaying(false);
+    const onPlay = (): void => { keyboardPaused.current = false; setPlaying(true); };
+    const syncStep = (): void => setActiveIndex(browseIndexAt(current.getCurrentFrame(), BROWSE_STOPS));
+    const onPause = (): void => { setPlaying(false); syncStep(); };
     const onPreference = (): void => {
       if (preference.matches) { current.pause(); current.seekTo(S(END_SEC + 2)); }
     };
     current.addEventListener("play", onPlay);
     current.addEventListener("pause", onPause);
+    current.addEventListener("timeupdate", syncStep);
+    current.addEventListener("seeked", syncStep);
     preference.addEventListener("change", onPreference);
     const frozen = previewFrame(new URLSearchParams(window.location.search).get("t"), FPS, TOTAL_FRAMES);
     if (frozen !== null) { current.pause(); current.seekTo(frozen); }
     else if (preference.matches) onPreference();
+    else if (keyboardPaused.current) { current.pause(); current.seekTo(BROWSE_STOPS[0].settledFrame); }
     else current.play();
+    syncStep();
     return () => {
       current.removeEventListener("play", onPlay);
       current.removeEventListener("pause", onPause);
+      current.removeEventListener("timeupdate", syncStep);
+      current.removeEventListener("seeked", syncStep);
       preference.removeEventListener("change", onPreference);
     };
   }, [ready, player]);
 
   return (
-    <div className={s.root} lang={locale}>
+    <div className={s.root} lang={locale} role="region" aria-label={copy.nav} tabIndex={0} onKeyDown={onKeyDown} onFocusCapture={(event) => {
+      if (event.target instanceof HTMLElement && event.target.matches(":focus-visible")) {
+        keyboardPaused.current = true;
+        player?.pause();
+      }
+    }}>
       <nav className={s.nav} aria-label={copy.nav}>
-        <Link className={s.brand} href={introHref(locale, basePath)} aria-label="WhatToDrink">
-          <svg className={s.brandMark} viewBox="0 0 34 40" fill="none" aria-hidden="true"><path d="M7 8h20l-2 22c-.3 3-2 5-5 5h-6c-3 0-4.7-2-5-5L7 8Z" stroke="currentColor" strokeWidth="1.5" /><path d="M10 20h14l-1 9c-.2 2-1 3-3 3h-6c-2 0-2.8-1-3-3l-1-9Z" fill="currentColor" /><path d="m15 4 7 9M12 2l2 4M26 1l-3 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
-          <b>WhatToDrink</b><em>{copy.tagline}</em>
+        <Link className={s.brand} href={introHref(locale, basePath)} aria-label={INTRO_BRAND.label}>
+          <Image className={s.brandMark} src={INTRO_BRAND.icon} width={34} height={35} alt="" unoptimized />
+          <Image className={s.brandWordmark} src={INTRO_BRAND.wordmarks[locale]} width={locale === "en" ? 90 : 55} height={25} alt={locale === "en" ? INTRO_BRAND.en : INTRO_BRAND.zh} unoptimized />
+          <em>{copy.tagline}</em>
         </Link>
         <div className={s.navr}>
           <div className={s.languages} role="group" aria-label={copy.language}>
@@ -100,12 +170,28 @@ export default function IntroPlayer({ locale, basePath }: { locale: AppLocale; b
           <StoreBadge platform="apple" copy={copy} /><StoreBadge platform="google" copy={copy} />
         </div>
       </nav>
-      <div className={s.stage} ref={stage} aria-hidden="true">
-        {ready ? <Player ref={setPlayer} component={Story} inputProps={{ w: size.w, h: size.h, locale }} durationInFrames={TOTAL_FRAMES} fps={FPS} compositionWidth={size.w} compositionHeight={size.h} className={s.player} controls={false} clickToPlay={false} doubleClickToFullscreen={false} spaceKeyToPlayOrPause={false} loop autoPlay={false} /> : <div className={s.loading}>WhatToDrink<small>{copy.tagline}</small></div>}
+      <div className={s.stage} ref={stage} aria-hidden="true" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={(event) => finishSwipe(event)} onPointerCancel={(event) => finishSwipe(event, true)} onLostPointerCapture={(event) => finishSwipe(event, true)}>
+        {ready ? <Player ref={setPlayer} component={Story} inputProps={inputProps} durationInFrames={TOTAL_FRAMES} fps={FPS} compositionWidth={size.w} compositionHeight={size.h} className={s.player} controls={false} clickToPlay={false} doubleClickToFullscreen={false} spaceKeyToPlayOrPause={false} loop autoPlay={false} /> : <div className={s.loading}>{INTRO_BRAND.label}<small>{copy.tagline}</small></div>}
       </div>
+      <div className={s.browseControls} role="group" aria-label={copy.browse.controls} onPointerEnter={(event) => { if (event.pointerType === "mouse") player?.pause(); }}>
+        <button className={s.browseButton} type="button" aria-label={copy.browse.previous} aria-disabled={activeIndex === 0} onClick={() => { if (activeIndex > 0) goBy(-1); }} disabled={!ready || !player}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m14 5-7 7 7 7" /></svg>
+        </button>
+        <div className={s.browseCaption}>
+          <div className={s.browseTitle}>
+            <select aria-label={copy.browse.choose} title={stopLabel(activeStop)} value={activeStop.sceneId ?? activeStop.kind} disabled={!ready || !player} onChange={(event) => goTo(BROWSE_STOPS.findIndex((stop) => (stop.sceneId ?? stop.kind) === event.target.value))}>
+              {BROWSE_CHAPTERS.map((stop) => <option key={stop.id} value={stop.sceneId ?? stop.kind}>{stopLabel(stop)}</option>)}
+            </select>
+            <small aria-hidden="true">{activeIndex + 1} / {BROWSE_STOPS.length}</small>
+          </div>
+          <span className={s.browseHint}>{playing ? copy.browse.hint : copy.browse.paused}</span>
+        </div>
+        <button className={s.browseButton} type="button" aria-label={copy.browse.next} aria-disabled={activeIndex === BROWSE_STOPS.length - 1} onClick={() => { if (activeIndex < BROWSE_STOPS.length - 1) goBy(1); }} disabled={!ready || !player}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m10 5 7 7-7 7" /></svg>
+        </button>
+      </div>
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>
       <footer className={s.footerNote}>
-        <Link className={s.compare} href={introHref(locale, "intro-backup")}>{copy.compare} ↗</Link>
-        <Link className={s.compare} href={introHref(locale, `${basePath}/artwork`)}>{copy.gallery} ↗</Link>
         <span>{copy.screenshotNote}</span><span>{copy.responsible}</span>
       </footer>
     </div>

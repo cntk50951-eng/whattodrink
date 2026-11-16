@@ -17,3 +17,7 @@
 - [首頁默認介紹頁](2026-10-23-home-intro.md) — HOME_UI 缺省改 intro；/intro 自動播放動畫、手機兼容要點、與 iOS 動畫源碼同步
 - [用戶／帖子／訊息舉報進後台隊列](2026-11-02-user-reports-queue.md) — 擴 cheers_reports（0070 待執行）、舊形狀兼容、作者服務端反查、/innerharbour/user-reports
 - [MapPin 加 authorAge](2026-11-06-mappin-author-age.md) — 共享型別加必填欄位要 grep 全 repo fixture，build 才會抓齊
+- [介紹頁三語文案重寫](2026-11-14-intro-copy-redesign.md) — 名詞對齊圖片內 App UI（ios-ui-copy.json）、→ 段數／換行數不可變、宣稱前查 Swift
+- [首屏正式品牌 hi drink／嗨飲](2026-11-15-intro-brand-opening.md) — 原 POC 圖示／最新 Cormorant／文楷字標不重畫；繁簡品牌均為嗨飲，光影單獨生成，來源 SHA-256 留存
+- [Production 與本地 intro 版本核對](2026-11-16-intro-production-version-audit.md) — production／main 仍是 2b5ce6a；品牌首屏、Ivy→骰子與移除底部連結尚在工作區，SITE_LIVE 不會發布本地修改
+- [最新版 intro 提交部署授權](2026-11-16-intro-release.md) — 用戶明確要求部署 M.5／M.6／M.7；同提交 Production 成功才算完成，保持 SITE_LIVE 封站，排除 reports／research_notes

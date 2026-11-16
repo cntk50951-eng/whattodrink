@@ -2,7 +2,7 @@ import type { AppLocale } from "@/i18n/routing";
 
 import introCopy from "./copy.json";
 
-export type SceneId = "capture" | "edit" | "publish" | "map" | "ivy" | "dice" | "party" | "trail" | "meet" | "tonight" | "cheers" | "home" | "cocktail";
+export type SceneId = "capture" | "edit" | "map" | "ivy" | "dice" | "party" | "trail" | "meet" | "tonight" | "cheers" | "home" | "cocktail";
 export type SceneCopy = { eyebrow: string; title: string; accent: string; sub: string; detail: string; focus: string };
 export type IntroCopy = {
   tagline: string;
@@ -18,6 +18,7 @@ export type IntroCopy = {
   gallery: string;
   screenshotNote: string;
   responsible: string;
+  browse: { controls: string; previous: string; next: string; choose: string; hint: string; paused: string; intro: string; end: string };
   hero: { eyebrow: string; title: string; accent: string; sub: string; post: string; ivy: string };
   end: { eyebrow: string; title: string; accent: string; sub: string };
   scenes: Record<SceneId, SceneCopy>;

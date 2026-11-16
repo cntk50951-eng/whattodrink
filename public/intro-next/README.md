@@ -1,5 +1,9 @@
 # 已發布的三語 intro
 
+2026-11-16 發布批次（M.5／M.6／M.7）：用戶授權提交部署本地最新版，包含品牌首屏、三語文案、照片編輯→地圖故事、Ivy→大話骰→調酒，以及底部去連結／手動回看。Production 仍沿 SITE_LIVE 封站控制；發布完成與來源版本請以 GitHub main 的 Vercel Production 狀態為準。
+
+2026-11-15 本地更新：首屏使用 `hi drink／嗨飲` 品牌主視覺，成品、來源與重建方式見 `brand/README.md`；原圖示／字標沿 iOS 品牌稿，66 張功能圖片不變。後續敘事以 `story.tsx`／`docs/intro-copywriting.md` 為準（編輯直接接地圖，Ivy 後接大話骰）。
+
 2026-11-14：用戶授權將新版接到 `/intro`（繁體）、`/zh-Hans/intro`（簡體）、`/en/intro`（英文）；`/intro-next` 保留預覽。原版已備份為 `/intro-backup`，原 components／shots 與 Git 標籤保留。
 
 網頁三語文案直接修改 `components/intro-next/copy.json`；欄位與故事順序見 `docs/intro-copywriting.md`。本輪未改寫文字或圖片。以下為歷次本地製作與驗證記錄，其中「不提交／部署」「不改原 intro」是當時限制，已由本輪明確發布授權更新。

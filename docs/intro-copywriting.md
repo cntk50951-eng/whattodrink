@@ -2,6 +2,8 @@
 
 實際生效來源：`components/intro-next/copy.json`。
 
+品牌正式名稱為 `hi drink`／`嗨飲`（繁簡均保留「嗨飲」）。首屏雙語品牌圖片在 `public/intro-next/brand/hi-drink-opening-v1.png`，與網頁功能介紹文案分開；修改 `hero.*` 不會改動圖片內向量字標。圖示／字標依 iOS hi-drink-motion-poc 定稿，來源與重建方式見同目錄 README。
+
 正式站保留 `SITE_LIVE=false`：下列正式路徑部署後仍會跳 coming-soon。產品尚未公開，請在本地 `http://localhost:3000` 預覽；文案檔可於 GitHub 編輯。Vercel 開關或全站路由不需為編寫文案而修改。
 
 - `zh-Hant`：繁體中文；頁面 `/intro`（明確語言入口 `/zh-Hant/intro`）。
@@ -26,13 +28,16 @@
 | `scenes.<場景>.detail` | 底部操作流程；保留現有 `→`／`·` 分段數量，對應畫面節奏 |
 | `scenes.<場景>.focus` | 畫面操作重點 |
 | `end.title`、`accent`、`sub` | 結尾主標與描述 |
+| `browse.*` | 手動瀏覽：前後畫面、功能選單、滑動／暫停提示與開場／結尾名稱；功能選單使用 scenes 的 eyebrow |
 | 其餘頂層字串 | 導航、播放／暫停、商店待推出及示意／理性飲酒文字 |
 
 ## 畫面順序
 
-開場 → `capture` 拍照選圖 → `edit` 編輯 → `publish` 預覽發布 → `map` 地圖帖子／詳情 → `ivy` Ivy 酒吧 → `cocktail` 選酒譜／材料／跟做／完成 → `dice` 大話骰 → `party` 酒局 → `trail` 足跡記錄／地圖預覽／腳印回放 → `meet` 遇見 → `tonight` 今晚喝什麼 → `cheers` 碰杯 → `home` 主地圖／個人主頁 → 結尾。
+開場 → `capture` 拍照選圖 → `edit` 編輯 → `map` 地圖帖子／詳情 → `ivy` Ivy 酒吧 → `dice` 大話骰 → `cocktail` 選酒譜／材料／跟做／完成 → `party` 酒局 → `trail` 足跡記錄／地圖預覽／腳印回放 → `meet` 遇見 → `tonight` 今晚喝什麼 → `cheers` 碰杯 → `home` 主地圖／個人主頁 → 結尾。
 
 照片發布優先，Ivy 及遊戲第二。三語使用相同欄位名稱；請保留 JSON keys 及有效 JSON 格式。三套圖片裡的 App UI 字樣是圖像內容，修改這份網頁文案不會改圖片。跟著調酒是配圖步驟與 Ivy 提示，文案應沿用 App 已有能力。
+
+介紹頁底部已移除圖庫／原版連結，只保留示意與理性飲酒文字。播放時可左右滑動、用前後箭頭／鍵盤逐張回看，或點目前功能名稱直接選段；手動選擇後停播，按播放繼續。原生選單顯示各幕 eyebrow，建議保持短且可區分（拍照／修圖／上地圖等）。
 
 ## 原版備份
 

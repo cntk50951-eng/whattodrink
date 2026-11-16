@@ -8,6 +8,8 @@ import type { AppLocale } from "@/i18n/routing";
 
 import { FPS, S } from "../intro/kit";
 import { INTRO_COPY, type IntroCopy, type SceneId } from "./copy";
+import { INTRO_BRAND } from "./brand";
+import { buildBrowseStops } from "./browse";
 import { cameraAt, phraseAt, screenAt, smoothProgress, type CameraPath, type CameraTarget, type ScreenTransition } from "./motion";
 import { ARTWORK_SCREENS, artworkSrc, type ArtworkId } from "./artwork";
 import s from "./intro-next.module.css";
@@ -33,11 +35,10 @@ const screenProps = Object.fromEntries((["zh-Hant", "zh-Hans", "en"] as const).m
 export const SCENES: Scene[] = [
   { id: "capture", path: "lift", transition: "lift", dur: 7.5, shots: [{ name: "camera", at: 0 }], target: { x: 50, y: 17, zoom: 1.55 } },
   { id: "edit", path: "arc", transition: "lift", dur: 8, shots: [{ name: "editor", at: 0 }], target: { x: 50, y: 91, zoom: 1.6 } },
-  { id: "publish", dur: 8.5, shots: [{ name: "preview", at: 0 }], target: { x: 50, y: 88, zoom: 1.5 } },
   { id: "map", path: "glide", transition: "slide", dur: 9, shots: [{ name: "map", at: 0 }, { name: "detail", at: 4.3, target: { x: 50, y: 65, zoom: 1.3 } }], target: { x: 50, y: 44, zoom: 1.4 } },
   { id: "ivy", path: "arc", transition: "dissolve", dur: 7.5, shots: [{ name: "ivy-bar", at: 0 }], target: { x: 50, y: 76, zoom: 1.4 } },
-  { id: "cocktail", path: "lift", transition: "lift", dur: 13, shots: [{ name: "cocktail-book", at: 0 }, { name: "cocktail-recipe", at: 2.6, target: { x: 50, y: 63, zoom: 1.25 } }, { name: "cocktail-step", at: 5.8, target: { x: 50, y: 63, zoom: 1.25 } }, { name: "cocktail-done", at: 9.5, target: { x: 50, y: 86, zoom: 1.25 } }], target: { x: 50, y: 55, zoom: 1.2 } },
   { id: "dice", path: "arc", transition: "dissolve", dur: 11, shots: [{ name: "dice-cups", at: 0 }, { name: "dice-peek", at: 3.5, target: { x: 50, y: 51, zoom: 1.35 } }, { name: "dice-cups", at: 7.3, target: { x: 50, y: 87, zoom: 1.45 } }], target: { x: 50, y: 54, zoom: 1.35 } },
+  { id: "cocktail", path: "lift", transition: "lift", dur: 13, shots: [{ name: "cocktail-book", at: 0 }, { name: "cocktail-recipe", at: 2.6, target: { x: 50, y: 63, zoom: 1.25 } }, { name: "cocktail-step", at: 5.8, target: { x: 50, y: 63, zoom: 1.25 } }, { name: "cocktail-done", at: 9.5, target: { x: 50, y: 86, zoom: 1.25 } }], target: { x: 50, y: 55, zoom: 1.2 } },
   { id: "party", phraseTimes: [0, 3.8, 5.9], path: "glide", transition: "slide", dur: 8, shots: [{ name: "party", at: 0 }, { name: "party-detail", at: 3.8, target: { x: 50, y: 52, zoom: 1.4 } }], target: { x: 50, y: 68, zoom: 1.25 } },
   { id: "trail", phraseTimes: [0, 1.3, 3.2, 6.9], path: "glide", transition: "lift", dur: 11.5, shots: [{ name: "trail", at: 0 }, { name: "trail-map", at: 3.2, target: { x: 50, y: 46, zoom: 1.2 } }, { name: "trail-replay", at: 6.9, target: { x: 50, y: 77, zoom: 1.25 } }], target: { x: 50, y: 74, zoom: 1.35 } },
   { id: "meet", path: "lift", transition: "lift", dur: 7.5, shots: [{ name: "meet", at: 0 }], target: { x: 50, y: 58, zoom: 1.3 } },
@@ -51,6 +52,7 @@ for (const scene of SCENES) { starts.push(next); next += scene.dur - OVERLAP; }
 export const END_SEC = next;
 export const TOTAL_SEC = END_SEC + END_DUR;
 export const TOTAL_FRAMES = S(TOTAL_SEC);
+export const BROWSE_STOPS = buildBrowseStops(SCENES, starts, END_SEC, FPS, TOTAL_FRAMES);
 
 function Atmosphere(): ReactElement {
   const t = useCurrentFrame() / FPS;
@@ -150,7 +152,20 @@ function HeroPhones({ copy, t, locale }: { copy: IntroCopy; t: number; locale: A
   );
 }
 
-function Title({ copy, locale }: { copy: IntroCopy; locale: AppLocale }): ReactElement {
+export const BRAND_IMAGE_PROPS = getImageProps({ src: INTRO_BRAND.opening, alt: INTRO_BRAND.label, width: 1400, height: 1400, sizes: "(max-width: 760px) 84vw, 42vw", loading: "eager", fetchPriority: "high" }).props;
+
+function BrandOpening({ t }: { t: number }): ReactElement {
+  const enter = smoothProgress(t, 0.1, 1.6);
+  const drift = smoothProgress(t, 1.6, TITLE);
+  return <div className={s.productStage}>
+    <div className={s.brandArtwork} style={{ "--brand-opacity": enter, "--brand-y": `${(1 - enter) * 16 - drift * 3}px`, "--brand-scale": 0.97 + enter * 0.03 + drift * 0.006 } as MotionStyle}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- Responsive optimized art in a frame-driven composition. */}
+      <img {...BRAND_IMAGE_PROPS} alt={INTRO_BRAND.label} draggable={false} />
+    </div>
+  </div>;
+}
+
+function Title({ copy }: { copy: IntroCopy }): ReactElement {
   const t = useCurrentFrame() / FPS;
   return (
     <Frame dur={TITLE}>
@@ -161,7 +176,7 @@ function Title({ copy, locale }: { copy: IntroCopy; locale: AppLocale }): ReactE
           <p>{copy.hero.sub.split("\n").map((line, i) => <Reveal inline key={line} t={t} at={1 + i * 0.25}>{line}</Reveal>)}</p>
           <Reveal t={t} at={1.4}><div className={s.heroChips}><span>{copy.hero.post}</span><span>{copy.hero.ivy}</span></div></Reveal>
         </div>
-        <HeroPhones copy={copy} t={t} locale={locale} />
+        <BrandOpening t={t} />
       </div>
     </Frame>
   );
@@ -189,7 +204,7 @@ export function Story({ w, h, locale }: { w: number; h: number; locale: AppLocal
   return (
     <AbsoluteFill className={s.story} data-locale={locale} style={{ "--canvas-w": `${w}px`, "--canvas-h": `${h}px` } as MotionStyle}>
       <Atmosphere />
-      <Sequence durationInFrames={S(TITLE)}><Title copy={copy} locale={locale} /></Sequence>
+      <Sequence durationInFrames={S(TITLE)}><Title copy={copy} /></Sequence>
       {SCENES.map((scene, i) => <Sequence key={scene.id} from={S(starts[i])} durationInFrames={S(scene.dur)} layout="none"><SceneView scene={scene} copy={copy} locale={locale} side={i % 2 === 0 ? 1 : -1} portrait={w <= 760} /></Sequence>)}
       <Sequence from={S(END_SEC)} durationInFrames={S(END_DUR)}><End copy={copy} locale={locale} /></Sequence>
     </AbsoluteFill>

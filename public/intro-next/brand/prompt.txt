@@ -1,0 +1,8 @@
+Built-in imagegen · 2026-11-15 · new decorative artwork · transparent background
+
+Create a premium restrained abstract supporting artwork for hi drink, a Hong Kong nightlife photo-sharing and bar companion app. This is BACKGROUND ART ONLY, no text, no lettering, no logo, no app icon, no phone, no people, no bottles or glassware. Square composition with generous transparent empty central area reserved for an existing brand lockup. Around the far perimeter: two delicate liquid amber light ribbons, like golden light refracted through a drink, softly curling at lower-left and upper-right; a few tiny warm droplets and subtle champagne bokeh, elegant translucent glasslike highlights. Dark warm amber and muted bronze, pale cream highlights, only a tiny cool teal reflection. Sophisticated editorial product launch, calm low-key cinematic lighting, airy, believable material, no dramatic splashes, no neon, no science fiction, no busy particle explosion. Most of central 65 percent remains clear and transparent. Soft fading edges, transparent background, standalone decorative light artwork ready to composite over near-black #090f14. Light must frame, never obscure, the central logo and words added later.
+
+Original generated output: exec-ea989c05-1ded-48cc-abdf-15a641632cf9.png
+Final composition: scripts/render-intro-brand.mjs
+Brand source: whattodrink_ios/docs/design/hi-drink-motion-poc/ (read-only)
+Reuse the approved PNG with the POC display crop. Retain current wordmark-en.svg and wordmark-zh.svg exact outlines. Do not use the older DM Serif wordmark.svg. Both Chinese locales use the official name 嗨飲.

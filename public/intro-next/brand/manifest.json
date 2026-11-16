@@ -1,0 +1,67 @@
+{
+  "brand": {
+    "en": "hi drink",
+    "zh-Hant": "嗨飲",
+    "zh-Hans": "嗨飲"
+  },
+  "source": "whattodrink_ios/docs/design/hi-drink-motion-poc/index.html",
+  "logoCrop": {
+    "x": 0,
+    "y": 6,
+    "width": 320,
+    "height": 332,
+    "cornerRadius": 80
+  },
+  "wordmarks": {
+    "en": "Cormorant Garamond 500",
+    "zh": "LXGW WenKai TC"
+  },
+  "generation": {
+    "mode": "built-in imagegen",
+    "scope": "Decorative amber light only. Original logo and outlined lettering composed without regeneration.",
+    "prompt": "prompt.txt"
+  },
+  "renderer": "scripts/render-intro-brand.mjs",
+  "assets": [
+    {
+      "file": "approved-logo-original.png",
+      "sha256": "85bce7d7cbfd72d63f4fb615fb5631bdb136c437b9d3ca3cdb0ec24c9a9df76a",
+      "bytes": 95571
+    },
+    {
+      "file": "wordmark-en.svg",
+      "sha256": "dcab4649c1a766c7590f05ddc5f9d2281817ac831601564d263358dcff38ad05",
+      "bytes": 7135
+    },
+    {
+      "file": "wordmark-zh.svg",
+      "sha256": "5ba48b64d55c7b49313b09ccd666f1b4657da13094d72dfa676576de8cafe987",
+      "bytes": 5191
+    },
+    {
+      "file": "amber-light-v1.png",
+      "sha256": "cb876ef07b3842b8f65cdc811105a90cc4876ae48565f55faa8e5ac4052df561",
+      "bytes": 764731
+    },
+    {
+      "file": "icon.svg",
+      "sha256": "06e09e7ccba902b44405a21492507c81341e544caa49770ad7fea9b1bf9f1cdd",
+      "bytes": 127673
+    },
+    {
+      "file": "hi-drink-opening-v1.svg",
+      "sha256": "e80ebd850d8deed846bb15f8bf7a7e0497f5ac52d2ab4dbc75f387d91b2019b7",
+      "bytes": 1160483
+    },
+    {
+      "file": "hi-drink-opening-v1.png",
+      "sha256": "32604a8a7844a4682de0331b818fa460edd9f8a960cb324fbcee4fd4bf891d6c",
+      "bytes": 845731
+    },
+    {
+      "file": "hi-drink-opening-v1.webp",
+      "sha256": "6c022d2695813c2b0e599294566cf3033a2fc19c72f773c2ed67f7a7a6b9452a",
+      "bytes": 333100
+    }
+  ]
+}
