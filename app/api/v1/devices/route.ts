@@ -1,7 +1,7 @@
 import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { parseDeviceIdentity } from "@/lib/api/devices";
 
-const PLATFORMS = ["web", "ios", "aos"] as const;
 const ENVS = ["sandbox", "production"] as const;
 const MAX_DEVICES = 10;
 
@@ -13,20 +13,6 @@ type DeviceBody = {
   locale?: unknown;
 };
 
-function parseToken(raw: unknown): { platform: string; push_token: string } | { error: string } {
-  if (typeof raw !== "object" || raw === null) return { error: "body 需为对象" };
-  const r = raw as Record<string, unknown>;
-  if (typeof r.platform !== "string" || !(PLATFORMS as readonly string[]).includes(r.platform)) {
-    return { error: "platform 非法" };
-  }
-  if (
-    typeof r.push_token !== "string" ||
-    !/^[0-9a-fA-F]{64,200}$/.test(r.push_token)
-  ) {
-    return { error: "push_token 非法（hex 64–200）" };
-  }
-  return { platform: r.platform, push_token: r.push_token };
-}
 
 /**
  * UR D.9 设备登记（🔒）。
@@ -46,7 +32,7 @@ export async function POST(req: Request): Promise<Response> {
   } catch {
     return apiError("invalid_params", "body 需为 JSON", 400);
   }
-  const idParsed = parseToken(raw);
+  const idParsed = parseDeviceIdentity(raw);
   if ("error" in idParsed) {
     return apiError("invalid_params", idParsed.error, 400);
   }
@@ -131,7 +117,7 @@ export async function DELETE(req: Request): Promise<Response> {
   } catch {
     return apiError("invalid_params", "body 需为 JSON", 400);
   }
-  const idParsed = parseToken(raw);
+  const idParsed = parseDeviceIdentity(raw);
   if ("error" in idParsed) {
     return apiError("invalid_params", idParsed.error, 400);
   }
@@ -165,7 +151,7 @@ export async function PATCH(req: Request): Promise<Response> {
   } catch {
     return apiError("invalid_params", "body 需为 JSON", 400);
   }
-  const idParsed = parseToken(raw);
+  const idParsed = parseDeviceIdentity(raw);
   if ("error" in idParsed) {
     return apiError("invalid_params", idParsed.error, 400);
   }

@@ -214,8 +214,8 @@ export async function POST(req: Request): Promise<Response> {
           console.error(`[api/v1/friends] stale-reset error: code=${uErr.code} message=${uErr.message}`);
           return apiError("internal", `好友邀請失敗（db ${uErr.code ?? "unknown"}）`, 500);
         }
-        after(() => {
-          void sendFriendPush("request", { fromUserId: userId, toUserId: targetUserId });
+        after(async () => {
+          await sendFriendPush("request", { fromUserId: userId, toUserId: targetUserId });
         });
         return apiOk({ status: "pending" as const }, 201);
       }
@@ -232,8 +232,8 @@ export async function POST(req: Request): Promise<Response> {
         return apiError("internal", `好友邀請失敗（db ${insErr.code ?? "unknown"}）`, 500);
       }
       // UR B.3 新请求推送（after 语义；失败不影响请求本身）。
-      after(() => {
-        void sendFriendPush("request", { fromUserId: userId, toUserId: targetUserId });
+      after(async () => {
+        await sendFriendPush("request", { fromUserId: userId, toUserId: targetUserId });
       });
       return apiOk({ status: "pending" as const }, 201);
     };

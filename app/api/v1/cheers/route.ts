@@ -173,8 +173,8 @@ export async function POST(req: Request): Promise<Response> {
     .select("id", { count: "exact", head: true })
     .eq("checkin_id", targetPost.id);
   // UR D.9 E1 碰杯推送（响应后异步，失败绝不影响主流程；dup 幂等路径不重推）。
-  after(() => {
-    void sendCheersPush({ fromUserId: userId, toUserId, checkinId: targetPost.id });
+  after(async () => {
+    await sendCheersPush({ fromUserId: userId, toUserId, checkinId: targetPost.id });
   });
   return apiOk({
     cheered: true,

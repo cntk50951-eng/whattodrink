@@ -1,12 +1,24 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.65.0
+  version: 1.66.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
     （見 lib/api/envelope.ts）。`GET /beers/health` 與 `POST /transcribe`
     為已上線但前期漏入規的端點，本版補齊（§9 演進要求版本化）。
+x-native-push-payloads:
+  ios:
+    transport: APNs
+    description: 保留現有 aps 與自訂 t／from／事件ID欄位，不由Firebase轉送
+  aos:
+    transport: FCM
+    description: notification 放標題／內容；data 值皆字串，保留 t 與事件ID；APNs 的 from 改成 from_user_id，避開FCM保留字
+    events:
+      cheers: [t, from_user_id, checkin_id]
+      friend_request: [t, from_user_id]
+      friend_accepted: [t, from_user_id]
+      game_invite: [t, from_user_id, room_id, code]
 paths:
   /api/v1/wall:
     get:
@@ -2455,10 +2467,11 @@ paths:
                   enum: [web, ios, aos]
                 push_token:
                   type: string
-                  description: APNs 十六进制 64–200 字符
+                  description: ios／web 保留 APNs 十六進制64–200字元；aos 為1–4096字元 opaque FCM registration token，不含空白或控制字元；不是服務帳戶私鑰
                 environment:
                   type: string
                   enum: [sandbox, production]
+                  description: 僅影響iOS APNs通道；aos沿用此欄位但FCM不使用APNs環境，缺省production
                 app_version:
                   type: string
                 locale:
@@ -2499,6 +2512,7 @@ paths:
                   enum: [web, ios, aos]
                 push_token:
                   type: string
+                  description: ios／web 為64–200 hex；aos 為1–4096字元 opaque FCM token，不含空白或控制字元
       responses:
         "200":
           description: 已解绑
@@ -2530,6 +2544,7 @@ paths:
                   enum: [web, ios, aos]
                 push_token:
                   type: string
+                  description: ios／web 為64–200 hex；aos 為1–4096字元 opaque FCM token，不含空白或控制字元
                 enabled:
                   type: boolean
                 locale:
@@ -2567,6 +2582,11 @@ paths:
                 event:
                   type: string
                   enum: [cheers, invite, chat]
+                platform:
+                  type: string
+                  enum: [ios, aos]
+                  default: ios
+                  description: 目標通道；只發送目前登入者的該平台設備
       responses:
         "200":
           description: 已发送（{sent, devices}）

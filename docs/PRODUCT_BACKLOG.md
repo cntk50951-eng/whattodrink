@@ -4573,3 +4573,20 @@ UR L.1　全站开关 `SITE_LIVE`＋coming soon 页 [✓]
 - 2026-11-16：續作完成三語首屏與品牌素材／優化圖片 HTTP 200 檢查，重啟本地預覽；待用戶親眼確認，未提交／推送。
 - 2026-11-16 production 稽核：GitHub main 與 Vercel Production 記錄仍指向 `2b5ce6a`；遠端原碼確認尚無品牌首屏、仍 Ivy→調酒→骰子且保留底部兩連結。M.5／M.6／M.7 皆為本地待提交修改；SITE_LIVE 僅封站控制，正式站目前已回 coming-soon。本輪未部署或改旗標。
 - 2026-11-16 用戶明確授權「請提交部署，確保 production 最新」：本輪發布範圍合併 M.5／M.6／M.7；以 main 的新提交、同 SHA 的 Vercel Production success 與正式 alias coming-soon 驗證。提交前 build 138 頁、全量 121 檔／1,251 tests 全綠、lint 0 errors／12 既有 warnings；不更動 SITE_LIVE 或原版備份，視覺驗收狀態待用戶確認。
+
+## UR D.11 AOS FCM 基礎通道與設備 API 相容擴充（2026-11-16）[WIP]
+
+- 授權：用戶確認 Vercel FIREBASE_SERVICE_ACCOUNT_JSON 已配置，要求 AOS build 成功後增強 web API；AOS-0.137 debug build 已通過。只改 shared API／push 層，iOS 保留直接 APNs。
+- 契約先行：OpenAPI 1.66.0，/devices 的 aos push_token 改為1–4096字元不含空白／控制字元的 opaque FCM token；ios／web 保留64–200 hex。POST／PATCH／DELETE共用驗證；token不回傳、不記log，現有綁定／解綁／enabled／locale／10台上限不變，無新表。
+- 聯調端點：/devices/test-push 加可選 platform=ios|aos，省略仍ios；沿現有 testOnly／登入／只發本人設備限制，不開生產端點。
+- 發送：官方 firebase-admin 14.5.1（Node22+），只從服務端 Secret 讀憑證；依 devices.platform 分流APNs／FCM。現有碰杯、好友請求／接受、遊戲邀請加 AOS 發送；保留iOS payload／sandbox／production／偏好／限頻／日誌口徑，FCM獨立憑證，失效token清理，暫時錯誤可重試。
+- 非目標：本階段不補聊天／約酒／酒局等尚無遠端事件的業務掛點，不遷移iOS至Firebase，不改AOS通知權限／service／channels／導航，不讀本機私鑰或部署／提交／push。22項業務清單仍待後續。
+- AC：AOS三方法可接受 opaque token；iOS hex和環境回歸全綠；只有Firebase配置也能給AOS發送，只有APNs配置仍給iOS發送，未知平台／壞行／缺配置不得誤送；mock單測驗payload、分流、失效／重試分類；完整build／lint／tests。真實送達需部署及AOS客戶端後續接線驗收。
+- 資料過堂：沿 devices.platform／push_token／environment／locale／enabled 和既有push_log；對應 docs/data/push-devices.md。
+- 改動記錄：2026-11-16 開工，先更新契約與台帳，結果後補；用戶回報的Secret存在不等於本機或部署已驗證。
+
+- D.11 審查補強（2026-11-16）：現有 after callback 原本丟棄推送 Promise，改 async／await（含遊戲邀請批次），讓平台在回應後追蹤發送生命週期；不改主請求回應或iOS payload。FCM data 保留字 from 改 from_user_id，契約及單測同步。
+
+- D.11 驗證（2026-11-16）：build 138頁、126檔／1285 tests全綠；lint 0errors／12既有warnings；tsc通過。未送真實通知／部署，AOS完整客戶端與其他業務事件待後續；維持WIP。交接memory 2026-11-16-aos-fcm-backend.md、docs/FCM_SETUP.md。
+
+- D.11 發佈授權（2026-11-16）：用戶明確要求將web API commit／push GitHub觸發Vercel；本批只提交D.11，不帶intro M.8／M.9或AOS原生改動，SITE_LIVE保持不變。

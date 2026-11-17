@@ -4,7 +4,8 @@
  * 缺 APNs key 即静默跳过＋warn（用户 Apple 后台并行办，不 block 落地）。
  */
 
-import { apnsConfigFromEnv, sendApn, type ApnsEnv } from "./apns";
+import type { ApnsEnv } from "./apns";
+import { configuredPushDevices, hasPushChannel, isDeadPushReason, nativePushConfigFromEnv, sendNativePush } from "./native";
 import { computeBadge } from "./badge";
 import { cheersCollapseId, cheersMergedTitle, fillPushTemplate, pushPrefsOf } from "./prefs";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -22,15 +23,6 @@ function copyFor(locale: string): Record<string, string> {
   return COPY[locale] ?? COPY["zh-Hant"];
 }
 
-type PushDevice = {
-  id: string;
-  push_token: string;
-  environment: string;
-  locale: string | null;
-};
-
-const DEAD_REASONS = new Set(["Unregistered", "BadDeviceToken", "DeviceTokenNotForTopic"]);
-
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -44,25 +36,22 @@ export async function sendCheersPush(args: {
 }): Promise<{ sent: number; skipped?: string }> {
   const { fromUserId, toUserId, checkinId } = args;
   try {
-    const cfg = apnsConfigFromEnv(process.env as Record<string, string | undefined>);
-    if (cfg === null) {
-      console.warn("[push] E1 skipped: missing APNs env");
+    const cfg = nativePushConfigFromEnv(process.env as Record<string, string | undefined>);
+    if (!hasPushChannel(cfg)) {
+      console.warn("[push] E1 skipped: missing APNs/FCM config");
       return { sent: 0, skipped: "no-creds" };
     }
     const supa = await createServiceClient();
     const nowMs = Date.now();
-    // 三刀 1：收件人 enabled ios 设备。
+    // 三刀 1：收件人 enabled native 设备（按独立凭证过滤通道）。
     const { data: devices } = await supa
       .from("devices")
-      .select("id,push_token,environment,locale")
+      .select("id,platform,push_token,environment,locale")
       .eq("user_id", toUserId)
-      .eq("platform", "ios")
+      .in("platform", ["ios", "aos"])
       .eq("enabled", true)
       .limit(10);
-    const devs = (((devices ?? []) as unknown[]) as Record<string, unknown>[]).filter(
-      (d): d is unknown & { id: string; push_token: string } =>
-        typeof d.id === "string" && typeof d.push_token === "string" && d.push_token !== "",
-    ) as PushDevice[];
+    const devs = configuredPushDevices(devices, cfg);
     if (devs.length === 0) return { sent: 0, skipped: "no-devices" };
     // 三刀 2：prefs 开关。
     const { data: peerRow } = await supa
@@ -153,9 +142,7 @@ export async function sendCheersPush(args: {
         checkin_id: checkinId,
       };
       const env: ApnsEnv = d.environment === "sandbox" ? "sandbox" : "production";
-      let res = await sendApn({
-        cfg,
-        env,
+      let res = await sendNativePush({ cfg, platform: d.platform, env,
         deviceToken: d.push_token,
         collapseId: cheersCollapseId(toUserId),
         payload,
@@ -165,15 +152,13 @@ export async function sendCheersPush(args: {
       while (!res.ok && (res.status === 429 || res.status >= 500 || res.status === 0) && tries < 2) {
         tries += 1;
         await sleep(tries * 1000);
-        res = await sendApn({
-          cfg,
-          env,
+        res = await sendNativePush({ cfg, platform: d.platform, env,
           deviceToken: d.push_token,
           collapseId: cheersCollapseId(toUserId),
           payload,
         });
       }
-      if (!res.ok && DEAD_REASONS.has(res.reason)) {
+      if (!res.ok && isDeadPushReason(res.reason)) {
         await supa.from("devices").delete().eq("id", d.id);
         await supa.from("push_log").insert({
           recipient_id: toUserId,
@@ -208,23 +193,20 @@ export async function sendCheersPush(args: {
 ): Promise<{ sent: number; skipped?: string }> {
   const { fromUserId, toUserId } = args;
   try {
-    const cfg = apnsConfigFromEnv(process.env as Record<string, string | undefined>);
-    if (cfg === null) {
-      console.warn(`[push] friend ${kind} skipped: missing APNs env`);
+    const cfg = nativePushConfigFromEnv(process.env as Record<string, string | undefined>);
+    if (!hasPushChannel(cfg)) {
+      console.warn(`[push] friend ${kind} skipped: missing APNs/FCM config`);
       return { sent: 0, skipped: "no-creds" };
     }
     const supa = await createServiceClient();
     const { data: devices } = await supa
       .from("devices")
-      .select("id,push_token,environment,locale")
+      .select("id,platform,push_token,environment,locale")
       .eq("user_id", toUserId)
-      .eq("platform", "ios")
+      .in("platform", ["ios", "aos"])
       .eq("enabled", true)
       .limit(10);
-    const devs = (((devices ?? []) as unknown[]) as Record<string, unknown>[]).filter(
-      (d): d is unknown & { id: string; push_token: string } =>
-        typeof d.id === "string" && typeof d.push_token === "string" && d.push_token !== "",
-    ) as PushDevice[];
+    const devs = configuredPushDevices(devices, cfg);
     if (devs.length === 0) return { sent: 0, skipped: "no-devices" };
     const { data: peerRow } = await supa
       .from("users")
@@ -258,14 +240,14 @@ export async function sendCheersPush(args: {
       };
       const env: ApnsEnv = d.environment === "sandbox" ? "sandbox" : "production";
       const collapse = `friend-${kind}-${toUserId}`;
-      let res = await sendApn({ cfg, env, deviceToken: d.push_token, collapseId: collapse, payload });
+      let res = await sendNativePush({ cfg, platform: d.platform, env, deviceToken: d.push_token, collapseId: collapse, payload });
       let tries = 0;
       while (!res.ok && (res.status === 429 || res.status >= 500 || res.status === 0) && tries < 2) {
         tries += 1;
         await sleep(tries * 1000);
-        res = await sendApn({ cfg, env, deviceToken: d.push_token, collapseId: collapse, payload });
+        res = await sendNativePush({ cfg, platform: d.platform, env, deviceToken: d.push_token, collapseId: collapse, payload });
       }
-      if (!res.ok && DEAD_REASONS.has(res.reason)) {
+      if (!res.ok && isDeadPushReason(res.reason)) {
         await supa.from("devices").delete().eq("id", d.id);
         await supa.from("push_log").insert({
           recipient_id: toUserId,
@@ -304,23 +286,20 @@ export async function sendGameInvitePush(args: {
 }): Promise<{ sent: number; skipped?: string }> {
   const { fromUserId, toUserId, roomId, code } = args;
   try {
-    const cfg = apnsConfigFromEnv(process.env as Record<string, string | undefined>);
-    if (cfg === null) {
-      console.warn("[push] game_invite skipped: missing APNs env");
+    const cfg = nativePushConfigFromEnv(process.env as Record<string, string | undefined>);
+    if (!hasPushChannel(cfg)) {
+      console.warn("[push] game_invite skipped: missing APNs/FCM config");
       return { sent: 0, skipped: "no-creds" };
     }
     const supa = await createServiceClient();
     const { data: devices } = await supa
       .from("devices")
-      .select("id,push_token,environment,locale")
+      .select("id,platform,push_token,environment,locale")
       .eq("user_id", toUserId)
-      .eq("platform", "ios")
+      .in("platform", ["ios", "aos"])
       .eq("enabled", true)
       .limit(10);
-    const devs = (((devices ?? []) as unknown[]) as Record<string, unknown>[]).filter(
-      (d): d is unknown & { id: string; push_token: string } =>
-        typeof d.id === "string" && typeof d.push_token === "string" && d.push_token !== "",
-    ) as PushDevice[];
+    const devs = configuredPushDevices(devices, cfg);
     if (devs.length === 0) return { sent: 0, skipped: "no-devices" };
     const { data: peerRow } = await supa
       .from("users")
@@ -355,14 +334,14 @@ export async function sendGameInvitePush(args: {
       };
       const env: ApnsEnv = d.environment === "sandbox" ? "sandbox" : "production";
       const collapse = `game-invite-${toUserId}`;
-      let res = await sendApn({ cfg, env, deviceToken: d.push_token, collapseId: collapse, payload });
+      let res = await sendNativePush({ cfg, platform: d.platform, env, deviceToken: d.push_token, collapseId: collapse, payload });
       let tries = 0;
       while (!res.ok && (res.status === 429 || res.status >= 500 || res.status === 0) && tries < 2) {
         tries += 1;
         await sleep(tries * 1000);
-        res = await sendApn({ cfg, env, deviceToken: d.push_token, collapseId: collapse, payload });
+        res = await sendNativePush({ cfg, platform: d.platform, env, deviceToken: d.push_token, collapseId: collapse, payload });
       }
-      if (!res.ok && DEAD_REASONS.has(res.reason)) {
+      if (!res.ok && isDeadPushReason(res.reason)) {
         await supa.from("devices").delete().eq("id", d.id);
         await supa.from("push_log").insert({
           recipient_id: toUserId,

@@ -113,8 +113,8 @@ export async function POST(
     freshPush.push({ toUserId: target });
   }
   if (freshPush.length > 0) {
-    after(() => {
-      void Promise.all(
+    after(async () => {
+      await Promise.all(
         freshPush.map((f) =>
           sendGameInvitePush({ fromUserId: userId, toUserId: f.toUserId, roomId: room.id, code: room.code }),
         ),

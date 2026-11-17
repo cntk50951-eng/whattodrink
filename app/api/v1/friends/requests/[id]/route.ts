@@ -112,8 +112,8 @@ export async function PATCH(
       console.error(`[api/v1/friends/requests] unmute error: code=${unmuteErr.code} message=${unmuteErr.message}`);
     }
     // 推送（after 语义：fire-and-forget，失败不影响接受本身）。
-    after(() => {
-      void sendFriendPush("accepted", { fromUserId: userId, toUserId: row.user_id });
+    after(async () => {
+      await sendFriendPush("accepted", { fromUserId: userId, toUserId: row.user_id });
     });
     return apiOk({ status: "accepted" as const });
   }

@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+### Added — UR D.11 AOS FCM 基礎通道（2026-11-16）
+- 共用devices API按平台驗證，AOS接受opaque FCM token，iOS／web保留APNs hex及原有owner／綁定／環境口徑；OpenAPI 1.66.0。
+- 服務端firebase-admin 14.5.1讀FIREBASE_SERVICE_ACCOUNT_JSON Secret，原生通道分流、FCM錯誤分類與失效清理；現有碰杯／好友／遊戲邀請加Android發送，iOS仍直接APNs。
+- FCM data來源人使用from_user_id（from為保留字），iOS payload不變；五個after掛點await推送Promise，保留回應後執行。聯調端點可選platform=aos，預設ios及原testOnly限制不變。
+- build 138頁、126檔／1285 tests全綠（新27項）；lint 0 errors／12既有warnings。更新資料文檔、接入說明及teammate memory；未讀私鑰／Secret值、未提交／push／部署或真實送達。AOS客戶端及其餘業務事件仍待後續，UR保持WIP。
+
+
 ### Changed
 - **UR M.5／M.6／M.7 · 同步最新 intro 至 Production**
   - 2026-11-16 用戶明確授權提交部署：一併發布三語文案／地圖故事銜接、hi drink／嗨飲品牌首屏、Ivy→大話骰→調酒、底部去連結與手動回看；保留原版備份及正式站封站。
