@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.66.0
+  version: 1.67.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -12,14 +12,68 @@ x-native-push-payloads:
     transport: APNs
     description: 保留現有 aps 與自訂 t／from／事件ID欄位，不由Firebase轉送
   aos:
-    transport: FCM
-    description: notification 放標題／內容；data 值皆字串，保留 t 與事件ID；APNs 的 from 改成 from_user_id，避開FCM保留字
+    transport: FCM data-only
+    description: >
+      所有data值皆字串；客戶端核對recipient_id等於當前登入者、expires_at未到期及event_id未處理後才顯示。
+      不使用FCM notification自動展示，避免登出／換帳號後顯示舊通知。iOS原APNs payload不變。
+      聊天正文、語音、位置坐標、投訴證據與自由文本不進payload。
+    required: [t, title, body, recipient_id, event_id, expires_at, collapse_id]
+    fields:
+      t: 業務事件種類
+      title: 本地化通用標題
+      body: 本地化安全提示，不含聊天正文或敏感案件內容
+      recipient_id: 收件人UUID
+      event_id: 穩定去重ID，同一事件重試保持不變
+      expires_at: Unix epoch毫秒字串，客戶端丟棄過期通知
+      collapse_id: 通知合併鍵
+      badge: 非負整數字串，可選
+      from_user_id: 來源人UUID，可選；APNs from轉換而來
+      conversation_id: 會話UUID，可選
+      invite_id: 私人邀約UUID，可選
+      party_id: 酒局UUID，可選
+      complaint_id: 投訴案件UUID，可選
+      room_id: 遊戲房UUID，可選
+      code: 遊戲房號，可選
+      checkin_id: 來源帖子UUID，可選
+      decision: approved／rejected或業務結果，可選
     events:
       cheers: [t, from_user_id, checkin_id]
       friend_request: [t, from_user_id]
       friend_accepted: [t, from_user_id]
       game_invite: [t, from_user_id, room_id, code]
+      chat: [t, from_user_id, conversation_id]
+      invite: [t, from_user_id, invite_id]
+      invite_reply: [t, from_user_id, invite_id, decision]
+      member_joined: [t, party_id]
+      party_cancelled: [t, party_id]
+      member_left: [t, party_id]
+      member_left_late: [t, party_id]
+      reminder_1h: [t, party_id]
+      attendance_confirm: [t, party_id]
+      complaint_filed: [t, complaint_id]
+      complaint_response_needed: [t, complaint_id]
+      complaint_ack: [t, complaint_id]
+      complaint_result: [t, complaint_id, decision]
+      trust_changed: [t, party_id]
+      game_join_request: [t, room_id]
+      game_join_result: [t, room_id, decision]
+      game_kicked: [t, room_id]
+    notice_kinds: [member_joined, party_cancelled, member_left, member_left_late, reminder_1h, attendance_confirm, complaint_filed, complaint_response_needed, complaint_ack, complaint_result, trust_changed, game_join_request, game_join_result, game_kicked]
 paths:
+  /api/internal/push-dispatch:
+    post:
+      operationId: dispatchNativePush
+      summary: 內部AOS推送outbox排程；只接受Vault保管的CRON_SECRET，不接受App session
+      description: 每分鐘由Supabase pg_cron/pg_net喚醒；最多claim16事件、4個事件worker、每事件10設備。未執行0077 migration時503，不自動建表。
+      security:
+        - cronSecret: []
+      responses:
+        "200":
+          description: claimed／sent（供應商接受數）／skipped／retry／failed計數；不代表已顯示於真機
+        "401":
+          description: CRON_SECRET未配置、太短或憑證不匹配
+        "503":
+          description: 排程、資料庫或FCM配置不可用
   /api/v1/wall:
     get:
       operationId: getWall
@@ -6984,6 +7038,10 @@ components:
                     strength:
                       type: number
   securitySchemes:
+    cronSecret:
+      type: http
+      scheme: bearer
+      description: 僅服務端CRON_SECRET（≥16字元），不是用戶JWT
     bearerAuth:
       type: http
       scheme: bearer

@@ -39,19 +39,24 @@ export function fcmMessage(args: { deviceToken: string; collapseId: string; payl
     if (key === "aps" || key === "message_type" || key.startsWith("google.") || key.startsWith("gcm.")) continue;
     if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") data[key === "from" ? "from_user_id" : key] = String(value);
   }
-  const badge = typeof a.badge === "number" && Number.isFinite(a.badge) ? Math.max(0, Math.floor(a.badge)) : undefined;
+  const badge = typeof a.badge === "number" && Number.isFinite(a.badge) ? Math.max(0, Math.floor(a.badge)) : 0;
+  // Data-only is intentional: Android checks the active recipient before showing anything,
+  // including in background. Firebase's automatic notification UI bypasses that guard.
+  data.title = typeof copy.title === "string" ? copy.title : data.title ?? "hi drink";
+  data.body = typeof copy.body === "string" ? copy.body : data.body ?? "";
+  data.collapse_id = args.collapseId;
+  data.badge = String(badge);
+  const now = Date.now();
+  const requestedExpiry = Number(data.expires_at);
+  const expiresAt = Number.isFinite(requestedExpiry) && requestedExpiry > 0 ? requestedExpiry : now + TTL_MS;
+  data.expires_at = String(expiresAt);
   return {
     token: args.deviceToken,
-    notification: {
-      title: typeof copy.title === "string" ? copy.title : "hi drink",
-      ...(typeof copy.body === "string" ? { body: copy.body } : {}),
-    },
     data,
     android: {
       priority: "high",
-      ttl: TTL_MS,
+      ttl: Math.max(0, Math.min(TTL_MS, expiresAt - now)),
       collapseKey: args.collapseId,
-      notification: { tag: args.collapseId, defaultSound: true, ...(badge === undefined ? {} : { notificationCount: badge }) },
     },
   };
 }

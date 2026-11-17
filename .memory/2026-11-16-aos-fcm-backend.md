@@ -26,3 +26,7 @@
 
 ## 後續發佈授權與範圍
 - 2026-11-16用戶明確授權D.11的web API commit／push並追蹤Vercel部署；與先前未獲授權的狀態區分。只提交本批shared API／FCM，其他intro WIP留在工作樹；AOS完整22項通知接入另進AOS-0.138／後端D.12。
+
+## 後續真實發佈狀態（2026-11-16）
+- fb17dcf00698a7150983fc85fbdb7a3a83b6dad5已提交並推送main，GitHub Vercel context success（Deployment has completed）；不是仍停本地。先前「未部署」為當時紀錄。
+- D12接續data-only完整payload／新事件，見2026-11-16-aos-push-outbox.md；iOS仍直接APNs。正式Supabase migration／排程和真機未啟用驗收。

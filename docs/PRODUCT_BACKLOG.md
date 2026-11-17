@@ -4590,3 +4590,13 @@ UR L.1　全站开关 `SITE_LIVE`＋coming soon 页 [✓]
 - D.11 驗證（2026-11-16）：build 138頁、126檔／1285 tests全綠；lint 0errors／12既有warnings；tsc通過。未送真實通知／部署，AOS完整客戶端與其他業務事件待後續；維持WIP。交接memory 2026-11-16-aos-fcm-backend.md、docs/FCM_SETUP.md。
 
 - D.11 發佈授權（2026-11-16）：用戶明確要求將web API commit／push GitHub觸發Vercel；本批只提交D.11，不帶intro M.8／M.9或AOS原生改動，SITE_LIVE保持不變。
+
+## UR D.12 AOS完整業務推送、持久outbox與排程（2026-11-16）[WIP]
+- 平台：共用後端新增事件先供AOS；iOS既有APNs payload／事件掛點保留，新增事件暫不發iOS。契約先行OpenAPI1.67.0，Android data-only含recipient_id／穩定event_id／epoch-ms expires_at，App驗帳號與去重後顯示。
+- 範圍：對照AOS memory A01～A22，新增messages／invites／notifications交易trigger入列，補member_joined／complaint_ack／complaint_response_needed事件；每分鐘SQL producer產1h提醒／結束出席通知，原lazy GET改共用producer。舊好友／碰杯／game_invite after掛點保留、Android補來源row ID／帳號／到期。
+- 投遞：native_push_outbox＋native_push_deliveries，service-only RPC claim、SKIP LOCKED lease、防並發、每設備去重、最多8次退避；CRON_SECRET保護POST /api/internal/push-dispatch。新事件AOS-only；派發前重查source／prefs／block／mute／read／expiry／owner，DB不明時fail closed。鎖屏沒有正文或證據。
+- 運維：0077 migration＋push-dispatch-cron.sql只由用戶Dashboard執行；pg_cron每分鐘經pg_net＋Vault調HTTPS端點，不加付費Vercel cron。不改SITE_LIVE、現有每日cron、正式DB或Secret。
+- AC：22項逐項真機；背景／鎖屏／冷熱啟動／登入後導航、登出換帳號不串通知、過期／靜音／屏蔽不發、部分設備失敗只重試該設備、provider含糊成功由App event_id兜去重。SQL準備好不等於已啟用；供應商接受不等於已顯示。
+- *改動記錄*：2026-11-16完成本地後端實作及專項測試18項（outbox15＋反向好友接受路由3），待整體gate、用戶Dashboard SQL／cron、部署及真機驗收。資料docs/data/push-devices.md；操作docs/FCM_SETUP.md；交接.memory/2026-11-16-aos-push-outbox.md；未commit／push，保持WIP。
+
+- D.12整體驗證（2026-11-16）：web139頁／1304tests／lint0errors12既有warnings；PGlite SQL trigger／去重／lease／權限綠。用戶已授權本批web提交推送部署，iOS不動、intro WIP排除；Supabase0077／Vaultcron與真機仍待用戶，維持WIP。

@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { isTestEndpointsEnabled } from "@/lib/api/testOnly";
@@ -32,6 +34,8 @@ export async function POST(req: Request): Promise<Response> {
     chat: { title: "[測試] 聊天", thread: "chat-test" },
   };
   const meta = titles[event];
+  const eventId = "test:" + randomUUID();
+  const expiresAt = String(Date.now() + 10 * 60_000);
   let sent = 0;
   for (const d of devs) {
     const res = await sendNativePush({
@@ -41,6 +45,7 @@ export async function POST(req: Request): Promise<Response> {
       payload: {
         aps: { alert: { title: meta.title, body: "[測試推送]" }, badge: badge.badge, sound: "default", "thread-id": meta.thread, "mutable-content": 0 },
         t: event, from: userId,
+        ...(platform === "aos" ? { recipient_id: userId, event_id: eventId, expires_at: expiresAt } : {}),
       },
     });
     if (res.ok) sent += 1;

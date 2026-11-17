@@ -13,7 +13,7 @@ UI 定稿前只记录、不建表；EPIC 3.0 按 `future-schema.md` 落表。
 | `future-schema.md` | 整体回顾：未来表草图＋EPIC 映射＋替换清单 | 草图，UI 定稿后细化 |
 | `intro-marketing.md` | `/intro`／`/intro-next` 三語介紹、圖片、播放狀態與原版備份 | UR M.1／M.4，全部不進庫 |
 
-- UR D.11 原生推送設備資料：`push-devices.md`（AOS FCM／iOS APNs設備身份與私有token；無新增表）。
+- UR D.11／D.12 原生推送資料：`push-devices.md`（設備身份／私有token；D.12新增內部outbox／delivery與排程，App不直接讀寫）。
 
 ## 标注约定（四列）
 

@@ -1,38 +1,77 @@
-# AOS FCM 基礎通道（UR D.11）
+# Android FCM 配置與啟用（D.11／D.12）
 
-## 已完成的配置
-- 服務端套件：firebase-admin 14.5.1，Node22+；iOS仍由原APNs通道送達，不需改iOS App。
-- Vercel後端環境變量：Name 為 FIREBASE_SERVICE_ACCOUNT_JSON，Type 為 Secret，Value 為整份服務帳戶JSON。用戶已確認配置；本輪未讀內容或驗證權限。
-- 不使用NEXT_PUBLIC前綴，不將私鑰放App、public、Git或log。服務端從環境讀取，無需上傳JSON檔到網站目錄。
-- 所有實作仍在本地工作樹，未提交／推送／部署；不要把本地build成功當成Vercel版本已更新。
+2026-11-16狀態：Firebase及Vercel FIREBASE_SERVICE_ACCOUNT_JSON由用戶確認ready。基礎通道已提交推送 `fb17dcf`，GitHub回報Vercel成功；D.12完整事件已完成本機回歸，按本次授權單獨提交推送，不帶intro工作樹改動。Supabase migration／排程及真機送達仍待啟用驗收。
 
-## 設備契約
-- POST／PATCH／DELETE /api/v1/devices，需使用App登入者的Bearer session。回應不包含token。
-- platform=ios／web 保留既有hex64–200驗證；platform=aos 接opaque FCM registration token，1–4096字元，不含空白／控制字元。
-- environment仍為sandbox|production，缺省production；只影響iOS APNs，FCM不使用APNs sandbox。測試與正式Firebase專案由後端憑證與App配置分隔。
-- 既有user_id取自已驗證登入者，登記re-bind、10台上限、enabled／locale同步及登出解綁語義保留。無需新增DB表或migration。
-- 本契約目前接FCM registration token；不要把Firebase Installation ID（FID）直接當token送入。未來如切換FID，先同步契約、發送SDK與AOS註冊流程。
+## 應用與憑證
 
-## 事件與payload
-- 本階段已有碰杯、好友請求／接受、遊戲邀請的Android分流；與APNs沿同一偏好、文案、限頻、badge及重試規則。
-- Android：FCM notification 放標題／內容，data 值都是字串，t保持cheers／friend_request／friend_accepted／game_invite，來源人為 from_user_id，來源帖子checkin_id，遊戲room_id／code。
-- iOS：aps／from／事件ID保持原樣。不能把FCM data保留字from原樣送入Android。
-- 已明確失效的FCM註冊會清理；泛化invalid-argument可能是payload問題，不得因此刪除有效設備。
+- Android專案在 `whattodrink_aos`，Firebase project `hidrink-0611`、package `hk.whattodrink.app`。Android配置只放其app/google-services.json（Git忽略），服務帳戶私鑰不進App。
+- 後端API／FCM程式及下方SQL在 **whattodrink web repo**。firebase-admin14.5.1、Node22+；只從server Secret `FIREBASE_SERVICE_ACCOUNT_JSON`讀完整service-account JSON，無NEXT_PUBLIC前綴。不改SITE_LIVE、其他環境值或iOS App。
+- iOS保留原直接APNs；D.12新事件先供AOS，現有四種APNs payload及sandbox／production相容。
 
-## 後續驗收順序
-1. 先補AOS runtime通知權限、Messaging service／channels／小圖標、取得與刷新token、登入綁定／登出解除及重試、通知點擊導航。現有AOS SDK auto-init仍關閉，還不能收到業務推送。
-2. 後端程式需經用戶另行授權commit／push／部署後才到Vercel；檢查Secret適用於目標環境並讓新deployment載入。保持原APNs配置、正式站開關及其他環境值。
-3. 在允許testOnly端點的非生產環境，將本人設備註冊為aos，POST /api/v1/devices/test-push，body為 {"event":"cheers","platform":"aos"}。沿原有開關，production維持不開test端點；省略platform仍是ios相容路徑。
-4. 對照API的sent／devices、供應商安全錯誤碼與真機鎖屏／背景／冷啟動／點擊。供應商接受不等於用戶看見，分別記錄。不要在聊天或issue貼session、token、私鑰或完整JSON。
-5. 聊天、約酒、酒局／出席／投訴／誠信等尚無遠端事件掛點，依兩端memory清單逐項設計及實作，不以此基礎通道代表22項全完成。
+## 契約與客戶端
 
-## 本輪本機驗證
-- build 138頁；126測試檔／1285項全綠；lint 0 errors／12既有warnings；iOS APNs函數及sandbox分流有回歸。
-- 未呼叫真實FCM／APNs，未裝機、未部署，UR保持WIP。
-- 契約：docs/api-openapi.yaml 1.66.0（含 x-native-push-payloads）；資料：docs/data/push-devices.md；交接：.memory/2026-11-16-aos-fcm-backend.md。
+- OpenAPI1.67.0：POST／PATCH／DELETE /api/v1/devices，登入Bearer、owner／rebind／10台上限／enabled／locale保持。ios/web仍hex64–200；aos opaque FCM registration token1–4096、無空白／控制字元，**不是FID或私鑰**。environment不決定FCM sandbox。
+- FCM **data-only**：t/title/body/recipient_id/event_id/expires_at(epoch-ms)/collapse_id等皆字串；來源人from_user_id，App先驗帳號與期限再顯示。iOS的from／aps不變。
+- AOS-0.138已接runtime權限、七類channels、加密token及receipt／pending route、登入與登出同步、前台橫幅、精準跳轉、頭像→通知設定及九類偏好；原始SDK配置「尚未接入」是歷史紀錄。
+- 手機恢復後按AOS `docs/PUSH_TEST_PLAN.md`逐項驗。非生產testOnly環境可用本人Bearer POST /api/v1/devices/test-push `{"event":"cheers","platform":"aos"}`；省略platform仍ios，production不開測試端點。
 
-## 官方依據
-- https://firebase.google.com/docs/admin/setup
-- https://firebase.google.com/docs/cloud-messaging/send/admin-sdk
-- https://firebase.google.com/docs/cloud-messaging/customize-messages/set-message-type
-- https://firebase.google.com/docs/cloud-messaging/ios/get-started
+## 本機驗證
+
+- web build139頁；128檔／1304tests綠；lint0errors／12既有warnings。iOS分流與原格式有回歸，未發真FCM／APNs。
+- 0077在臨時PGlite真PostgreSQL跑apply／replay、實際trigger、reminder／attendance去重、claim不重疊／lease重領、RPC權限與expiry皆過；沒有連正式DB。重跑腳本見scripts/verify-push-outbox-sql.mjs，PGlite只供本機測試、不加runtime依賴。
+- Android assemble及747tests綠，lint仍有25個既有Compose資源讀取錯誤；沒有真機親驗，不將UR打✓。手機重啟由用戶暫停裝機，未歸因App。
+
+## D.12：完整AOS業務推送與持久outbox（待Dashboard啟用）
+
+**下方SQL尚未在Supabase執行，故新的持久事件與提醒尚未啟用。** 新業務事件僅發AOS；iOS現有APNs四種payload與發送掛點保持不變，其他iOS事件等客戶端路由準備好再開。沒有增加付費Vercel每分鐘cron，也不改現有兩個每日job或SITE_LIVE。
+
+### 用戶操作順序（SQL只由用戶在Supabase Dashboard執行）
+1. 檢視並執行 `supabase/migrations/0077_native_push_outbox.sql`。此檔整體transaction，建立outbox／delivery、只供service_role的claim RPC、來源trigger和排程producer。沒有重播舊消息；啟用後的新INSERT／有效狀態轉換才入列。若已有重複提醒，partial unique index會令migration整體回滾，先查明重複資料；不要為通過migration盲刪通知。
+2. 後端D.12按本輪既有授權commit／push並部署（最終SHA見memory／交付），確認Vercel已有FIREBASE_SERVICE_ACCOUNT_JSON與至少16字元CRON_SECRET。可沿用現有帳號清理cron的Secret；本功能不輸出其值，不讀取或修改正式Secret。
+3. 在Supabase Extensions啟用pg_cron、pg_net與Vault。在**Vault UI**建立 `push_dispatch_url`（Production HTTPS `/api/internal/push-dispatch`完整網址）和 `push_dispatch_secret`（與Vercel CRON_SECRET相同）。不把真實Secret寫進repo或分享截圖。
+4. 檢視並執行 `supabase/push-dispatch-cron.sql`。它只替換名為native-push-dispatch的job，每分鐘HTTP POST喚醒後端。從Vault取Bearer，不傳service_role key。移除舊的**酒局1小時提醒**重複cron（先確認job SQL，勿刪其他job）；新producer本身已生成該提醒。
+5. 請用戶真機測試以下22項、拒絕權限、鎖屏／背景／冷啟動、換帳號／登出、通知點擊、靜音／屏蔽／已讀、過期房間與斷網重試。SQL migration和mock測試不代表真機送達驗收。
+
+### 22項來源與分工
+| 清單 | 來源 | 狀態／路由資料 |
+|---|---|---|
+| A01／A02 好友請求與接受 | 保留sendFriendPush原after掛點；補POST反向pending自動接受AOS-only掛點 | Android增加recipient_id、穩定來源row事件ID、到期；iOS不變 |
+| A03／A04 好友／陌生人私信（包括全部附件） | messages INSERT trigger | t=chat，conversation_id；發送前重新查成員、水位、mute、封鎖、模式和chat／stranger_chat偏好 |
+| A05 新私人約酒 | drink_invites INSERT sent | t=invite，invite_id；好友invites／陌生stranger_invites（預設關） |
+| A06 私人約酒回應 | sent→accepted／declined UPDATE trigger | t=invite_reply，invite_id／decision；invite_replies；婉拒推送是本次清單明確要求的行為更新 |
+| A07 新成員加入 | joins INSERT trigger生成member_joined通知 | 只有真正新增，幂等23505重試不生成；通知發起人 |
+| A08／A09／A10 撤局／退出／臨近退出 | notifications INSERT trigger | party_cancelled／member_left／member_left_late；維持原有收件人與開局前／屏蔽政策 |
+| A11 開局前1小時 | 每分鐘producer生成reminder_1h | 發起人＋當時仍在joins者，通知與去重reservation同transaction；遲掃可補至開局前，開始即過期 |
+| A12 結束確認出席 | 每分鐘producer生成attendance_confirm | 結束後24h窗口，host＋仍在joins者；原lazy GET改調同一producer（0077執行前僅RPC缺失才回退舊寫法），沒有兩套競態寫入 |
+| A13 被投訴 | 原complaint_filed通知 | 安全案件仍通知；非安全與response-needed合併成一次系統提醒 |
+| A14 需要申辯 | complaints INSERT awaiting_response trigger | complaint_response_needed；依真實response_due_at，已回應／過期則不發 |
+| A15 投訴回執 | complaints INSERT trigger | complaint_ack→filer |
+| A16／A17 結果與誠信 | 原complaint_result／trust_changed通知 | 維持現有結果、收件人與誠信門檻；鎖屏僅通用提示 |
+| A18 遊戲邀請 | 保留sendGameInvitePush原after掛點 | 加Android事件識別／帳號／房間到期；iOS不變 |
+| A19／A20／A21 入座申請／結果／踢出 | 原game_join_request／game_join_result／game_kicked通知 | room_id，approved／rejected；申請5分鐘有效，重查房間和申請／玩家狀態 |
+| A22 碰杯與回敬 | 保留sendCheersPush原after掛點 | 繼承原限頻／合併／來源帖；Android穩定事件ID與帳號防串 |
+
+### 重試、安全與限制
+- claim RPC用FOR UPDATE SKIP LOCKED、3分鐘lease與隨機lease_token；每批16事件、4個事件worker、每事件最多10設備，45秒工作預算、單次provider等待上限5秒。超時／資料庫錯誤fail closed、不聯繫provider，留待重試；最多8次、退避30秒至1小時，過期／耗盡進dead。
+- 每事件每設備成功記native_push_deliveries，部分失敗只重試未成功設備；FCM明確dead registration停用對應owner/token仍一致的設備。FCM暫時失敗或invalid-argument不刪有效token。
+- 傳送前再讀owner／enabled／token、使用者偏好、source狀態、讀水位、封鎖與mute。帳號在最後一個網路瞬間仍可能切換，因此Android仍必須核對recipient_id與當前帳號。data-only避免系統直接顯示舊帳號通知。
+- 至少一次送達：provider接受後、DB記成功前進程可能中斷，provider timeout也可能實際已接受；不能承諾網路exactly-once。相同event_id保持不變，App以event_id去重，collapse_id聚合；去重不能只靠新UUID。
+- 舊三個send函數仍是既有after模式（未遷至持久outbox），保留其既有行為與限制。不得將新outbox的持久保證套用到好友／碰杯／遊戲邀請三個舊family。
+- party偏好統管酒局／投訴／誠信，game_invites偏好統管遊戲通知；未私創新push_prefs鍵。陌生人預設關。聊天正文、座標、圖片、證據、案件自由文本不進push。
+- 沒有Google Play services的機型不保證FCM可達；若需要中國大陸／無GMS設備覆蓋，另規劃廠商通道，不以常駐輪詢代替系統push。供應商接受不等於用戶已看見。
+
+### 觀測與排障（只查安全欄位）
+```sql
+SELECT status,count(*),min(created_at) AS oldest FROM public.native_push_outbox GROUP BY status;
+SELECT id,kind,status,attempts,last_error,available_at,lease_until FROM public.native_push_outbox
+ WHERE status IN ('pending','processing','dead') ORDER BY created_at LIMIT 50;
+SELECT status,count(*) FROM public.native_push_deliveries GROUP BY status;
+SELECT jobid,jobname,active FROM cron.job WHERE jobname='native-push-dispatch';
+SELECT jobid,status,start_time,end_time,return_message FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;
+SELECT id,status_code,timed_out,error_msg FROM net._http_response ORDER BY id DESC LIMIT 10;
+```
+API只回計數，503不輸出token／Secret／SDK原始錯誤；native_push_outbox last_error亦只有安全代碼。不要查閱／複製Vault decrypted_secret到log。臨時停發可由Dashboard取消native-push-dispatch或將devices.enabled關閉；重啟後source會重新驗證，過期不補發。
+
+D.12新表是內部投遞狀態，不可由App直接讀寫。後續保留期／清理policy尚未自動排程，觀測表量後制定；不要無限保留debug資料或刪除仍可重試事件。參考[Supabase排程與Vault](https://supabase.com/docs/guides/functions/schedule-functions)、[PostgreSQL鎖定與SKIP LOCKED](https://www.postgresql.org/docs/current/sql-select.html)。
+
+pg_net官方提醒：帶Bearer的HTTP request在發送前會短暫留在net.http_request_queue，具有資料庫登入權的人可能讀到；限制DB登入／schema權限，不截圖queue headers，Vault不是對高權限DB使用者隱藏傳輸header的保證。

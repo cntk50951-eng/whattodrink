@@ -4,6 +4,8 @@
  * 缺 APNs key 即静默跳过＋warn（用户 Apple 后台并行办，不 block 落地）。
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import type { ApnsEnv } from "./apns";
 import { configuredPushDevices, hasPushChannel, isDeadPushReason, nativePushConfigFromEnv, sendNativePush } from "./native";
 import { computeBadge } from "./badge";
@@ -24,6 +26,36 @@ function copyFor(locale: string): Record<string, string> {
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/** Android account/expiry guard; iOS keeps its original payload byte-for-byte shape. */
+async function aosEventMeta(db: SupabaseClient, table: string, filters: Record<string,string>, recipientId: string, kind: string): Promise<Record<string,string>|null> {
+ const receiver=await db.from("users").select("id,push_prefs").eq("id",recipientId).maybeSingle();
+ if(receiver.error||!receiver.data)return null;
+ const preferences=pushPrefsOf(receiver.data.push_prefs);
+ if(!(kind==="cheers"?preferences.cheers:kind==="game_invite"?preferences.game_invites:preferences.friends))return null;
+ const actor=filters.from_user_id??(kind==="friend_request"?filters.user_id:filters.friend_id);
+ if(!actor)return null;
+ const block=await db.from("cheers_blocks").select("blocker_id").or(`and(blocker_id.eq.${actor},blocked_id.eq.${recipientId}),and(blocker_id.eq.${recipientId},blocked_id.eq.${actor})`).limit(1);
+ if(block.error||!Array.isArray(block.data)||block.data.length)return null;
+ let query=db.from(table).select("id,created_at");
+ for(const [key,value] of Object.entries(filters))query=query.eq(key,value);
+ const {data,error}=await query.order("created_at",{ascending:false}).limit(1).maybeSingle();
+ if(error||!data||typeof data.id!=="string")return null;
+ let expiresAt=Date.now()+86_400_000;
+ if(table==="game_invites"){
+  const room=await db.from("game_rooms").select("expires_at,status").eq("id",filters.room_id).maybeSingle();
+  if(room.error||!room.data||room.data.status!=="lobby")return null;
+  const roomExpiry=Date.parse(String(room.data.expires_at));if(!Number.isFinite(roomExpiry)||roomExpiry<=Date.now())return null;expiresAt=Math.min(expiresAt,roomExpiry);
+ }
+ const created=kind==="friend_accepted"?Date.now():Date.parse(String(data.created_at));
+ if(!Number.isFinite(created)||created+86_400_000<=Date.now())return null;
+ return {recipient_id:recipientId,event_id:`${kind}:${data.id}`,expires_at:String(Math.min(expiresAt,created+86_400_000))};
+}
+
+async function aosDeviceIsCurrent(db: SupabaseClient, id: string, token: string, recipient: string): Promise<boolean> {
+ const {data,error}=await db.from("devices").select("id").eq("id",id).eq("platform","aos").eq("user_id",recipient).eq("enabled",true).eq("push_token",token).maybeSingle();
+ return !error&&data!==null;
+}
 
 /**
  * E1 碰杯推送（cheers POST 成功后 after() 调；throw 永不外泄，调用方 fire-and-forget）。
@@ -118,8 +150,10 @@ export async function sendCheersPush(args: {
         beerName = (beerRow as { name: string }).name;
       }
     }
+    const aosMeta=devs.some(d=>d.platform==="aos")?await aosEventMeta(supa,"cheers",{from_user_id:fromUserId,to_user_id:toUserId,checkin_id:checkinId},toUserId,"cheers"):null;
     let sent = 0;
     for (const d of devs) {
+      if(d.platform==="aos"&&(!aosMeta||!await aosDeviceIsCurrent(supa,d.id,d.push_token,toUserId)))continue;
       const t = (k: string): string => copyFor(typeof d.locale === "string" ? d.locale : "zh-Hant")[k] ?? copyFor("zh-Hant")[k] ?? k;
       const title =
         (minCount ?? 0) > 0
@@ -130,6 +164,7 @@ export async function sendCheersPush(args: {
         alert.body = fillPushTemplate(t("pushCheersBody"), { beer: beerName });
       }
       const payload = {
+        ...(d.platform === "aos" ? aosMeta : {}),
         aps: {
           alert,
           badge: badge.badge,
@@ -189,7 +224,7 @@ export async function sendCheersPush(args: {
  * 沿 E1 同形（badge＋collapse＋410 删行＋重试＋日志）；无合并（请求低频）。
  */export async function sendFriendPush(
   kind: "request" | "accepted",
-  args: { fromUserId: string; toUserId: string },
+  args: { fromUserId: string; toUserId: string; aosOnly?: boolean },
 ): Promise<{ sent: number; skipped?: string }> {
   const { fromUserId, toUserId } = args;
   try {
@@ -206,7 +241,7 @@ export async function sendCheersPush(args: {
       .in("platform", ["ios", "aos"])
       .eq("enabled", true)
       .limit(10);
-    const devs = configuredPushDevices(devices, cfg);
+    const devs = configuredPushDevices(devices, cfg).filter(d => !args.aosOnly || d.platform === "aos");
     if (devs.length === 0) return { sent: 0, skipped: "no-devices" };
     const { data: peerRow } = await supa
       .from("users")
@@ -223,11 +258,14 @@ export async function sendCheersPush(args: {
       .maybeSingle();
     const nick = (fromRow as { nickname?: unknown } | null)?.nickname;
     const fromName = typeof nick === "string" && nick !== "" ? nick : "酒友";
+    const aosMeta=devs.some(d=>d.platform==="aos")?await aosEventMeta(supa,"friendships",kind==="request"?{user_id:fromUserId,friend_id:toUserId,status:"pending"}:{user_id:toUserId,friend_id:fromUserId,status:"accepted"},toUserId,kind==="request"?"friend_request":"friend_accepted"):null;
     let sent = 0;
     for (const d of devs) {
+      if(d.platform==="aos"&&(!aosMeta||!await aosDeviceIsCurrent(supa,d.id,d.push_token,toUserId)))continue;
       const t = (k: string): string => copyFor(typeof d.locale === "string" ? d.locale : "zh-Hant")[k] ?? copyFor("zh-Hant")[k] ?? k;
       const titleKey = kind === "request" ? "pushFriendRequestTitle" : "pushFriendAcceptedTitle";
       const payload = {
+        ...(d.platform === "aos" ? aosMeta : {}),
         aps: {
           alert: { title: fillPushTemplate(t(titleKey), { name: fromName }) },
           badge: badge.badge,
@@ -316,10 +354,13 @@ export async function sendGameInvitePush(args: {
       .maybeSingle();
     const nick = (fromRow as { nickname?: unknown } | null)?.nickname;
     const fromName = typeof nick === "string" && nick !== "" ? nick : "酒友";
+    const aosMeta=devs.some(d=>d.platform==="aos")?await aosEventMeta(supa,"game_invites",{room_id:roomId,from_user_id:fromUserId,to_user_id:toUserId,status:"pending"},toUserId,"game_invite"):null;
     let sent = 0;
     for (const d of devs) {
+      if(d.platform==="aos"&&(!aosMeta||!await aosDeviceIsCurrent(supa,d.id,d.push_token,toUserId)))continue;
       const t = (k: string): string => copyFor(typeof d.locale === "string" ? d.locale : "zh-Hant")[k] ?? copyFor("zh-Hant")[k] ?? k;
       const payload = {
+        ...(d.platform === "aos" ? aosMeta : {}),
         aps: {
           alert: { title: fillPushTemplate(t("pushGameInviteTitle"), { name: fromName }) },
           badge: badge.badge,

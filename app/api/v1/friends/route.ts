@@ -182,6 +182,11 @@ export async function POST(req: Request): Promise<Response> {
           .or(
             `and(blocker_id.eq.${userId},blocked_id.eq.${targetUserId}),and(blocker_id.eq.${targetUserId},blocked_id.eq.${userId})`,
           );
+        // D.12: this acceptance entry previously lacked a push. Add AOS only;
+        // the original iOS after hooks and APNs behavior are unchanged.
+        after(async () => {
+          await sendFriendPush("accepted", { fromUserId: userId, toUserId: targetUserId, aosOnly: true });
+        });
         return apiOk({ status: "accepted" as const });
       }
       const myPending = rows.some(

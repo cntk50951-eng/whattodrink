@@ -81,3 +81,9 @@ UI 全确定后按此开工 EPIC 3.0 真表设计。
 - EPIC 2.0（AI 推荐决策时刻）：读 `beers`＋`mood_logs`＋`checkins` 历史。
 - EPIC 3.0（足迹／社交／地图壁垒）：上表＋`users`＋`cheers`，护城河在此。
 - EPIC 4.0（本地策展／酒桌游戏，暂缓）：`bars`＋`game_*` 到时再议。
+
+## D.12 Android通知投遞內部表（2026-11-16，0077待用戶執行）
+
+- `native_push_outbox`：UUID事件、唯一event_key、recipient／actor、kind、source_type／source_id、安全導航payload、created／expires／available時間、status／attempts／lease_until／lease_token／last_error／finished_at；不存聊天正文／證據／token。RLS啟用無公開policy、撤anon／authenticated權限，僅service_role處理。
+- `native_push_deliveries(event_id,device_id,status,finished_at)`：複合PK，每設備已完成／失效結果；FK cascade，無App API。0077同時定義只供service_role claim RPC，來源trigger及reminder producer；devices／notifications既有欄位不變。
+- 派發重查原來源、偏好、封鎖、mute／read／expiry與設備owner；資料對照push-devices.md，啟用與Vault cron步驟FCM_SETUP.md。iOS舊APNs保留，新增事件先供AOS。

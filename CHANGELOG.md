@@ -4,11 +4,18 @@
 
 ## [Unreleased]
 
+### Added — UR D.12 AOS完整業務推送與持久outbox（2026-11-16）
+- OpenAPI1.67與Android data-only帳號／事件／到期契約；聊天、約酒、酒局／投訴／誠信／遊戲通知接持久outbox，新增缺少的member_joined／complaint_ack／response-needed來源與定時1h／出席producer。
+- 0077交易trigger＋服務端lease claim／每設備結果去重／退避重試；CRON_SECRET端點與pg_cron／pg_net／Vault操作腳本，只準備檔案，未代用戶執行SQL。派發前fail closed重查隱私／已讀／過期與設備owner；鎖屏不帶正文／證據。
+- 舊三family after掛點保留，僅Android加穩定來源event_id／recipient_id／expiry，iOS原APNs不變；新增業務事件AOS-only。出席lazy GET共用原子producer，避免雙寫競態（migration前RPC缺失保留舊路徑）；補POST互相好友請求自動接受AOS-only通知與18項回歸。部署、SQL啟用與真機驗收待辦見FCM_SETUP.md。
+- 整體驗證：build139頁、128檔／1304tests綠、lint0errors／12既有warnings；PGlite實際SQL整合通過，可重跑腳本已保留。依本次授權只發佈web push改動，SQL與手機親驗仍待用戶。
+
+
 ### Added — UR D.11 AOS FCM 基礎通道（2026-11-16）
 - 共用devices API按平台驗證，AOS接受opaque FCM token，iOS／web保留APNs hex及原有owner／綁定／環境口徑；OpenAPI 1.66.0。
 - 服務端firebase-admin 14.5.1讀FIREBASE_SERVICE_ACCOUNT_JSON Secret，原生通道分流、FCM錯誤分類與失效清理；現有碰杯／好友／遊戲邀請加Android發送，iOS仍直接APNs。
 - FCM data來源人使用from_user_id（from為保留字），iOS payload不變；五個after掛點await推送Promise，保留回應後執行。聯調端點可選platform=aos，預設ios及原testOnly限制不變。
-- build 138頁、126檔／1285 tests全綠（新27項）；lint 0 errors／12既有warnings。更新資料文檔、接入說明及teammate memory；未讀私鑰／Secret值、未提交／push／部署或真實送達。AOS客戶端及其餘業務事件仍待後續，UR保持WIP。
+- 首輪build138頁、126檔／1285tests綠（新27項）、lint0errors／12既有warnings；其後按用戶授權已推送fb17dcf、Vercel success。未讀私鑰／Secret值或發真通知；完整客戶端／事件接續D.12及AOS-0.138，UR仍待端到端驗收。
 
 
 ### Changed

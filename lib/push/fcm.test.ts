@@ -33,13 +33,26 @@ describe("FCM credentials", () => {
 describe("FCM payload", () => {
   it("preserves event IDs and copies alert without sending an APNs envelope", () => {
     const m = fcmMessage(args);
-    expect(m).toMatchObject({ token: args.deviceToken, notification: { title: "Test", body: "A toast" }, data: { t: "cheers", from_user_id: "peer", checkin_id: "post" }, android: { collapseKey: "cheers-user", notification: { tag: "cheers-user", notificationCount: 3 } } });
+    expect(m).toMatchObject({ token: args.deviceToken, data: { title: "Test", body: "A toast", badge: "3", collapse_id: "cheers-user", t: "cheers", from_user_id: "peer", checkin_id: "post" }, android: { collapseKey: "cheers-user" } });
     expect(m.data).not.toHaveProperty("aps");
     expect(m.data).not.toHaveProperty("from");
     expect(m).not.toHaveProperty("apns");
+    expect(m).not.toHaveProperty("notification");
+    expect(m.android).not.toHaveProperty("notification");
   });
   it("carries friend and room targeting fields and stringifies scalar data", () => {
-    expect(fcmMessage({ ...args, payload: { t: "game_invite", room_id: "room", code: "123456", count: 2, message_type: "reserved", "google.private": "reserved", "gcm.hidden": "reserved", nested: { private: true } } }).data).toEqual({ t: "game_invite", room_id: "room", code: "123456", count: "2" });
+    expect(fcmMessage({ ...args, payload: { t: "game_invite", room_id: "room", code: "123456", count: 2, message_type: "reserved", "google.private": "reserved", "gcm.hidden": "reserved", nested: { private: true } } }).data).toMatchObject({ t: "game_invite", room_id: "room", code: "123456", count: "2", title: "hi drink", body: "", collapse_id: "cheers-user", badge: "0" });
+  });
+});
+
+describe("FCM lifetime", () => {
+  it("carries recipient identity and bounds provider TTL to the event expiry", () => {
+    const expires = Date.now() + 30_000;
+    const m = fcmMessage({ ...args, payload: { recipient_id: "owner", event_id: "message-id", expires_at: String(expires), title: "Title", body: "Safe copy" } });
+    expect(m.data).toMatchObject({ recipient_id: "owner", event_id: "message-id", expires_at: String(expires), title: "Title", body: "Safe copy" });
+    expect(m.android?.ttl).toBeGreaterThan(0);
+    expect(m.android?.ttl).toBeLessThanOrEqual(30_000);
+    expect(fcmMessage({ ...args, payload: { expires_at: "1" } }).android?.ttl).toBe(0);
   });
 });
 

@@ -132,6 +132,16 @@ async function ensureAttendanceConfirm(
   partyId: string,
   expiresMs: number,
 ): Promise<void> {
+  // D.12: scheduler and lazy GET share one atomic, bounded producer. The old two writes
+  // could consume a reservation without creating its notice, or race cron into duplicates.
+  const { error } = await svc.rpc("produce_native_push_reminders");
+  if (!error) return;
+  // Deploying the backend can precede the user's Dashboard migration. Preserve the
+  // existing GET behavior only for a missing RPC; other failures remain fail closed.
+  if (error.code !== "PGRST202" && error.code !== "42883") {
+    console.warn("[attendance] reminder producer unavailable");
+    return;
+  }
   const closesAt = new Date(expiresMs + TRUST_CONFIG.attendance_window_h * 3600_000).toISOString();
   const { data: party } = await svc.from("parties").select("host_user_id,place,start_at").eq("id", partyId).maybeSingle();
   const prow = party as { host_user_id?: unknown; place?: unknown; start_at?: unknown } | null;
