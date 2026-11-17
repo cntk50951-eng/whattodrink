@@ -103,12 +103,17 @@ export async function dispatchNativePush(db:SupabaseClient):Promise<{claimed:num
    ...(status==="pending"?{available_at:retryAt(e.attempts,Date.now())}:{finished_at:new Date().toISOString()})}).eq("id",e.id).eq("lease_token",e.lease_token));
  };
  const processEvent=async(e:OutboxEvent):Promise<void>=>{
+  let stage="start";let lastReason="";
   try{
    if(Date.now()>=deadline)throw new Error("dispatch-budget");
+   stage="eligibility";
    if(!await eventStillEligible(db,e,Date.now())){await finish(e,"skipped");summary.skipped++;return;}
+   stage="devices";
    const devices=configuredPushDevices(await rows(db.from("devices").select("id,platform,push_token,environment,locale").eq("user_id",e.recipient_id).eq("platform","aos").eq("enabled",true).limit(10)),cfg);
    if(!devices.length){await finish(e,"skipped","no-aos-devices");summary.skipped++;return;}
+   stage="badge";
    const badge=(await computeBadge(db,e.recipient_id)).badge;
+   stage="deliveries-read";
    const done=await rows(db.from("native_push_deliveries").select("device_id").eq("event_id",e.id));const doneIds=new Set(done.map(r=>r.device_id));
    let retry=false;let successes=0;
    for(const device of devices){
@@ -121,19 +126,24 @@ export async function dispatchNativePush(db:SupabaseClient):Promise<{claimed:num
     const payload=eventPayload(e,device.locale);
     (payload.aps as Row).badge=badge;
     let timeout: ReturnType<typeof setTimeout>|undefined;
-    const result=await Promise.race([sendNativePush({cfg,platform:"aos",env:"production",deviceToken:device.push_token,collapseId:`${e.kind}-${e.payload.conversation_id??e.payload.party_id??e.payload.room_id??e.recipient_id}`,payload}),new Promise<never>((_,reject)=>{timeout=setTimeout(()=>reject(new Error("provider-timeout")),5000);})]).finally(()=>{if(timeout)clearTimeout(timeout);});
+    stage="send";
+    // 15s: the first firebase-admin call on a cold function also fetches an OAuth token.
+    const result=await Promise.race([sendNativePush({cfg,platform:"aos",env:"production",deviceToken:device.push_token,collapseId:`${e.kind}-${e.payload.conversation_id??e.payload.party_id??e.payload.room_id??e.recipient_id}`,payload}),new Promise<never>((_,reject)=>{timeout=setTimeout(()=>reject(new Error("provider-timeout")),15_000);})]).finally(()=>{if(timeout)clearTimeout(timeout);});
+    stage="record";
+    if(!result.ok)lastReason=result.reason;
     if(result.ok){await write(db.from("native_push_deliveries").upsert({event_id:e.id,device_id:device.id,status:"sent"},{onConflict:"event_id,device_id"}));successes++;}
     else if(isDeadPushReason(result.reason)){
      await write(db.from("native_push_deliveries").upsert({event_id:e.id,device_id:device.id,status:"dead"},{onConflict:"event_id,device_id"}));
      await write(db.from("devices").update({enabled:false}).eq("id",device.id).eq("user_id",e.recipient_id).eq("push_token",device.push_token));
     }else retry=true;
    }
-   if(retry){await finish(e,e.attempts>=8?"dead":"pending","transport-failed");summary.retry++;}
+   if(retry){await finish(e,e.attempts>=8?"dead":"pending",`transport-failed${lastReason?":"+lastReason:""}`.slice(0,80));summary.retry++;}
    else{await finish(e,"sent");summary.sent+=successes;}
-  }catch{
+  }catch(error){
    summary.failed++;
-   // Sanitized code only. If persisting retry fails, the lease expires and another run can reclaim.
-   await finish(e,e.attempts>=8?"dead":"pending","dispatch-failed");
+   // Sanitized code only (stage + fixed-vocabulary message, never tokens/payloads). If persisting retry fails, the lease expires and another run can reclaim.
+   const msg=error instanceof Error&&/^[a-z][a-z0-9-]{2,40}$/.test(error.message)?error.message:"unexpected";
+   await finish(e,e.attempts>=8?"dead":"pending",`dispatch-failed:${stage}:${msg}`);
   }
  };
  // Four event workers, bounded claim (16) and device fanout (10), isolate a failed worker.

@@ -95,6 +95,6 @@ describe("D.12 durable per-device delivery",()=>{
  });
  it("persists sanitized retry on a privacy database error without contacting FCM",async()=>{
   vi.spyOn(Date,"now").mockReturnValue(now);const t=chatTables();t.native_push_outbox=[{...event(),status:"processing"}];
-  const result=await dispatchNativePush(database(t,"cheers_blocks"));expect(result.failed).toBe(1);expect(transport.send).not.toHaveBeenCalled();expect(t.native_push_outbox[0]).toMatchObject({status:"pending",last_error:"dispatch-failed"});
+  const result=await dispatchNativePush(database(t,"cheers_blocks"));expect(result.failed).toBe(1);expect(transport.send).not.toHaveBeenCalled();expect(t.native_push_outbox[0]).toMatchObject({status:"pending",last_error:"dispatch-failed:eligibility:database-read-failed"});
  });
 });
