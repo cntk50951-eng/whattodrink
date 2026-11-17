@@ -22,6 +22,7 @@
 ---
 
 | ID | 标题 | 状态 | 严重度 | 发现日期 / 报告人 | 关联 UR | 确诊根因 |
+| DEF-20261116-003 | 推送cron持續報configuration missing | Fixing | P1 | 2026-11-16 / @user | UR D.12 | Open→Investigating；用戶boolean結果URL與Secret均不存在，Vault缺兩項配置；待用戶補齊及驗證cron／HTTP，未呼叫HTTP |
 | DEF-20261114-001 | `/intro-next` 從簡中／英文切不回繁體 | Verified | P1 | 2026-11-14 / @user | UR M.2 | 繁體入口未帶 locale，next-intl 沿用 NEXT_LOCALE cookie；12 路 HTTP＋瀏覽器點擊通過，待用戶確認 |
 | DEF-20261114-002 | `/intro-next` 首次載入無法開啟播放 | Verified | P1 | 2026-11-14 / @user | UR M.3／M.4 | 有界預載、掛載後初始化；8 項慢載單測及三語實際播放回歸，隨 M.4 發布 |
 | DEF-20261014-001 | 投诉详情时间线／AI 建议裸 JSON＋不见双方身份 | Fixing | P1 | 2026-10-14 / @yuki | UR E.31 | 时间线／AI 两段 `JSON.stringify` 直出（review/[id]/page:175／181），见详情 |
@@ -950,3 +951,19 @@
 - 修復：開場三張高優先，最多等 1.8 秒即放行；其餘兩張併發背景預載，單張 8 秒逾時不阻塞後續。Player callback ref 同步至 state，掛載後綁事件及啟動；手動 toggle 傳點擊事件；離頁／換語言清理，遲到圖片不重啟。
 - 修復驗證：8 項測試模擬全部圖片懸置、失敗、遲到、背景逾時、取消與響應式來源；瀏覽器繁中／簡中／英文自動播放及暫停／恢復成功；`?t=8` 保持凍結且可主動播放，控制台無應用錯誤。減少動態的停結尾分支沿用，未修改系統偏好。build 132 頁；117 檔／1,234 tests；lint 零錯／12 個既有 warnings。
 - 回歸範圍：僅新版介紹頁播放器；原 `/intro`、v1／v2、圖片素材與全站路由不變。
+
+### DEF-20261116-003 — 推送cron設定守衛失敗
+
+- **狀態**：Fixing（缺失Vault已確診；URL用戶回報已配置。web新增專用Secret支援，待用戶填值與cron／HTTP驗收）
+- **嚴重度**：P1 主要；D.12新事件首次投遞與重試均受阻。
+- **發現日期／報告人**：2026-11-16 / @user（日誌UTC 2026-11-17 07:17–07:19）
+- **復現步驟**：建native-push-dispatch job6→readiness四項true→查job6最近三次執行紀錄，均failed。
+- **期望vs實際**：每分鐘喚醒web dispatcher；實際ERROR push cron configuration missing，wake_native_push_dispatch line7 at RAISE。
+- **初判根因**：Vault兩項缺失或值不符合守衛。
+- **已確認根因**：用戶回報兩個exists均false：push_dispatch_url與push_dispatch_secret均未建立，觸發配置守衛，尚未進入HTTP呼叫。
+- **確診證據／待核實**：supabase/push-dispatch-cron.sql的RAISE只在URL為NULL／regex不符或Secret為NULL／不足16字元觸發；net.http_post在其後，尚未呼叫。用戶只讀查詢url_exists／url_correct／secret_exists／secret_length_ok全false，確認兩個具名Vault配置均不存在；尚未修復。
+- **關聯UR**：D.12；CHANGELOG及memory同批記錄，配置修復後再核對cron succeeded及其HTTP回應。
+- **修復驗證**：尚未進行。不得將四個readiness=true當Vault正常，也不得印decrypted_secret或向用戶索取密鑰。
+- **回歸範圍**：Vault名稱／URL／Secret長度、cron執行、後端HTTP認證及dispatcher；手機仍暫停，不新增正式DB操作。
+
+- DEF-20261116-003修正驗證：新增8項真handler認證測試；build139頁、129檔／1312tests綠、lint0errors／12既有warnings；新專用Secret已配置時拒絕舊值，空／短值不回退；正式配置與cron／HTTP未驗，不能標Verified。

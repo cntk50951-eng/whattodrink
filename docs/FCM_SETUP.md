@@ -23,14 +23,17 @@
 
 ## D.12：完整AOS業務推送與持久outbox（待Dashboard啟用）
 
-**下方SQL尚未在Supabase執行，故新的持久事件與提醒尚未啟用。** 新業務事件僅發AOS；iOS現有APNs四種payload與發送掛點保持不變，其他iOS事件等客戶端路由準備好再開。沒有增加付費Vercel每分鐘cron，也不改現有兩個每日job或SITE_LIVE。
+**最新用戶SQL結果：outbox_ready／deliveries_ready／claim_ready／cron_active全true，核心物件與job6 active已確認；實際排程執行／HTTP結果及真機送達仍待核實。無需重跑建立SQL。** 新業務事件僅發AOS；iOS現有APNs四種payload與發送掛點保持不變，其他iOS事件等客戶端路由準備好再開。沒有增加付費Vercel每分鐘cron，也不改現有兩個每日job或SITE_LIVE。
 
 ### 用戶操作順序（SQL只由用戶在Supabase Dashboard執行）
 1. 檢視並執行 `supabase/migrations/0077_native_push_outbox.sql`。此檔整體transaction，建立outbox／delivery、只供service_role的claim RPC、來源trigger和排程producer。沒有重播舊消息；啟用後的新INSERT／有效狀態轉換才入列。若已有重複提醒，partial unique index會令migration整體回滾，先查明重複資料；不要為通過migration盲刪通知。
-2. 後端D.12按本輪既有授權commit／push並部署（最終SHA見memory／交付），確認Vercel已有FIREBASE_SERVICE_ACCOUNT_JSON與至少16字元CRON_SECRET。可沿用現有帳號清理cron的Secret；本功能不輸出其值，不讀取或修改正式Secret。
-3. 在Supabase Extensions啟用pg_cron、pg_net與Vault。在**Vault UI**建立 `push_dispatch_url`（Production HTTPS `/api/internal/push-dispatch`完整網址）和 `push_dispatch_secret`（與Vercel CRON_SECRET相同）。不把真實Secret寫進repo或分享截圖。
+2. 後端D.12按本輪既有授權commit／push並部署（最終SHA見memory／交付），確認Vercel已有FIREBASE_SERVICE_ACCOUNT_JSON與至少16字元PUSH_DISPATCH_SECRET（建議32個隨機字元，Production）。新值用於推送，不必讀回或輪替共用CRON_SECRET；新增／修改環境值後需redeploy生效。未設定專用值時相容CRON_SECRET；明確設空／短值則拒絕，不回退。
+3. 在Supabase Extensions啟用pg_cron、pg_net與Vault。在**Vault UI**建立 `push_dispatch_url`（Production HTTPS `/api/internal/push-dispatch`完整網址）和 `push_dispatch_secret`（與Vercel PUSH_DISPATCH_SECRET相同）。不把真實Secret寫進repo或分享截圖。
 4. 檢視並執行 `supabase/push-dispatch-cron.sql`。它只替換名為native-push-dispatch的job，每分鐘HTTP POST喚醒後端。從Vault取Bearer，不傳service_role key。移除舊的**酒局1小時提醒**重複cron（先確認job SQL，勿刪其他job）；新producer本身已生成該提醒。
 5. 請用戶真機測試以下22項、拒絕權限、鎖屏／背景／冷啟動、換帳號／登出、通知點擊、靜音／屏蔽／已讀、過期房間與斷網重試。SQL migration和mock測試不代表真機送達驗收。
+
+### 舊Secret無法讀回時
+Vercel Secret儲存後不可讀回，無需取回舊CRON_SECRET。新增Production Secret **PUSH_DISPATCH_SECRET**，在本機密碼管理器保留，再將同值填入Supabase Vault **push_dispatch_secret**。Vault URL仍為push_dispatch_url，不需重跑0077或重建job6。部署新環境後重查Vault四項、cron執行及HTTP結果。新值只用於Supabase→web認證，不放App，也不使用Firebase service-account JSON替代。
 
 ### 22項來源與分工
 | 清單 | 來源 | 狀態／路由資料 |
@@ -51,7 +54,19 @@
 | A19／A20／A21 入座申請／結果／踢出 | 原game_join_request／game_join_result／game_kicked通知 | room_id，approved／rejected；申請5分鐘有效，重查房間和申請／玩家狀態 |
 | A22 碰杯與回敬 | 保留sendCheersPush原after掛點 | 繼承原限頻／合併／來源帖；Android穩定事件ID與帳號防串 |
 
-### 重試、安全與限制
+### 目前cron負責首次投遞及重試
++
++messages／drink_invites／notifications的trigger只入outbox，目前沒有事件完成後立即喚醒dispatcher。因此每分鐘native-push-dispatch同時負責新事件**首次發送**、可重試事件，以及產生1h／結束出席提醒；不是純補發兜底。正常可能等待約0–60秒，排隊／網路／供應商會更久，聊天不能宣稱已即時派發。既有好友／碰杯／遊戲邀請三family仍API after直接嘗試，不由此cron統一補發。
++
++建立腳本已提交，agent未執行正式Supabase SQL。核實job可在SQL Editor執行：
++```sql
++SELECT jobid, jobname, schedule, active
++FROM cron.job
++WHERE jobname = 'native-push-dispatch';
++```
++未啟用pg_cron時cron schema尚不存在；不以腳本在repo等同job已建立。
++
++### 重試、安全與限制
 - claim RPC用FOR UPDATE SKIP LOCKED、3分鐘lease與隨機lease_token；每批16事件、4個事件worker、每事件最多10設備，45秒工作預算、單次provider等待上限5秒。超時／資料庫錯誤fail closed、不聯繫provider，留待重試；最多8次、退避30秒至1小時，過期／耗盡進dead。
 - 每事件每設備成功記native_push_deliveries，部分失敗只重試未成功設備；FCM明確dead registration停用對應owner/token仍一致的設備。FCM暫時失敗或invalid-argument不刪有效token。
 - 傳送前再讀owner／enabled／token、使用者偏好、source狀態、讀水位、封鎖與mute。帳號在最後一個網路瞬間仍可能切換，因此Android仍必須核對recipient_id與當前帳號。data-only避免系統直接顯示舊帳號通知。

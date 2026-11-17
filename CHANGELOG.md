@@ -9,7 +9,8 @@
 - 0077交易trigger＋服務端lease claim／每設備結果去重／退避重試；CRON_SECRET端點與pg_cron／pg_net／Vault操作腳本，只準備檔案，未代用戶執行SQL。派發前fail closed重查隱私／已讀／過期與設備owner；鎖屏不帶正文／證據。
 - 舊三family after掛點保留，僅Android加穩定來源event_id／recipient_id／expiry，iOS原APNs不變；新增業務事件AOS-only。出席lazy GET共用原子producer，避免雙寫競態（migration前RPC缺失保留舊路徑）；補POST互相好友請求自動接受AOS-only通知與18項回歸。部署、SQL啟用與真機驗收待辦見FCM_SETUP.md。
 - 整體驗證：build139頁、128檔／1304tests綠、lint0errors／12既有warnings；PGlite實際SQL整合通過，可重跑腳本已保留。依本次授權只發佈web push改動，SQL與手機親驗仍待用戶。
-
+- 啟用排查：DEF-20261116-003，job6因Vault configuration missing失敗；用戶確認Vault URL／Secret均未建立，待補齊並驗cron／HTTP，尚未修復或驗收。
+- DEF-20261116-003配置修正：推送新增PUSH_DISPATCH_SECRET優先，未設定才相容CRON_SECRET；空／短專用值拒絕、不回退。同步1.67.1／env範例／Vault說明，避免輪替其他cron共用密鑰，無新SQL或App改動。
 
 ### Added — UR D.11 AOS FCM 基礎通道（2026-11-16）
 - 共用devices API按平台驗證，AOS接受opaque FCM token，iOS／web保留APNs hex及原有owner／綁定／環境口徑；OpenAPI 1.66.0。

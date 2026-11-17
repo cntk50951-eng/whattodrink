@@ -26,3 +26,5 @@ AOS FCM data 使用 from_user_id（FCM 保留 from），iOS 仍使用原 from；
 | 排程憑證 | URL與Bearer Secret | Supabase Vault UI＋Vercel CRON_SECRET | Vault；不進App或業務表 |
 
 新事件只發AOS，iOS舊APNs不變。legacy三family的Android metadata由真實來源row ID產生，但仍沿after投遞；不宣稱已持久化。SQL執行／部署／真機驗證狀態見FCM_SETUP.md。
+
+- D.12配置修正：推送認證優先讀PUSH_DISPATCH_SECRET，未設定才相容CRON_SECRET；Supabase Vault仍叫push_dispatch_secret。專用值配置後拒絕舊共用值，空／短值拒絕；無新增業務資料或表。

@@ -2,7 +2,7 @@
 -- In Supabase Dashboard: enable pg_cron, pg_net, Vault extensions first.
 -- Vault UI secrets (never paste real values into a checked-in file):
 -- push_dispatch_url = https://www.whattodrink.app/api/internal/push-dispatch
--- push_dispatch_secret = same >=16 character value as Vercel CRON_SECRET
+-- push_dispatch_secret = same >=16 character value as Vercel PUSH_DISPATCH_SECRET (legacy CRON_SECRET when dedicated value is unset)
 -- Vault handles encryption; no service-role key is sent by pg_net.
 CREATE OR REPLACE FUNCTION public.wake_native_push_dispatch()
 RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$

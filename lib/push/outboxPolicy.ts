@@ -2,6 +2,11 @@
 import { timingSafeEqual } from "node:crypto";
 
 export const NOTICE_KINDS = ["member_joined","party_cancelled","member_left","member_left_late","reminder_1h","attendance_confirm","complaint_filed","complaint_response_needed","complaint_ack","complaint_result","trust_changed","game_join_request","game_join_result","game_kicked"] as const;
+/** Isolate push credentials from Vercel Cron. Explicit empty/weak values fail closed. */
+export function pushDispatchSecret(env: Record<string, string | undefined>): string | undefined {
+  return env.PUSH_DISPATCH_SECRET ?? env.CRON_SECRET;
+}
+
 export function isDispatchAuthorized(authorization: string | null, secret: string | undefined): boolean {
   if (!secret || secret.length < 16 || !authorization) return false;
   const actual = Buffer.from(authorization); const expected = Buffer.from("Bearer " + secret);

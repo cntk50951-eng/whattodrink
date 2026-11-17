@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.67.0
+  version: 1.67.1
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -63,7 +63,7 @@ paths:
   /api/internal/push-dispatch:
     post:
       operationId: dispatchNativePush
-      summary: 內部AOS推送outbox排程；只接受Vault保管的CRON_SECRET，不接受App session
+      summary: 內部AOS推送outbox排程；接受Vault保管的PUSH_DISPATCH_SECRET（未設定時相容CRON_SECRET），不接受App session
       description: 每分鐘由Supabase pg_cron/pg_net喚醒；最多claim16事件、4個事件worker、每事件10設備。未執行0077 migration時503，不自動建表。
       security:
         - cronSecret: []
@@ -71,7 +71,7 @@ paths:
         "200":
           description: claimed／sent（供應商接受數）／skipped／retry／failed計數；不代表已顯示於真機
         "401":
-          description: CRON_SECRET未配置、太短或憑證不匹配
+          description: 推送Secret未配置、太短或憑證不匹配；專用值已設定時不接受舊CRON_SECRET
         "503":
           description: 排程、資料庫或FCM配置不可用
   /api/v1/wall:
@@ -7041,7 +7041,7 @@ components:
     cronSecret:
       type: http
       scheme: bearer
-      description: 僅服務端CRON_SECRET（≥16字元），不是用戶JWT
+      description: 僅服務端PUSH_DISPATCH_SECRET（≥16字元）；未設定時相容CRON_SECRET，不是用戶JWT
     bearerAuth:
       type: http
       scheme: bearer
