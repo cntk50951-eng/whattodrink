@@ -3,12 +3,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { configuredPushDevices, isDeadPushReason, nativePushConfigFromEnv, sendNativePush } from "./native";
 import { computeBadge } from "./badge";
 import { pushPrefsOf } from "./prefs";
-import { eventPayload, retryAt, unreadMessage } from "./outboxPolicy";
+import { cleanName, eventPayload, retryAt, unreadMessage } from "./outboxPolicy";
+import type { CopyContext } from "./outboxPolicy";
 
 type Row = Record<string, unknown>;
 export type OutboxEvent = {id:string;recipient_id:string;kind:string;source_type:"notification"|"message"|"invite";source_id:string;actor_id:string|null;payload:Row;expires_at:string;attempts:number;lease_token:string};
 async function rows(query: PromiseLike<{data:unknown;error:unknown}>): Promise<Row[]> {
- const result=await query;if(result.error) throw new Error("database-read-failed");
+ const result=await query;
+ if(result.error){
+  // Postgres/PostgREST error code only (e.g. 42703 missing column, 42p01 missing table, 42501 permission, pgrst205); never the message text.
+  const code=typeof result.error==="object"&&result.error!==null&&"code" in result.error?String((result.error as {code:unknown}).code).toLowerCase():"";
+  throw new Error(/^[a-z0-9]{4,10}$/.test(code)?`database-read-failed-${code}`:"database-read-failed");
+ }
  if(result.data===null)return [];if(!Array.isArray(result.data))throw new Error("invalid-database-shape");
  return result.data.filter((r):r is Row=>typeof r==="object"&&r!==null&&!Array.isArray(r));
 }
@@ -92,6 +98,19 @@ export async function eventStillEligible(db:SupabaseClient,e:OutboxEvent,now:num
  return e.kind==="member_joined"?actorMember!==null:actorMember===null;
 }
 
+/** Display names for notification copy. Best effort: any failure falls back to generic copy and never blocks delivery. */
+async function copyContext(db:SupabaseClient,e:OutboxEvent):Promise<CopyContext>{
+ const ctx:CopyContext={};
+ try{
+  if(e.actor_id){ctx.actor=cleanName((await one(db.from("users").select("nickname").eq("id",e.actor_id).limit(1)))?.nickname);}
+  if(typeof e.payload.party_id==="string"){
+   const party=await one(db.from("parties").select("host_user_id").eq("id",e.payload.party_id).limit(1));
+   if(party&&typeof party.host_user_id==="string")ctx.host=cleanName((await one(db.from("users").select("nickname").eq("id",party.host_user_id).limit(1)))?.nickname);
+  }
+ }catch{/* generic copy */}
+ return ctx;
+}
+
 export async function dispatchNativePush(db:SupabaseClient):Promise<{claimed:number;sent:number;skipped:number;retry:number;failed:number}>{
  const cfg=nativePushConfigFromEnv(process.env);if(!cfg.fcm)throw new Error("fcm-not-configured");
  const scheduled=await db.rpc("produce_native_push_reminders");if(scheduled.error)throw new Error("reminder-producer-failed");
@@ -111,6 +130,8 @@ export async function dispatchNativePush(db:SupabaseClient):Promise<{claimed:num
    stage="devices";
    const devices=configuredPushDevices(await rows(db.from("devices").select("id,platform,push_token,environment,locale").eq("user_id",e.recipient_id).eq("platform","aos").eq("enabled",true).limit(10)),cfg);
    if(!devices.length){await finish(e,"skipped","no-aos-devices");summary.skipped++;return;}
+   stage="copy";
+   const copyCtx=await copyContext(db,e);
    stage="badge";
    const badge=(await computeBadge(db,e.recipient_id)).badge;
    stage="deliveries-read";
@@ -123,7 +144,7 @@ export async function dispatchNativePush(db:SupabaseClient):Promise<{claimed:num
     const current=await one(db.from("devices").select("id,user_id,enabled,push_token").eq("id",device.id).limit(1));
     if(!current||current.user_id!==e.recipient_id||current.enabled!==true||current.push_token!==device.push_token)continue;
     if(!await eventStillEligible(db,e,Date.now()))continue;
-    const payload=eventPayload(e,device.locale);
+    const payload=eventPayload(e,device.locale,copyCtx);
     (payload.aps as Row).badge=badge;
     let timeout: ReturnType<typeof setTimeout>|undefined;
     stage="send";

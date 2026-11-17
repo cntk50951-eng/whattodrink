@@ -43,8 +43,36 @@ export function safePushCopy(kind: string, locale: string | null): {title: strin
  return {title:(TITLE[kind] ?? ["你有新通知","你有新通知","You have a new notification"])[index],
  body:["打開 hi drink 查看詳情","打开 hi drink 查看详情","Open hi drink for details"][index]};
 }
-export function eventPayload(event: {id:string;recipient_id:string;kind:string;actor_id:string|null;payload:Record<string,unknown>;expires_at:string}, locale: string|null): Record<string,unknown> {
- const copy=safePushCopy(event.kind,locale);
+/** Display names only. Never message text, evidence or free text beyond a nickname. */
+export type CopyContext = { actor?: string; host?: string };
+export function cleanName(v: unknown): string|undefined {
+ if (typeof v!=="string") return undefined;
+ const s=v.replace(/[\u0000-\u001f\u007f​-‏‪-‮]/g,"").trim().slice(0,20);
+ return s===""?undefined:s;
+}
+type L3 = [string,string,string];
+const pick=(l:L3,locale:string|null):string=>l[locale==="en"?2:locale==="zh-Hans"?1:0];
+const PARTY_TITLE:L3=["酒局通知","酒局通知","Gathering"];
+const PARTY_STATE: Record<string,L3> = {
+ member_joined:["有人加入","有人加入","someone joined"],party_cancelled:["已取消","已取消","was cancelled"],
+ member_left:["有人退出","有人退出","someone left"],member_left_late:["開局前有人退出","开局前有人退出","someone left before it starts"],
+ reminder_1h:["即將開始","即将开始","starts soon"],attendance_confirm:["請確認出席","请确认出席","please confirm attendance"],
+};
+/** Type-specific lock/notification copy with a display name. Falls back to generic copy when a name is missing. */
+export function richPushCopy(kind: string, locale: string|null, ctx: CopyContext, payload: Record<string,unknown>): {title:string;body:string}|null {
+ const a=ctx.actor,h=ctx.host,en=locale==="en";
+ if(kind==="chat"&&a) return {title:pick(["聊天訊息","聊天消息","Chat message"],locale),body:pick([`${a} 傳來新訊息`,`${a} 发来新消息`,`${a} sent you a message`],locale)};
+ if(kind==="invite"&&a) return {title:pick(["約酒邀請","约酒邀请","Drink invitation"],locale),body:pick([`${a} 邀請你一起喝酒`,`${a} 邀请你一起喝酒`,`${a} invited you for a drink`],locale)};
+ if(kind==="invite_reply"&&a&&(payload.decision==="accepted"||payload.decision==="declined")){
+  const ok=payload.decision==="accepted";
+  return {title:pick(["約酒回覆","约酒回复","Invitation reply"],locale),body:pick(ok?[`${a} 接受了你的邀請`,`${a} 接受了你的邀请`,`${a} accepted your invitation`]:[`${a} 婉拒了你的邀請`,`${a} 婉拒了你的邀请`,`${a} declined your invitation`],locale)};
+ }
+ const state=PARTY_STATE[kind];
+ if(state&&h) return {title:pick(PARTY_TITLE,locale),body:en?`${h}'s gathering: ${pick(state,locale)}`:`${h}的酒局：${pick(state,locale)}`};
+ return null;
+}
+export function eventPayload(event: {id:string;recipient_id:string;kind:string;actor_id:string|null;payload:Record<string,unknown>;expires_at:string}, locale: string|null, ctx: CopyContext = {}): Record<string,unknown> {
+ const copy=richPushCopy(event.kind,locale,ctx,event.payload)??safePushCopy(event.kind,locale);
  const ids: Record<string,unknown>={};
  for (const key of ["conversation_id","invite_id","party_id","complaint_id","room_id","code","decision","checkin_id"]) {
   const value=event.payload[key];if(typeof value==="string") ids[key]=value;

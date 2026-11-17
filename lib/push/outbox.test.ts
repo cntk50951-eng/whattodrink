@@ -1,6 +1,6 @@
 import {beforeEach,describe,expect,it,vi} from "vitest";
 import type {SupabaseClient} from "@supabase/supabase-js";
-import {eventPayload,isDispatchAuthorized,NOTICE_KINDS,retryAt,safePushCopy,unreadMessage} from "./outboxPolicy";
+import {cleanName,eventPayload,isDispatchAuthorized,NOTICE_KINDS,retryAt,richPushCopy,safePushCopy,unreadMessage} from "./outboxPolicy";
 const transport=vi.hoisted(()=>({send:vi.fn()}));
 vi.mock("./badge",()=>({computeBadge:async()=>({badge:7})}));
 vi.mock("./native",()=>({
@@ -96,5 +96,25 @@ describe("D.12 durable per-device delivery",()=>{
  it("persists sanitized retry on a privacy database error without contacting FCM",async()=>{
   vi.spyOn(Date,"now").mockReturnValue(now);const t=chatTables();t.native_push_outbox=[{...event(),status:"processing"}];
   const result=await dispatchNativePush(database(t,"cheers_blocks"));expect(result.failed).toBe(1);expect(transport.send).not.toHaveBeenCalled();expect(t.native_push_outbox[0]).toMatchObject({status:"pending",last_error:"dispatch-failed:eligibility:database-read-failed"});
+ });
+});
+
+describe("type-specific notification copy",()=>{
+ it("names the type and the person, never message text",()=>{
+  const p=eventPayload({...event({kind:"chat"}),actor_id:"a",payload:{conversation_id:"conv",body:"secret text"}},"zh-Hant",{actor:"Ray"});
+  expect((p.aps as {alert:{title:string;body:string}}).alert).toEqual({title:"聊天訊息",body:"Ray 傳來新訊息"});
+  expect(JSON.stringify(p)).not.toMatch(/secret/);
+  expect(richPushCopy("invite","en",{actor:"Ray"},{})).toEqual({title:"Drink invitation",body:"Ray invited you for a drink"});
+  expect(richPushCopy("invite_reply","zh-Hans",{actor:"Ray"},{decision:"declined"})?.body).toBe("Ray 婉拒了你的邀请");
+  expect(richPushCopy("member_joined","zh-Hant",{host:"Amy"},{})).toEqual({title:"酒局通知",body:"Amy的酒局：有人加入"});
+  expect(richPushCopy("reminder_1h","en",{host:"Amy"},{})?.body).toBe("Amy's gathering: starts soon");
+ });
+ it("falls back to generic copy without a name and for sensitive kinds",()=>{
+  expect(richPushCopy("chat","en",{},{})).toBeNull();
+  for(const kind of ["complaint_filed","complaint_result","trust_changed","game_kicked"])expect(richPushCopy(kind,"en",{actor:"Ray",host:"Amy"},{})).toBeNull();
+  expect(eventPayload({...event({kind:"chat"}),payload:{conversation_id:"conv"}},"en").aps).toMatchObject({alert:{title:"You have a new message"}});
+ });
+ it("cleans display names",()=>{
+  expect(cleanName("  Ray\u202e\n  ")).toBe("Ray");expect(cleanName("x".repeat(50))).toHaveLength(20);expect(cleanName("   ")).toBeUndefined();expect(cleanName(5)).toBeUndefined();
  });
 });
