@@ -49,7 +49,7 @@ async function aosEventMeta(db: SupabaseClient, table: string, filters: Record<s
  }
  const created=kind==="friend_accepted"?Date.now():Date.parse(String(data.created_at));
  if(!Number.isFinite(created)||created+86_400_000<=Date.now())return null;
- return {recipient_id:recipientId,event_id:`${kind}:${data.id}`,expires_at:String(Math.min(expiresAt,created+86_400_000))};
+ return {recipient_id:recipientId,event_id:kind.startsWith("friend_")?`${kind}:${data.id}:${Date.parse(String(data.created_at))}`:`${kind}:${data.id}`,expires_at:String(Math.min(expiresAt,created+86_400_000))};
 }
 
 async function aosDeviceIsCurrent(db: SupabaseClient, id: string, token: string, recipient: string): Promise<boolean> {

@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased] — D.12 推送覆蓋復核（2026-11-18）
+
+### Fixed
+- DEF-20261118-001：按22情境追實際producer而非只看send.ts；補本輪確認的漏送／路由邊界，詳見web docs/PUSH_COVERAGE_MATRIX.md。
+- Android品牌通知及前台橫幅／通知欄現況同步PUSH_TEST_PLAN、data/notifications；iOS APNs最後階段待辦另列，真機未驗收。
+
+所有重要修改會記錄在這個檔案。格式借鑑 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/)。
+
 所有重要修改會記錄在這個檔案。格式借鑑 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/)。
 
 ## [Unreleased]

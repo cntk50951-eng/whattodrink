@@ -967,3 +967,14 @@
 - **回歸範圍**：Vault名稱／URL／Secret長度、cron執行、後端HTTP認證及dispatcher；手機仍暫停，不新增正式DB操作。
 
 - DEF-20261116-003修正驗證：新增8項真handler認證測試；build139頁、129檔／1312tests綠、lint0errors／12既有warnings；新專用Secret已配置時拒絕舊值，空／短值不回退；正式配置與cron／HTTP未驗，不能標Verified。
+
+## DEF-20261118-001 — AOS 推送覆蓋復核發現邊界流程漏送
+
+- 狀態：Open → Investigating → Fixing → Fixed（本次修正提交合入main；真機待驗，不標Verified）。
+- 嚴重度：P1 主要；發現日期／報告人：2026-11-18／用戶。
+- 復現步驟：復活兩天前的 blocked 好友記錄；開局後合法加入；已有玩家資料時批准 pending 申請；踢人同時封鎖。
+- 期望 vs 實際：22核心場景可按既有偏好送達並安全跳轉；以上邊界會漏送／無提示／誤判身份。
+- 確診根因：stale 好友行沿用舊 created_at；member_joined 誤套開局前門檻；approve 23505 修復分支略過結果通知；踢人兼封鎖抑制了系統移出通知。
+- 關聯 UR：D.12；CHANGELOG 與本日 push-coverage-audit memory 回鏈。
+- 修復驗證：精準提交130檔／1321 tests、139頁build、lint 0 errors／12既有warnings；真機送達待用戶親驗，不標Verified。
+- 回歸範圍：好友、酒局、遊戲、邀請、品牌、前台／背景、帳號及過期守衛。

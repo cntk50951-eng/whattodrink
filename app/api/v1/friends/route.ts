@@ -212,7 +212,7 @@ export async function POST(req: Request): Promise<Response> {
       if (myStale) {
         const { error: uErr } = await svc
           .from("friendships")
-          .update(requestFields)
+          .update({ ...requestFields, created_at: new Date().toISOString() })
           .eq("user_id", userId)
           .eq("friend_id", targetUserId);
         if (uErr !== null) {

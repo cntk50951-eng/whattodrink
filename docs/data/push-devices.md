@@ -15,7 +15,7 @@
 AOS FCM data 使用 from_user_id（FCM 保留 from），iOS 仍使用原 from；事件欄位與ID見OpenAPI的x-native-push-payloads。不能將APNs整包直接塞入FCM data。
 
 
-## D.12 AOS業務推送（待用戶執行0077）
+## D.12 AOS業務推送（0077物件已由用戶確認，真機待驗）
 | 用途 | 類型 | 當前來源 | 表映射 |
 |---|---|---|---|
 | 待發事件、重試與租約 | UUID、recipient、kind、source ID、安全導航ID、expires、status、attempts、lease token | notifications/messages/drink_invites trigger | native_push_outbox（RLS，僅service_role） |
@@ -28,3 +28,11 @@ AOS FCM data 使用 from_user_id（FCM 保留 from），iOS 仍使用原 from；
 新事件只發AOS，iOS舊APNs不變。legacy三family的Android metadata由真實來源row ID產生，但仍沿after投遞；不宣稱已持久化。SQL執行／部署／真機驗證狀態見FCM_SETUP.md。
 
 - D.12配置修正：推送認證優先讀PUSH_DISPATCH_SECRET，未設定才相容CRON_SECRET；Supabase Vault仍叫push_dispatch_secret。專用值配置後拒絕舊共用值，空／短值拒絕；無新增業務資料或表。
+
+## 2026-11-18事件身份與結果修正（DEF-20261118-001）
+
+| 用途 | 類型 | 當前來源 | 表映射 |
+|---|---|---|---|
+| 同一好友row不同請求世代去重 | friend_request/friend_accepted的event_id包含row ID及created_at epoch | 復活stale行重設既有created_at；同世代重試穩定；iOS payload不加欄位 | friendships.created_at，無新欄位 |
+| 入席與移出狀態結果 | 既有kind／party_id／room_id | member_joined有效至party.expires_at；game_kicked兼封鎖仍屬系統狀態；仍查source／偏好 | 沿native_push_outbox、notifications及現有成員表 |
+| 已存在遊戲玩家的批准結果 | game_join_result及原decision／room_id | 正常插入、已有active玩家、同用戶unique競態共用producer；非本人席位衝突409 | 沿game_join_requests、game_room_players、notifications；無新schema |

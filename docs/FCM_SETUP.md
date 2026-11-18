@@ -1,6 +1,6 @@
 # Android FCM 配置與啟用（D.11／D.12）
 
-2026-11-16狀態：Firebase及Vercel FIREBASE_SERVICE_ACCOUNT_JSON由用戶確認ready。基礎通道已提交推送 `fb17dcf`，GitHub回報Vercel成功；D.12完整事件已完成本機回歸，按本次授權單獨提交推送，不帶intro工作樹改動。Supabase migration／排程及真機送達仍待啟用驗收。
+2026-11-18現況：D.11／D.12及專用Secret修正已部署；用戶已驗0077物件、Vault與job6，request482 HTTP200空批次。22情境源碼及本輪邊界修正見PUSH_COVERAGE_MATRIX；有事件的FCM實送與真機驗收仍待完成。下方啟用步驟供新環境使用，現有正式環境不需重建。
 
 ## 應用與憑證
 
@@ -23,7 +23,7 @@
 
 ## D.12：完整AOS業務推送與持久outbox（待Dashboard啟用）
 
-**最新用戶SQL結果：outbox_ready／deliveries_ready／claim_ready／cron_active全true，核心物件與job6 active已確認；實際排程執行／HTTP結果及真機送達仍待核實。無需重跑建立SQL。** 新業務事件僅發AOS；iOS現有APNs四種payload與發送掛點保持不變，其他iOS事件等客戶端路由準備好再開。沒有增加付費Vercel每分鐘cron，也不改現有兩個每日job或SITE_LIVE。
+**2026-11-17配置驗證完成：Vault五欄全true、request482 HTTP200且空批次正常、自動job6 UTC08:22–08:24連續三次succeeded。DEF-20261116-003配置缺陷Verified；無需額外建表或重建cron。FCM真事件／真機實送仍未驗，D.12保持WIP。** 新業務事件僅發AOS；iOS現有APNs四種payload與發送掛點保持不變，其他iOS事件等客戶端路由準備好再開。沒有增加付費Vercel每分鐘cron，也不改現有兩個每日job或SITE_LIVE。
 
 ### 用戶操作順序（SQL只由用戶在Supabase Dashboard執行）
 1. 檢視並執行 `supabase/migrations/0077_native_push_outbox.sql`。此檔整體transaction，建立outbox／delivery、只供service_role的claim RPC、來源trigger和排程producer。沒有重播舊消息；啟用後的新INSERT／有效狀態轉換才入列。若已有重複提醒，partial unique index會令migration整體回滾，先查明重複資料；不要為通過migration盲刪通知。
@@ -32,7 +32,14 @@
 4. 檢視並執行 `supabase/push-dispatch-cron.sql`。它只替換名為native-push-dispatch的job，每分鐘HTTP POST喚醒後端。從Vault取Bearer，不傳service_role key。移除舊的**酒局1小時提醒**重複cron（先確認job SQL，勿刪其他job）；新producer本身已生成該提醒。
 5. 請用戶真機測試以下22項、拒絕權限、鎖屏／背景／冷啟動、換帳號／登出、通知點擊、靜音／屏蔽／已讀、過期房間與斷網重試。SQL migration和mock測試不代表真機送達驗收。
 
+若readiness的URL三欄false而Secret兩欄true，可由用戶執行 `supabase/push-dispatch-set-url.sql` 修正具名公開URL；不改密鑰或job。執行後再驗五欄、cron及HTTP。
+
+完整Vault條件可用只讀 `supabase/push-dispatch-readiness.sql` 檢查五欄；只有Secret兩欄true不足以判定URL可用。URL格式必須含https及完整path，無尾斜線／空白／引號。
+
 ### 舊Secret無法讀回時
+
+專用Secret支援已於3f0929f部署Production成功（2026-11-16）；新增／修改Vercel環境值後仍需Redeploy載入該值。
+
 Vercel Secret儲存後不可讀回，無需取回舊CRON_SECRET。新增Production Secret **PUSH_DISPATCH_SECRET**，在本機密碼管理器保留，再將同值填入Supabase Vault **push_dispatch_secret**。Vault URL仍為push_dispatch_url，不需重跑0077或重建job6。部署新環境後重查Vault四項、cron執行及HTTP結果。新值只用於Supabase→web認證，不放App，也不使用Firebase service-account JSON替代。
 
 ### 22項來源與分工
@@ -67,7 +74,7 @@ Vercel Secret儲存後不可讀回，無需取回舊CRON_SECRET。新增Producti
 +未啟用pg_cron時cron schema尚不存在；不以腳本在repo等同job已建立。
 +
 +### 重試、安全與限制
-- claim RPC用FOR UPDATE SKIP LOCKED、3分鐘lease與隨機lease_token；每批16事件、4個事件worker、每事件最多10設備，45秒工作預算、單次provider等待上限5秒。超時／資料庫錯誤fail closed、不聯繫provider，留待重試；最多8次、退避30秒至1小時，過期／耗盡進dead。
+- claim RPC用FOR UPDATE SKIP LOCKED、3分鐘lease與隨機lease_token；每批16事件、4個事件worker、每事件最多10設備，45秒工作預算、單次provider等待上限15秒。超時／資料庫錯誤fail closed、不聯繫provider，留待重試；最多8次、退避30秒至1小時，過期／耗盡進dead。
 - 每事件每設備成功記native_push_deliveries，部分失敗只重試未成功設備；FCM明確dead registration停用對應owner/token仍一致的設備。FCM暫時失敗或invalid-argument不刪有效token。
 - 傳送前再讀owner／enabled／token、使用者偏好、source狀態、讀水位、封鎖與mute。帳號在最後一個網路瞬間仍可能切換，因此Android仍必須核對recipient_id與當前帳號。data-only避免系統直接顯示舊帳號通知。
 - 至少一次送達：provider接受後、DB記成功前進程可能中斷，provider timeout也可能實際已接受；不能承諾網路exactly-once。相同event_id保持不變，App以event_id去重，collapse_id聚合；去重不能只靠新UUID。
@@ -90,3 +97,7 @@ API只回計數，503不輸出token／Secret／SDK原始錯誤；native_push_out
 D.12新表是內部投遞狀態，不可由App直接讀寫。後續保留期／清理policy尚未自動排程，觀測表量後制定；不要無限保留debug資料或刪除仍可重試事件。參考[Supabase排程與Vault](https://supabase.com/docs/guides/functions/schedule-functions)、[PostgreSQL鎖定與SKIP LOCKED](https://www.postgresql.org/docs/current/sql-select.html)。
 
 pg_net官方提醒：帶Bearer的HTTP request在發送前會短暫留在net.http_request_queue，具有資料庫登入權的人可能讀到；限制DB登入／schema權限，不截圖queue headers，Vault不是對高權限DB使用者隱藏傳輸header的保證。
+
+## 2026-11-18覆蓋復核
+
+22情境的實際來源、兩條發送路徑、偏好與未驗範圍見 [PUSH_COVERAGE_MATRIX.md](PUSH_COVERAGE_MATRIX.md)。本輪只改API／dispatcher，無新migration，既有0077與job6不需重跑；需要確認正式trigger啟用可執行 `supabase/push-coverage-readiness.sql`（唯讀、不發送）。

@@ -4608,3 +4608,5 @@ UR L.1　全站开关 `SITE_LIVE`＋coming soon 页 [✓]
 - D.12／DEF-20261116-003配置修正開工（2026-11-16）：用戶已設Vault URL，但舊CRON_SECRET為不可讀回的Secret。推送新增PUSH_DISPATCH_SECRET優先、未設定才相容舊CRON_SECRET，避免輪替影響帳號清理與配對；專用值空／短時拒絕、不回退。Vault仍叫push_dispatch_secret，無新SQL／表／job；只改web。驗收：實際handler認證測試、全量gate及部署；正式Secret仍由用戶配置。
 
 - D.12專用Secret gate（2026-11-16）：build139頁、129檔／1312tests綠（新8項）、lint0errors／12既有warnings；僅API認證改動，無App／DB／UI改動，正式Secret及job6執行／HTTP待用戶。
+
+- 2026-11-18 D.12／DEF-20261118-001：現行22情境逐項追來源，修正舊memory誤判；補好友世代／酒局入席／遊戲批准與移出／Android失效邀請與冷啟身份，品牌smallIcon、大圖及前台橫幅。詳見web PUSH_COVERAGE_MATRIX；真機未驗，維持WIP。

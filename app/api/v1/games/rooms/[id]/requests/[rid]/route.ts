@@ -74,31 +74,41 @@ export async function POST(
   if (loaded.room.status !== "lobby") {
     return apiError("room_started", "對局已開始，不可再加入", 409);
   }
-  const members = await getActiveMembers(svc, loaded.room.id);
-  if (members.length >= loaded.room.max_players) {
-    return apiError("room_full", "房間已滿", 409);
+  // A pending application can coexist with a player inserted by an earlier attempt.
+  // Check before capacity: an existing active player does not consume another seat.
+  const { data: existing, error: existingErr } = await svc.from("game_room_players")
+    .select("user_id,status").eq("room_id", loaded.room.id).eq("user_id", joinReq.user_id).maybeSingle();
+  if (existingErr) return apiError("internal", "讀取成員失敗", 500);
+  if (existing && existing.status !== "active") return apiError("forbidden", "該玩家不可重新加入", 403);
+  let inserted = false;
+  let seat = 0;
+  if (!existing) {
+    const members = await getActiveMembers(svc, loaded.room.id);
+    if (members.length >= loaded.room.max_players) return apiError("room_full", "房間已滿", 409);
+    seat = members.reduce((mx, m) => Math.max(mx, m.seat), -1) + 1;
+    const { error: jErr } = await svc.from("game_room_players").insert({
+      room_id: loaded.room.id, user_id: joinReq.user_id, seat, ready: false, status: "active",
+    });
+    if (jErr) {
+      if (jErr.code !== "23505") return apiError("internal", "同意失敗", 500);
+      // A unique seat collision with a DIFFERENT player must not approve this request.
+      const { data: raced, error: racedErr } = await svc.from("game_room_players")
+        .select("status").eq("room_id", loaded.room.id).eq("user_id", joinReq.user_id).maybeSingle();
+      if (racedErr) return apiError("internal", "讀取成員失敗", 500);
+      if (raced?.status !== "active") return apiError("room_full", "席位已變更，請重試", 409);
+    } else inserted = true;
   }
-  const seat = members.reduce((mx, m) => Math.max(mx, m.seat), -1) + 1;
-  const { error: jErr } = await svc.from("game_room_players").insert({
-    room_id: loaded.room.id,
-    user_id: joinReq.user_id,
-    seat,
-    ready: false,
-    status: "active",
-  });
-  if (jErr !== null) {
-    if (jErr.code === "23505") {
-      await svc.from("game_join_requests").update({ status: "approved", decided_at: nowIso, decided_by: userId }).eq("id", rid);
-      return apiOk({ version: loaded.room.version, status: "approved" as const });
-    }
-    console.error(`[games/requests] approve error: code=${jErr.code} message=${jErr.message}`);
-    return apiError("internal", "同意失敗", 500);
-  }
-  await svc
+  const { data: decided, error: decisionErr } = await svc
     .from("game_join_requests")
     .update({ status: "approved", decided_at: nowIso, decided_by: userId })
-    .eq("id", rid);
-  const version = await bumpRoom(svc, loaded.room.id, loaded.room.version, Date.now());
+    .eq("id", rid).eq("status", "pending").select("id");
+  if (decisionErr) return apiError("internal", "同意失敗", 500);
+  if (!decided?.length) {
+    const { data: current } = await svc.from("game_join_requests").select("status").eq("id", rid).maybeSingle();
+    if (!current) return apiError("internal", "讀取申請失敗", 500);
+    return apiOk({ version: loaded.room.version, status: current.status });
+  }
+  const version = inserted ? await bumpRoom(svc, loaded.room.id, loaded.room.version, Date.now()) : null;
   if (version !== null) {
     await appendEvent(svc, loaded.room.id, version, "member_joined", joinReq.user_id, { seat, via: "request" });
   }

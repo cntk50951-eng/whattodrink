@@ -118,3 +118,34 @@ describe("type-specific notification copy",()=>{
   expect(cleanName("  Ray\u202e\n  ")).toBe("Ray");expect(cleanName("x".repeat(50))).toHaveLength(20);expect(cleanName("   ")).toBeUndefined();expect(cleanName(5)).toBeUndefined();
  });
 });
+
+describe("coverage boundary regressions",()=>{
+ function partyTables(kind="member_joined"):Record<string,R[]>{const t=chatTables();
+  t.notifications=[{id:"notice",kind,user_id:"recipient",read_at:null}];
+  t.parties=[{id:"party",host_user_id:"recipient",status:"open",start_at:new Date(now-1000).toISOString(),expires_at:new Date(now+3600_000).toISOString()}];
+  t.joins=[{party_id:"party",user_id:"actor"}];return t;
+ }
+ const joined=()=>event({source_type:"notification",source_id:"notice",kind:"member_joined",payload:{party_id:"party"}});
+ it("notifies the host of a valid join after the gathering has started",async()=>{
+  expect(await eventStillEligible(database(partyTables()),joined(),now)).toBe(true);
+ });
+ it("drops joins after the member left, gathering ended or was cancelled",async()=>{
+  for(const mutate of [(t:Record<string,R[]>)=>{t.joins=[];},(t:Record<string,R[]>)=>{t.parties[0].expires_at=new Date(now-1).toISOString();},(t:Record<string,R[]>)=>{t.parties[0].status="cancelled";}]){
+   const t=partyTables();mutate(t);expect(await eventStillEligible(database(t),joined(),now)).toBe(false);
+  }
+ });
+ it("keeps departure notices restricted to before the gathering starts",async()=>{
+  for(const kind of ["member_left","member_left_late"]){const t=partyTables(kind);t.joins=[];
+   expect(await eventStillEligible(database(t),{...joined(),kind},now)).toBe(false);
+  }
+ });
+ it("delivers the system removal result even when the host also blocked the player",async()=>{
+  const t=chatTables();t.cheers_blocks=[{blocker_id:"actor",blocked_id:"recipient"}];
+  t.notifications=[{id:"notice",kind:"game_kicked",user_id:"recipient",read_at:null}];
+  t.game_rooms=[{id:"room",host_id:"actor",status:"lobby",expires_at:new Date(now+3600_000).toISOString()}];
+  t.game_room_players=[{room_id:"room",user_id:"recipient",status:"kicked"}];
+  const e=event({source_type:"notification",source_id:"notice",kind:"game_kicked",payload:{room_id:"room"}});
+  expect(await eventStillEligible(database(t),e,now)).toBe(true);
+  t.game_room_players[0].status="active";expect(await eventStillEligible(database(t),e,now)).toBe(false);
+ });
+});

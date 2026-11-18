@@ -68,3 +68,11 @@ OpenAPI1.67定data-only字串契約（recipient_id／event_id／epoch-ms expires
 - 工具教訓：長多行patch漏行前綴會整批拒絕、未寫入；改程式逐行加前綴產生patch，不假定前段已落地。
 
 - 專用Secret完整gate：build139頁、129檔／1312tests綠（新8項handler認證／fallback／failclosed）、lint0errors12既有warnings；技能code-review已自檢，github-api沿本次推送授權使用；只發佈本批push修正，intro工作樹保留。未碰真密鑰、Supabase或手機。
+
+## 專用Secret修正已部署（2026-11-16）
++- 3f0929f179afd1105d362a13c6e353280ddbc92f已commit／push，12個push相關檔案；Vercel Production deployment7847317710 success，6YC5dFb1ADaqffgJTWGDF94Sd3z5，環境https://whattodrink-mok59uagu-cntk50951-8657s-projects.vercel.app。其他intro／coming-soon WIP排除。
++- 完整工作樹139頁／1312tests（129檔）綠，精準index快照1305tests（128檔）綠；lint0errors／12既有warnings。原purge-accounts／meet-suggestions程式未改。
++- 用戶下一步Production新增PUSH_DISPATCH_SECRET並Redeploy，SupabaseVault push_dispatch_secret填同值。push_dispatch_url用戶已設；不需重跑任何SQL或重建job6。Secret不可讀回請用戶在本機密碼管理器保留，不向聊天貼值。正式Secret未由agent操作。
++- DEF-20261116-003仍待用戶填值後cron succeeded／HTTP200核實，不能標Verified或推送全部完成。手機依用戶指令繼續暫停。
+
+- 收尾：Production無授權POST實測401 unauthorized，沒有觸發推送；memory／CHANGELOG／push-devices資料與設定文檔已同步，臨時腳本／askpass／gate logs／index快照已清。未觸碰正式密鑰或手機。

@@ -35,7 +35,8 @@ export async function eventStillEligible(db:SupabaseClient,e:OutboxEvent,now:num
  const recipient=await one(db.from("users").select("id,mode,push_prefs").eq("id",e.recipient_id).limit(1));
  if(!recipient)return false;
  const prefs=pushPrefsOf(recipient.push_prefs);
- if(e.actor_id&&await blocked(db,e.actor_id,e.recipient_id,e.source_type==="message"))return false;
+ // Removal is a system result, including kick-and-block; it carries no host text.
+ if(e.actor_id&&e.kind!=="game_kicked"&&await blocked(db,e.actor_id,e.recipient_id,e.source_type==="message"))return false;
  if(e.source_type==="message"){
   const msg=await one(db.from("messages").select("id,conversation_id,sender_id,created_at").eq("id",e.source_id).limit(1));
   if(!msg||msg.sender_id!==e.actor_id||msg.conversation_id!==e.payload.conversation_id||recipient.mode==="stealth")return false;
@@ -93,7 +94,9 @@ export async function eventStillEligible(db:SupabaseClient,e:OutboxEvent,now:num
  if(p.status!=="open")return false;
  if(e.kind==="reminder_1h")return future(p.start_at,now)&&(p.host_user_id===e.recipient_id||member!==null);
  if(e.kind==="attendance_confirm")return !future(p.expires_at,now)&&typeof p.expires_at==="string"&&Date.parse(p.expires_at)+86_400_000>now&&(p.host_user_id===e.recipient_id||member!==null);
- if(p.host_user_id!==e.recipient_id||!future(p.start_at,now)||!e.actor_id)return false;
+ if(p.host_user_id!==e.recipient_id||!e.actor_id)return false;
+ // Joining is legal until the gathering ends; departures only alert before it starts.
+ if(!future(e.kind==="member_joined"?p.expires_at:p.start_at,now))return false;
  const actorMember=await one(db.from("joins").select("user_id").eq("party_id",p.id).eq("user_id",e.actor_id).limit(1));
  return e.kind==="member_joined"?actorMember!==null:actorMember===null;
 }
