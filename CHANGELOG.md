@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased] — 公開法律頁 `/legal/*`（2026-11-19，D1；**未部署**）
+
+### Added
+- `/legal/privacy`、`/legal/terms`、`/legal/delete-account`（繁／簡／英；`app/[locale]/legal/`）：商店要填的公開私隱政策與刪號說明網址。私隱政策與條款內容＝iOS／AOS App 內六份 JSON 的逐字節副本（`content/legal/`，`scripts/check-legal-sync.sh` 驗三倉一致）；刪號頁只寫已核實內容（兩種刪除方式與 App 內字串一致、30 天恢復期、到期清登入帳號與檔案），不含未確認的保留期。舊 `/terms`（三種模式說明）不動。
+- `lib/home.ts`：`isLegalPath`＋`resolveSiteGate` 放行 `/legal/*`（只一層、locale 須合法），`SITE_LIVE=false` 關站時商店審核仍打得開。新增測試：`lib/legal.test.ts` 8 條、`lib/home.test.ts` 2 條（兩檔合計 30 條全過）。
+- 驗證：tsc／eslint 乾淨、`npm run build` 過；`SITE_LIVE=false` 起生產伺服器 `curl`：法律頁（含 `/en`、`/zh-Hans`）全 200，`/wall` 與 `/legal/privacy/x` 仍 307。**未測**：手機寬度版式（待用戶目測）、Vercel 實際環境。
+- 已知：footer 的「私隱」連結仍指向不存在的 `/privacy`（`components/marketing/footer.tsx` 為他人未提交改動，未碰）。
+
 ## [Unreleased] — 地圖釘不再對外回傳作者完整生日（2026-11-18，`DEF-20261118-002`）
 
 ### Fixed

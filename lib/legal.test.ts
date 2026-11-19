@@ -1,0 +1,71 @@
+import { describe, expect, it } from "vitest";
+import { DELETE_ACCOUNT, LEGAL_CHROME, SUPPORT_EMAIL, getLegalDoc, isLegalLocale, legalPath, type LegalLocale } from "./legal";
+
+const LOCALES: LegalLocale[] = ["zh-Hant", "zh-Hans", "en"];
+
+describe("公開法律頁內容", () => {
+  it("私隱政策／條款三語都有內容，且章節數三語一致", () => {
+    for (const slug of ["privacy", "terms"] as const) {
+      const counts = LOCALES.map((l) => getLegalDoc(slug, l).sections.length);
+      expect(new Set(counts).size).toBe(1);
+      for (const l of LOCALES) {
+        const d = getLegalDoc(slug, l);
+        expect(d.title).not.toBe("");
+        expect(d.summary.length).toBeGreaterThan(0);
+        for (const s of d.sections) expect(s.paragraphs.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("用戶可見文字不得殘留內部審閱標記或占位", () => {
+    const all = JSON.stringify(
+      (["privacy", "terms"] as const).flatMap((slug) => LOCALES.map((l) => getLegalDoc(slug, l))),
+    );
+    expect(all).not.toMatch(/法律審閱|時限：待|\[\?\]|TODO|TBD|待確認|【待/);
+  });
+
+  it("私隱政策與條款都寫明客服信箱（與 App 內一致）", () => {
+    for (const slug of ["privacy", "terms"] as const) {
+      for (const l of LOCALES) {
+        expect(JSON.stringify(getLegalDoc(slug, l))).toContain(SUPPORT_EMAIL);
+      }
+    }
+  });
+
+  it("刪號說明：三語都有兩種刪除方式與四步入口，且只出現已核實的 30 天", () => {
+    for (const l of LOCALES) {
+      const d = DELETE_ACCOUNT[l];
+      expect(d.options).toHaveLength(2);
+      expect(d.steps).toHaveLength(4);
+      expect(d.options[0]?.body).toContain("30");
+      // 不新增任何其他天數承諾（用戶 2026-11-18 要求移除未確認的刪除時限）
+      const rest = Object.fromEntries(Object.entries(d).filter(([k]) => k !== "effective")); // 生效日期（…18日）不是時限
+      const nums = JSON.stringify(rest).match(/\d+\s*(天|日|days?)/gi) ?? [];
+      expect(nums.length).toBeGreaterThan(0);
+      expect(nums.every((n) => n.startsWith("30"))).toBe(true);
+    }
+  });
+
+  it("刪號頁不承諾人工處理信件（沒有對應流程）", () => {
+    for (const l of LOCALES) expect(JSON.stringify(DELETE_ACCOUNT[l])).not.toContain("@");
+  });
+
+  it("私隱政策寫明負責人與通訊地址（PCPD 指引）", () => {
+    expect(JSON.stringify(getLegalDoc("privacy", "zh-Hant"))).toContain("香港沙田");
+    expect(JSON.stringify(getLegalDoc("privacy", "zh-Hans"))).toContain("香港沙田");
+    expect(JSON.stringify(getLegalDoc("privacy", "en"))).toContain("Sha Tin, Hong Kong");
+  });
+
+  it("不再出現不存在的「設定 › 刪除帳號」路徑", () => {
+    const all = JSON.stringify((["privacy", "terms"] as const).flatMap((slug) => LOCALES.map((l) => getLegalDoc(slug, l))));
+    expect(all).not.toMatch(/設定 ›|设置 ›|Settings >/);
+  });
+
+  it("路徑：預設語言不帶前綴，其餘帶前綴；語言判斷", () => {
+    expect(legalPath("privacy", "zh-Hant")).toBe("/legal/privacy");
+    expect(legalPath("delete-account", "en")).toBe("/en/legal/delete-account");
+    expect(isLegalLocale("zh-Hans")).toBe(true);
+    expect(isLegalLocale("fr")).toBe(false);
+    expect(LEGAL_CHROME.en.privacy).toBe("Privacy Policy");
+  });
+});

@@ -42,6 +42,18 @@ export function isComingSoonPath(pathname: string): boolean {
 }
 
 /**
+ * 公開法律頁（`/legal/privacy`｜`/legal/terms`｜`/legal/delete-account`，含 locale 前綴變體）。
+ * App Store／Google Play 審核要能打開私隱政策與刪號說明，關站時也必須放行。
+ * 只放行 `/legal` 下一層（深一層以上不算），locale 段須在 locales 內。
+ */
+export function isLegalPath(pathname: string, locales: readonly string[] = []): boolean {
+  const clean = pathname !== "/" ? pathname.replace(/\/$/, "") : pathname;
+  const seg = clean.split("/").slice(1); // 去掉開頭空段
+  if (seg.length > 0 && locales.includes(seg[0] as string)) seg.shift();
+  return seg[0] === "legal" && seg.length <= 2;
+}
+
+/**
  * 关站目标：siteLive＝true 一律 null（零行为变化）；
  * siteLive＝false 时，非 coming-soon 路径回 coming-soon（locale 前缀保留语言，
  * 深路径只取语言段，如 `/zh-Hans/wall`→`/zh-Hans/coming-soon`）；
@@ -56,6 +68,7 @@ export function resolveSiteGate(
   if (siteLive) return null;
   if (isComingSoonPath(pathname)) return null;
   if (isComingSoonPath(pathname.replace(/\/$/, ""))) return null;
+  if (isLegalPath(pathname, locales)) return null;
   const clean = pathname !== "/" ? pathname.replace(/\/$/, "") : pathname;
   if (clean === "/") return "/coming-soon";
   const seg = clean.split("/");

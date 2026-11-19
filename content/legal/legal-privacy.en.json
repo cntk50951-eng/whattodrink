@@ -1,0 +1,66 @@
+{
+  "title": "Privacy Policy",
+  "effective": "18 November 2026",
+  "summaryTitle": "In one sentence",
+  "summary": [
+    "We only collect what the app needs to work. Your location is used to show the map and nearby friends, and you can go invisible, block people or delete your account at any time. We do not use your data to track you across apps or websites."
+  ],
+  "note": "",
+  "sections": [
+    {
+      "title": "Account details",
+      "tag": "Friends see nickname and avatar",
+      "paragraphs": [
+        "[Required] Email, nickname and date of birth (used to confirm you are 18 or over). Avatar and gender are optional. Used to sign you in and show your profile."
+      ]
+    },
+    {
+      "title": "Location",
+      "tag": "Follows your visibility setting",
+      "paragraphs": [
+        "[Optional, you can refuse] Only collected while you use the app. If you refuse you can still browse the Hong Kong map. Used to show the map, nearby bars and friends. In invisible mode it is not shown to others."
+      ]
+    },
+    {
+      "title": "Photos, videos and voice",
+      "tag": "Whoever you post it to",
+      "paragraphs": [
+        "[Optional] Check-in photos, chat media, and your voice when you talk to the bartender Ivy (turned into text by your phone's system speech recognition service)."
+      ]
+    },
+    {
+      "title": "Chat and meetup content",
+      "tag": "People in the conversation",
+      "paragraphs": [
+        "[Required to use the feature] Messages, meetup details and game-room records. Used to run the features and to handle reports and complaints."
+      ]
+    },
+    {
+      "title": "Device and push",
+      "tag": "Only us",
+      "paragraphs": [
+        "[Optional] Push notification token and app version. Used to send the notifications you agree to receive."
+      ]
+    },
+    {
+      "title": "Third-party services",
+      "paragraphs": [
+        "Your data may be processed by:"
+      ],
+      "bullets": [
+        "AMap (Gaode): maps and search. Your location is sent to its servers. You agree to this when you accept these terms on first launch.",
+        "Supabase: sign-in and data storage.",
+        "Google: only if you choose to sign in with Google; we receive your email and name.",
+        "Apple and Google (depending on your phone): push notifications and speech recognition; Sign in with Apple on iPhone.",
+        "AI service providers: the messages you send to the bartender Ivy, your search requests, and content that needs a safety check are sent to AI service providers to generate replies and voice, keep your preference memory and run content safety checks."
+      ]
+    },
+    {
+      "title": "Your rights",
+      "paragraphs": [
+        "You can request access to and correction of your personal data, and you can ask for deletion by tapping “Delete account” at the bottom of your profile panel (tap your avatar on the home screen). For access or correction requests contact support@whattodrink.app. Person in charge: freelance developer; correspondence address: Sha Tin, Hong Kong. We reply within the time required by the Ordinance."
+      ]
+    }
+  ],
+  "version": "1.0"
+}

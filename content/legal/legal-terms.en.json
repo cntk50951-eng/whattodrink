@@ -1,0 +1,76 @@
+{
+  "title": "Terms of Service",
+  "effective": "18 November 2026",
+  "summaryTitle": "Key points (about 1 minute)",
+  "summary": [
+    "You must be 18 or over to use the app.",
+    "You are responsible for what you post. Be respectful.",
+    "We are only a tool. Meet in public places when you go out for drinks.",
+    "Drinking-game penalties are always voluntary. Never pressure anyone, and never drive after drinking.",
+    "You can report, block, or delete your account at any time from your profile panel."
+  ],
+  "note": "",
+  "sections": [
+    {
+      "title": "About the service",
+      "paragraphs": [
+        "hi drink (the \"Service\") is provided by the hi drink development team (\"we\"). It includes the map, check-ins, friends, chat, drinking meetups and games. By using the Service you accept these Terms."
+      ]
+    },
+    {
+      "title": "Eligibility: 18 or over",
+      "paragraphs": [
+        "You must be 18 or over. Hong Kong law prohibits the sale or supply of liquor to people under 18 in the course of business, and we only allow adults to use the Service. If we find that you are under 18 we may suspend or delete your account."
+      ]
+    },
+    {
+      "title": "Your content and community rules",
+      "paragraphs": [
+        "You keep ownership of your photos, text and voice, and you allow us to store, display and transmit them to run the Service. Please do not post:"
+      ],
+      "bullets": [
+        "Illegal, sexual, violent, harassing or discriminatory content",
+        "Other people's private information, or photos taken without their consent",
+        "Content that encourages excessive drinking or supplies alcohol to minors",
+        "Spam, impersonation or commercial harassment"
+      ]
+    },
+    {
+      "title": "Meetups and personal safety",
+      "paragraphs": [
+        "We only provide matching and chat tools. We are not the host of any meetup. Meet in public places, tell a friend, and judge the risks yourself."
+      ]
+    },
+    {
+      "title": "Drinking games and responsibility",
+      "paragraphs": [
+        "Drinking penalties in games are entirely voluntary and can always be swapped for another challenge. Never force anyone to drink. Do not drive after drinking."
+      ]
+    },
+    {
+      "title": "Location and who can see you",
+      "paragraphs": [
+        "In Settings you can choose public, friends only, or invisible. See the Privacy Policy for details."
+      ]
+    },
+    {
+      "title": "Reports, complaints and how we handle them",
+      "paragraphs": [
+        "You can report a user or content, report inside a game room, or file a complaint about attendance or behaviour at a meetup. You can also block someone. Complaints are first classified automatically and then handled by our reviewers. The person complained about can respond, and both sides can appeal after the result. Safety cases are handled first. We may remove content, restrict features or suspend accounts."
+      ]
+    },
+    {
+      "title": "Ending your account",
+      "paragraphs": [
+        "You can delete your account at any time by tapping “Delete account” at the bottom of your profile panel (tap your avatar on the home screen)."
+      ]
+    },
+    {
+      "title": "Governing law and contact",
+      "paragraphs": [
+        "These Terms are governed by the laws of the Hong Kong Special Administrative Region. Contact: support@whattodrink.app."
+      ]
+    }
+  ],
+  "version": "1.0"
+}
