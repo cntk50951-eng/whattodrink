@@ -8,8 +8,8 @@ export async function Footer() {
 
   const links = [
     { key: "about", href: "/about" },
-    { key: "privacy", href: "/privacy" },
-    { key: "terms", href: "/terms" },
+    { key: "privacy", href: "/legal/privacy" },
+    { key: "terms", href: "/legal/terms" },
     { key: "contact", href: "mailto:hello@whattodrink.app" },
   ] as const;
 
