@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased] — 發布冪等 C-01＋詳情補作者欄位（2026-11-19；**遷移 0078 未執行、未部署**）
+
+### Added
+- `POST /api/v1/checkins` 讀 `Idempotency-Key`：同一用戶同一個 key 只會有一則打卡；回包丟失後同 key 重送，直接回既有那則（201、同 id，**不再審核、不再發積分、不帶 bar_reward**）。header 缺席／不合法一律當沒帶（不報 400，舊客戶端每次送新 UUID 照常能發）。並發重送靠唯一索引擋，撞衝突後回先插入的那則。
+- 遷移 `0078_checkins_client_key.sql`：`checkins.client_key text`＋部分唯一索引 `(user_id, client_key) where client_key is not null`。**沒跑這條也安全**：查／插遇 `42703`（列不存在）整單降級為沒有冪等。
+- `GET /api/v1/checkins/{id}`（含歸檔分支）回包補 `user_id／nickname／avatar_url／kind／expires_at`（只暱稱與頭像，永不回 dob／bio／性別）；只有 id 的入口（動態／聊天卡／約酒／通知／深鏈）靠它補全作者。
+
+### Fixed
+- 插入時的可選列（hashtags／photo_urls／client_key）改為「錯誤點名哪個去掉哪個」的循環。原本固定的 if 鏈在 Postgres 報的缺列順序與鏈不一致時會漏掉，掉進「0007 未遷移」回退把貼文全部變私密。
+- 驗證：tsc／eslint（0 error）／vitest 1350 全過（新增 12 條：header 解析、缺列降級、重放短路、23505 並發）／`npm run build` 過。
+
 ## [Unreleased] — 公開法律頁 `/legal/*`（2026-11-19，D1；**未部署**）
 
 ### Added

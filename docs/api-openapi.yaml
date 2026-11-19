@@ -1006,6 +1006,18 @@ paths:
     post:
       operationId: postCheckin
       summary: 打卡落库（需登录，A.12 雙類型：flash 24h / post 永久，visibility 由 users.mode 派生）
+      description: |
+        冪等（C-01）：帶 `Idempotency-Key` header（8–64 個字母數字／`_`／`-`，UUID 即可）時，同一用戶同一個 key 只會有一則打卡。
+        回包丟失後用**同一個 key** 重送，服務端直接回既有那則（同 id、同 201 形狀，不再審核、不再發積分、不含 `bar_reward`）。
+        客戶端：一次「發布」只產一個 key，這次發布的所有重試沿用它；成功或用戶放棄後才換新。
+        header 缺席或不合法一律當沒帶（不報 400），所以舊客戶端不受影響。
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9_-]{8,64}$"
       security:
         - bearerAuth: []
       requestBody:
@@ -1151,6 +1163,26 @@ paths:
                       id:
                         type: string
                         format: uuid
+                      user_id:
+                        type: string
+                        format: uuid
+                        nullable: true
+                        description: 作者 id（R3-POST-01：只有 id 的入口靠它補全作者；舊客戶端忽略）
+                      nickname:
+                        type: string
+                        nullable: true
+                        description: 作者暱稱（只回暱稱與頭像，永不回 dob／bio／性別）
+                      avatar_url:
+                        type: string
+                        nullable: true
+                      kind:
+                        type: string
+                        enum: [flash, post]
+                        nullable: true
+                      expires_at:
+                        type: string
+                        format: date-time
+                        nullable: true
                       photo_url:
                         type: string
                         nullable: true

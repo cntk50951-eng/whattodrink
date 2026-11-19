@@ -6,6 +6,12 @@ import { checkinVisibilityFor } from "@/lib/api/privacy";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { isDeletionPending } from "@/lib/accountDeletion";
 import { grantPostCredit, type PostRewardOutcome } from "@/lib/barCredits";
+import {
+  isClientKeyColumnMissing,
+  isClientKeyConflict,
+  parseIdempotencyKey,
+  stripMissingOptionalColumn,
+} from "@/lib/api/checkinIdempotency";
 
 /**
  * UR A.12 打卡雙類型（🔒，承 A.10）。
@@ -14,6 +20,57 @@ import { grantPostCredit, type PostRewardOutcome } from "@/lib/barCredits";
  */
 
 const CHECKIN_SELECT = "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript,tags";
+
+type AuthedSupabase = Awaited<ReturnType<typeof getAuthedClient>>["supabase"];
+
+/** 201 回包裡的 checkin 物件（新建與冪等重放共用同一個口徑）。 */
+function createdCheckinJson(row: Record<string, unknown>, hashtags: string[]) {
+  return {
+    id: row.id as string,
+    beer_id: (row.beer_id as string | null) ?? null,
+    lat: row.lat as number,
+    lng: row.lng as number,
+    place_name: row.place_name as string | null,
+    kind: row.kind as "flash" | "post",
+    visibility: row.visibility as "private" | "public" | "friends",
+    expires_at: row.expires_at as string | null,
+    created_at: row.created_at as string,
+    photo_url: (row.photo_url as string | null) ?? null,
+    note: (row.note as string | null) ?? null,
+    audio_url: (row.audio_url as string | null) ?? null,
+    audio_seconds: (row.audio_seconds as number | null) ?? null,
+    transcript: (row.transcript as string | null) ?? null,
+    tags: Array.isArray(row.tags) ? (row.tags as unknown[]).filter((x): x is string => typeof x === "string") : [],
+    hashtags,
+  };
+}
+
+type KeyLookup = { kind: "hit"; row: Record<string, unknown> } | { kind: "miss" } | { kind: "unsupported" };
+
+/**
+ * C-01：按 (user_id, client_key) 找已建的那則。0078 未跑（client_key 列不存在）＝unsupported（整單降級成沒有冪等）；
+ * 其他讀取錯誤當 miss（寧可繼續發布，並發重複由唯一索引擋，不因查詢抖動而讓用戶發不出去）。
+ */
+async function lookupByClientKey(supabase: AuthedSupabase, userId: string, key: string): Promise<KeyLookup> {
+  const run = (cols: string) =>
+    supabase.from("checkins").select(cols).eq("user_id", userId).eq("client_key", key).maybeSingle();
+  let { data, error } = await run(`${CHECKIN_SELECT},hashtags`);
+  if (error !== null && error.code === "42703" && !isClientKeyColumnMissing(error)) {
+    ({ data, error } = await run(CHECKIN_SELECT)); // 0061 沒跑：hashtags 列不存在，回放時 hashtags 為空
+  }
+  if (error !== null) {
+    if (isClientKeyColumnMissing(error)) return { kind: "unsupported" };
+    console.warn(`[api/v1/checkins] idempotency lookup failed, continue: code=${error.code} message=${error.message}`);
+    return { kind: "miss" };
+  }
+  return data === null ? { kind: "miss" } : { kind: "hit", row: data as unknown as Record<string, unknown> };
+}
+
+function replayResponse(row: Record<string, unknown>): Response {
+  const hashtags = Array.isArray(row.hashtags) ? (row.hashtags as unknown[]).filter((x): x is string => typeof x === "string") : [];
+  // 重放不回 bar_reward：積分只在第一次建立時發（grantPostCredit 按 post id 去重，且回包丟失時客戶端本來就沒收到）
+  return apiOk({ checkin: createdCheckinJson(row, hashtags) }, 201);
+}
 
 /** key 缺席只 warn 一次（開發態容許跳過；生產必須配 key，見 UR E.2）。 */
 let warnedNoModerationKey = false;
@@ -46,6 +103,15 @@ export async function POST(req: Request): Promise<Response> {
   const transcriptText = parsed.body.transcript ?? null;
   const tags = parsed.body.tags ?? [];
   const hashtags = parsed.body.hashtags ?? [];
+
+  // C-01 發布冪等：同一次發布的重試帶同一個 Idempotency-Key。先於審核／落庫短路——重放不能再打一次 OpenAI／MiniMax。
+  // header 不合法就當沒帶（舊客戶端每次都送新 UUID，必須照常能發）；0078 未跑則整單降級為沒有冪等。
+  let clientKey = parseIdempotencyKey(req.headers.get("Idempotency-Key"));
+  if (clientKey !== null) {
+    const found = await lookupByClientKey(supabase, userId, clientKey);
+    if (found.kind === "hit") return replayResponse(found.row);
+    if (found.kind === "unsupported") clientKey = null;
+  }
 
   try {
     // 防御：若 public.users 缺行（0006 触发器未执行或旧库），先补行再落库，避免 FK 23503
@@ -224,30 +290,29 @@ export async function POST(req: Request): Promise<Response> {
       const optionalCols: Record<string, unknown> = {
         ...(hashtags.length > 0 ? { hashtags } : {}),
         ...(photoUrls !== null ? { photo_urls: photoUrls } : {}),
+        ...(clientKey !== null ? { client_key: clientKey } : {}),
       };
       let { data, error } = await supabase
         .from("checkins")
         .insert({ ...fullRow, ...optionalCols })
         .select(CHECKIN_SELECT)
         .single();
-      if (error?.code === "42703" && /photo_urls/.test(error.message ?? "")) {
-        console.warn("[api/v1/checkins] 0071 未遷移，多圖只存封面");
-        delete optionalCols.photo_urls;
+      // 可選列（hashtags／photo_urls／client_key）哪個不存在就去掉哪個重試（Postgres 報第一個缺的列，順序不固定，所以用循環而不是固定 if 鏈）。
+      // 否則 0078 還沒跑時帶 client_key 的插入會 42703，掉進下面「0007 未遷移」回退把貼文全部變私密。
+      for (let attempt = 0; attempt < 4 && error?.code === "42703"; attempt++) {
+        const dropped = stripMissingOptionalColumn(optionalCols, error.message ?? undefined);
+        if (dropped === null) break;
+        console.warn(`[api/v1/checkins] 列 ${dropped} 未遷移，略過`);
         ({ data, error } = await supabase
           .from("checkins")
           .insert({ ...fullRow, ...optionalCols })
           .select(CHECKIN_SELECT)
           .single());
       }
-      // 0061 沒跑（hashtags 列不存在）：去掉自定義標籤照常落庫，不要掉進下面「0007 未遷移」的私密回退
-      if (error?.code === "42703" && /hashtags/.test(error.message ?? "")) {
-        console.warn("[api/v1/checkins] 0061 未遷移，hashtags 略過");
-        delete optionalCols.hashtags;
-        ({ data, error } = await supabase
-          .from("checkins")
-          .insert({ ...fullRow, ...optionalCols })
-          .select(CHECKIN_SELECT)
-          .single());
+      // 並發重送：另一個相同 key 的請求剛好先插入了 → 回那一則（只認 client_key 唯一索引的衝突）
+      if (clientKey !== null && isClientKeyConflict(error)) {
+        const again = await lookupByClientKey(supabase, userId, clientKey);
+        if (again.kind === "hit") return replayResponse(again.row);
       }
       if (error === null && data !== null) {
         inserted = data as unknown as Record<string, unknown>;
@@ -325,24 +390,7 @@ export async function POST(req: Request): Promise<Response> {
         ...(barReward !== null
           ? { bar_reward: { granted: barReward.granted, reason: barReward.reason, credits: barReward.credits } }
           : {}),
-        checkin: {
-          id: row.id as string,
-          beer_id: (row.beer_id as string | null) ?? null,
-          lat: row.lat as number,
-          lng: row.lng as number,
-          place_name: row.place_name as string | null,
-          kind: row.kind as "flash" | "post",
-          visibility: row.visibility as "private" | "public" | "friends",
-          expires_at: row.expires_at as string | null,
-          created_at: row.created_at as string,
-          photo_url: (row.photo_url as string | null) ?? null,
-          note: (row.note as string | null) ?? null,
-          audio_url: (row.audio_url as string | null) ?? null,
-          audio_seconds: (row.audio_seconds as number | null) ?? null,
-          transcript: (row.transcript as string | null) ?? null,
-          tags: Array.isArray(row.tags) ? (row.tags as unknown[]).filter((x): x is string => typeof x === "string") : [],
-          hashtags,
-        },
+        checkin: createdCheckinJson(row, hashtags),
       },
       201,
     );

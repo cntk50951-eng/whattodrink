@@ -12,7 +12,29 @@ import { summarizeRatings } from "@/lib/api/rating";
  */
 
 const DETAIL_COLUMNS =
-  "id,user_id,visibility,photo_url,note,audio_url,audio_seconds,transcript,created_at,place_name,lat,lng,beer_id,rating,tags,hashtags";
+  "id,user_id,visibility,photo_url,note,audio_url,audio_seconds,transcript,created_at,place_name,lat,lng,beer_id,rating,tags,hashtags,kind,expires_at";
+
+/**
+ * 作者公開身份（R3-POST-01）：詳情回包補 `user_id／nickname／avatar_url`，讓只有 id 的入口（動態／聊天卡／約酒／通知／深鏈）
+ * 也能顯示作者、開主頁、舉報、約 TA。只回暱稱與頭像（地圖釘本來就對外公開的那兩個）；**永不回 dob／bio／性別等。**
+ * 查不到（帳號已註銷等）回 null，欄位照樣給 null，不拖垮詳情。
+ */
+async function readAuthorIdentity(
+  service: Awaited<ReturnType<typeof createServiceClient>>,
+  ownerId: string | null,
+): Promise<{ nickname: string | null; avatar_url: string | null }> {
+  if (ownerId === null) return { nickname: null, avatar_url: null };
+  try {
+    const { data } = await service.from("users").select("nickname,avatar_url").eq("id", ownerId).maybeSingle();
+    const u = (data ?? null) as { nickname?: unknown; avatar_url?: unknown } | null;
+    return {
+      nickname: typeof u?.nickname === "string" && u.nickname !== "" ? u.nickname : null,
+      avatar_url: typeof u?.avatar_url === "string" && u.avatar_url !== "" ? u.avatar_url : null,
+    };
+  } catch {
+    return { nickname: null, avatar_url: null };
+  }
+}
 
 /**
  * UR E.22 歸檔回退（舊分享鏈／深鏈不斷；只讀快照，主缺才查）。
@@ -31,7 +53,7 @@ async function readArchived(
     const { data, error } = await service
       .from("checkins_archive")
       .select(
-        "id,user_id,visibility,photo_url,note,audio_url,audio_seconds,transcript,created_at,place_name,lat,lng,beer_id,rating_avg,rating_count,like_count,want_count,comment_count,cheers_count",
+        "id,user_id,visibility,photo_url,note,audio_url,audio_seconds,transcript,created_at,place_name,lat,lng,beer_id,rating_avg,rating_count,like_count,want_count,comment_count,cheers_count,kind,expires_at",
       )
       .eq("id", id)
       .maybeSingle();
@@ -81,9 +103,15 @@ async function readArchived(
   const count = (v: unknown): number =>
     typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
   const avg = num(arow.rating_avg);
+  const author = await readAuthorIdentity(service, ownerId);
   return apiOk({
     checkin: {
       id: arow.id as string,
+      user_id: ownerId,
+      nickname: author.nickname,
+      avatar_url: author.avatar_url,
+      kind: arow.kind === "flash" || arow.kind === "post" ? arow.kind : null,
+      expires_at: (arow.expires_at as string | null) ?? null,
       photo_url: (arow.photo_url as string | null) ?? null,
       note: (arow.note as string | null) ?? null,
       audio_url: (arow.audio_url as string | null) ?? null,
@@ -264,9 +292,16 @@ export async function GET(
       if (Array.isArray(arr)) photoUrls = arr.filter((x): x is string => typeof x === "string");
     }
   } catch {}
+  const author = await readAuthorIdentity(service, ownerId);
   return apiOk({
     checkin: {
       id: row.id as string,
+      // 作者身份與貼文種類（R3-POST-01）：只有 id 的入口靠它補全；缺席／舊客戶端忽略即兼容
+      user_id: ownerId,
+      nickname: author.nickname,
+      avatar_url: author.avatar_url,
+      kind: row.kind === "flash" || row.kind === "post" ? row.kind : null,
+      expires_at: (row.expires_at as string | null) ?? null,
       photo_url: (row.photo_url as string | null) ?? null,
       // ≥2 張才有；[0] 即 photo_url。單圖帖子為空數組
       photo_urls: photoUrls.length >= 2 ? photoUrls : [],
