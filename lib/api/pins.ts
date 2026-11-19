@@ -44,9 +44,7 @@ export type PinJson = {
   nickname: string | null;
   avatarUrl: string | null;
   gender: string | null;
-  /** UR E.18 作者生日（面板年齡徽章；YYYY-MM-DD 形，无即 null）。 */
-  authorDob: string | null;
-  /** 作者足歲（服務端按 dob 算；客戶端只該用它，不必拿生日自算；dob 缺失／非法即 null，客戶端藏年齡）。 */
+  /** 作者足歲（服務端按 dob 算；dob 缺失／非法即 null，客戶端藏年齡）。完整生日不回傳（私隱：他人只見年齡，同 users/[id]/profile 口徑）。 */
   authorAge: number | null;
   /** UR E.18 作者簽名（完全公開；无即 null）。 */
   authorBio: string | null;
@@ -139,6 +137,7 @@ export function toPinJson(raw: unknown, nowMs: number = Date.now()): PinJson | n
   let avatarUrl: string | null = null;
   let gender: string | null = null;
   let lastSeenAt: string | null = null;
+  // 僅用於服務端算 authorAge；不得進回包（匿名可取，見 docs/WEB_HANDOFF_PIN_AUTHOR_DOB.md）。
   let authorDob: string | null = null;
   let authorBio: string | null = null;
   if (users !== null && typeof users === "object") {
@@ -207,7 +206,6 @@ export function toPinJson(raw: unknown, nowMs: number = Date.now()): PinJson | n
     nickname,
     avatarUrl,
     gender,
-    authorDob,
     authorAge: ageOf(authorDob, nowMs),
     authorBio,
     photoThumb,

@@ -79,6 +79,7 @@
 | DEF-20261006-002 | iOS 好友釘 pill 无走马灯（pins 缺 note 字段） | Open | P2 | 2026-10-06 / @user | UR E.20 | 待确认，见详情 |
 
 
+| DEF-20261118-002 | `GET /api/v1/map/pins` 匿名回傳作者完整生日 `authorDob` | Fixed（本地；tsc／eslint／1328 測試過；**未部署**，需部署＋清 CDN） | P1 | 2026-11-18 / 跨端審計 `NEW-REL-03` | 見 iOS `docs/WEB_HANDOFF_PIN_AUTHOR_DOB.md` | `lib/api/pins.ts` `toPinJson` 把 `users.dob` 原樣放進回包；與 `users/[id]/profile`「他人只見 age」口徑矛盾，契約 yaml 亦無此字段。改為只回 `authorAge`。 |
 - **严重度**：P2 次要（慢＋白屏感；记录最终能出来）
 - **发现日期 / 报告人**：2026-10-03 / @user
 - **复现步骤**：

@@ -186,8 +186,8 @@ type V2Card =
       avatarEmoji: string | null;
       /** UR C.10：三態（api 自由串經 parseGender，MOCK 直用）。 */
       gender: Gender;
-      /** UR E.18：作者生日（面板年齡徽章；MOCK 無即 null）。 */
-      authorDob: string | null;
+      /** UR E.18：作者足歲（服務端算；面板年齡徽章；MOCK 無即 null）。完整生日不回傳。 */
+      authorAge: number | null;
       /** UR E.18：作者簽名（完全公開；MOCK 無即 null）。 */
       bio: string | null;
       /** UR C.10：打卡時間 epoch ms（無則不渲染時間行）。 */
@@ -1030,7 +1030,7 @@ export function V2Home() {
         avatarUrl: api.avatarUrl,
         avatarEmoji: null,
         gender: parseGender(api.gender),
-        authorDob: api.authorDob,
+        authorAge: api.authorAge,
         bio: api.authorBio,
         checkedInAt:
           typeof api.checkedInAt === "number" &&
@@ -1098,7 +1098,7 @@ export function V2Home() {
         avatarUrl: null,
         avatarEmoji: m.avatarEmoji,
         gender: m.gender,
-        authorDob: null,
+        authorAge: null,
         bio: null,
         checkedInAt: m.checkedInAt,
       });
@@ -2749,10 +2749,9 @@ export function V2Home() {
                       {/* UR E.18：性別符號＋年齡徽章（secret 沿舊文字；无 dob 不编岁数）。 */}
                       <Badge variant="outline">
                         {card.gender === "male" ? "♂ " : card.gender === "female" ? "♀ " : ""}
-                        {(() => {
-                          const a = ageOf(card.authorDob, nowMs);
-                          return a === null ? t(GENDER_KEY[card.gender]) : t2("ageYears", { n: a });
-                        })()}
+                        {card.authorAge === null
+                          ? t(GENDER_KEY[card.gender])
+                          : t2("ageYears", { n: card.authorAge })}
                       </Badge>
                       {card.online && <Badge>{t("onlineNow")}</Badge>}
                     </SheetTitle>

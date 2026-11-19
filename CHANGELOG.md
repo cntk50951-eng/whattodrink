@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased] — 地圖釘不再對外回傳作者完整生日（2026-11-18，`DEF-20261118-002`）
+
+### Fixed
+- `[shared]`（**未部署**）`GET /api/v1/map/pins` 不再回傳 `authorDob`（匿名可批量取公開帖作者完整生日；與私隱政策「他人只見年齡」矛盾）：`toPinJson` 只輸出服務端算好的 `authorAge`；web 首頁釘面板改讀 `authorAge`（顯示不變）；`docs/api-openapi.yaml` `MapPin` 補 `authorBio`、註明不回傳生日；`pins.test.ts` 改斷言無 `authorDob`。iOS／AOS 本就不消費該字段，無需改。`tsc`／eslint（0 error）／vitest 131 檔 1328 測試過。**上線前須部署，並確認 CDN 無含 `authorDob` 的舊緩存。** 來源：`docs/WEB_HANDOFF_PIN_AUTHOR_DOB.md`（`authorBio` 默認保留，待用戶確認）。
+
 ## [Unreleased] — D.12 推送覆蓋復核（2026-11-18）
 
 ### Fixed

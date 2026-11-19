@@ -116,7 +116,7 @@ describe("toPinJson", () => {
     expect(pin?.area).toBe("銅鑼灣");
     expect(pin?.isOnline).toBe(true);
     expect(pin?.checkedInAt).toBe(Date.parse("2026-09-15T11:55:00Z"));
-    expect(pin?.authorDob).toBe("2000-01-01");
+    expect(pin).not.toHaveProperty("authorDob");
     expect(pin?.authorAge).toBe(26);
     expect(pin?.authorBio).toBeNull();
     expect(pin?.photoThumb).toBe("data:image/jpeg;base64,/9j/");
