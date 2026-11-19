@@ -7,7 +7,6 @@ export async function Footer() {
   const t = await getTranslations("footer");
 
   const links = [
-    { key: "about", href: "/about" },
     { key: "privacy", href: "/legal/privacy" },
     { key: "terms", href: "/legal/terms" },
     { key: "contact", href: "mailto:hello@whattodrink.app" },
