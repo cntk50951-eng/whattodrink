@@ -272,60 +272,63 @@ export async function GET(req: Request): Promise<Response> {
   const joinCounts = new Map<string, number>();
   const gendersByParty = new Map<string, (string | null)[]>();
   const mine = new Set<string>();
+  const arrivedIds = new Set<string>();
+  let trustMap = new Map<string, Awaited<ReturnType<typeof hostTrustMap>> extends Map<string, infer V> ? V : never>();
   if (ids.length > 0) {
-    const { data: joins } = await supabase
-      .from("joins")
-      .select("party_id,user_id")
-      .in("party_id", ids);
-    const jrows = ((joins ?? []) as { party_id: string; user_id: string }[]).filter(
-      (j) => typeof j.party_id === "string" && typeof j.user_id === "string",
-    );
-    // joiner 性別（male/female_count 用；secret／未知不計，沿 countGenders）。
-    const genderOf = new Map<string, string | null>();
-    const joinerIds = [...new Set(jrows.map((j) => j.user_id))];
-    if (joinerIds.length > 0) {
-      const { data: joiners } = await supabase
-        .from("users")
-        .select("id,gender")
-        .in("id", joinerIds);
-      for (const u of ((joiners ?? []) as { id: string; gender: string | null }[])) {
-        genderOf.set(u.id, u.gender ?? null);
-      }
-    }
-    for (const j of jrows) {
+    // 查完主表後四路併發：joins→性別 / 發起人資料 / 我是否到場打卡 / 發起人信用徽章，消除原先 7 層串行 DB RTT
+    const svc = await createServiceClient();
+    const [joinsRes, hostsRes, attRes, trustRes] = await Promise.all([
+      (async () => {
+        const { data: joins } = await supabase
+          .from("joins")
+          .select("party_id,user_id")
+          .in("party_id", ids);
+        const jrows = ((joins ?? []) as { party_id: string; user_id: string }[]).filter(
+          (j) => typeof j.party_id === "string" && typeof j.user_id === "string",
+        );
+        const genderOf = new Map<string, string | null>();
+        const joinerIds = [...new Set(jrows.map((j) => j.user_id))];
+        if (joinerIds.length > 0) {
+          const { data: joiners } = await supabase
+            .from("users")
+            .select("id,gender")
+            .in("id", joinerIds);
+          for (const u of ((joiners ?? []) as { id: string; gender: string | null }[])) {
+            genderOf.set(u.id, u.gender ?? null);
+          }
+        }
+        return { jrows, genderOf };
+      })(),
+      hostIds.length > 0
+        ? supabase.from("users").select("id,nickname,avatar_url").in("id", hostIds)
+        : Promise.resolve({ data: null }),
+      viewerId !== null
+        ? svc
+            .from("party_attendance")
+            .select("party_id")
+            .eq("user_id", viewerId)
+            .in("party_id", ids)
+            .not("arrived_at", "is", null)
+        : Promise.resolve({ data: null }),
+      hostTrustMap(svc, hostIds, Date.now()),
+    ]);
+    for (const j of joinsRes.jrows) {
       joinCounts.set(j.party_id, (joinCounts.get(j.party_id) ?? 0) + 1);
       if (viewerId !== null && j.user_id === viewerId) mine.add(j.party_id);
       const arr = gendersByParty.get(j.party_id) ?? [];
-      arr.push(genderOf.get(j.user_id) ?? null);
+      arr.push(joinsRes.genderOf.get(j.user_id) ?? null);
       gendersByParty.set(j.party_id, arr);
     }
-    if (hostIds.length > 0) {
-      const { data: users } = await supabase
-        .from("users")
-        .select("id,nickname,avatar_url")
-        .in("id", hostIds);
-      hosts = new Map(
-        (((users ?? []) as unknown[]) as { id: string; nickname: string; avatar_url: string | null }[]).map(
-          (u) => [u.id, { nickname: u.nickname, avatar_url: u.avatar_url }],
-        ),
-      );
-    }
-  }
-  // E.30 发起人信用徽章（批量 3 查询收敛；service 读，零 policy 表）。
-  // 我是否已到场打卡（party_attendance 零 policy，走 service；只对登录者；供 iOS 跨设备恢复「已打卡」）
-  const arrivedIds = new Set<string>();
-  if (viewerId !== null && ids.length > 0) {
-    const { data: att } = await (await createServiceClient())
-      .from("party_attendance")
-      .select("party_id")
-      .eq("user_id", viewerId)
-      .in("party_id", ids)
-      .not("arrived_at", "is", null);
-    for (const a of ((att ?? []) as unknown[]) as { party_id?: unknown }[]) {
+    hosts = new Map(
+      (((hostsRes.data ?? []) as unknown[]) as { id: string; nickname: string; avatar_url: string | null }[]).map(
+        (u) => [u.id, { nickname: u.nickname, avatar_url: u.avatar_url }],
+      ),
+    );
+    for (const a of ((attRes.data ?? []) as unknown[]) as { party_id?: unknown }[]) {
       if (typeof a.party_id === "string") arrivedIds.add(a.party_id);
     }
+    trustMap = trustRes;
   }
-  const trustMap = await hostTrustMap(await createServiceClient(), hostIds, Date.now());
   const items = list.map((r) => {
     const host = hosts.get(r.host_user_id) ?? { nickname: "酒友", avatar_url: null };
     const gc = countGenders(gendersByParty.get(r.id) ?? []);

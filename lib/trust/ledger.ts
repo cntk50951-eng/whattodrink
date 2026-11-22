@@ -215,7 +215,12 @@ export async function hostTrustMap(
   const since90 = new Date(nowMs - 90 * DAY_MS).toISOString();
   const [{ data: ledgers }, { data: hosted }, { data: cancels }] = await Promise.all([
     svc.from("trust_events").select("user_id,kind,delta,created_at,expires_at").in("user_id", ids).limit(5000),
-    svc.from("parties").select("host_user_id").in("host_user_id", ids).limit(5000),
+    svc
+      .from("parties")
+      .select("id,host_user_id,status,created_at,expires_at")
+      .in("host_user_id", ids)
+      .order("created_at", { ascending: false })
+      .limit(5000),
     svc.from("party_events").select("user_id").eq("kind", "cancel").in("user_id", ids).gte("created_at", since90).limit(5000),
   ]);
   const byUser = new Map<string, { kind: unknown; delta: unknown; created_at: unknown; expires_at: unknown }[]>();
@@ -225,40 +230,47 @@ export async function hostTrustMap(
     byUser.get(r.user_id)?.push(r as { kind: unknown; delta: unknown; created_at: unknown; expires_at: unknown });
   }
   const hostedCount = new Map<string, number>();
-  for (const p of ((hosted ?? []) as unknown[]) as { host_user_id?: unknown }[]) {
+  const settledIds: { id: string; host_user_id: string }[] = [];
+  const since90Ms = nowMs - 90 * DAY_MS;
+  for (const p of ((hosted ?? []) as unknown[]) as {
+    id?: unknown;
+    host_user_id?: unknown;
+    status?: unknown;
+    created_at?: unknown;
+    expires_at?: unknown;
+  }[]) {
     if (typeof p.host_user_id !== "string") continue;
     hostedCount.set(p.host_user_id, (hostedCount.get(p.host_user_id) ?? 0) + 1);
+    if (
+      typeof p.id === "string" &&
+      p.status === "open" &&
+      typeof p.created_at === "string" &&
+      Date.parse(p.created_at) >= since90Ms &&
+      typeof p.expires_at === "string" &&
+      Date.parse(p.expires_at) + 24 * 3600_000 <= nowMs
+    ) {
+      settledIds.push({ id: p.id, host_user_id: p.host_user_id });
+    }
   }
   const cancelCount = new Map<string, number>();
   for (const e of ((cancels ?? []) as unknown[]) as { user_id?: unknown }[]) {
     if (typeof e.user_id !== "string") continue;
     cancelCount.set(e.user_id, (cancelCount.get(e.user_id) ?? 0) + 1);
   }
-  // 完成率批量：近 90 天已结算自办局（分母）＋其中 attended≥2 的局（分子）。
-  const since90b = new Date(nowMs - 90 * DAY_MS).toISOString();
-  const { data: hostedSettled } = await svc
-    .from("parties")
-    .select("id,host_user_id,expires_at")
-    .in("host_user_id", ids)
-    .eq("status", "open")
-    .gte("created_at", since90b)
-    .limit(2000);
-  const settledIds = (((hostedSettled ?? []) as unknown[]) as { id?: unknown; host_user_id?: unknown; expires_at?: unknown }[]).filter(
-    (p) => typeof p.id === "string" && typeof p.host_user_id === "string" && typeof p.expires_at === "string" && Date.parse(p.expires_at) + 24 * 3600_000 <= nowMs,
-  );
+  // 完成率批量：近 90 天已结算自办局（分母，复用上方一次 parties 查询）＋其中 attended≥2 的局（分子）。
   const attCounts = new Map<string, number>();
   const settledByHost = new Map<string, number>();
   for (const p of settledIds) {
-    settledByHost.set(p.host_user_id as string, (settledByHost.get(p.host_user_id as string) ?? 0) + 1);
+    settledByHost.set(p.host_user_id, (settledByHost.get(p.host_user_id) ?? 0) + 1);
   }
   if (settledIds.length > 0) {
     const { data: attAll } = await svc
       .from("party_attendance")
       .select("party_id,user_id")
-      .in("party_id", settledIds.map((p) => p.id as string))
+      .in("party_id", settledIds.map((p) => p.id))
       .eq("outcome", "attended")
       .limit(5000);
-    const hostOf = new Map(settledIds.map((p) => [p.id as string, p.host_user_id as string]));
+    const hostOf = new Map(settledIds.map((p) => [p.id, p.host_user_id]));
     for (const a of ((attAll ?? []) as unknown[]) as { party_id?: unknown; user_id?: unknown }[]) {
       if (typeof a.party_id !== "string" || typeof a.user_id !== "string") continue;
       if (a.user_id === hostOf.get(a.party_id)) continue;
@@ -267,8 +279,8 @@ export async function hostTrustMap(
   }
   const madeByHost = new Map<string, number>();
   for (const p of settledIds) {
-    if ((attCounts.get(p.id as string) ?? 0) >= 2) {
-      const h = p.host_user_id as string;
+    if ((attCounts.get(p.id) ?? 0) >= 2) {
+      const h = p.host_user_id;
       madeByHost.set(h, (madeByHost.get(h) ?? 0) + 1);
     }
   }

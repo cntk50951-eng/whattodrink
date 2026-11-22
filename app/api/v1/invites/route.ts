@@ -192,20 +192,19 @@ export async function GET(req: Request): Promise<Response> {
   let peers = new Map<string, { nickname: string; avatar_url: string | null }>();
   let friendSet = new Set<string>();
   if (peerIds.length > 0) {
-    const { data: users } = await supabase
-      .from("users")
-      .select("id,nickname,avatar_url")
-      .in("id", peerIds);
+    const [{ data: users }, { data: fsRows }] = await Promise.all([
+      supabase.from("users").select("id,nickname,avatar_url").in("id", peerIds),
+      supabase
+        .from("friendships")
+        .select("user_id,friend_id,status")
+        .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+        .limit(200),
+    ]);
     peers = new Map(
       (((users ?? []) as unknown[]) as { id: string; nickname: string; avatar_url: string | null }[]).map(
         (u) => [u.id, { nickname: u.nickname, avatar_url: u.avatar_url }],
       ),
     );
-    const { data: fsRows } = await supabase
-      .from("friendships")
-      .select("user_id,friend_id,status")
-      .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
-      .limit(200);
     const frows = ((fsRows ?? []) as unknown[]).filter(
       (r): r is FriendshipRow =>
         typeof r === "object" && r !== null && "user_id" in (r as Record<string, unknown>),

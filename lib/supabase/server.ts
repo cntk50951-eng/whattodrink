@@ -52,8 +52,8 @@ export async function getUserId(): Promise<string | null> {
         const supa = createSupabaseJs(env.url, env.publicKey, {
           auth: { persistSession: false },
         });
-        const { data: userData } = await supa.auth.getUser(token);
-        return userData.user?.id ?? null;
+        const { data: claimData } = await supa.auth.getClaims(token);
+        return claimData?.claims.sub ?? null;
       }
     }
   } catch {
@@ -110,8 +110,8 @@ export async function getAuthedClient(req?: Request): Promise<{
       auth: { persistSession: false },
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
-    const { data: userData } = await supa.auth.getUser(token);
-    const uid = userData.user?.id ?? null;
+    const { data: claimData } = await supa.auth.getClaims(token);
+    const uid = claimData?.claims.sub ?? null;
     if (uid !== null) {
       // 用帶 Authorization 頭的 client 作 DB，RLS 才能過
       return { supabase: supa as unknown as Awaited<ReturnType<typeof createClient>>, userId: uid };
