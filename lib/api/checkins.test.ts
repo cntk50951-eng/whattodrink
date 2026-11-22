@@ -104,13 +104,43 @@ describe("parseCreateCheckinBody (UR A.10 → A.12 kind)", () => {
 });
 
 describe("parseMineParams", () => {
-  it("默认 30", () => {
+  it("默认 30 且 thumb=false", () => {
     const res = parseMineParams(new URLSearchParams());
     expect("limit" in res && res.limit).toBe(30);
+    expect("thumb" in res && res.thumb).toBe(false);
+  });
+  it("thumb=1／true 開啟縮圖輕量模式", () => {
+    const r1 = parseMineParams(new URLSearchParams({ limit: "50", thumb: "1" }));
+    expect("thumb" in r1 && r1.thumb).toBe(true);
+    const r2 = parseMineParams(new URLSearchParams({ thumb: "true" }));
+    expect("thumb" in r2 && r2.thumb).toBe(true);
+    const r3 = parseMineParams(new URLSearchParams({ thumb: "0" }));
+    expect("thumb" in r3 && r3.thumb).toBe(false);
   });
   it("非法 limit → 400", () => {
     const res = parseMineParams(new URLSearchParams({ limit: "999" }));
     expect("error" in res).toBe(true);
+  });
+});
+
+describe("toMineRow thumb=1 映射", () => {
+  it("缺少 photo_url 時自動由 photo_thumb 映射至 photo_url，保留原圖優先", () => {
+    const base = {
+      id: "11111111-1111-1111-1111-111111111111",
+      beer_id: null,
+      lat: 22.54,
+      lng: 114.05,
+      place_name: "深圳",
+      kind: "post" as const,
+      visibility: "public" as const,
+      expires_at: null,
+      created_at: "2026-11-22T10:00:00.000Z",
+      beers: null,
+    };
+    const thumbOnly = toMineRow({ ...base, photo_thumb: "data:image/jpeg;base64,THUMB" });
+    expect(thumbOnly?.photo_url).toBe("data:image/jpeg;base64,THUMB");
+    const both = toMineRow({ ...base, photo_url: "data:image/jpeg;base64,FULL", photo_thumb: "data:image/jpeg;base64,THUMB" });
+    expect(both?.photo_url).toBe("data:image/jpeg;base64,FULL");
   });
 });
 

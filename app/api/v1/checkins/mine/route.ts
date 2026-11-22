@@ -9,6 +9,8 @@ import { parseMineParams, toMineRow } from "@/lib/api/checkins";
  */
 
 const MINE_COLUMNS = "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript,tags,hashtags,beers(id,name,emoji,category,tagline,icon_url)";
+/** `thumb=1` 首頁地圖／列表瘦身列：改取 96px `photo_thumb`、省略原圖 `photo_url` 與音訊 `audio_url`，回包從數 MB 壓至百 KB 級。 */
+const MINE_COLUMNS_THUMB = "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_thumb,note,audio_seconds,transcript,tags,hashtags,beers(id,name,emoji,category,tagline,icon_url)";
 
 export async function GET(req: Request): Promise<Response> {
   const { supabase, userId } = await getAuthedClient(req);
@@ -20,14 +22,14 @@ export async function GET(req: Request): Promise<Response> {
   if ("error" in parsed) {
     return apiError("invalid_params", parsed.error, 400);
   }
-  const { limit } = parsed;
+  const { limit, thumb } = parsed;
 
   try {
     let rows: unknown[] | null = null;
     {
       const { data, error } = await supabase
         .from("checkins")
-        .select(MINE_COLUMNS)
+        .select(thumb ? MINE_COLUMNS_THUMB : MINE_COLUMNS)
         .eq("user_id", userId)
         .eq("type", "want")
         .order("created_at", { ascending: false })
@@ -63,8 +65,9 @@ export async function GET(req: Request): Promise<Response> {
     // iOS-0.68 定案（主嫌实锤）：checkins_archive 零 FK（0026 刻意审计不断链），
     // PostgREST 内嵌 beers(...) 无关系可走即 PGRST200 整查失败——故归档只选平列，
     // beer 另查一次手动拼（形状与主表行一致）；出错 warn 不静默。
-    const ARCHIVE_COLUMNS =
-      "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript,tags";
+    const ARCHIVE_COLUMNS = thumb
+      ? "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_thumb,note,audio_seconds,transcript,tags"
+      : "id,beer_id,lat,lng,place_name,kind,visibility,expires_at,created_at,photo_url,note,audio_url,audio_seconds,transcript,tags";
     try {
       const { data: archived, error: archErr } = await supabase
         .from("checkins_archive")

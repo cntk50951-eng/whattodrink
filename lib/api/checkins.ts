@@ -280,13 +280,15 @@ export function parseCreateCheckinBody(
 
 export function parseMineParams(
   search: URLSearchParams,
-): { limit: number } | { error: string } {
+): { limit: number; thumb: boolean } | { error: string } {
   const limitRaw = search.get("limit");
   const limit = limitRaw === null ? CHECKINS_MINE_LIMIT : Number(limitRaw);
   if (!Number.isInteger(limit) || limit < 1 || limit > CHECKINS_MINE_MAX_LIMIT) {
     return { error: `limit 非法：${limitRaw ?? ""}（要 1-${CHECKINS_MINE_MAX_LIMIT} 整数）` };
   }
-  return { limit };
+  const thumbRaw = search.get("thumb")?.trim().toLowerCase();
+  const thumb = thumbRaw === "1" || thumbRaw === "true";
+  return { limit, thumb };
 }
 
 // ---- 详情 id 校验（DEF-20260929-003：DELETE/GET 共用，纯函数可单测） ----
@@ -343,11 +345,13 @@ export function toMineRow(raw: unknown): MineRowJson | null {
   if (!Number.isFinite(Date.parse(createdAt))) return null;
   if (expiresAt !== null && !Number.isFinite(Date.parse(expiresAt))) return null;
   // UR E.2 三件套（列缺席回 null，不炸整行；沿既有容错口徑）。
+  // `thumb=1` 輕量列表模式只查 `photo_thumb`、不查原圖 `photo_url`（避免多圖帳號單次回包數 MB 跨境逾時），
+  // 這裡把 `photo_thumb` 映射到 `photo_url` 欄位，保持 `MineRowJson` 契約形狀不變。
   const photoUrl =
     typeof raw.photo_url === "string"
       ? raw.photo_url
-      : raw.photo_url === null || raw.photo_url === undefined
-        ? null
+      : typeof raw.photo_thumb === "string"
+        ? raw.photo_thumb
         : null;
   const note =
     typeof raw.note === "string"

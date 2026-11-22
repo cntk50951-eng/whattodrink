@@ -1338,6 +1338,12 @@ paths:
             minimum: 1
             maximum: 50
             default: 30
+        - name: thumb
+          in: query
+          description: 傳 `1`（或 `true`）時只回 96px 縮圖（映射至 `photo_url` 欄位）且省略 `audio_url`，用於首頁地圖／列表輕量拉取；不傳則沿舊版回原圖。
+          schema:
+            type: string
+            enum: ["1", "true"]
       responses:
         "200":
           description: 倒序（新在前）我的打卡，含 beers join
