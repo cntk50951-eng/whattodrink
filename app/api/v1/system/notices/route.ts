@@ -45,6 +45,7 @@ export async function GET(req: Request): Promise<Response> {
     locale,
   });
   const res = apiOk({ notices });
-  res.headers.set("Cache-Control", "public, s-maxage=30, stale-while-revalidate=60");
+  // 本機不緩存（max-age=0），僅 CDN 短緩存 5 秒（s-maxage=5）：兼顧發佈／下架 ≤5 秒生效與高併發抗壓
+  res.headers.set("Cache-Control", "public, max-age=0, s-maxage=5");
   return res;
 }
