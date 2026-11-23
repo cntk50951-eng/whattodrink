@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isDefaultCoverRef, cancelPolicy, countGenders, hkDayStartISO, isAllowedPoiCoverUrl, leavePolicy, partyCoverUploadPath, mineOrCondition, minutesBeforeStart, parsePartyBody, partyExpiresAt, partyJoinState, partyMixLine, partyMixText, partyProgress, partyRemainText, partySlotStartAt, seatFor } from "./party";
+import { isDefaultCoverRef, cancelPolicy, canDeleteExpiredParty, countGenders, hkDayStartISO, isAllowedPoiCoverUrl, leavePolicy, partyCoverUploadPath, mineOrCondition, minutesBeforeStart, parsePartyBody, partyExpiresAt, partyJoinState, partyMixLine, partyMixText, partyProgress, partyRemainText, partySlotStartAt, seatFor } from "./party";
 
 describe("parsePartyBody", () => {
   const NOW = Date.parse("2026-10-08T00:00:00Z");
@@ -232,5 +232,14 @@ describe("封面 cover_url／cover_source", () => {
     expect(partyCoverUploadPath(mk("u1/a.jpg") + "?x=1", sb, "u1")).toBeNull();
     expect(partyCoverUploadPath(mk("u1/../u2/a.jpg"), sb, "u1")).toBeNull();
     expect(partyCoverUploadPath(`${sb}/storage/v1/object/public/avatars/u1/a.jpg`, sb, "u1")).toBeNull();
+  });
+});
+
+describe("canDeleteExpiredParty", () => {
+  it("僅已過期或已撤銷的終態酒局允許單邊刪除", () => {
+    const now = Date.parse("2026-11-23T12:00:00Z");
+    expect(canDeleteExpiredParty({ status: "open", expiresAtMs: now - 1000, nowMs: now })).toBe(true);
+    expect(canDeleteExpiredParty({ status: "cancelled", expiresAtMs: now + 3600_000, nowMs: now })).toBe(true);
+    expect(canDeleteExpiredParty({ status: "open", expiresAtMs: now + 3600_000, nowMs: now })).toBe(false);
   });
 });

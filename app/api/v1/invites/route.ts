@@ -175,12 +175,23 @@ export async function GET(req: Request): Promise<Response> {
   }
   const box = new URL(req.url).searchParams.get("box") === "sent" ? "sent" : "inbox";
   const col = box === "sent" ? "from_user_id" : "to_user_id";
-  const { data: rows, error } = await supabase
+  const hideCol = box === "sent" ? "hidden_by_from_at" : "hidden_by_to_at";
+  let { data: rows, error } = await supabase
     .from("drink_invites")
     .select("id,from_user_id,to_user_id,checkin_id,place,bill_intent,start_at,expires_at,status,created_at")
     .eq(col, userId)
+    .is(hideCol, null)
     .order("created_at", { ascending: false })
     .limit(30);
+  if (error !== null && error.code === "42703") {
+    // 0082 未跑前兼容：退回不過濾隱藏欄位
+    ({ data: rows, error } = await supabase
+      .from("drink_invites")
+      .select("id,from_user_id,to_user_id,checkin_id,place,bill_intent,start_at,expires_at,status,created_at")
+      .eq(col, userId)
+      .order("created_at", { ascending: false })
+      .limit(30));
+  }
   if (error !== null) {
     console.error(`[api/v1/invites] read error: code=${error.code} message=${error.message}`);
     return apiError("internal", "邀約讀取失敗", 500);

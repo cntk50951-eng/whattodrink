@@ -366,3 +366,9 @@ export function minutesBeforeStart(startAtMs: number, nowMs: number): number {
   if (!Number.isFinite(startAtMs)) return 0;
   return Math.round((startAtMs - nowMs) / 60_000);
 }
+
+/** 是否允許從「我的約局」單邊刪除：僅已過期或已撤銷的終態酒局可刪，進行中酒局必須走撤局或退出。 */
+export function canDeleteExpiredParty(args: { status: string; expiresAtMs: number; nowMs: number }): boolean {
+  if (args.status === "cancelled") return true;
+  return Number.isFinite(args.expiresAtMs) && args.nowMs >= args.expiresAtMs;
+}

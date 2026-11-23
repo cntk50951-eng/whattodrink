@@ -2377,6 +2377,49 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+    delete:
+      operationId: deleteExpiredParty
+      summary: 單邊刪除已過期／已撤銷酒局（需登录；發起人或參與者；僅從自己的「我的約局」隱藏，0082）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 已從我的約局移除
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非發起人或參與者
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: 進行中的酒局不可刪除
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
   /api/v1/parties/{id}/attendance:
     get:
       operationId: getPartyAttendance
@@ -2602,6 +2645,49 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "410":
           description: 已過期（讀時判，無 cron）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+    delete:
+      operationId: deleteExpiredInvite
+      summary: 單邊刪除已過期／已結束私約邀請（需登录；發起方或接收方；僅隱藏自己視角，0082）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 已從我的約局移除
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 非發起方或接收方
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: 進行中的邀約不可刪除
           content:
             application/json:
               schema:

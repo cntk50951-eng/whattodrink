@@ -1,6 +1,6 @@
 import { createServiceClient, getAuthedClient, getUserId } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { cancelPolicy, leavePolicy, minutesBeforeStart } from "@/lib/api/party";
+import { cancelPolicy, canDeleteExpiredParty, leavePolicy, minutesBeforeStart } from "@/lib/api/party";
 import { hostTrustMap } from "@/lib/trust/ledger";
 import { writeTrustEvent } from "@/lib/trust/ledger";
 
@@ -296,4 +296,61 @@ export async function PATCH(
     console.error(`[api/v1/parties] notify error: code=${nErr.code} message=${nErr.message}`);
   }
   return apiOk({ cancelled: true, notified_count: joinerIds.length });
+}
+
+/**
+ * 單邊刪除已過期／已結束公開酒局（🔒；0082）。
+ * `DELETE /api/v1/parties/:id` —— 僅寫入 `party_hides(user_id, party_id)` 從自己的「我的約局」隱藏，
+ * 不刪主表紀錄，保留其他參與者視角、誠信台帳與投訴紀錄；進行中的酒局回 409。
+ */
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<Response> {
+  const { supabase, userId } = await getAuthedClient(req);
+  if (userId === null) {
+    return apiError("unauthorized", "未登录", 401);
+  }
+  const { id } = await params;
+  if (typeof id !== "string" || id === "" || id.length > 64) {
+    return apiError("invalid_params", "id 非法", 400);
+  }
+  const { data: rowRaw } = await supabase
+    .from("parties")
+    .select("id,host_user_id,status,expires_at")
+    .eq("id", id)
+    .maybeSingle();
+  const row = rowRaw as {
+    id: string;
+    host_user_id: string;
+    status: string;
+    expires_at: string;
+  } | null;
+  if (row === null) return apiError("not_found", "酒局不存在", 404);
+  const svc = await createServiceClient();
+  let isMember = row.host_user_id === userId;
+  if (!isMember) {
+    const { data: joined } = await svc
+      .from("joins")
+      .select("user_id")
+      .eq("party_id", id)
+      .eq("user_id", userId)
+      .maybeSingle();
+    isMember = joined !== null;
+  }
+  if (!isMember) return apiError("forbidden", "無權操作此酒局", 403);
+  if (!canDeleteExpiredParty({ status: row.status, expiresAtMs: Date.parse(row.expires_at), nowMs: Date.now() })) {
+    return apiError("not_ended", "進行中的酒局不可刪除，請先撤局或退出", 409);
+  }
+  const { error } = await svc
+    .from("party_hides")
+    .upsert({ user_id: userId, party_id: id, hidden_at: new Date().toISOString() }, { onConflict: "user_id,party_id" });
+  if (error !== null) {
+    if (error.code === "42P01") {
+      return apiError("internal", "尚未執行約局刪除遷移（0082）", 500);
+    }
+    console.error(`[api/v1/parties] hide error: code=${error.code} message=${error.message}`);
+    return apiError("internal", "刪除酒局失敗", 500);
+  }
+  return apiOk({ deleted: true });
 }

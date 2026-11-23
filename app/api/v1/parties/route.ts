@@ -265,7 +265,23 @@ export async function GET(req: Request): Promise<Response> {
     console.error(`[api/v1/parties] list error: code=${error.code} message=${error.message}`);
     return apiError("internal", "酒局讀取失敗", 500);
   }
-  const list = ((rows ?? []) as PartyListRow[]).filter((r) => typeof r.id === "string");
+  let hiddenPartyIds = new Set<string>();
+  if (box === "mine" && viewerId !== null) {
+    const { data: hides, error: hErr } = await supabase
+      .from("party_hides")
+      .select("party_id")
+      .eq("user_id", viewerId);
+    if (hErr === null && Array.isArray(hides)) {
+      hiddenPartyIds = new Set(
+        (hides as { party_id?: unknown }[])
+          .map((h) => h.party_id)
+          .filter((v): v is string => typeof v === "string" && v !== ""),
+      );
+    }
+  }
+  const list = ((rows ?? []) as PartyListRow[]).filter(
+    (r) => typeof r.id === "string" && !hiddenPartyIds.has(r.id),
+  );
   const ids = list.map((r) => r.id);
   const hostIds = [...new Set(list.map((r) => r.host_user_id))];
   let hosts = new Map<string, { nickname: string; avatar_url: string | null }>();

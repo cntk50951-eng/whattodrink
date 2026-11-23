@@ -112,3 +112,15 @@ export function inviteDisplay(
   if (nowMs - createdAt > 24 * 3600_000) return "noReply";
   return "waiting";
 }
+
+/** 是否允許從「我的約局」單邊刪除：已過期或已終態（婉拒／撤回／完成）的邀請可刪，進行中須先撤回或婉拒。 */
+export function canDeleteExpiredInvite(args: {
+  status: string;
+  expiresAtMs: number | null;
+  nowMs: number;
+}): boolean {
+  if (args.status === "declined" || args.status === "recalled" || args.status === "completed" || args.status === "expired") {
+    return true;
+  }
+  return args.expiresAtMs !== null && Number.isFinite(args.expiresAtMs) && args.nowMs >= args.expiresAtMs;
+}

@@ -1,5 +1,6 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { canDeleteExpiredInvite } from "@/lib/api/invites";
 
 /**
  * UR E.16 邀约推进（🔒）。
@@ -141,4 +142,57 @@ export async function PATCH(
     start_at: row.start_at,
     checkin_id: row.checkin_id,
   });
+}
+
+/**
+ * 單邊刪除已過期／已結束私約邀請（🔒；0082）。
+ * `DELETE /api/v1/invites/:id` —— 僅寫自己一側的 `hidden_by_from_at` / `hidden_by_to_at`，
+ * 不物理刪行、不影響對方視角與每日 3 次發起額度；進行中的邀請回 409。
+ */
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<Response> {
+  const { supabase, userId } = await getAuthedClient(req);
+  if (userId === null) {
+    return apiError("unauthorized", "未登录", 401);
+  }
+  const { id } = await params;
+  if (typeof id !== "string" || id === "" || id.length > 64) {
+    return apiError("invalid_params", "id 非法", 400);
+  }
+  const { data: rowRaw } = await supabase
+    .from("drink_invites")
+    .select("id,from_user_id,to_user_id,status,expires_at")
+    .eq("id", id)
+    .maybeSingle();
+  const row = rowRaw as {
+    id: string;
+    from_user_id: string | null;
+    to_user_id: string | null;
+    status: string;
+    expires_at: string | null;
+  } | null;
+  if (row === null) return apiError("not_found", "邀約不存在", 404);
+  const isFrom = row.from_user_id === userId;
+  const isTo = row.to_user_id === userId;
+  if (!isFrom && !isTo) return apiError("forbidden", "無權操作此邀約", 403);
+  const expMs = typeof row.expires_at === "string" ? Date.parse(row.expires_at) : null;
+  if (!canDeleteExpiredInvite({ status: row.status, expiresAtMs: expMs, nowMs: Date.now() })) {
+    return apiError("not_ended", "進行中的邀約不可刪除，請先撤回或婉拒", 409);
+  }
+  const svc = await createServiceClient();
+  const nowIso = new Date().toISOString();
+  const patch: Record<string, string> = {};
+  if (isFrom) patch.hidden_by_from_at = nowIso;
+  if (isTo) patch.hidden_by_to_at = nowIso;
+  const { error } = await svc.from("drink_invites").update(patch).eq("id", id);
+  if (error !== null) {
+    if (error.code === "42703") {
+      return apiError("internal", "尚未執行約局刪除遷移（0082）", 500);
+    }
+    console.error(`[api/v1/invites] delete error: code=${error.code} message=${error.message}`);
+    return apiError("internal", "刪除邀約失敗", 500);
+  }
+  return apiOk({ deleted: true });
 }

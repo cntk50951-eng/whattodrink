@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { inviteDisplay, inviteWindow, parseInviteBody } from "./invites";
+import { canDeleteExpiredInvite, inviteDisplay, inviteWindow, parseInviteBody } from "./invites";
 
 describe("parseInviteBody", () => {
   it("三段收（place 去空白 1–30 字；对象二选一；bill 必填）", () => {
@@ -105,5 +105,18 @@ describe("inviteWindow custom", () => {
   it("custom 取传入时刻＋3h 窗", () => {
     const t = Date.parse("2026-10-08T12:00:00Z");
     expect(inviteWindow("custom", 0, t)).toEqual({ startAt: t, expiresAt: t + 3 * 3600_000 });
+  });
+});
+
+describe("canDeleteExpiredInvite", () => {
+  it("已過期或已終態邀約允許單邊刪除，進行中拒絕", () => {
+    const now = Date.parse("2026-11-23T12:00:00Z");
+    expect(canDeleteExpiredInvite({ status: "sent", expiresAtMs: now - 1000, nowMs: now })).toBe(true);
+    expect(canDeleteExpiredInvite({ status: "accepted", expiresAtMs: now - 1000, nowMs: now })).toBe(true);
+    expect(canDeleteExpiredInvite({ status: "declined", expiresAtMs: now + 3600_000, nowMs: now })).toBe(true);
+    expect(canDeleteExpiredInvite({ status: "recalled", expiresAtMs: null, nowMs: now })).toBe(true);
+    expect(canDeleteExpiredInvite({ status: "completed", expiresAtMs: null, nowMs: now })).toBe(true);
+    expect(canDeleteExpiredInvite({ status: "sent", expiresAtMs: now + 3600_000, nowMs: now })).toBe(false);
+    expect(canDeleteExpiredInvite({ status: "accepted", expiresAtMs: now + 3600_000, nowMs: now })).toBe(false);
   });
 });
