@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { after } from "next/server";
 
+import { OpsNav } from "@/components/innerharbour/OpsNav";
 import { requireAdminPage } from "@/lib/opsPage";
 
 /* eslint-disable react-hooks/purity -- Server Component 整页门禁＋读库＋懒清理必须在 render 内读时间；无客户端交互。 */
@@ -16,7 +17,7 @@ const SNAPSHOT_KEEP_DAYS = 7;
  * 順帶懶清已處理舉報的過期快照（7 天）。
  */
 export default async function GameReportsPage() {
-  const { svc } = await requireAdminPage({}, "/innerharbour/game-reports");
+  const { role, svc } = await requireAdminPage({}, "/innerharbour/game-reports");
   after(async () => {
     const cutoff = new Date(Date.now() - SNAPSHOT_KEEP_DAYS * 24 * 3600_000).toISOString();
     await svc.from("game_reports").update({ snapshot: null }).lt("created_at", cutoff).neq("status", "pending").not("snapshot", "is", null);
@@ -33,7 +34,9 @@ export default async function GameReportsPage() {
   );
   const openSafety = list.filter((r) => r.category === "safety" && r.status === "pending");
   return (
-    <main style={{ padding: 24 }}>
+    <div>
+      <OpsNav active="game-reports" role={role} />
+      <main style={{ padding: 24 }}>
       <h1>遊戲舉報（{list.length}）</h1>
       {openSafety.length > 0 && (
         <p role="alert" style={{ border: "2px solid crimson", padding: 12, color: "crimson", fontWeight: 700 }}>
@@ -52,5 +55,6 @@ export default async function GameReportsPage() {
         ))}
       </ul>
     </main>
+    </div>
   );
 }

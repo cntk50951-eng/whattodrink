@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { after } from "next/server";
 
+import { OpsNav } from "@/components/innerharbour/OpsNav";
 import { requireAdminPage } from "@/lib/opsPage";
 import { reportRank } from "@/lib/userReports";
 
@@ -26,7 +27,7 @@ const REASON_LABEL: Record<string, string> = {
  * 順帶懶清已處理舉報的過期證據快照（7 天）。
  */
 export default async function UserReportsPage() {
-  const { svc } = await requireAdminPage({}, "/innerharbour/user-reports");
+  const { role, svc } = await requireAdminPage({}, "/innerharbour/user-reports");
   after(async () => {
     const cutoff = new Date(Date.now() - SNAPSHOT_KEEP_DAYS * 24 * 3600_000).toISOString();
     await svc.from("cheers_reports").update({ snapshot: null }).lt("created_at", cutoff).neq("status", "pending").not("snapshot", "is", null);
@@ -42,7 +43,9 @@ export default async function UserReportsPage() {
   const pending = list.filter((r) => r.status === "pending");
   const urgent = pending.filter((r) => r.reason_code === "underage");
   return (
-    <main style={{ padding: 24 }}>
+    <div>
+      <OpsNav active="user-reports" role={role} />
+      <main style={{ padding: 24 }}>
       <h1>用戶舉報（待處理 {pending.length}／共 {list.length}）</h1>
       {urgent.length > 0 && (
         <p role="alert" style={{ border: "2px solid crimson", padding: 12, color: "crimson", fontWeight: 700 }}>
@@ -64,5 +67,6 @@ export default async function UserReportsPage() {
         })}
       </ul>
     </main>
+    </div>
   );
 }

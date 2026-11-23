@@ -74,6 +74,62 @@ paths:
           description: 推送Secret未配置、太短或憑證不匹配；專用值已設定時不接受舊CRON_SECRET
         "503":
           description: 排程、資料庫或FCM配置不可用
+  /api/v1/system/notices:
+    get:
+      operationId: getSystemNotices
+      summary: 取得當前生效的系統消息與版本更新公告（0080；免登入）
+      description: 依 platform（ios/android）、客戶端 version（低於 max_version 才下發）與 locale 回傳三語在地化公告；severity=force 永遠置頂。
+      parameters:
+        - in: query
+          name: platform
+          required: true
+          schema:
+            type: string
+            enum: [ios, android]
+        - in: query
+          name: version
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: locale
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 生效中公告列表（最多 5 條）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [notices]
+                properties:
+                  notices:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, kind, severity, title, body, bullets, starts_at]
+                      properties:
+                        id: { type: string, format: uuid }
+                        kind: { type: string, enum: [update, maintenance, announcement] }
+                        severity: { type: string, enum: [normal, force] }
+                        version_label: { type: string, nullable: true }
+                        title: { type: string }
+                        body: { type: string }
+                        bullets:
+                          type: array
+                          items:
+                            type: object
+                            required: [icon, title, desc]
+                            properties:
+                              icon: { type: string }
+                              title: { type: string }
+                              desc: { type: string }
+                        cta_label: { type: string, nullable: true }
+                        cta_url: { type: string, nullable: true }
+                        starts_at: { type: integer }
+                        ends_at: { type: integer, nullable: true }
   /api/v1/wall:
     get:
       operationId: getWall

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { after } from "next/server";
 
+import { OpsNav } from "@/components/innerharbour/OpsNav";
 import { sweepOverdueResponses } from "@/lib/complaints";
 import { requireAdminPage } from "@/lib/opsPage";
 
@@ -13,7 +14,7 @@ export const metadata = { robots: { index: false, follow: false } };
  * status escalated／triaged，safety 優先；顯示等待時長與 flags；頂部顯示未簽收的 safety 告警。
  */
 export default async function ReviewQueuePage() {
-  const { svc } = await requireAdminPage({}, "/innerharbour/review");
+  const { role, svc } = await requireAdminPage({}, "/innerharbour/review");
   // 沒有定時任務時，申辯逾期轉人工由隊列載入順帶掃（不阻塞渲染）。
   after(() => {
     void sweepOverdueResponses(svc);
@@ -55,7 +56,9 @@ export default async function ReviewQueuePage() {
     return sevOf(b) - sevOf(a);
   });
   return (
-    <main style={{ padding: 24, fontFamily: "system-ui" }}>
+    <div>
+      <OpsNav active="review" role={role} />
+      <main style={{ padding: 24, fontFamily: "system-ui" }}>
       <h1>投訴審核隊列（{list.length}）</h1>
       <p>
         只列「待人工」案件；處理完的案件在 <Link href="/innerharbour/review/history">已處理記錄</Link>。
@@ -104,5 +107,6 @@ export default async function ReviewQueuePage() {
         </tbody>
       </table>
     </main>
+    </div>
   );
 }
