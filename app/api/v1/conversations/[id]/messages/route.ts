@@ -112,13 +112,14 @@ export async function GET(
   const runMessagesQuery = (withDeletedAt: boolean) => {
     let query = supabase
       .from("messages")
-      .select("id,sender_id,kind,body,attachments,created_at")
+      .select(
+        withDeletedAt
+          ? "id,sender_id,kind,body,attachments,created_at,deleted_at"
+          : "id,sender_id,kind,body,attachments,created_at",
+      )
       .eq("conversation_id", parsedId.id)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false });
-    if (withDeletedAt) {
-      query = query.is("deleted_at", null);
-    }
     if (clearedBefore !== null) {
       query = query.gt("created_at", clearedBefore);
     }

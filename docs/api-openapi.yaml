@@ -6391,6 +6391,9 @@ components:
           type: integer
           nullable: true
           description: audio 專用秒數
+        deleted:
+          type: boolean
+          description: 是否已被發送方為所有人撤回（true 時 body/attachments 均為空，客戶端顯示「此訊息已被刪除」占位）
     Conversation:
       type: object
       required: [id, peer, last_message, unread, muted, updated_at]

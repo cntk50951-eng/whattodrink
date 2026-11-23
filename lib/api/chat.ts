@@ -444,6 +444,8 @@ export type ChatMessageJson = {
   /** Epoch ms（DB 是 ISO，mapper 轉；轉不過＝壞行）。 */
   created_at: number;
   mine: boolean;
+  /** 為所有人撤回後為 true（body／attachments 均清空，客戶端依語系顯示「此訊息已被刪除」） */
+  deleted?: boolean;
 };
 
 export type ConversationJson = {
@@ -474,6 +476,22 @@ export function toChatMessage(raw: unknown, me: string): ChatMessageJson | null 
   if (createdRaw === null) return null;
   const created_at = Date.parse(createdRaw);
   if (!Number.isFinite(created_at)) return null;
+  // 已為所有人撤回（deleted_at 非空）：返回脫敏墓碑行，絕不洩露原文字或附件路徑
+  if (typeof raw.deleted_at === "string" && raw.deleted_at !== "") {
+    return {
+      id,
+      sender_id,
+      kind: "text",
+      body: null,
+      attachments: [],
+      mime: null,
+      bytes: null,
+      secs: null,
+      created_at,
+      mine: sender_id === me,
+      deleted: true,
+    };
+  }
   const attachments = Array.isArray(raw.attachments) ? raw.attachments : [];
   // D.8 顶层回显：首个文件型附件的 mime/bytes/secs（文本／分享即 null）。
   let mime: string | null = null;

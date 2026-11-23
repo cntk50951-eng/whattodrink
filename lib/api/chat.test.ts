@@ -468,4 +468,32 @@ describe("聊天訊息刪除與撤回（0079）", () => {
     expect(canRecallMessage("u2", "u1", fresh, now)).toMatchObject({ ok: false, status: 403, code: "forbidden" });
     expect(canRecallMessage("u1", "u1", expired, now)).toMatchObject({ ok: false, status: 410, code: "window_closed" });
   });
+
+  it("toChatMessage 對已撤回訊息回傳脫敏墓碑（deleted=true、清空正文與附件）", () => {
+    const out = toChatMessage(
+      {
+        id: "m-del",
+        sender_id: "u2",
+        kind: "image",
+        body: "秘密文字",
+        attachments: [{ path: "secret.jpg", mime: "image/jpeg", bytes: 123 }],
+        created_at: "2026-11-22T12:00:00Z",
+        deleted_at: "2026-11-22T12:01:00Z",
+      },
+      "u1",
+    );
+    expect(out).toEqual({
+      id: "m-del",
+      sender_id: "u2",
+      kind: "text",
+      body: null,
+      attachments: [],
+      mime: null,
+      bytes: null,
+      secs: null,
+      created_at: Date.parse("2026-11-22T12:00:00Z"),
+      mine: false,
+      deleted: true,
+    });
+  });
 });
