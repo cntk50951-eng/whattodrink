@@ -195,9 +195,9 @@ export function toClientSystemNotice(
     ) || null;
   const ctaUrl = sanitizeNoticeUrl(typeof row.cta_url === "string" ? row.cta_url : null);
   const maxVer = typeof row.max_version === "string" && parseSemver(row.max_version) !== null ? row.max_version : null;
-  // 防磚安全門：強制更新若缺有效版本門檻或跳轉連結，自動降級為 normal，避免把全量用戶鎖死
+  // 防磚安全門：強制更新若缺有效版本門檻、跳轉連結或按鈕文案，自動降級為 normal，避免把全量用戶鎖死
   const effectiveSeverity: NoticeSeverity =
-    severity === "force" && (ctaUrl === null || maxVer === null) ? "normal" : severity;
+    severity === "force" && (ctaUrl === null || maxVer === null || ctaLabel === null) ? "normal" : severity;
   const versionLabel = trimStr(row.version_label, 40) || null;
   return {
     id: row.id,
@@ -306,12 +306,18 @@ export function parseAdminNoticeForm(fd: FormData): { ok: true; data: AdminNotic
   if (ctaUrlRaw && ctaUrl === null) {
     return { ok: false, error: "跳轉連結僅允許 https://、itms-apps:// 或 market://" };
   }
+  const ctaLabelHant = s("cta_label_zh_hant", 40) || null;
+  const ctaLabelHans = s("cta_label_zh_hans", 40) || null;
+  const ctaLabelEn = s("cta_label_en", 40) || null;
   if (severity === "force") {
     if (!maxVerRaw) {
       return { ok: false, error: "強制更新必須填寫目標版本門檻（例如 1.5.0），避免鎖死最新版用戶" };
     }
     if (!ctaUrl) {
       return { ok: false, error: "強制更新必須填寫有效的商店更新連結（https://、itms-apps:// 或 market://）" };
+    }
+    if (!ctaLabelHant && !ctaLabelHans && !ctaLabelEn) {
+      return { ok: false, error: "強制更新必須填寫跳轉按鈕文案（例如「立即更新」），避免彈窗無操作出口" };
     }
   }
 
@@ -364,9 +370,9 @@ export function parseAdminNoticeForm(fd: FormData): { ok: true; data: AdminNotic
       body_zh_hans: s("body_zh_hans", 600),
       body_en: s("body_en", 600),
       bullets,
-      cta_label_zh_hant: s("cta_label_zh_hant", 40) || null,
-      cta_label_zh_hans: s("cta_label_zh_hans", 40) || null,
-      cta_label_en: s("cta_label_en", 40) || null,
+      cta_label_zh_hant: ctaLabelHant,
+      cta_label_zh_hans: ctaLabelHans,
+      cta_label_en: ctaLabelEn,
       cta_url: ctaUrl,
       published: fd.get("published") === "on",
       starts_at: new Date(startsMs).toISOString(),
