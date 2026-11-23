@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canRecallMessage,
+  CHAT_RECALL_WINDOW_MS,
   decodeChatCursor,
   directKey,
   encodeChatCursor,
@@ -11,6 +13,8 @@ import {
   parseConversationOrigin,
   parseCreateConversationBody,
   parseCreateMessageBody,
+  parseDeleteMessageScope,
+  parseMessageId,
   parseReadBody,
   peerIdsOfMembers,
   parseSignBody,
@@ -438,5 +442,30 @@ describe("listPeerOrFallback（列表對方簡檔不回 null）", () => {
 
   it("頭像不是字串時回 null，不洩露奇怪型別", () => {
     expect(listPeerOrFallback({ id: "u2", nickname: "N", avatar_url: 5 }).avatar_url).toBeNull();
+  });
+});
+
+describe("聊天訊息刪除與撤回（0079）", () => {
+  it("parseDeleteMessageScope 預設 me，只接受 me|everyone", () => {
+    expect(parseDeleteMessageScope(null)).toBe("me");
+    expect(parseDeleteMessageScope("")).toBe("me");
+    expect(parseDeleteMessageScope("me")).toBe("me");
+    expect(parseDeleteMessageScope("everyone")).toBe("everyone");
+    expect("error" in (parseDeleteMessageScope("all") as object)).toBe(true);
+  });
+
+  it("parseMessageId 僅接受合法 UUID", () => {
+    const id = "11111111-1111-4111-8111-111111111111";
+    expect(parseMessageId(id)).toEqual({ id });
+    expect("error" in parseMessageId("not-a-uuid")).toBe(true);
+  });
+
+  it("canRecallMessage 限本人且 48 小時內", () => {
+    const now = Date.parse("2026-11-22T12:00:00Z");
+    const fresh = new Date(now - 60_000).toISOString();
+    const expired = new Date(now - CHAT_RECALL_WINDOW_MS - 1000).toISOString();
+    expect(canRecallMessage("u1", "u1", fresh, now)).toEqual({ ok: true });
+    expect(canRecallMessage("u2", "u1", fresh, now)).toMatchObject({ ok: false, status: 403, code: "forbidden" });
+    expect(canRecallMessage("u1", "u1", expired, now)).toMatchObject({ ok: false, status: 410, code: "window_closed" });
   });
 });

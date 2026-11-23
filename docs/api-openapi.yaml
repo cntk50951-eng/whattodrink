@@ -5481,7 +5481,7 @@ paths:
   /api/v1/conversations/{id}:
     delete:
       operationId: hideConversation
-      summary: 刪會話（只藏自己，需登录，D.2）
+      summary: 刪會話或清空聊天紀錄（只清自己，需登录，D.2＋0079）
       security:
         - bearerAuth: []
       parameters:
@@ -5490,9 +5490,16 @@ paths:
           required: true
           schema:
             type: string
+        - name: mode
+          in: query
+          required: false
+          description: 預設從列表隱藏並清空紀錄（寫 hidden_at＋cleared_before）；傳 clear 時僅清空紀錄保留會話
+          schema:
+            type: string
+            enum: [delete, clear]
       responses:
         "200":
-          description: 已藏（對方不受影響）
+          description: 已刪／已清（對方不受影響）
           content:
             application/json:
               schema:
@@ -5500,10 +5507,77 @@ paths:
                 properties:
                   ok:
                     type: boolean
+                  mode:
+                    type: string
+                    enum: [delete, clear]
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           description: 非成員（fail-closed）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/conversations/{id}/messages/{messageId}:
+    delete:
+      operationId: deleteMessage
+      summary: 刪除單條聊天訊息（僅對我／48h 內雙方撤回，需登录，0079）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: scope
+          in: query
+          required: false
+          description: me＝僅對我刪除（預設，自己與對方訊息皆可）；everyone＝為所有人撤回（限本人且 48 小時內）
+          schema:
+            type: string
+            enum: [me, everyone]
+            default: me
+      responses:
+        "200":
+          description: 已刪除或已撤回
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  scope:
+                    type: string
+                    enum: [me, everyone]
+                  id:
+                    type: string
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 嘗試撤回他人訊息
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: 非成員或訊息不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "410":
+          description: 已超過 48 小時撤回時限
           content:
             application/json:
               schema:

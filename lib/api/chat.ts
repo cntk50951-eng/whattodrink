@@ -517,3 +517,40 @@ export function isConversationExpired(expiresAtIso: string, nowMs: number): bool
   if (!Number.isFinite(t)) return true;
   return t <= nowMs;
 }
+
+/** 雙方撤回時限（對標 WhatsApp：48 小時內可為所有人撤回，逾時僅可為自己刪除）。 */
+export const CHAT_RECALL_WINDOW_MS = 48 * 3600_000;
+
+export type DeleteMessageScope = "me" | "everyone";
+
+/** 單條刪除範圍解析（預設 me；只許 me | everyone）。 */
+export function parseDeleteMessageScope(raw: string | null): DeleteMessageScope | ChatParseError {
+  if (raw === null || raw === "" || raw === "me") return "me";
+  if (raw === "everyone") return "everyone";
+  return { error: "scope 非法（只要 me|everyone）" };
+}
+
+const MESSAGE_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** 訊息 id 路徑參數校驗（UUID 鎖）。 */
+export function parseMessageId(raw: string): { id: string } | ChatParseError {
+  if (!MESSAGE_UUID_RE.test(raw)) return { error: "message_id 非法" };
+  return { id: raw };
+}
+
+/** 撤回（everyone）資格校驗：僅發送者本人且於 48 小時窗口內。 */
+export function canRecallMessage(
+  senderId: string,
+  userId: string,
+  createdAtIso: string,
+  nowMs: number,
+): { ok: true } | { ok: false; status: 403 | 410; code: "forbidden" | "window_closed"; message: string } {
+  if (senderId !== userId) {
+    return { ok: false, status: 403, code: "forbidden", message: "只能撤回自己發送的訊息" };
+  }
+  const sentMs = Date.parse(createdAtIso);
+  if (!Number.isFinite(sentMs) || nowMs - sentMs > CHAT_RECALL_WINDOW_MS) {
+    return { ok: false, status: 410, code: "window_closed", message: "已超過可撤回時間，僅可為自己刪除" };
+  }
+  return { ok: true };
+}

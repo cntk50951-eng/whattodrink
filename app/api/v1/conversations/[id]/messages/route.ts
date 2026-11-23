@@ -40,21 +40,50 @@ export async function GET(
     return apiError("invalid_params", parsed.error, 400);
   }
   const { limit, cursor } = parsed.params;
-  const { data: mine } = await supabase
+  // 成員校驗＋清空水位（0079 未跑前缺 cleared_before 列時優雅退回）
+  let clearedBefore: string | null = null;
+  let memberFound = false;
+  const mineRes = await supabase
     .from("conversation_members")
-    .select("conversation_id")
+    .select("conversation_id,cleared_before")
     .eq("conversation_id", parsedId.id)
     .eq("user_id", userId)
     .maybeSingle();
-  if (mine === null) {
+  if (mineRes.error !== null && mineRes.error.code === "42703") {
+    const legacyMine = await supabase
+      .from("conversation_members")
+      .select("conversation_id")
+      .eq("conversation_id", parsedId.id)
+      .eq("user_id", userId)
+      .maybeSingle();
+    memberFound = legacyMine.data !== null;
+  } else {
+    memberFound = mineRes.data !== null;
+    const cb = (mineRes.data as { cleared_before?: unknown } | null)?.cleared_before;
+    if (typeof cb === "string" && cb !== "") clearedBefore = cb;
+  }
+  if (!memberFound) {
     return apiError("not_found", "找不到该会话", 404);
   }
   // §十四：顶层 quota（好友 null；陌生累计凭 sent_as_stranger 列，走 service）。
   const svc = await createServiceClient();
-  const { data: allMembers } = await svc
-    .from("conversation_members")
-    .select("user_id")
-    .eq("conversation_id", parsedId.id);
+  const [{ data: allMembers }, delRes] = await Promise.all([
+    svc
+      .from("conversation_members")
+      .select("user_id")
+      .eq("conversation_id", parsedId.id),
+    supabase
+      .from("message_deletions")
+      .select("message_id")
+      .eq("user_id", userId),
+  ]);
+  // 單邊已刪訊息 id 集合（0079 未跑前表不存在 42P01 時視作空集）
+  const deletedIds = new Set<string>();
+  if (delRes.error === null && Array.isArray(delRes.data)) {
+    for (const d of delRes.data as { message_id?: unknown }[]) {
+      if (typeof d.message_id === "string") deletedIds.add(d.message_id);
+    }
+  }
   const peerIds = peerIdsOfMembers(
     ((allMembers ?? []) as unknown[]) as { user_id: unknown }[],
     userId,
@@ -79,24 +108,41 @@ export async function GET(
       quota = strangerQuotaJson(await countStrangerSent(svc, parsedId.id, userId));
     }
   }
-  let query = supabase
-    .from("messages")
-    .select("id,sender_id,kind,body,attachments,created_at")
-    .eq("conversation_id", parsedId.id)
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false });
-  if (cursor !== null) {
-    // keyset：(created_at, id) 全序倒序翻頁（沿 wall exact-tie 口徑）
-    query = query.or(
-      `created_at.lt.${cursor.ca},and(created_at.eq.${cursor.ca},id.lt.${cursor.id})`,
-    );
+  const fetchLimit = Math.min(limit + 1 + deletedIds.size, 150);
+  const runMessagesQuery = (withDeletedAt: boolean) => {
+    let query = supabase
+      .from("messages")
+      .select("id,sender_id,kind,body,attachments,created_at")
+      .eq("conversation_id", parsedId.id)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false });
+    if (withDeletedAt) {
+      query = query.is("deleted_at", null);
+    }
+    if (clearedBefore !== null) {
+      query = query.gt("created_at", clearedBefore);
+    }
+    if (cursor !== null) {
+      // keyset：(created_at, id) 全序倒序翻頁（沿 wall exact-tie 口徑）
+      query = query.or(
+        `created_at.lt.${cursor.ca},and(created_at.eq.${cursor.ca},id.lt.${cursor.id})`,
+      );
+    }
+    return query.limit(fetchLimit);
+  };
+  let { data: rows, error: qErr } = await runMessagesQuery(true);
+  if (qErr !== null && qErr.code === "42703") {
+    ({ data: rows, error: qErr } = await runMessagesQuery(false));
   }
-  const { data: rows, error: qErr } = await query.limit(limit + 1);
   if (qErr !== null) {
     console.error(`[api/v1/conversations/messages] list error: code=${qErr.code} message=${qErr.message}`);
     return apiError("internal", "读取消息失败", 500);
   }
-  const list = ((rows ?? []) as unknown[]).slice(0, limit + 1);
+  const visibleRaw = ((rows ?? []) as unknown[]).filter((r) => {
+    const mid = (r as { id?: unknown } | null)?.id;
+    return typeof mid === "string" && !deletedIds.has(mid);
+  });
+  const list = visibleRaw.slice(0, limit + 1);
   const mapped = [];
   for (const r of list) {
     const m = toChatMessage(r, userId);
@@ -446,11 +492,18 @@ export async function POST(
     console.error(`[api/v1/conversations/messages] insert error: code=${iErr?.code} message=${iErr?.message}`);
     return apiError("internal", "发送失败", 500);
   }
-  // 90 天保留：寫後刷會話 expires_at（沿 D.1 設計）
-  await supabase
-    .from("conversations")
-    .update({ expires_at: new Date(nowMs + 90 * 24 * 3600_000).toISOString() })
-    .eq("id", parsedId.id);
+  // 90 天保留：寫後刷會話 expires_at（沿 D.1 設計），並同步解除雙方 hidden_at（保留各自 cleared_before，確保收件人不會漏新消息）
+  await Promise.all([
+    supabase
+      .from("conversations")
+      .update({ expires_at: new Date(nowMs + 90 * 24 * 3600_000).toISOString() })
+      .eq("id", parsedId.id),
+    svc
+      .from("conversation_members")
+      .update({ hidden_at: null })
+      .eq("conversation_id", parsedId.id)
+      .not("hidden_at", "is", null),
+  ]);
   const message = toChatMessage(inserted, userId);
   if (message === null) {
     return apiError("internal", "发送失败", 500);
