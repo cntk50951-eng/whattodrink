@@ -194,11 +194,15 @@ export function toClientSystemNotice(
       locale,
     ) || null;
   const ctaUrl = sanitizeNoticeUrl(typeof row.cta_url === "string" ? row.cta_url : null);
+  const maxVer = typeof row.max_version === "string" && parseSemver(row.max_version) !== null ? row.max_version : null;
+  // 防磚安全門：強制更新若缺有效版本門檻或跳轉連結，自動降級為 normal，避免把全量用戶鎖死
+  const effectiveSeverity: NoticeSeverity =
+    severity === "force" && (ctaUrl === null || maxVer === null) ? "normal" : severity;
   const versionLabel = trimStr(row.version_label, 40) || null;
   return {
     id: row.id,
     kind,
-    severity,
+    severity: effectiveSeverity,
     version_label: versionLabel,
     title,
     body,
@@ -301,6 +305,14 @@ export function parseAdminNoticeForm(fd: FormData): { ok: true; data: AdminNotic
   const ctaUrl = ctaUrlRaw ? sanitizeNoticeUrl(ctaUrlRaw) : null;
   if (ctaUrlRaw && ctaUrl === null) {
     return { ok: false, error: "跳轉連結僅允許 https://、itms-apps:// 或 market://" };
+  }
+  if (severity === "force") {
+    if (!maxVerRaw) {
+      return { ok: false, error: "強制更新必須填寫目標版本門檻（例如 1.5.0），避免鎖死最新版用戶" };
+    }
+    if (!ctaUrl) {
+      return { ok: false, error: "強制更新必須填寫有效的商店更新連結（https://、itms-apps:// 或 market://）" };
+    }
   }
 
   const bullets: AdminNoticePayload["bullets"] = [];

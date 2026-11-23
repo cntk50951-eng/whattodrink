@@ -89,15 +89,31 @@ describe("systemNotices 純邏輯", () => {
         version_label: "v1.5.0",
         title_zh_hant: "請升級",
         title_en: "Please Upgrade",
+        cta_label_zh_hant: "立即更新",
+        cta_label_en: "Update Now",
+        cta_url: "https://apps.apple.com/app/id123",
         published: true,
         starts_at: "2026-11-21T00:00:00Z",
+      },
+      {
+        id: "broken-force-no-url",
+        kind: "update",
+        severity: "force",
+        platforms: ["ios"],
+        max_version: "1.5.0",
+        title_zh_hant: "缺少連結的強更",
+        published: true,
+        starts_at: "2026-11-21T01:00:00Z",
       },
     ];
 
     const forOldIos = filterActiveNotices(rows, { platform: "ios", version: "1.4.2", locale: "en", nowMs: now });
-    expect(forOldIos.map((n) => n.id)).toEqual(["force-upgrade", "normal-new"]);
+    expect(forOldIos.map((n) => n.id)).toEqual(["force-upgrade", "normal-new", "broken-force-no-url"]);
+    expect(forOldIos[0]?.severity).toBe("force");
     expect(forOldIos[0]?.title).toBe("Please Upgrade");
     expect(forOldIos[1]?.bullets).toEqual([{ icon: "🍻", title: "Highlight 1", desc: "Desc" }]);
+    // 缺 cta_url 的 force 公告必須安全降級為 normal，絕不把用戶鎖死
+    expect(forOldIos[2]?.severity).toBe("normal");
 
     // 已升級至 1.5.0 的用戶自動不再收到 max_version=1.5.0 的更新通知
     const forNewIos = filterActiveNotices(rows, { platform: "ios", version: "1.5.0", locale: "zh-Hant", nowMs: now });
@@ -130,5 +146,31 @@ describe("systemNotices 純邏輯", () => {
       expect(parsed.data.bullets).toHaveLength(1);
       expect(parsed.data.published).toBe(true);
     }
+
+    // 強制更新缺 max_version 或 cta_url 必須被表單校驗攔截
+    const forceNoMax = new FormData();
+    forceNoMax.set("kind", "update");
+    forceNoMax.set("severity", "force");
+    forceNoMax.set("platform_ios", "on");
+    forceNoMax.set("title_zh_hant", "強制升級");
+    forceNoMax.set("cta_url", "https://apps.apple.com/app/id123");
+    expect(parseAdminNoticeForm(forceNoMax).ok).toBe(false);
+
+    const forceNoUrl = new FormData();
+    forceNoUrl.set("kind", "update");
+    forceNoUrl.set("severity", "force");
+    forceNoUrl.set("platform_ios", "on");
+    forceNoUrl.set("title_zh_hant", "強制升級");
+    forceNoUrl.set("max_version", "1.5.0");
+    expect(parseAdminNoticeForm(forceNoUrl).ok).toBe(false);
+
+    const forceOk = new FormData();
+    forceOk.set("kind", "update");
+    forceOk.set("severity", "force");
+    forceOk.set("platform_ios", "on");
+    forceOk.set("title_zh_hant", "強制升級");
+    forceOk.set("max_version", "1.5.0");
+    forceOk.set("cta_url", "https://apps.apple.com/app/id123");
+    expect(parseAdminNoticeForm(forceOk).ok).toBe(true);
   });
 });
