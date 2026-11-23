@@ -22,6 +22,7 @@
 ---
 
 | ID | 标题 | 状态 | 严重度 | 发现日期 / 报告人 | 关联 UR | 确诊根因 |
+| DEF-20261122-001 | 关站时 `/privacy` 与 `/terms` 跳到 Coming Soon | Fixed | P2 | 2026-11-22 / @user | UR L.2 | `lib/home.ts` 的关站规则缺少旧入口转址 |
 | DEF-20261116-003 | 推送cron持續報configuration missing | Fixing | P1 | 2026-11-16 / @user | UR D.12 | Open→Investigating；用戶boolean結果URL與Secret均不存在，Vault缺兩項配置；待用戶補齊及驗證cron／HTTP，未呼叫HTTP |
 | DEF-20261114-001 | `/intro-next` 從簡中／英文切不回繁體 | Verified | P1 | 2026-11-14 / @user | UR M.2 | 繁體入口未帶 locale，next-intl 沿用 NEXT_LOCALE cookie；12 路 HTTP＋瀏覽器點擊通過，待用戶確認 |
 | DEF-20261114-002 | `/intro-next` 首次載入無法開啟播放 | Verified | P1 | 2026-11-14 / @user | UR M.3／M.4 | 有界預載、掛載後初始化；8 項慢載單測及三語實際播放回歸，隨 M.4 發布 |
@@ -968,6 +969,19 @@
 - **回歸範圍**：Vault名稱／URL／Secret長度、cron執行、後端HTTP認證及dispatcher；手機仍暫停，不新增正式DB操作。
 
 - DEF-20261116-003修正驗證：新增8項真handler認證測試；build139頁、129檔／1312tests綠、lint0errors／12既有warnings；新專用Secret已配置時拒絕舊值，空／短值不回退；正式配置與cron／HTTP未驗，不能標Verified。
+
+## DEF-20261122-001 — 关站时 `/privacy` 与 `/terms` 跳到 Coming Soon
+
+- **状态**：Fixed（修正随此提交合入 main）
+- **严重度**：P2 次要
+- **发现日期 / 报告人**：2026-11-22 / @user
+- **复现步骤**：在 `SITE_LIVE=false` 时用访客浏览器打开正式站 `/privacy` 与 `/terms`。
+- **期望 vs 实际**：期望到达对应的公开私隐政策与服务条款，实际两条路径都跳到 `/coming-soon`。
+- **初判根因**：关站规则放行了 `/legal/*`，旧入口没有相应的转址。
+- **确诊根因**：`lib/home.ts` 的 `resolveSiteGate` 放行 `/legal/*`，其他访客路径走 Coming Soon。正式站四次请求（裸网址及 `/en` 前缀）均返回 307 到相应的 Coming Soon 页面。
+- **关联 UR**：UR L.2。
+- **修复验证**：本地 `SITE_LIVE=false` 生产预览确认两条旧入口繁／简／英均 307 到对应 200 文件，普通路径仍 307 到 Coming Soon。开站开发服务 `/terms` 200 并显示三种模式说明。Webpack build 生成 153 页，Vitest 136 档／1,368 项全绿，ESLint 0 errors／12 既有 warnings。待正式站部署验证。
+- **回归范围**：两条入口及三语路径、公开法律页、普通页面封站行为、开站时的 `/terms`。
 
 ## DEF-20261118-001 — AOS 推送覆蓋復核發現邊界流程漏送
 

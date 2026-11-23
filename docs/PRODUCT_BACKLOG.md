@@ -4506,18 +4506,26 @@ UR M.1　產品介紹頁科技感與宣傳畫面重構（新增 intro-next 對�
 
 EPIC L　上线开关（launch gate，访客向全站封站＋coming soon）[WIP]
 
-> 未上线期间，服务器端一个 boolean flag 随时控制全站开关：关＝访客全站只见 coming soon；开＝行为与现在一致。v1／v2 web 用户侧不再使用，故封站覆盖全部访客路由。
+> 未上线期间，`SITE_LIVE` 控制访客页面的开放状态。关站时，Coming Soon 和公开法律文件仍可访问，其他访客页面转到 Coming Soon。
 
 UR L.1　全站开关 `SITE_LIVE`＋coming soon 页 [✓]
-作为 PM，我希望在服务器端设一个 true/false flag，随时开关全站：关时访客无论进哪个页面都只看到 coming soon；开时一切如常（裸 `/` 照 `HOME_UI` 走）。
+作为 PM，我希望在服务器端设一个 true/false flag。关站时访客仍可查阅公开法律文件，其他访客页面转到 Coming Soon；开站时裸 `/` 照 `HOME_UI` 走。
 *范围*：
-1. `lib/home.ts`（纯函数加法）：`parseSiteLive`（缺省 true；`0/false/off/no/closed` 大小写不敏感即关）＋`isComingSoonPath`＋`resolveSiteGate`（关站时非 coming-soon 路径回 `/coming-soon`，带 locale 前缀的回 `/<locale>/coming-soon`；coming-soon 本体永远放行方便预览）＋单测。
+1. `lib/home.ts`（纯函数加法）：`parseSiteLive`（缺省 true；`0/false/off/no/closed` 大小写不敏感即关）＋`isComingSoonPath`＋`resolveSiteGate`（关站时将未放行的路径转到 `/coming-soon`，路径带 locale 前缀时转到 `/<locale>/coming-soon`；Coming Soon 本体可直接预览）＋单测。
 2. `proxy.ts`（edge）：`SITE_LIVE=false` 时先行 307 到 coming-soon（沿 C.7 范式）；`/innerharbour` 管理后台永远放行（锁掉就没法管了）；API 路由不在 proxy matcher 内天然不受影响；`SITE_LIVE=true`／缺省零行为变化。
 3. `app/[locale]/coming-soon/page.tsx`（Server Component，纯静态零 JS）：沿 intro 奶油底＋涂鸦品牌语言；COMING SOON 大字＋三语副标（按 locale 直出，不进 messages，避免全局 key 扰动）＋啤酒杯 doodle＋App Store／Google Play 占位（沿 intro `#app-store-todo` 口径）；`robots noindex`（未上线不收录）；响应式（手机单列，桌面居中卡）。
 4. `.env.example` 说明（Vercel 改值后需 redeploy，沿 C.7 proxy 烘焙口径）。
+5. 关站时公开访问 `/legal/privacy`、`/legal/terms`、`/legal/delete-account`，支持繁／简／英路径。
 *非目标*：503 状态码（用 307＋200，保持 proxy 现有范式）；coming-soon 订阅／留资表单（另开 UR）；v1 任何文件。
 *改动记录*
 - 2026-11-02：建档即开工置 [WIP]（用户指令：未上线＋随时开关＋全站锁定＋新增 SITE_LIVE＋设计 coming soon 供选）
+- 2026-11-22：复核正式站。隐私政策及服务条款三语均回 200，首页与 `/wall` 仍回 307 至 `/coming-soon`。放行规则已在 `172db05` 实现，见 CHANGELOG 的「公開法律頁」。
+
+UR L.2　关站时保留私隐政策与服务条款的旧入口 [WIP]
+- 关联 `DEF-20261122-001`。`SITE_LIVE=false` 时，`/privacy` 与 `/terms` 以 307 转到对应 `/legal/` 文件，保留有效的语言前缀。
+- 验收：跟随转址后显示对应法律文件，普通页面仍转到 Coming Soon，开站时 `/terms` 继续显示模式说明。
+*改动记录*
+- 2026-11-22：`resolveSiteGate` 加入两条旧入口的精确转址，兼容语言前缀与尾斜杠。见 CHANGELOG UR L.2／`DEF-20261122-001`。
 
 
 ### UR M.2 — 介紹頁繁體切換修復 [WIP]

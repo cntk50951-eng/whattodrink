@@ -20,9 +20,8 @@ export function parseHomeUi(raw: unknown): HomeUi {
  * UR L.1 上线开关（纯函数，可单测；与 HOME_UI 正交）。
  *
  * `SITE_LIVE`：缺省／非法一律 true（开站，行为与现在一致）；
- * 字面 "0"／"false"／"off"／"no"／"closed"（大小写＋首尾空白不敏感）即 false（关站，
- * proxy 把访客全站 307 到 `/coming-soon`，见 resolveSiteGate）。
- * 关站语义：访客路由全锁，只有 coming-soon 本体放行（方便关站时预览）；
+ * 字面 "0"／"false"／"off"／"no"／"closed"（大小写＋首尾空白不敏感）即 false。
+ * 关站时放行 Coming Soon 和公开法律页，其他访客路由的转址见 resolveSiteGate；
  * `/innerharbour` 后台由 proxy 直接放行，不进此函数。
  */
 
@@ -54,11 +53,8 @@ export function isLegalPath(pathname: string, locales: readonly string[] = []): 
 }
 
 /**
- * 关站目标：siteLive＝true 一律 null（零行为变化）；
- * siteLive＝false 时，非 coming-soon 路径回 coming-soon（locale 前缀保留语言，
- * 深路径只取语言段，如 `/zh-Hans/wall`→`/zh-Hans/coming-soon`）；
- * coming-soon 本体一律 null（预览不锁）。
- * 注意：尾斜杠先归一；ops／share 放行由 proxy 负责，不在此函数。
+ * 开站时返回 null。关站时放行 Coming Soon 与公开法律页，旧法律入口转到对应文件，
+ * 其余访客路径转到 Coming Soon。转址保留有效的 locale 前缀。
  */
 export function resolveSiteGate(
   pathname: string,
@@ -70,15 +66,14 @@ export function resolveSiteGate(
   if (isComingSoonPath(pathname.replace(/\/$/, ""))) return null;
   if (isLegalPath(pathname, locales)) return null;
   const clean = pathname !== "/" ? pathname.replace(/\/$/, "") : pathname;
-  if (clean === "/") return "/coming-soon";
-  const seg = clean.split("/");
-  if (seg.length === 2 && locales.includes(seg[1] as string)) {
-    return `/${seg[1]}/coming-soon`;
+  const [, firstSegment] = clean.split("/");
+  const localePrefix = firstSegment && locales.includes(firstSegment) ? `/${firstSegment}` : "";
+  const pathWithoutLocale = clean.slice(localePrefix.length);
+  // `/terms` is the app's mode guide when the site is live.
+  if (pathWithoutLocale === "/privacy" || pathWithoutLocale === "/terms") {
+    return `${localePrefix}/legal${pathWithoutLocale}`;
   }
-  if (seg.length >= 3 && locales.includes(seg[1] as string)) {
-    return `/${seg[1]}/coming-soon`;
-  }
-  return "/coming-soon";
+  return `${localePrefix}/coming-soon`;
 }
 
 /**

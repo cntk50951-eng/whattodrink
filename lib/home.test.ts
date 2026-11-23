@@ -69,6 +69,9 @@ describe("resolveSiteGate (UR L.1)", () => {
     expect(resolveSiteGate("/", true, locales)).toBeNull();
     expect(resolveSiteGate("/wall", true, locales)).toBeNull();
     expect(resolveSiteGate("/coming-soon", true, locales)).toBeNull();
+    expect(resolveSiteGate("/privacy", true, locales)).toBeNull();
+    expect(resolveSiteGate("/terms", true, locales)).toBeNull();
+    expect(resolveSiteGate("/en/terms", true, locales)).toBeNull();
   });
 
   it("關站：裸 / 與深路徑回 /coming-soon", () => {
@@ -82,6 +85,17 @@ describe("resolveSiteGate (UR L.1)", () => {
     expect(resolveSiteGate("/en", false, locales)).toBe("/en/coming-soon");
     expect(resolveSiteGate("/zh-Hans/", false, locales)).toBe("/zh-Hans/coming-soon");
     expect(resolveSiteGate("/zh-Hant/wall", false, locales)).toBe("/zh-Hant/coming-soon");
+  });
+
+  it.each([
+    ["/privacy", "/legal/privacy"],
+    ["/terms", "/legal/terms"],
+    ["/en/privacy/", "/en/legal/privacy"],
+    ["/en/terms", "/en/legal/terms"],
+    ["/zh-Hans/terms", "/zh-Hans/legal/terms"],
+    ["/zh-Hant/privacy", "/zh-Hant/legal/privacy"],
+  ])("關站：舊入口 %s 轉到 %s", (pathname, target) => {
+    expect(resolveSiteGate(pathname, false, locales)).toBe(target);
   });
 
   it("關站：公開法律頁放行（商店審核要能打開），含 locale 前綴", () => {
@@ -99,6 +113,10 @@ describe("resolveSiteGate (UR L.1)", () => {
     expect(resolveSiteGate("/legalx/privacy", false, locales)).toBe("/coming-soon");
     expect(resolveSiteGate("/wall/legal", false, locales)).toBe("/coming-soon");
     expect(resolveSiteGate("/en/wall", false, locales)).toBe("/en/coming-soon");
+    expect(resolveSiteGate("/privacy/details", false, locales)).toBe("/coming-soon");
+    expect(resolveSiteGate("/en/terms/details", false, locales)).toBe("/en/coming-soon");
+    expect(resolveSiteGate("/xx/terms", false, locales)).toBe("/coming-soon");
+    expect(resolveSiteGate("/terms-old", false, locales)).toBe("/coming-soon");
   });
 
   it("關站：coming-soon 本體永遠放行（預覽不鎖）", () => {
