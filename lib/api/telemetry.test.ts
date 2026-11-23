@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeAnalyticsReport, parseTelemetryBatch, type StoredAnalyticsRow } from "./telemetry";
+import { computeAnalyticsReport, computeUserJourneys, parseTelemetryBatch, type StoredAnalyticsRow } from "./telemetry";
 
 describe("telemetry 批次校驗與報表聚合", () => {
   it("parseTelemetryBatch 過濾非法事件名並剝除敏感 PII 欄位", () => {
@@ -75,5 +75,15 @@ describe("telemetry 批次校驗與報表聚合", () => {
     expect(steps[2]?.dropOff).toBe(1);
     expect(report.funnels.partyCreate.avgDurationSec).toBe(18);
     expect(report.funnels.partyCreate.abandonSteps[0]).toEqual({ label: "step2_place", count: 1, pct: 100 });
+    expect(report.activeUsersInWindow).toBe(3);
+
+    const journeys = computeUserJourneys(rows, { days: 7, nowMs: now });
+    expect(journeys).toHaveLength(2);
+    const byFlow = new Map(journeys.map((j) => [j.flowId, j]));
+    expect(byFlow.get("f1")?.status).toBe("success");
+    expect(byFlow.get("f1")?.userId).toBe("u1");
+    expect(byFlow.get("f2")?.status).toBe("abandoned");
+    expect(byFlow.get("f2")?.lastStep).toBe("step2_place");
+    expect(byFlow.get("f2")?.userId).toBe("u2");
   });
 });

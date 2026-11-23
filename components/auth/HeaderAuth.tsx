@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
 import { clearUserLocalCaches } from "@/lib/auth/clear";
@@ -10,11 +10,16 @@ import { displayName } from "@/lib/auth/profile";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 
+const LEGAL_PATH_RE = /^\/(?:(?:zh-Hant|zh-Hans|en)\/)?legal(?:\/|$)/;
+
 /**
  * UR A.7 header 已登入態：顯示暱稱頭像 + 登出。
  * 掛載後讀 session 並訂閱變化，未登入時顯示登入鈕，避免 header 空白。
+ * 公開法律頁（/legal/privacy｜/legal/terms｜/legal/delete-account）不顯示右上角登入鈕。
  */
 export function HeaderAuth() {
+  const pathname = usePathname();
+  const isLegalPage = typeof pathname === "string" && LEGAL_PATH_RE.test(pathname);
   const t = useTranslations("nav");
   const ta = useTranslations("auth");
   const router = useRouter();
@@ -23,6 +28,7 @@ export function HeaderAuth() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (isLegalPage) return;
     let alive = true;
     const supabase = createClient();
     void supabase.auth.getUser().then(({ data }) => {
@@ -64,7 +70,11 @@ export function HeaderAuth() {
       alive = false;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [isLegalPage]);
+
+  if (isLegalPage) {
+    return null;
+  }
 
   async function handleLogout(): Promise<void> {
     const supabase = createClient();

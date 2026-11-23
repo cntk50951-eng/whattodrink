@@ -38,17 +38,26 @@ export function LegalShell({
   return (
     <Container size="narrow" className="py-10 md:py-14">
       <article className="mx-auto max-w-2xl">
-        <nav aria-label={c.languageLabel} className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-          <span className="text-muted-foreground">{c.languageLabel}</span>
+        <nav aria-label={c.languageLabel} className="mb-6 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground mr-1">{c.languageLabel}</span>
           {LOCALES.map((l) =>
             l === locale ? (
-              <span key={l} aria-current="true" className="font-semibold">
+              <span
+                key={l}
+                aria-current="true"
+                className="rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background"
+              >
                 {LOCALE_NAMES[l]}
               </span>
             ) : (
-              <Link key={l} href={`/${l}/legal/${slug}`} hrefLang={l} className="underline underline-offset-4">
+              <a
+                key={l}
+                href={`/${l}/legal/${slug}`}
+                hrefLang={l}
+                className="rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+              >
                 {LOCALE_NAMES[l]}
-              </Link>
+              </a>
             ),
           )}
         </nav>

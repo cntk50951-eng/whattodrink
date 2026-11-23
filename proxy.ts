@@ -4,15 +4,17 @@ import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 import { parseHomeUi, parseSiteLive, resolveHomeTarget, resolveSiteGate } from "@/lib/home";
 import { routing } from "./i18n/routing";
+import { introRouting, isIntroRoute } from "./i18n/intro-routing";
 import { isOpsPath } from "./lib/opsPath";
 import { isSharePath } from "./lib/share/partyPage";
 
 const intlMiddleware = createMiddleware(routing);
+const introIntlMiddleware = createMiddleware(introRouting);
 
 /**
  * Reads the locale from cookie → Accept-Language → defaultLocale (zh-Hant)
  * and persists the resolved locale to the `NEXT_LOCALE` cookie.
- * Combined with `localePrefix: 'never'`, URLs stay clean (/, /bars, /mood).
+ * `as-needed` omits the default prefix. Intro alone defaults to Traditional Chinese.
  *
  * UR A.3：先跑 intl 拿到最終回包，再進 Supabase session 刷新——
  * 刷新後的 cookie（含 options）＋no-store headers 直接寫在同一包上。
@@ -57,7 +59,8 @@ export default async function proxy(request: NextRequest) {
   if (homeTarget !== null) {
     return NextResponse.redirect(new URL(homeTarget, request.url));
   }
-  const response = intlMiddleware(request) ?? NextResponse.next();
+  const localize = isIntroRoute(request.nextUrl.pathname) ? introIntlMiddleware : intlMiddleware;
+  const response = localize(request) ?? NextResponse.next();
   try {
     return await updateSession(request, response);
   } catch (err) {

@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerE
 import type { AppLocale } from "@/i18n/routing";
 
 import { FPS, S } from "../intro/kit";
-import { previewFrame } from "./playback";
+import { initializePlayback } from "./playback";
 import { browseIndexAt, completeSwipe, isHorizontalIntent, seekBrowseStop } from "./browse";
 import { preloadIntroArtwork } from "./preload";
 import { INTRO_COPY, introHref, introLanguageHref, type IntroBasePath, type IntroCopy } from "./copy";
@@ -132,11 +132,15 @@ export default function IntroPlayer({ locale, basePath }: { locale: AppLocale; b
     current.addEventListener("timeupdate", syncStep);
     current.addEventListener("seeked", syncStep);
     preference.addEventListener("change", onPreference);
-    const frozen = previewFrame(new URLSearchParams(window.location.search).get("t"), FPS, TOTAL_FRAMES);
-    if (frozen !== null) { current.pause(); current.seekTo(frozen); }
-    else if (preference.matches) onPreference();
-    else if (keyboardPaused.current) { current.pause(); current.seekTo(BROWSE_STOPS[0].settledFrame); }
-    else current.play();
+    initializePlayback(current, {
+      search: window.location.search,
+      fps: FPS,
+      totalFrames: TOTAL_FRAMES,
+      reducedMotion: preference.matches,
+      reading: keyboardPaused.current,
+      readingFrame: BROWSE_STOPS[0].settledFrame,
+      reducedFrame: S(END_SEC + 2),
+    });
     syncStep();
     return () => {
       current.removeEventListener("play", onPlay);
@@ -171,7 +175,8 @@ export default function IntroPlayer({ locale, basePath }: { locale: AppLocale; b
         </div>
       </nav>
       <div className={s.stage} ref={stage} aria-hidden="true" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={(event) => finishSwipe(event)} onPointerCancel={(event) => finishSwipe(event, true)} onLostPointerCapture={(event) => finishSwipe(event, true)}>
-        {ready ? <Player ref={setPlayer} component={Story} inputProps={inputProps} durationInFrames={TOTAL_FRAMES} fps={FPS} compositionWidth={size.w} compositionHeight={size.h} className={s.player} controls={false} clickToPlay={false} doubleClickToFullscreen={false} spaceKeyToPlayOrPause={false} loop autoPlay={false} /> : <div className={s.loading}>{INTRO_BRAND.label}<small>{copy.tagline}</small></div>}
+        {/* This composition is silent. Do not let an unresumable AudioContext block its animation clock. */}
+        {ready ? <Player ref={setPlayer} component={Story} inputProps={inputProps} durationInFrames={TOTAL_FRAMES} fps={FPS} compositionWidth={size.w} compositionHeight={size.h} className={s.player} controls={false} clickToPlay={false} doubleClickToFullscreen={false} spaceKeyToPlayOrPause={false} initiallyMuted numberOfSharedAudioTags={0} loop autoPlay={false} /> : <div className={s.loading}>{INTRO_BRAND.label}<small>{copy.tagline}</small></div>}
       </div>
       <div className={s.browseControls} role="group" aria-label={copy.browse.controls} onPointerEnter={(event) => { if (event.pointerType === "mouse") player?.pause(); }}>
         <button className={s.browseButton} type="button" aria-label={copy.browse.previous} aria-disabled={activeIndex === 0} onClick={() => { if (activeIndex > 0) goBy(-1); }} disabled={!ready || !player}>

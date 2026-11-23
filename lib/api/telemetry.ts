@@ -247,6 +247,7 @@ export type AnalyticsDashboardReport = {
   days: number;
   platform: string;
   totalEvents: number;
+  activeUsersInWindow: number;
   dauToday: number;
   wau7d: number;
   mau30d: number;
@@ -266,6 +267,26 @@ export type AnalyticsDashboardReport = {
   themes: BreakdownItem[];
   locales: BreakdownItem[];
   screens: BreakdownItem[];
+};
+
+export type JourneyKind = "party_create" | "checkin" | "auth";
+export type JourneyStatus = "success" | "failed" | "abandoned" | "in_progress";
+
+export type UserJourneyAttempt = {
+  flowId: string;
+  journey: JourneyKind;
+  userId: string | null;
+  anonId: string;
+  actorKey: string;
+  platform: string;
+  appVersion: string | null;
+  status: JourneyStatus;
+  lastStep: string;
+  errorCode: string | null;
+  durationSec: number | null;
+  startedAt: string;
+  lastEventAt: string;
+  steps: string[];
 };
 
 function hkDayKey(ms: number): string {
@@ -402,6 +423,7 @@ export function computeAnalyticsReport(
   }
 
   const allSessions = new Set<string>();
+  const windowActors = new Set<string>();
   const actorPlatform = new Map<string, string>();
   const actorVersion = new Map<string, string>();
   const actorTheme = new Map<string, string>();
@@ -417,6 +439,7 @@ export function computeAnalyticsReport(
     const dk = hkDayKey(ms);
     const actor = actorKey(r);
     allSessions.add(r.session_id);
+    windowActors.add(actor);
 
     const b = dayBuckets.get(dk);
     if (b) {
@@ -519,6 +542,7 @@ export function computeAnalyticsReport(
     days,
     platform: platformFilter,
     totalEvents: windowRows.length,
+    activeUsersInWindow: windowActors.size,
     dauToday: dauSet.size,
     wau7d: wauSet.size,
     mau30d: mauSet.size,
@@ -539,4 +563,177 @@ export function computeAnalyticsReport(
     locales: toBreakdown(countMap(actorLocale), 4),
     screens: toBreakdown(screenCounts, 8),
   };
+}
+
+function classifyJourneyEvent(eventName: string): JourneyKind | null {
+  if (eventName.startsWith("party_create_")) return "party_create";
+  if (eventName.startsWith("checkin_")) return "checkin";
+  if (eventName.startsWith("auth_")) return "auth";
+  return null;
+}
+
+function stepTokenForEvent(r: StoredAnalyticsRow): string {
+  switch (r.event_name) {
+    case "party_create_open":
+      return "party_open";
+    case "party_create_step_view":
+      return String(r.props?.step ?? "") === "step2" ? "party_step2" : "party_step1";
+    case "party_create_submit":
+      return "party_submit";
+    case "party_create_success":
+      return "party_success";
+    case "party_create_failed":
+      return "party_failed";
+    case "party_create_abandon":
+      return "party_abandon";
+    case "checkin_open":
+      return "checkin_open";
+    case "checkin_photo_ready":
+      return "checkin_photo";
+    case "checkin_publish_open":
+      return "checkin_publish_open";
+    case "checkin_publish_submit":
+      return "checkin_submit";
+    case "checkin_publish_success":
+      return "checkin_success";
+    case "checkin_publish_failed":
+      return "checkin_failed";
+    case "checkin_abandon":
+      return "checkin_abandon";
+    case "auth_open":
+      return "auth_open";
+    case "auth_submit":
+      return typeof r.props?.provider === "string" ? `auth_submit:${r.props.provider}` : "auth_submit";
+    case "auth_success":
+      return "auth_success";
+    case "auth_failed":
+      return "auth_failed";
+    case "auth_abandon":
+      return "auth_abandon";
+    default:
+      return r.event_name;
+  }
+}
+
+/**
+ * 按用戶（與 flow_id）拆解每次發佈酒局／拍照打卡／登入的完整步驟與結果，供後台逐人排查卡點。
+ */
+export function computeUserJourneys(
+  allRows: StoredAnalyticsRow[],
+  opts: {
+    days: number;
+    platform?: string;
+    journey?: JourneyKind | "all";
+    userId?: string | null;
+    nowMs?: number;
+    limit?: number;
+  },
+): UserJourneyAttempt[] {
+  const nowMs = opts.nowMs ?? Date.now();
+  const days = Math.min(Math.max(opts.days, 1), 90);
+  const cutoff = nowMs - days * 86_400_000;
+  const platformFilter = opts.platform && VALID_PLATFORMS.has(opts.platform) ? opts.platform : "all";
+  const journeyFilter = opts.journey && opts.journey !== "all" ? opts.journey : "all";
+  const userFilter = opts.userId?.trim() || null;
+  const limit = opts.limit ?? 80;
+
+  const grouped = new Map<string, { journey: JourneyKind; rows: StoredAnalyticsRow[] }>();
+
+  for (const r of allRows) {
+    const ms = Date.parse(r.created_at);
+    if (!Number.isFinite(ms) || ms < cutoff) continue;
+    if (platformFilter !== "all" && r.platform !== platformFilter) continue;
+    const j = classifyJourneyEvent(r.event_name);
+    if (!j) continue;
+    if (journeyFilter !== "all" && j !== journeyFilter) continue;
+    if (userFilter) {
+      const targetMatch = r.user_id === userFilter || `a:${r.anon_id}` === userFilter || `u:${r.user_id}` === userFilter;
+      if (!targetMatch) continue;
+    }
+    const fk = flowKey(r);
+    const key = `${j}:${fk}`;
+    let bucket = grouped.get(key);
+    if (!bucket) {
+      bucket = { journey: j, rows: [] };
+      grouped.set(key, bucket);
+    }
+    bucket.rows.push(r);
+  }
+
+  const out: UserJourneyAttempt[] = [];
+  for (const [k, { journey, rows }] of grouped.entries()) {
+    rows.sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+    const first = rows[0]!;
+    const last = rows[rows.length - 1]!;
+    // 優先取同 flow 裡已關聯的 user_id（例如登入成功後才有 user_id）
+    const resolvedUserId = rows.find((r) => r.user_id)?.user_id ?? null;
+    const steps: string[] = [];
+    let status: JourneyStatus = "in_progress";
+    let lastStep = "open";
+    let errorCode: string | null = null;
+    let durationMs: number | null = null;
+
+    for (const r of rows) {
+      const tok = stepTokenForEvent(r);
+      if (steps[steps.length - 1] !== tok) steps.push(tok);
+
+      if (r.event_name === "party_create_step_view" && typeof r.props?.step === "string") {
+        lastStep = r.props.step;
+      } else if (r.event_name === "checkin_photo_ready") {
+        lastStep = "edit";
+      } else if (r.event_name === "checkin_publish_open") {
+        lastStep = "publish";
+      } else if (r.event_name === "auth_submit" && typeof r.props?.provider === "string") {
+        lastStep = r.props.provider;
+      } else if (r.event_name.endsWith("_submit")) {
+        lastStep = "submit";
+      }
+
+      if (r.event_name.endsWith("_success")) {
+        status = "success";
+        lastStep = "success";
+        if (typeof r.props?.duration_ms === "number" && Number.isFinite(r.props.duration_ms)) {
+          durationMs = r.props.duration_ms;
+        }
+      } else if (r.event_name.endsWith("_failed")) {
+        if (status !== "success") status = "failed";
+        if (typeof r.props?.error_code === "string" && r.props.error_code.trim()) {
+          errorCode = r.props.error_code.trim();
+        }
+      } else if (r.event_name.endsWith("_abandon")) {
+        if (status !== "success") status = "abandoned";
+        if (typeof r.props?.last_step === "string" && r.props.last_step.trim()) {
+          lastStep = r.props.last_step.trim();
+        }
+        if (durationMs === null && typeof r.props?.spent_ms === "number" && Number.isFinite(r.props.spent_ms)) {
+          durationMs = r.props.spent_ms;
+        }
+      }
+    }
+
+    if (durationMs === null) {
+      const span = Date.parse(last.created_at) - Date.parse(first.created_at);
+      if (span > 0 && span < 3_600_000) durationMs = span;
+    }
+
+    out.push({
+      flowId: first.flow_id ?? k,
+      journey,
+      userId: resolvedUserId,
+      anonId: first.anon_id,
+      actorKey: resolvedUserId ? `u:${resolvedUserId}` : `a:${first.anon_id}`,
+      platform: last.platform,
+      appVersion: last.app_version,
+      status,
+      lastStep,
+      errorCode,
+      durationSec: durationMs !== null ? Math.round((durationMs / 1000) * 10) / 10 : null,
+      startedAt: first.created_at,
+      lastEventAt: last.created_at,
+      steps,
+    });
+  }
+
+  out.sort((a, b) => Date.parse(b.lastEventAt) - Date.parse(a.lastEventAt));
+  return out.slice(0, limit);
 }
