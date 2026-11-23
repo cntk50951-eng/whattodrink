@@ -1,12 +1,13 @@
 import Link from "next/link";
 
-export type OpsSection = "review" | "user-reports" | "game-reports" | "notices";
+export type OpsSection = "review" | "user-reports" | "game-reports" | "notices" | "analytics";
 
 const TABS: { key: OpsSection; href: string; label: string }[] = [
   { key: "review", href: "/innerharbour/review", label: "投訴審核" },
   { key: "user-reports", href: "/innerharbour/user-reports", label: "用戶舉報" },
   { key: "game-reports", href: "/innerharbour/game-reports", label: "遊戲舉報" },
   { key: "notices", href: "/innerharbour/notices", label: "系統消息與更新" },
+  { key: "analytics", href: "/innerharbour/analytics", label: "數據與漏斗" },
 ];
 
 /**

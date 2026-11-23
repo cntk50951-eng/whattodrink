@@ -130,6 +130,54 @@ paths:
                         cta_url: { type: string, nullable: true }
                         starts_at: { type: integer }
                         ends_at: { type: integer, nullable: true }
+  /api/v1/telemetry/events:
+    post:
+      operationId: postTelemetryEvents
+      summary: 批次上報第一方產品埋點與漏斗事件（0081；免登入或帶 Bearer）
+      description: 單批次 1–50 條，以 event_id 冪等去重；嚴格白名單並過濾 PII 欄位。已登入時由後端自動關聯 user_id；若伺服器配置 POSTHOG_API_KEY 則異步雙寫至 PostHog。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items:
+                    type: object
+                    required: [event_id, event_name, anon_id, session_id, platform, client_ts]
+                    properties:
+                      event_id: { type: string, format: uuid }
+                      event_name: { type: string }
+                      anon_id: { type: string }
+                      session_id: { type: string }
+                      flow_id: { type: string, nullable: true }
+                      platform: { type: string, enum: [ios, android, web] }
+                      app_version: { type: string, nullable: true }
+                      locale: { type: string, nullable: true }
+                      theme: { type: string, nullable: true }
+                      client_ts: { type: integer, description: "毫秒 Unix 時間戳" }
+                      props:
+                        type: object
+                        additionalProperties: true
+      responses:
+        "200":
+          description: 批次接收結果
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, accepted]
+                properties:
+                  ok: { type: boolean }
+                  accepted: { type: integer }
+                  skipped: { type: boolean }
+        "400":
+          description: 請求體格式或批次大小不合法
   /api/v1/wall:
     get:
       operationId: getWall
