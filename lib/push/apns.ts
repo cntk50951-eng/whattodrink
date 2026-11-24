@@ -4,7 +4,7 @@
  * 无依赖（node:crypto 直签，不引 jose）。
  */
 
-import { createPrivateKey, sign } from "node:crypto";
+import { createHash, createPrivateKey, sign } from "node:crypto";
 import { connect, type ClientHttp2Session } from "node:http2";
 
 export type ApnsEnv = "sandbox" | "production";
@@ -77,6 +77,21 @@ export type ApnsResult =
   | { ok: true; apnsId: string | null }
   | { ok: false; status: number; reason: string };
 
+/** APNs `apns-collapse-id` 上限 64 bytes（超限回 HTTP 400 BadCollapseId，且不在重試範圍內，通知會直接丟掉）。 */
+export const APNS_COLLAPSE_ID_MAX_BYTES = 64;
+
+/**
+ * 把任意 collapse 字串收斂成合法的 collapse-id：本來就合法的原樣返回（同一事件永遠得到同一個值，合併語義不變）；
+ * 超限的保留第一段（事件類型，便於人讀日誌）＋原字串 SHA-256 前 40 位 hex，總長 ≤ 57 bytes 且穩定。
+ * 例：`party_cancelled-<uuid>-<uuid>`（89 bytes）、`invite_completed-<uuid>-<uuid>`（90 bytes）。
+ */
+export function apnsCollapseId(raw: string): string {
+  if (Buffer.byteLength(raw, "utf8") <= APNS_COLLAPSE_ID_MAX_BYTES) return raw;
+  const head = raw.split("-")[0]?.replace(/[^A-Za-z0-9_]/g, "").slice(0, 16) ?? "";
+  const digest = createHash("sha256").update(raw, "utf8").digest("hex").slice(0, 40);
+  return head === "" ? digest : `${head}-${digest}`;
+}
+
 /**
  * 发一条（HTTP/2 POST /3/device/{token}；调用方定重试，本函数单次尽力）。
  * headers 含 collapse-id／push-type／priority／expiration／topic（沿交接 §3.5）。
@@ -101,7 +116,7 @@ export async function sendApn(args: {
     "apns-push-type": "alert",
     "apns-priority": "10",
     "apns-expiration": String(args.expirationEpochSec ?? Math.floor(Date.now() / 1000) + 24 * 3600),
-    "apns-collapse-id": args.collapseId,
+    "apns-collapse-id": apnsCollapseId(args.collapseId),
   };
   const timeoutMs = args.timeoutMs ?? 10_000;
   return await new Promise<ApnsResult>((resolve) => {
