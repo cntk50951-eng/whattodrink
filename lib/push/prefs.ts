@@ -1,6 +1,7 @@
 /**
  * UR D.9 推送偏好（`users.push_prefs`；读缺键默认，写整体替换严格校验）。
- * 默认全 true，唯 stranger_invites 默认 false（E.16 陌生人邀约折叠不推送）。
+ * 默认**全 true**（2026-11-24 用戶定案：陌生人聊天／陌生人邀約也默認開；原 stranger_invites／stranger_chat 默認 false）。
+ * 客戶端（iOS／AOS）缺鍵時鏡像同一組默認，改這裡必須三端同改，否則設置頁顯示「開」而服務端按「關」處理。
  */
 
 export const PUSH_PREF_KEYS = [
@@ -24,8 +25,8 @@ const DEFAULTS: PushPrefs = {
   invites: true,
   invite_replies: true,
   chat: true,
-  stranger_invites: false,
-  stranger_chat: false,
+  stranger_invites: true,
+  stranger_chat: true,
   friends: true,
   party: true,
   game_invites: true,

@@ -10,25 +10,25 @@ import {
 } from "./prefs";
 
 describe("pushPrefsOf", () => {
-  it("缺键默认（stranger_invites 唯 false）；坏形全默认", () => {
+  it("缺键默认全 true（含陌生人聊天／邀約）；坏形全默认", () => {
     expect(pushPrefsOf(null)).toEqual({
       cheers: true,
       invites: true,
       invite_replies: true,
       chat: true,
-      stranger_invites: false,
-      stranger_chat: false,
+      stranger_invites: true,
+      stranger_chat: true,
       friends: true,
       party: true,
       game_invites: true,
     });
-    expect(pushPrefsOf({ cheers: false, stranger_invites: true })).toEqual({
+    expect(pushPrefsOf({ cheers: false, stranger_invites: false })).toEqual({
       cheers: false,
       invites: true,
       invite_replies: true,
       chat: true,
-      stranger_invites: true,
-      stranger_chat: false,
+      stranger_invites: false,
+      stranger_chat: true,
       friends: true,
       party: true,
       game_invites: true,
@@ -44,8 +44,8 @@ describe("parsePushPrefs", () => {
         invites: true,
         invite_replies: true,
         chat: true,
-        stranger_invites: false,
-        stranger_chat: false,
+        stranger_invites: true,
+        stranger_chat: true,
         friends: true,
         party: true,
         game_invites: true,

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.68.1
+  version: 1.68.2
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -3080,7 +3080,7 @@ paths:
                   type: object
                   description: >
                     推送偏好**整体替换**（UR D.9）：9 个已知键（cheers／invites／invite_replies／chat／stranger_invites／stranger_chat／friends／party／game_invites），
-                    值须 boolean，未知键或非 boolean 400。**缺的键不保留旧值，按默认重置**（默认全 true，唯 stranger_invites／stranger_chat 为 false），
+                    值须 boolean，未知键或非 boolean 400。**缺的键不保留旧值，按默认重置**（默认**全 true**；stranger_invites／stranger_chat 原默认 false，2026-11-24 起也默认 true），客户端缺键须镜像同一组默认。
                     所以客户端要写就带齐全部 9 个键（AOS 已如此；iOS 目前没有分类设置入口，不写此字段）。
                   additionalProperties: false
                   properties:
@@ -6441,7 +6441,7 @@ components:
           $ref: "#/components/schemas/TastePreferences"
         push_prefs:
           type: object
-          description: 推送偏好（9 个键；缺键读端按默认：全开，唯 stranger_invites／stranger_chat 关，UR D.9）
+          description: 推送偏好（9 个键；缺键读端按默认：9 键全开（2026-11-24 起；stranger_invites／stranger_chat 原默认关），UR D.9）
         height_cm:
           type: integer
           nullable: true

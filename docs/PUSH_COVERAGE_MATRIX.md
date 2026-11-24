@@ -27,8 +27,8 @@
 | A01 好友申請 | friend_request／friends | friends POST新建或stale復活 → sendFriendPush(request)，L | 好友請求展開並定位來源人 |
 | A02 接受好友 | friend_accepted／friends | friends/requests/[id]接受；friends POST雙向pending自動接受 → sendFriendPush(accepted)，L | 好友頁定位新好友 |
 | A03 好友私信 | chat／chat | conversations/[id]/messages INSERT → enqueue_native_message，Q；文字／圖片／語音／帖子／位置／酒局卡共用 | 指定conversation |
-| A04 陌生人私信 | chat／stranger_chat預設關 | 同A03，派發時查當前好友關係及模式／封鎖／mute／讀水位 | 指定陌生會話 |
-| A05 私人約酒 | invite／invites或stranger_invites預設關 | invites POST → drink_invites INSERT sent → enqueue_native_invite，Q | 約局›我的›指定邀請 |
+| A04 陌生人私信 | chat／stranger_chat（預設開，2026-11-24 起） | 同A03，派發時查當前好友關係及模式／封鎖／mute／讀水位 | 指定陌生會話 |
+| A05 私人約酒 | invite／invites或stranger_invites（預設開，2026-11-24 起） | invites POST → drink_invites INSERT sent → enqueue_native_invite，Q | 約局›我的›指定邀請 |
 | A06 約酒回覆 | invite_reply／invite_replies | invites/[id] sent→accepted/declined UPDATE trigger，Q | 同一邀請最新狀態 |
 | A07 酒局入席 | member_joined／party | parties/[id]/joins INSERT → native_join_notice → notifications → enqueue_native_notice，Q | 酒局詳情／成員 |
 | A08 撤局 | party_cancelled／party | parties/[id]取消，寫notification → Q | 已取消酒局 |
