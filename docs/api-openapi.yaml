@@ -3156,14 +3156,6 @@ paths:
                 confirm:
                   type: boolean
                   description: 必须为 true（防误触）
-      responses:
-        "200":
-          description: 已注销
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [deleted, mode, purge_at]
                 apple_authorization_code:
                   type: string
                   minLength: 1
@@ -3172,7 +3164,16 @@ paths:
                     用 Apple 登入的帳號刪除前須再授權一次（Apple TN3194：刪帳號必須撤銷 Sign in with Apple token）。
                     iOS 用 `ASAuthorizationAppleIDProvider` 再授權後取 `authorizationCode`（UTF-8 字串）帶來；一次性、約 5 分鐘內有效。
                     服務端用 SIWA key 簽 client secret → 換 token → 撤銷，**不存任何 Apple token**；先撤銷後刪資料，撤銷失敗不動資料。
+                    必須是登入時綁定的那個 Apple ID 授權的，否則回 400 `apple_code_invalid`。
                     沒綁 Apple 的帳號不用帶；帶了也忽略。恢復期內重複 grace 是冪等回原到期日，不再要求。
+      responses:
+        "200":
+          description: 已注销
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted, mode, purge_at]
                 properties:
                   deleted:
                     type: boolean
@@ -3185,7 +3186,7 @@ paths:
                     description: grace 时为到期清除时间（申请后 30 天）；now 时为 null
         "400":
           description: >
-            body 非法／缺 confirm:true；或 `code=apple_code_invalid`＝Apple 拒絕了 `apple_authorization_code`（已用過／過期）。
+            body 非法／缺 confirm:true；或 `code=apple_code_invalid`＝Apple 拒絕了 `apple_authorization_code`（已用過／過期／不是登入時綁定的 Apple ID）。
             後者客戶端應重新做一次 Apple 授權再重試，資料沒有被動。
           content:
             application/json:
@@ -3193,14 +3194,6 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/Internal"
-  /api/v1/me/restore:
-    post:
-      operationId: restoreMyAccount
-      summary: 恢复账号（需登录，UR I.3）。恢复期（30 天）内回填快照：个人资料＋自己发的内容；好友／聊天／碰杯／酒局不恢复
-      security:
-        - bearerAuth: []
         "409":
           description: >
             `code=apple_reauth_required`：此帳號綁了 Apple 登入但請求沒帶 `apple_authorization_code`。
@@ -3209,14 +3202,22 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
-      responses:
-        "200":
+        "500":
+          $ref: "#/components/responses/Internal"
         "503":
           description: Apple 暫時無法連線（撤銷沒完成，資料沒有被動）。稍後重試同一請求
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+  /api/v1/me/restore:
+    post:
+      operationId: restoreMyAccount
+      summary: 恢复账号（需登录，UR I.3）。恢复期（30 天）内回填快照：个人资料＋自己发的内容；好友／聊天／碰杯／酒局不恢复
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
           description: 已恢复
           content:
             application/json:
