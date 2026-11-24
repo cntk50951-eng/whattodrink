@@ -69,20 +69,23 @@ describe("公開法律頁內容", () => {
     }
   });
 
-  it("私隱政策具名第三方 AI，且不再宣稱 Sign in with Apple（尚未上線）", () => {
+  it("私隱政策具名第三方 AI，並寫明 Sign in with Apple 的資料處理（2026-11-24 起 Apple 登入上線，版本 1.2）", () => {
+    const APPLE_SIGNIN: Record<string, RegExp> = { "zh-Hant": /Apple 登入/, "zh-Hans": /Apple 登录/, en: /sign in with Apple/i };
+    const NO_TOKEN: Record<string, string> = { "zh-Hant": "我們不保存任何 Apple 令牌", "zh-Hans": "我们不保存任何 Apple 令牌", en: "We do not store any Apple tokens" };
     for (const l of LOCALES) {
       const all = JSON.stringify(getLegalDoc("privacy", l));
       expect(all).toContain("MiniMax");
       expect(all).toContain("OpenAI");
-      expect(all).not.toMatch(/Sign in with Apple|Apple 登入|Apple 登录/);
+      expect(all).toMatch(APPLE_SIGNIN[l]);            // 帳號資料、第三方服務、刪除帳號三處都要提到
+      expect(all).toContain(NO_TOKEN[l]);              // 與實現一致：刪帳號時用一次性授權碼撤銷，不保存 Apple token
     }
   });
 
-  it("條款含 Ivy 與兒少安全兩節，三語章節數一致；版本 1.1", () => {
+  it("條款含 Ivy 與兒少安全兩節，三語章節數一致；兩份文件版本都是 1.2（與 iOS currentVersion／AOS CURRENT_VERSION 同步）", () => {
     for (const l of LOCALES) {
       const t = getLegalDoc("terms", l);
-      expect(t.version).toBe("1.1");
-      expect(getLegalDoc("privacy", l).version).toBe("1.1");
+      expect(t.version).toBe("1.2");
+      expect(getLegalDoc("privacy", l).version).toBe("1.2");
       expect(JSON.stringify(t)).toContain("Ivy");
       expect(JSON.stringify(t)).toContain("/legal/child-safety");
     }

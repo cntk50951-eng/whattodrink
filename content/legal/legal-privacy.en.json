@@ -11,7 +11,8 @@
       "title": "Account details",
       "tag": "Friends see nickname and avatar",
       "paragraphs": [
-        "[Required] Email, nickname, gender and date of birth (date of birth confirms you are 18 or over; gender is used for meetup gender quotas and for showing people nearby, and may appear on your profile). Avatar is optional. Used to sign you in and show your profile."
+        "[Required] Email, nickname, gender and date of birth (date of birth confirms you are 18 or over; gender is used for meetup gender quotas and for showing people nearby, and may appear on your profile). Avatar is optional. Used to sign you in and show your profile.",
+        "If you sign in with Apple, we receive your Apple account identifier and email address from Apple. If you choose \"Hide My Email\", we receive an Apple-generated relay address instead of your real email. We do not receive your name or your Apple password."
       ]
     },
     {
@@ -52,6 +53,7 @@
         "AMap (Gaode): maps and search. Your location is sent to its servers. You agree to this when you accept these terms on first launch.",
         "Supabase: sign-in and data storage.",
         "Google: only if you choose to sign in with Google; we receive your email and name.",
+        "Apple: only if you choose to sign in with Apple, we receive your Apple account identifier and email (or Apple's relay address). When you delete your account, we ask you to authorize with Apple once more and send the resulting one-time authorization code to Apple, so that we can revoke our sign-in authorization for your Apple account. We do not store any Apple tokens.",
         "Apple and Google (depending on your phone): push notifications and speech recognition.",
         "MiniMax (AI service provider): when you talk to the bartender Ivy, your messages, recent chat history and preference memory are sent to MiniMax to write Ivy's replies and update the memory; Ivy's reply text is sent to make her voice; your search and Meet requests are sent to work out what you are looking for; your taste summary (favourites, likes and dislikes, groups of drinks from your public and friends-only check-ins, and what Ivy remembers about your taste) is sent to write your taste card; and the text and evidence photos in a meetup complaint, including the other person's reply, are sent to help sort complaints. Servers may be outside Hong Kong. You are asked before you first use Ivy or Meet search.",
         "OpenAI and MiniMax (content safety): posts and photos, comments, nicknames, search and Meet requests, meetup details and complaint text may be checked automatically for safety. Servers may be outside Hong Kong."
@@ -60,9 +62,9 @@
     {
       "title": "Your rights",
       "paragraphs": [
-        "You can request access to and correction of your personal data, and you can ask for deletion by tapping “Delete account” at the bottom of your profile panel (tap your avatar on the home screen). For access or correction requests contact support@whattodrink.app. Person in charge: freelance developer; correspondence address: Sha Tin, Hong Kong. We reply within the time required by the Ordinance. If you cannot open the app, email support@whattodrink.app from the email address you signed up with, with the subject “Delete my account”. We will confirm it is you, then delete your account and the files you uploaded as in “Delete permanently now”, and reply once it is done, within 30 days of confirming your identity."
+        "You can request access to and correction of your personal data, and you can ask for deletion by tapping “Delete account” at the bottom of your profile panel (tap your avatar on the home screen). For access or correction requests contact support@whattodrink.app. Person in charge: freelance developer; correspondence address: Sha Tin, Hong Kong. We reply within the time required by the Ordinance. If you cannot open the app, email support@whattodrink.app from the email address you signed up with, with the subject “Delete my account”. We will confirm it is you, then delete your account and the files you uploaded as in “Delete permanently now”, and reply once it is done, within 30 days of confirming your identity. If you signed in with Apple, deleting your account requires you to authorize with Apple once more so that we can revoke the sign-in authorization. If you cancel that step, your account is not deleted."
       ]
     }
   ],
-  "version": "1.1"
+  "version": "1.2"
 }

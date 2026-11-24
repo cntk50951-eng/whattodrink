@@ -11,12 +11,18 @@ type Row = Record<string, unknown>;
  * Kinds this dispatcher may also deliver to iOS devices via APNs. Everything else stays AOS-only.
  * A kind belongs here only if iOS has NO direct sender for it; otherwise the recipient gets two pushes
  * (e.g. party_cancelled/invite_* already go through sendPartyNoticePush with iosOnly:true).
- * chat, invite, invite_reply, member_joined/left/left_late, reminder_1h and attendance_confirm have no direct iOS sender: they only reach iOS through this outbox.
- * NOT here on purpose: party_cancelled, party_completed, invite_cancelled, invite_completed (sendPartyNoticePush), and kinds the iOS app cannot route yet
- * (complaint_*, trust_changed, game_*): add them together with the iOS route, not before.
+ * None of these has a direct iOS sender: they only reach iOS through this outbox.
+ * Push-2c (2026-11-24): complaint_* (iOS → complaints page), trust_changed (→ trust page) and game_join_request/game_join_result/game_kicked
+ * (→ games) joined the list together with their iOS routes (PushRoute.complaints/.trust/.games). Lock-screen copy for them is generic (outboxPolicy),
+ * never evidence or free text.
+ * NOT here on purpose: party_cancelled, party_completed, invite_cancelled, invite_completed (sendPartyNoticePush: a direct iOS sender exists, adding them
+ * would double-notify). A kind may be added only if iOS has no direct sender AND the iOS app can route it.
+ * The UGC report notices (report_submitted, post_reported, post_actioned, report_actioned, report_resolved) are in-app only: the 0077 trigger never enqueues them.
  */
 export const IOS_OUTBOX_KINDS: ReadonlySet<string> = new Set([
  "chat","invite","invite_reply","member_joined","member_left","member_left_late","reminder_1h","attendance_confirm",
+ "complaint_filed","complaint_response_needed","complaint_ack","complaint_result","trust_changed",
+ "game_join_request","game_join_result","game_kicked",
 ]);
 export type OutboxEvent = {id:string;recipient_id:string;kind:string;source_type:"notification"|"message"|"invite";source_id:string;actor_id:string|null;payload:Row;expires_at:string;attempts:number;lease_token:string};
 async function rows(query: PromiseLike<{data:unknown;error:unknown}>): Promise<Row[]> {

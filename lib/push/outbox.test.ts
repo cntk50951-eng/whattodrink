@@ -182,17 +182,40 @@ describe("iOS chat delivery through the outbox (Push-2a)",()=>{
   const r=await dispatchNativePush(database(t));
   expect(r.sent).toBe(1);expect(transport.send).toHaveBeenCalledWith(expect.objectContaining({platform:"ios",payload:expect.objectContaining({t:"invite",invite_id:"inv"})}));
  });
- it("never sends a kind that is not allowlisted to iOS",async()=>{
+ it("delivers a trust change to iOS with only generic lock-screen copy (Push-2c; report penalties produce these)",async()=>{
   transport.apns={keyId:"k"};vi.spyOn(Date,"now").mockReturnValue(now);const t=chatTables();
-  t.notifications=[{id:"notice",kind:"trust_changed",user_id:"recipient",read_at:null}];
-  t.native_push_outbox=[{...event({source_type:"notification",source_id:"notice",kind:"trust_changed",payload:{}}),status:"processing"}];t.devices=[ios()];
+  t.notifications=[{id:"notice",kind:"trust_changed",user_id:"recipient",read_at:null,payload:{delta:-10,note:"private evidence"}}];
+  t.native_push_outbox=[{...event({source_type:"notification",source_id:"notice",kind:"trust_changed",payload:{delta:-10,note:"private evidence"}}),status:"processing"}];t.devices=[ios()];
+  const r=await dispatchNativePush(database(t));
+  expect(r.sent).toBe(1);
+  const call=transport.send.mock.calls[0][0];
+  expect(call).toMatchObject({platform:"ios",payload:expect.objectContaining({t:"trust_changed"})});
+  expect(JSON.stringify(call.payload)).not.toMatch(/private|evidence|-10/);
+ });
+ it("delivers game results to iOS (kicked)",async()=>{
+  transport.apns={keyId:"k"};vi.spyOn(Date,"now").mockReturnValue(now);const t=chatTables();
+  t.notifications=[{id:"notice",kind:"game_kicked",user_id:"recipient",read_at:null}];
+  t.game_rooms=[{id:"room",host_id:"actor",status:"lobby",expires_at:new Date(now+3600_000).toISOString()}];
+  t.game_room_players=[{room_id:"room",user_id:"recipient",status:"kicked"}];
+  t.native_push_outbox=[{...event({source_type:"notification",source_id:"notice",kind:"game_kicked",payload:{room_id:"room"}}),status:"processing"}];t.devices=[ios()];
+  const r=await dispatchNativePush(database(t));
+  expect(r.sent).toBe(1);expect(transport.send).toHaveBeenCalledWith(expect.objectContaining({platform:"ios",payload:expect.objectContaining({t:"game_kicked",room_id:"room"})}));
+ });
+ it("never sends a kind that is not allowlisted to iOS (party_cancelled already has a direct iOS sender)",async()=>{
+  transport.apns={keyId:"k"};vi.spyOn(Date,"now").mockReturnValue(now);const t=chatTables();
+  t.notifications=[{id:"notice",kind:"party_cancelled",user_id:"recipient",read_at:null}];
+  t.parties=[{id:"party",host_user_id:"recipient",status:"cancelled",start_at:new Date(now+1000).toISOString(),expires_at:new Date(now+3600_000).toISOString()}];
+  t.joins=[{party_id:"party",user_id:"actor"}];
+  t.native_push_outbox=[{...event({source_type:"notification",source_id:"notice",kind:"party_cancelled",payload:{party_id:"party"}}),status:"processing"}];t.devices=[ios()];
   const r=await dispatchNativePush(database(t));
   expect(transport.send).not.toHaveBeenCalled();expect(r.skipped).toBe(1);expect(t.native_push_outbox[0]).toMatchObject({status:"skipped",last_error:"no-devices"});
  });
- it("keeps kinds that already have a direct iOS sender, and kinds iOS cannot route yet, out of the allowlist",()=>{
-  // direct iOS senders (sendPartyNoticePush) would double-notify; iOS has no route for complaint/trust/game yet
-  for(const k of ["party_cancelled","party_completed","invite_cancelled","invite_completed","complaint_filed","complaint_response_needed","complaint_ack","complaint_result","trust_changed","game_join_request","game_join_result","game_kicked"])expect(IOS_OUTBOX_KINDS.has(k)).toBe(false);
-  expect([...IOS_OUTBOX_KINDS].sort()).toEqual(["attendance_confirm","chat","invite","invite_reply","member_joined","member_left","member_left_late","reminder_1h"]);
+ it("keeps kinds that already have a direct iOS sender out of the allowlist, and lists exactly what iOS can route",()=>{
+  // direct iOS senders (sendPartyNoticePush) would double-notify
+  for(const k of ["party_cancelled","party_completed","invite_cancelled","invite_completed"])expect(IOS_OUTBOX_KINDS.has(k)).toBe(false);
+  // UGC report notices are in-app only (the 0077 trigger never enqueues them) and must not be pushed
+  for(const k of ["report_submitted","post_reported","post_actioned","report_actioned","report_resolved"])expect(IOS_OUTBOX_KINDS.has(k)).toBe(false);
+  expect([...IOS_OUTBOX_KINDS].sort()).toEqual(["attendance_confirm","chat","complaint_ack","complaint_filed","complaint_response_needed","complaint_result","game_join_request","game_join_result","game_kicked","invite","invite_reply","member_joined","member_left","member_left_late","reminder_1h","trust_changed"]);
  });
  it("disables an iOS device whose token APNs rejects, without retrying forever",async()=>{
   transport.apns={keyId:"k"};const t=live();t.devices=[ios()];transport.send.mockResolvedValue({ok:false,status:400,reason:"BadDeviceToken"});
