@@ -11,8 +11,9 @@
 ## iOS 現況（2026-11-24 起）
 
 - 上表是 **Android 22 情境**。iOS 走直接 APNs（不經 FCM），現有來源：`cheers`、`friend_request`、`friend_accepted`、`game_invite`（L 路徑），以及 `party_cancelled`／`party_completed`／`invite_cancelled`／`invite_completed`（`sendPartyNoticePush`，其中 `party_cancelled` 帶 `iosOnly` 避免 Android 重複）。
-- **Q 路徑 outbox 對 iOS 開放的 kind 由 `lib/push/outbox.ts` 的 `IOS_OUTBOX_KINDS` 決定，目前只有 `chat`（A03 好友私信、A04 陌生人私信）**：iOS 設備按其登記的 `environment`（sandbox／production）選 APNs host；鎖屏文案同 Android（只有暱稱，不含訊息內容）；`aps.thread-id` 按會話分組。好友／陌生人偏好、封鎖、靜音、已讀水位、隱身模式沿用 `eventStillEligible`。
+- **Q 路徑 outbox 對 iOS 開放的 kind 由 `lib/push/outbox.ts` 的 `IOS_OUTBOX_KINDS` 決定，目前是 `chat`（A03、A04）、`invite`／`invite_reply`（A05、A06）、`member_joined`／`member_left`／`member_left_late`／`reminder_1h`／`attendance_confirm`（A07、A09～A12）**：iOS 設備按其登記的 `environment`（sandbox／production）選 APNs host；鎖屏文案同 Android（只有暱稱，不含訊息內容）；`aps.thread-id` 按會話分組。好友／陌生人偏好、封鎖、靜音、已讀水位、隱身模式沿用 `eventStillEligible`。
 - **往白名單加 kind 前必查**：該 kind 在 iOS 有沒有直接發送來源（例如 `party_cancelled`、`invite_*` 已有 `sendPartyNoticePush`）。有就先關掉直接發送，否則收件人會收到兩條。
+- **尚未對 iOS 開放**：`complaint_*`、`trust_changed`、`game_join_request`／`game_join_result`／`game_kicked`（iOS 還沒有這幾種的點擊路由，要和 iOS 路由一起加）；`party_cancelled` 等 4 種有直接來源，永遠不能放進白名單。
 - 延遲：outbox 由每分鐘 cron 派發，iOS 聊天推送比 L 路徑（碰杯／好友申請）多 0–60 秒。
 - iOS 壞 token（`BadDeviceToken`／`Unregistered`／`DeviceTokenNotForTopic`）：outbox 把設備行設為 `enabled=false`（與 L 路徑直接刪行不同）；iOS 端只在 token／環境／版本／語言變化或超過 24 小時才重新上報。
 - 未驗證：正式環境 AOS→iOS 聊天推送的真機送達（單測只證明路由與去重邏輯）。

@@ -8,8 +8,33 @@ export type ProfileGender = "male" | "female";
 
 export const BIO_MAX = 140;
 export const DOB_MIN = "1900-01-01";
-/** 昵称上限 20 字（WEB_HANDOFF_PROFILE_EDIT_MODERATION 定案；按字计，emoji 算 1）。 */
-export const NICKNAME_MAX = 20;
+/**
+ * 昵称上限 30 字（2026-11-24 由 20 放寬：Apple／Google 帶來的名字常超過 20，客戶端引導頁因此卡住）。
+ * 按 Unicode 字符計（`Array.from`，emoji 算 1）；iOS 用 `unicodeScalars.count`、AOS 用 `codePointCount`，三端口徑一致。
+ * DB `users.nickname` 是無長度限制的 text，放寬不需要遷移。
+ */
+export const NICKNAME_MAX = 30;
+
+/** Apple「隱藏我的郵箱」的中繼地址：前綴是隨機串，不能當暱稱。 */
+const APPLE_RELAY_DOMAIN = "privaterelay.appleid.com";
+
+/**
+ * 新帳號的預設暱稱（auth 的 full_name／name 優先，其次郵箱前綴；中繼郵箱前綴不用；都沒有回「酒友」）。
+ * 一定不超過 NICKNAME_MAX（按字符截，不切開 emoji），用戶之後不改也不會卡在長度校驗上。
+ */
+export function defaultNicknameFrom(meta: Record<string, unknown>, email: unknown): string {
+  const emailPrefix =
+    typeof email === "string" && email.includes("@") && !email.toLowerCase().endsWith(`@${APPLE_RELAY_DOMAIN}`)
+      ? email.split("@")[0]
+      : null;
+  const cand =
+    (typeof meta.full_name === "string" && meta.full_name.trim() !== "" && meta.full_name) ||
+    (typeof meta.name === "string" && meta.name.trim() !== "" && meta.name) ||
+    emailPrefix;
+  if (typeof cand !== "string") return "酒友";
+  const t = Array.from(cand.trim()).slice(0, NICKNAME_MAX).join("").trim();
+  return t === "" ? "酒友" : t;
+}
 /** 改名频率：每天最多 3 次（HK 自然天，沿 cheers／invites 口径）。 */
 export const NICKNAME_DAILY_LIMIT = 3;
 

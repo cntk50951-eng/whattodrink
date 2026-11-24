@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ageOf, avatarPublicUrl, collectNightStats, hkAge, infoVisibilityOf, nightKeyHK, parseProfileBody, parseProfileInfoBody, shouldOnboard, weekNights, weekStartHK, weekStreak } from "./profile";
+import { NICKNAME_MAX, ageOf, avatarPublicUrl, collectNightStats, defaultNicknameFrom, hkAge, infoVisibilityOf, nightKeyHK, parseProfileBody, parseProfileInfoBody, shouldOnboard, weekNights, weekStartHK, weekStreak } from "./profile";
 
 describe("ageOf", () => {
   // 2026-10-04（UTC）为锚。
@@ -42,11 +42,13 @@ describe("parseProfileBody", () => {
   });
   it("昵称：去空／1-20 字／空与超长拒（emoji 按字计）", () => {
     expect(parseProfileBody({ nickname: "  Chloe " })).toEqual({ nickname: "Chloe" });
-    expect(parseProfileBody({ nickname: "x".repeat(20) })).toEqual({ nickname: "x".repeat(20) });
-    expect(parseProfileBody({ nickname: "🍺".repeat(20) })).toEqual({ nickname: "🍺".repeat(20) });
+    expect(parseProfileBody({ nickname: "x".repeat(30) })).toEqual({ nickname: "x".repeat(30) });
+    expect(parseProfileBody({ nickname: "🍺".repeat(30) })).toEqual({ nickname: "🍺".repeat(30) });   // emoji 按 1 字算（UTF-16 是 60）
     expect(parseProfileBody({ nickname: "   " })).toHaveProperty("error");
     expect(parseProfileBody({ nickname: "" })).toHaveProperty("error");
-    expect(parseProfileBody({ nickname: "x".repeat(21) })).toHaveProperty("error");
+    expect(parseProfileBody({ nickname: "x".repeat(31) })).toHaveProperty("error");
+    expect(parseProfileBody({ nickname: "🍺".repeat(31) })).toHaveProperty("error");
+    expect(NICKNAME_MAX).toBe(30);
     expect(parseProfileBody({ nickname: 123 })).toHaveProperty("error");
   });
 });
@@ -159,5 +161,31 @@ describe("infoVisibilityOf（缺鍵＝friends）", () => {
     expect(infoVisibilityOf({}, "height")).toBe("friends");
     expect(infoVisibilityOf(null, "height")).toBe("friends");
     expect(infoVisibilityOf({ height: "galaxy" }, "height")).toBe("friends");
+  });
+});
+
+describe("defaultNicknameFrom（新帳號預設暱稱）", () => {
+  it("prefers full_name, then name, then the email prefix", () => {
+    expect(defaultNicknameFrom({ full_name: "Chloe Wong", name: "x" }, "a@b.com")).toBe("Chloe Wong");
+    expect(defaultNicknameFrom({ name: "Ray" }, "a@b.com")).toBe("Ray");
+    expect(defaultNicknameFrom({}, "ray.hsu@example.com")).toBe("ray.hsu");
+  });
+  it("never uses an Apple private-relay prefix (random string); falls back to 酒友", () => {
+    expect(defaultNicknameFrom({}, "k3j2h9x_abcd@privaterelay.appleid.com")).toBe("酒友");
+    expect(defaultNicknameFrom({}, "K3J2H9X@PrivateRelay.AppleID.com")).toBe("酒友");
+    expect(defaultNicknameFrom({ full_name: "Chloe" }, "x@privaterelay.appleid.com")).toBe("Chloe");
+  });
+  it("falls back for empty / missing / non-string inputs", () => {
+    for (const [m, e] of [[{}, undefined], [{ full_name: "  " }, null], [{ name: 5 }, 7], [{}, "no-at-sign"]] as Array<[Record<string, unknown>, unknown]>) {
+      expect(defaultNicknameFrom(m, e)).toBe("酒友");
+    }
+  });
+  it("is capped at NICKNAME_MAX characters without splitting an emoji, so the user is never stuck on a too-long default", () => {
+    const long = defaultNicknameFrom({ full_name: "x".repeat(80) }, null);
+    expect(Array.from(long)).toHaveLength(NICKNAME_MAX);
+    const emoji = defaultNicknameFrom({ full_name: "🍺".repeat(45) }, null);
+    expect(Array.from(emoji)).toHaveLength(NICKNAME_MAX);
+    expect(emoji).toBe("🍺".repeat(NICKNAME_MAX));
+    expect(parseProfileBody({ nickname: long })).toEqual({ nickname: long });   // 預設值本身通過校驗
   });
 });

@@ -3,6 +3,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseCreateCheckinBody } from "@/lib/api/checkins";
 import { recordUserHashtags } from "@/lib/hashtagLibrary";
 import { checkinVisibilityFor } from "@/lib/api/privacy";
+import { defaultNicknameFrom } from "@/lib/api/profile";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { isDeletionPending } from "@/lib/accountDeletion";
 import { grantPostCredit, type PostRewardOutcome } from "@/lib/barCredits";
@@ -125,11 +126,7 @@ export async function POST(req: Request): Promise<Response> {
         try {
           const { data: u } = await supabase.auth.getUser();
           const meta = (u.user?.user_metadata ?? {}) as Record<string, unknown>;
-          const cand =
-            (typeof meta.full_name === "string" && meta.full_name) ||
-            (typeof meta.name === "string" && meta.name) ||
-            (typeof u.user?.email === "string" ? u.user.email.split("@")[0] : null);
-          if (typeof cand === "string" && cand.trim().length > 0) nickname = cand.trim().slice(0, 32);
+          nickname = defaultNicknameFrom(meta, u.user?.email);
           if (typeof meta.avatar_url === "string") avatar = meta.avatar_url;
           else if (typeof meta.picture === "string") avatar = meta.picture;
         } catch {}

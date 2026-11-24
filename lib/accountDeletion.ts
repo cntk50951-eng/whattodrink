@@ -63,12 +63,20 @@ export function purgeAtFrom(now: Date): Date {
   return new Date(now.getTime() + GRACE_DAYS * DAY_MS);
 }
 
-export function parseDeleteBody(raw: unknown): { mode: DeleteMode } | { error: string } {
+export function parseDeleteBody(
+  raw: unknown,
+): { mode: DeleteMode; appleAuthorizationCode?: string } | { error: string } {
   if (typeof raw !== "object" || raw === null) return { error: "body 需为对象" };
   const r = raw as Record<string, unknown>;
   if (r.confirm !== true) return { error: "需要 confirm:true（防误触）" };
   if (r.mode !== "now" && r.mode !== "grace") return { error: "mode 非法：只要 now|grace" };
-  return { mode: r.mode };
+  // Apple 登入帳號刪除前的一次性授權碼（可選；沒綁 Apple 的帳號不用帶）
+  const code = r.apple_authorization_code;
+  if (code === undefined || code === null) return { mode: r.mode };
+  if (typeof code !== "string" || code.trim() === "" || code.length > 4096) {
+    return { error: "apple_authorization_code 需为 1–4096 字符的字符串" };
+  }
+  return { mode: r.mode, appleAuthorizationCode: code.trim() };
 }
 
 /** 恢复期内才可恢复（status=grace 且未过 purge_at）。 */

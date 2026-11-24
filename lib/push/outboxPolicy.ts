@@ -1,5 +1,6 @@
 /** D.12 pure policy. Lock-screen copy never accepts message text or complaint evidence. */
 import { timingSafeEqual } from "node:crypto";
+import { NICKNAME_MAX } from "../api/profile";
 
 export const NOTICE_KINDS = ["member_joined","party_cancelled","member_left","member_left_late","reminder_1h","attendance_confirm","complaint_filed","complaint_response_needed","complaint_ack","complaint_result","trust_changed","game_join_request","game_join_result","game_kicked"] as const;
 /** Isolate push credentials from Vercel Cron. Explicit empty/weak values fail closed. */
@@ -47,7 +48,8 @@ export function safePushCopy(kind: string, locale: string | null): {title: strin
 export type CopyContext = { actor?: string; host?: string };
 export function cleanName(v: unknown): string|undefined {
  if (typeof v!=="string") return undefined;
- const s=v.replace(/[\u0000-\u001f\u007f​-‏‪-‮]/g,"").trim().slice(0,20);
+ // 按字符截到暱稱上限（不切開 emoji）：舊帳號暱稱可能比現在的上限長
+ const s=Array.from(v.replace(/[\u0000-\u001f\u007f​-‏‪-‮]/g,"").trim()).slice(0,NICKNAME_MAX).join("").trim();
  return s===""?undefined:s;
 }
 type L3 = [string,string,string];

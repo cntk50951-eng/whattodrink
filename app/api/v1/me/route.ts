@@ -1,8 +1,9 @@
 import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
-import { isDeletionPending, parseDeleteBody, requestDeletion } from "@/lib/accountDeletion";
+import { getDeletionRow, isDeletionPending, isRestorable, parseDeleteBody, requestDeletion } from "@/lib/accountDeletion";
+import { appleRevocationGate } from "@/lib/appleSignIn";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parsePatchModeBody, toMeJson } from "@/lib/mode";
-import { NICKNAME_DAILY_LIMIT, parseProfileBody, parseProfileInfoBody } from "@/lib/api/profile";
+import { NICKNAME_DAILY_LIMIT, defaultNicknameFrom, parseProfileBody, parseProfileInfoBody } from "@/lib/api/profile";
 import { hkDayStartISO } from "@/lib/api/party";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { parsePreferences } from "@/lib/api/taste";
@@ -37,12 +38,7 @@ async function ensureUserRow(
     try {
       const { data: u } = await supabase.auth.getUser();
       const meta = (u.user?.user_metadata ?? {}) as Record<string, unknown>;
-      const cand =
-        (typeof meta.full_name === "string" && meta.full_name) ||
-        (typeof meta.name === "string" && meta.name) ||
-        (typeof u.user?.email === "string" ? u.user.email.split("@")[0] : null);
-      if (typeof cand === "string" && cand.trim().length > 0)
-        nickname = cand.trim().slice(0, 32);
+      nickname = defaultNicknameFrom(meta, u.user?.email);
       if (typeof meta.avatar_url === "string") avatar = meta.avatar_url;
       else if (typeof meta.picture === "string") avatar = meta.picture;
     } catch {}
@@ -385,7 +381,16 @@ export async function DELETE(req: Request): Promise<Response> {
   }
   try {
     const svc = await createServiceClient();
-    const r = await requestDeletion(svc, userId, parsed.mode, new Date());
+    const now = new Date();
+    // 恢復期內重複 grace＝冪等回原到期日，資料早已刪、Apple 也已處理過：不再要求重新授權
+    const existing = parsed.mode === "grace" ? await getDeletionRow(svc, userId) : null;
+    const alreadyInGrace = existing !== null && isRestorable(existing, now);
+    if (!alreadyInGrace) {
+      // Apple TN3194：用 Apple 登入的帳號刪除時必須撤銷 token。先撤銷後刪資料，撤銷失敗不動資料
+      const gate = await appleRevocationGate(svc, userId, parsed.appleAuthorizationCode ?? null);
+      if (!gate.proceed) return apiError(gate.code, gate.message, gate.status);
+    }
+    const r = await requestDeletion(svc, userId, parsed.mode, now);
     return apiOk({ deleted: true, mode: r.mode, purge_at: r.purgeAt });
   } catch (err) {
     console.error(`[api/v1/me] delete error: ${err instanceof Error ? err.message : "unknown"}`);

@@ -44,6 +44,8 @@ export type ApiErrorCode =
   | "ai_unavailable"
   | "onboarding_required"
   | "account_pending_deletion"
+  | "apple_reauth_required"
+  | "apple_code_invalid"
   | "invalid_answer"
   | "not_judge"
   | "already_accused"

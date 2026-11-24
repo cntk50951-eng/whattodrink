@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.67.2
+  version: 1.68.1
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -3043,7 +3043,7 @@ paths:
                 nickname:
                   type: string
                   maxLength: 20
-                  description: 改昵称（去空 1-20 字；每天最多 3 次，超限 429）
+                  description: 改昵称（去空 1-30 字，按 Unicode 字符計、emoji 算 1；每天最多 3 次，超限 429。2026-11-24 由 20 放寬到 30）
                 height_cm:
                   type: integer
                   minimum: 140
@@ -3164,6 +3164,15 @@ paths:
               schema:
                 type: object
                 required: [deleted, mode, purge_at]
+                apple_authorization_code:
+                  type: string
+                  minLength: 1
+                  maxLength: 4096
+                  description: >
+                    用 Apple 登入的帳號刪除前須再授權一次（Apple TN3194：刪帳號必須撤銷 Sign in with Apple token）。
+                    iOS 用 `ASAuthorizationAppleIDProvider` 再授權後取 `authorizationCode`（UTF-8 字串）帶來；一次性、約 5 分鐘內有效。
+                    服務端用 SIWA key 簽 client secret → 換 token → 撤銷，**不存任何 Apple token**；先撤銷後刪資料，撤銷失敗不動資料。
+                    沒綁 Apple 的帳號不用帶；帶了也忽略。恢復期內重複 grace 是冪等回原到期日，不再要求。
                 properties:
                   deleted:
                     type: boolean
@@ -3175,7 +3184,9 @@ paths:
                     format: date-time
                     description: grace 时为到期清除时间（申请后 30 天）；now 时为 null
         "400":
-          description: body 非法／缺 confirm:true
+          description: >
+            body 非法／缺 confirm:true；或 `code=apple_code_invalid`＝Apple 拒絕了 `apple_authorization_code`（已用過／過期）。
+            後者客戶端應重新做一次 Apple 授權再重試，資料沒有被動。
           content:
             application/json:
               schema:
@@ -3190,8 +3201,22 @@ paths:
       summary: 恢复账号（需登录，UR I.3）。恢复期（30 天）内回填快照：个人资料＋自己发的内容；好友／聊天／碰杯／酒局不恢复
       security:
         - bearerAuth: []
+        "409":
+          description: >
+            `code=apple_reauth_required`：此帳號綁了 Apple 登入但請求沒帶 `apple_authorization_code`。
+            客戶端先做 Apple 授權取 authorizationCode，再帶著它重送同一個刪除請求。資料沒有被動。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
       responses:
         "200":
+        "503":
+          description: Apple 暫時無法連線（撤銷沒完成，資料沒有被動）。稍後重試同一請求
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
           description: 已恢复
           content:
             application/json:

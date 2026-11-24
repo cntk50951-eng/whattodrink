@@ -24,7 +24,7 @@ describe("D.12 reciprocal friend-request acceptance",()=>{
   const result=await POST(request());expect(result.status).toBe(200);expect(await result.json()).toEqual({status:"accepted"});
   expect(state.push).not.toHaveBeenCalled();expect(state.jobs).toHaveLength(1);
   const pending=state.jobs[0]();expect(pending).toBeInstanceOf(Promise);await pending;
-  expect(state.push).toHaveBeenCalledWith("accepted",{fromUserId:"me",toUserId:"peer",aosOnly:true});
+  expect(state.push).toHaveBeenCalledWith("accepted",{fromUserId:"me",toUserId:"peer"});
  });
  it("does not re-notify an already accepted pair",async()=>{
   state.rows[0].status="accepted";expect((await POST(request())).status).toBe(200);expect(state.jobs).toHaveLength(0);

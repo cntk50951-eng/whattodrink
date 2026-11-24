@@ -21,6 +21,11 @@ describe("parseDeleteBody", () => {
     expect(parseDeleteBody({ mode: "grace", confirm: true })).toEqual({ mode: "grace" });
   });
   it("缺 confirm／mode 非法／非对象 → error", () => {
+    expect(parseDeleteBody({ mode: "now", confirm: true, apple_authorization_code: " abc " })).toEqual({ mode: "now", appleAuthorizationCode: "abc" });
+    expect(parseDeleteBody({ mode: "grace", confirm: true, apple_authorization_code: null })).toEqual({ mode: "grace" });
+    for (const bad of ["", "   ", 5, {}, "x".repeat(4097)]) {
+      expect("error" in parseDeleteBody({ mode: "now", confirm: true, apple_authorization_code: bad })).toBe(true);
+    }
     expect("error" in parseDeleteBody({ mode: "now" })).toBe(true);
     expect("error" in parseDeleteBody({ mode: "now", confirm: "yes" })).toBe(true);
     expect("error" in parseDeleteBody({ mode: "later", confirm: true })).toBe(true);

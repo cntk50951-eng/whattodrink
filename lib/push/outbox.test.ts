@@ -115,7 +115,7 @@ describe("type-specific notification copy",()=>{
   expect(eventPayload({...event({kind:"chat"}),payload:{conversation_id:"conv"}},"en").aps).toMatchObject({alert:{title:"You have a new message"}});
  });
  it("cleans display names",()=>{
-  expect(cleanName("  Ray\u202e\n  ")).toBe("Ray");expect(cleanName("x".repeat(50))).toHaveLength(20);expect(cleanName("   ")).toBeUndefined();expect(cleanName(5)).toBeUndefined();
+  expect(cleanName("  Ray\u202e\n  ")).toBe("Ray");expect(cleanName("x".repeat(50))).toHaveLength(30);expect(Array.from(cleanName("🍺".repeat(50)) as string)).toHaveLength(30);expect(cleanName("   ")).toBeUndefined();expect(cleanName(5)).toBeUndefined();
  });
 });
 
@@ -175,14 +175,24 @@ describe("iOS chat delivery through the outbox (Push-2a)",()=>{
   expect((calls.find(c=>c.platform==="aos").payload as {aps:R}).aps["thread-id"]).toBeUndefined();
   expect(calls.find(c=>c.platform==="ios")).toMatchObject({env:"sandbox",deviceToken:"ios-token"});
  });
- it("never sends a non-allowlisted kind to iOS (those already have a direct iOS sender)",async()=>{
+ it("sends a private invitation to iOS (no direct iOS sender exists for it)",async()=>{
   transport.apns={keyId:"k"};vi.spyOn(Date,"now").mockReturnValue(now);const t=chatTables();
   t.drink_invites=[{id:"inv",from_user_id:"actor",to_user_id:"recipient",status:"sent",expires_at:new Date(now+60_000).toISOString()}];
-  const e=event({source_type:"invite",source_id:"inv",kind:"invite",payload:{invite_id:"inv"}});
-  t.native_push_outbox=[{...e,status:"processing"}];t.devices=[ios()];
+  t.native_push_outbox=[{...event({source_type:"invite",source_id:"inv",kind:"invite",payload:{invite_id:"inv"}}),status:"processing"}];t.devices=[ios()];
+  const r=await dispatchNativePush(database(t));
+  expect(r.sent).toBe(1);expect(transport.send).toHaveBeenCalledWith(expect.objectContaining({platform:"ios",payload:expect.objectContaining({t:"invite",invite_id:"inv"})}));
+ });
+ it("never sends a kind that is not allowlisted to iOS",async()=>{
+  transport.apns={keyId:"k"};vi.spyOn(Date,"now").mockReturnValue(now);const t=chatTables();
+  t.notifications=[{id:"notice",kind:"trust_changed",user_id:"recipient",read_at:null}];
+  t.native_push_outbox=[{...event({source_type:"notification",source_id:"notice",kind:"trust_changed",payload:{}}),status:"processing"}];t.devices=[ios()];
   const r=await dispatchNativePush(database(t));
   expect(transport.send).not.toHaveBeenCalled();expect(r.skipped).toBe(1);expect(t.native_push_outbox[0]).toMatchObject({status:"skipped",last_error:"no-devices"});
-  expect([...IOS_OUTBOX_KINDS]).toEqual(["chat"]);
+ });
+ it("keeps kinds that already have a direct iOS sender, and kinds iOS cannot route yet, out of the allowlist",()=>{
+  // direct iOS senders (sendPartyNoticePush) would double-notify; iOS has no route for complaint/trust/game yet
+  for(const k of ["party_cancelled","party_completed","invite_cancelled","invite_completed","complaint_filed","complaint_response_needed","complaint_ack","complaint_result","trust_changed","game_join_request","game_join_result","game_kicked"])expect(IOS_OUTBOX_KINDS.has(k)).toBe(false);
+  expect([...IOS_OUTBOX_KINDS].sort()).toEqual(["attendance_confirm","chat","invite","invite_reply","member_joined","member_left","member_left_late","reminder_1h"]);
  });
  it("disables an iOS device whose token APNs rejects, without retrying forever",async()=>{
   transport.apns={keyId:"k"};const t=live();t.devices=[ios()];transport.send.mockResolvedValue({ok:false,status:400,reason:"BadDeviceToken"});

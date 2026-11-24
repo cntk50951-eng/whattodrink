@@ -182,10 +182,10 @@ export async function POST(req: Request): Promise<Response> {
           .or(
             `and(blocker_id.eq.${userId},blocked_id.eq.${targetUserId}),and(blocker_id.eq.${targetUserId},blocked_id.eq.${userId})`,
           );
-        // D.12: this acceptance entry previously lacked a push. Add AOS only;
-        // the original iOS after hooks and APNs behavior are unchanged.
+        // 互加自動成為好友：通知先發申請的那一方（雙端）。D.12 起 AOS 有這條；iOS 此前沒有，2026-11-24 補上。
+        // 這條路徑只有這一個推送（原申請的 friend_request 在當時已發），不會重複。
         after(async () => {
-          await sendFriendPush("accepted", { fromUserId: userId, toUserId: targetUserId, aosOnly: true });
+          await sendFriendPush("accepted", { fromUserId: userId, toUserId: targetUserId });
         });
         return apiOk({ status: "accepted" as const });
       }
