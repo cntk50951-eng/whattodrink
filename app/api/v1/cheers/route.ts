@@ -1,6 +1,7 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { after } from "next/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { isPairBlocked } from "@/lib/api/blocks";
 import { canViewCheckin } from "@/lib/api/checkins";
 import { type FriendshipRow, friendIdsOf } from "@/lib/friends";
 import { cheersQuota, isMinorDob, parseCheersBody, parseCheersMessage } from "@/lib/api/cheers";
@@ -113,6 +114,9 @@ export async function POST(req: Request): Promise<Response> {
   if (toUserId === null || toUserId === userId) {
     return apiError("forbidden", "不可敬自己", 403);
   }
+  if (await isPairBlocked(await createServiceClient(), userId, toUserId)) {
+    return apiError("not_found", "打卡不存在", 404);
+  }
   // UR E.19 未成年禁写（共用 isMinorDob；dob 缺席放行，首登闸另管）。
   const { data: fromRow } = await supabase
     .from("users")
@@ -223,6 +227,9 @@ export async function DELETE(req: Request): Promise<Response> {
     .maybeSingle();
   const post = postRaw as { id: string; user_id: string | null; visibility: unknown } | null;
   if (post === null) {
+    return apiError("not_found", "打卡不存在", 404);
+  }
+  if (post.user_id !== null && post.user_id !== userId && (await isPairBlocked(await createServiceClient(), userId, post.user_id))) {
     return apiError("not_found", "打卡不存在", 404);
   }
   if (post.user_id !== userId && post.visibility !== "public") {

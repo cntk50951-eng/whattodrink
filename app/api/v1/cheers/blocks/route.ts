@@ -4,6 +4,61 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
+ * 查詢我的封鎖名單（🔒；解除封鎖入口用）。
+ * `GET /api/v1/cheers/blocks` —— 只回本人主動封鎖的用戶（`blocker_id = userId`），
+ * 附暱稱、頭像與封鎖時間，按封鎖時間新到舊排，上限 200。
+ */
+export async function GET(req: Request): Promise<Response> {
+  const { userId } = await getAuthedClient(req);
+  if (userId === null) {
+    return apiError("unauthorized", "未登录", 401);
+  }
+  const service = await createServiceClient();
+  const { data: rows, error } = await service
+    .from("cheers_blocks")
+    .select("blocked_id,created_at")
+    .eq("blocker_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error !== null) {
+    console.error(`[api/v1/cheers/blocks] list error: code=${error.code} message=${error.message}`);
+    return apiError("internal", "讀取封鎖名單失敗", 500);
+  }
+  const list = ((rows ?? []) as unknown[]) as { blocked_id?: unknown; created_at?: unknown }[];
+  const ids = list
+    .map((r) => (typeof r.blocked_id === "string" ? r.blocked_id : null))
+    .filter((id): id is string => id !== null && id !== "");
+  if (ids.length === 0) {
+    return apiOk({ items: [] });
+  }
+  const { data: users } = await service
+    .from("users")
+    .select("id,nickname,avatar_url")
+    .in("id", ids);
+  const userMap = new Map(
+    (((users ?? []) as unknown[]) as { id: string; nickname?: unknown; avatar_url?: unknown }[]).map((u) => [
+      u.id,
+      {
+        nickname: typeof u.nickname === "string" && u.nickname.trim() !== "" ? u.nickname : "酒友",
+        avatar_url: typeof u.avatar_url === "string" && u.avatar_url !== "" ? u.avatar_url : null,
+      },
+    ]),
+  );
+  const items = list
+    .filter((r): r is { blocked_id: string; created_at?: unknown } => typeof r.blocked_id === "string" && r.blocked_id !== "")
+    .map((r) => {
+      const u = userMap.get(r.blocked_id);
+      return {
+        user_id: r.blocked_id,
+        nickname: u?.nickname ?? "酒友",
+        avatar_url: u?.avatar_url ?? null,
+        created_at: typeof r.created_at === "string" ? r.created_at : null,
+      };
+    });
+  return apiOk({ items });
+}
+
+/**
  * UR E.15 屏蔽（🔒）。
  * `POST /api/v1/cheers/blocks {blocked_id}` —— upsert 幂等；
  * 双向任一有行，发送侧静默拒（中性文案，不泄谁屏蔽谁）。

@@ -1,5 +1,6 @@
-import { createClient, getAuthedClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { getBlockedUserIds } from "@/lib/api/blocks";
 import { toPinJson } from "@/lib/api/pins";
 import { haversineMeters } from "@/lib/geo";
 import { groupOfKey } from "@/lib/api/taste";
@@ -72,8 +73,10 @@ export async function POST(req: Request): Promise<Response> {
     return apiError("internal", "搜尋失敗", 500);
   }
   const rows = [...((flash.data ?? []) as unknown[]), ...((post.data ?? []) as unknown[])] as Record<string, unknown>[];
+  const blockedIds = await getBlockedUserIds(await createServiceClient(), userId);
   const out: Record<string, unknown>[] = [];
   for (const r of rows) {
+    if (blockedIds.size > 0 && typeof r.user_id === "string" && blockedIds.has(r.user_id)) continue;
     const pin = toPinJson(r, nowMs);
     if (pin === null) continue;
     let dist: number | null = null;

@@ -1,5 +1,6 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { isPairBlocked } from "@/lib/api/blocks";
 import { canViewCheckin, parseCheckinIdParam } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
 import { parseRatingBody, summarizeRatings } from "@/lib/api/rating";
@@ -84,6 +85,10 @@ export async function POST(
   if (post.user_id !== null && post.user_id === userId) {
     return apiError("forbidden", "作者不可给自己打分", 403);
   }
+  const service = await createServiceClient();
+  if (post.user_id !== null && (await isPairBlocked(service, userId, post.user_id))) {
+    return apiError("not_found", "打卡不存在", 404);
+  }
   // 隐身禁投（沿 like；聚合公开，投即暴露）。
   const { data: meRow } = await supabase
     .from("users")
@@ -94,7 +99,6 @@ export async function POST(
     return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
   }
   // 写（RLS owner insert／update／delete 三保险；upsert 天然一人一票）。
-  const service = await createServiceClient();
   if (parsed.rating === null) {
     const { error: dErr } = await supabase
       .from("checkin_ratings")

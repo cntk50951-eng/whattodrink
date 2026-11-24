@@ -1,5 +1,6 @@
-import { createClient, getAuthedClient, getUserId } from "@/lib/supabase/server";
+import { createClient, createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { getBlockedUserIds } from "@/lib/api/blocks";
 import { PINS_RANGE_MS, parsePinsParams, toPinJson } from "@/lib/api/pins";
 import type { BBox } from "@/lib/api/pins";
 import { friendIdsOf, hideOnlineForViewer } from "@/lib/friends";
@@ -42,8 +43,10 @@ export async function GET(req: Request): Promise<Response> {
 
   try {
     const supabase = await createClient();
-    // 綠點關係過濾只看「作者 mode」：viewer 身份順手取（匿名回 null，不擋公開讀）
-    const viewerId = await getUserId();
+    // 綠點關係與雙向屏蔽過濾：用 getAuthedClient(req) 兼容 Cookie + Mobile Bearer 雙通道
+    const { userId: viewerId } = await getAuthedClient(req);
+    const blockedIds =
+      viewerId !== null ? await getBlockedUserIds(await createServiceClient(), viewerId) : new Set<string>();
 
     // 並行雙查：flash 24h 內 + post 在 range 內，合併後按 created_at 倒序截斷
     const [flashRes, postRes] = await Promise.all([
@@ -109,7 +112,9 @@ export async function GET(req: Request): Promise<Response> {
           return apiError("internal", `pins 讀取失敗(fallback): ${fbError.code} ${fbError.message} ${(fbError as unknown as {details?:string})?.details ?? ""}`.trim(), 500);
         }
         const rows = (fbData ?? []) as unknown[];
-        const pins = rows.map((r) => toPinJson(r)).filter((p): p is NonNullable<typeof p> => p !== null);
+        const pins = rows
+          .map((r) => toPinJson(r))
+          .filter((p): p is NonNullable<typeof p> => p !== null && !blockedIds.has(p.userId));
         return apiOk({ pins, sync_cursor: Date.now() });
       }
       const err = flashErr ?? postErr;
@@ -118,7 +123,11 @@ export async function GET(req: Request): Promise<Response> {
       return apiError("internal", `pins 讀取失敗: ${err?.code ?? "unknown"} ${err?.message ?? ""} ${(err as unknown as {details?:string})?.details ?? ""}`.trim(), 500);
     }
 
-    const merged = [...((flashRes.data ?? []) as unknown[]), ...((postRes.data ?? []) as unknown[])];
+    const merged = [...((flashRes.data ?? []) as unknown[]), ...((postRes.data ?? []) as unknown[])].filter((r) => {
+      if (blockedIds.size === 0 || typeof r !== "object" || r === null) return true;
+      const uid = (r as Record<string, unknown>).user_id;
+      return typeof uid !== "string" || !blockedIds.has(uid);
+    });
     // 按 created_at 倒序，截 limit（兩流各 limit，合併後再截）
     merged.sort((a, b) => {
       const ca = (a as Record<string, unknown>).created_at as string;
@@ -209,10 +218,11 @@ async function friendsScopePins(
       console.error(`[api/v1/map/pins] friendships error: code=${fsErr.code} message=${fsErr.message}`);
       return apiError("internal", "好友查詢失敗", 500);
     }
+    const blockedIds = await getBlockedUserIds(await createServiceClient(), userId);
     const friendIds = friendIdsOf(
       userId,
       (fsRows ?? []) as { user_id: unknown; friend_id: unknown; status: unknown }[],
-    );
+    ).filter((id) => !blockedIds.has(id));
     // 無好友即空牆：不下 `.in([])`（PostgREST 空集語義不定），直接回 []
     if (friendIds.length === 0) {
       return apiOk({ pins: [], sync_cursor: Date.now() });
@@ -255,7 +265,11 @@ async function friendsScopePins(
       console.error(`[api/v1/map/pins] friends scope error: code=${err.code} message=${err.message}`);
       return apiError("internal", "好友 pins 讀取失敗", 500);
     }
-    const merged = [...((flashRes.data ?? []) as unknown[]), ...((postRes.data ?? []) as unknown[])];
+    const merged = [...((flashRes.data ?? []) as unknown[]), ...((postRes.data ?? []) as unknown[])].filter((r) => {
+      if (blockedIds.size === 0 || typeof r !== "object" || r === null) return true;
+      const uid = (r as Record<string, unknown>).user_id;
+      return typeof uid !== "string" || !blockedIds.has(uid);
+    });
     merged.sort((a, b) => {
       const ca = (a as Record<string, unknown>).created_at as string;
       const cb = (b as Record<string, unknown>).created_at as string;

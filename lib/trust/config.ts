@@ -87,4 +87,6 @@ export const TRUST_KIND_TEXT: Record<string, string> = {
   harassment_upheld: "投訴成立（不當言行）",
   complaint_dismissed: "投訴未獲成立",
   complaint_malicious: "惡意投訴",
+  post_report_upheld: "帖文經舉報核實違規",
+  user_report_upheld: "帳號經舉報核實違規",
 };

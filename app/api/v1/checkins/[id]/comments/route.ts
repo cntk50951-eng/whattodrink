@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { getBlockedUserIds, isPairBlocked } from "@/lib/api/blocks";
 import { isMinorDob } from "@/lib/api/cheers";
 import { canViewCheckin, parseCheckinIdParam } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
@@ -118,6 +119,16 @@ export async function GET(
     const authed = await getAuthedClient(req);
     const gated = await gateNonPublic(service, loaded.post, authed.userId);
     if (gated !== null) return gated;
+    if (
+      authed.userId !== null &&
+      loaded.post.user_id !== null &&
+      loaded.post.user_id !== authed.userId &&
+      (await isPairBlocked(service, authed.userId, loaded.post.user_id))
+    ) {
+      return apiError("not_found", "帖子不存在", 404);
+    }
+    const blockedIds =
+      authed.userId !== null ? await getBlockedUserIds(service, authed.userId) : new Set<string>();
 
     // 讀評論：只回 visible，创建时间倒序 keyset（limit＋1 探下一页）。
     let query = service
@@ -149,6 +160,10 @@ export async function GET(
           ? { anonId: readAnonId(req) as string }
           : null;
     for (const r of (rows ?? []) as unknown[]) {
+      if (blockedIds.size > 0 && typeof r === "object" && r !== null) {
+        const uid = (r as Record<string, unknown>).user_id;
+        if (typeof uid === "string" && blockedIds.has(uid)) continue;
+      }
       const j = toCommentJson(r);
       if (j !== null) {
         comments.push(withViewerFlags(j, viewer, loaded.post.user_id, rawAnonIdOf(r)));
@@ -232,6 +247,14 @@ export async function POST(
     const post = loaded.post;
     const gated = await gateNonPublic(service, post, userId);
     if (gated !== null) return gated;
+    if (
+      userId !== null &&
+      post.user_id !== null &&
+      post.user_id !== userId &&
+      (await isPairBlocked(service, userId, post.user_id))
+    ) {
+      return apiError("not_found", "帖子不存在", 404);
+    }
 
     // 隱身禁評（A.15 社交禁令；自己的帖也不行——評論是社交面）。
     if (userId !== null) {

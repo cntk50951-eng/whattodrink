@@ -1,5 +1,8 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { after } from "next/server";
+
+import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { notifyReportSubmitted, runPostReportStp } from "@/lib/api/reportStp";
 import {
   messageEvidence,
   parseReportBody,
@@ -10,7 +13,16 @@ import {
 } from "@/lib/userReports";
 
 type MessageRow = { id: string; conversation_id: string; sender_id: string; kind: string; body: string | null; created_at: string | null };
-type PostRow = { id: string; user_id: string; place_name: string | null; note: string | null; kind: string | null; created_at: string | null };
+type PostRow = {
+  id: string;
+  user_id: string;
+  place_name: string | null;
+  note: string | null;
+  transcript: string | null;
+  photo_url: string | null;
+  kind: string | null;
+  created_at: string | null;
+};
 
 /** 訊息證據：被舉報那條＋之前最多 5 條上下文（RLS 保證舉報人只看得到自己會話裡的）。 */
 const MESSAGE_CONTEXT = 5;
@@ -43,6 +55,7 @@ export async function POST(req: Request): Promise<Response> {
 
   let targetUserId = p.targetUserId;
   let snapshot: SnapshotLine[] | null = null;
+  let postForStp: PostRow | null = null;
 
   if (p.targetType === "message" && p.targetRef !== null) {
     const { data } = await supabase
@@ -66,13 +79,14 @@ export async function POST(req: Request): Promise<Response> {
   } else if (p.targetType === "post" && p.targetRef !== null) {
     const { data } = await supabase
       .from("checkins")
-      .select("id,user_id,place_name,note,kind,created_at")
+      .select("id,user_id,place_name,note,transcript,photo_url,kind,created_at")
       .eq("id", p.targetRef)
       .maybeSingle();
     const post = data as PostRow | null;
     if (post === null) return apiError("not_found", "找不到這則帖子", 404);
     if (post.user_id === userId) return apiError("invalid_params", "不能舉報自己", 400);
     targetUserId = post.user_id;
+    postForStp = post;
     const text = [post.place_name, post.note].filter((s): s is string => typeof s === "string" && s !== "").join(" · ");
     snapshot = [{ who: "reported", kind: post.kind ?? "post", text: clipSnapshotText(text), at: post.created_at }];
   }
@@ -117,18 +131,63 @@ export async function POST(req: Request): Promise<Response> {
     return apiOk({ reported: true });
   }
 
-  const { error } = await supabase.from("cheers_reports").insert({
-    reporter_id: userId,
-    target_user_id: targetUserId,
-    target_type: p.targetType,
-    target_ref: p.targetRef,
-    reason_code: p.reasonCode,
-    reason: p.reason,
-    snapshot,
-  });
+  const { data: inserted, error } = await supabase
+    .from("cheers_reports")
+    .insert({
+      reporter_id: userId,
+      target_user_id: targetUserId,
+      target_type: p.targetType,
+      target_ref: p.targetRef,
+      reason_code: p.reasonCode,
+      reason: p.reason,
+      snapshot,
+    })
+    .select("id")
+    .single();
   if (error !== null) {
     console.error(`[api/v1/cheers/reports] insert error: code=${error.code} message=${error.message}`);
     return apiError("internal", "举报失败", 500);
   }
-  return apiOk({ reported: true });
+  const reportId = typeof (inserted as { id?: unknown } | null)?.id === "string" ? (inserted as { id: string }).id : "";
+
+  // 寫入舉報人「已提交舉報」動態紀錄，並對帖文舉報啟動背景 AI STP 自動分診（不拖慢 HTTP 回包）
+  const svc = await createServiceClient();
+  let targetName: string | null = null;
+  try {
+    const { data: tu } = await svc.from("users").select("nickname").eq("id", targetUserId).maybeSingle();
+    const n = (tu as { nickname?: unknown } | null)?.nickname;
+    if (typeof n === "string" && n.trim() !== "") targetName = n.trim();
+  } catch {}
+
+  if (reportId !== "") {
+    await notifyReportSubmitted(svc, {
+      reporterId: userId,
+      reportId,
+      targetType: p.targetType,
+      targetRef: p.targetRef,
+      reasonCode: p.reasonCode,
+      placeName: postForStp?.place_name ?? null,
+      targetName,
+    });
+    if (p.targetType === "post" && postForStp !== null && p.targetRef !== null) {
+      const stpTargetRef = p.targetRef;
+      const stpTargetUserId = targetUserId;
+      const stpPost = postForStp;
+      after(async () => {
+        const bgSvc = await createServiceClient();
+        await runPostReportStp(bgSvc, {
+          reportId,
+          targetRef: stpTargetRef,
+          targetUserId: stpTargetUserId,
+          reporterId: userId,
+          reasonCode: p.reasonCode,
+          placeName: stpPost.place_name,
+          note: stpPost.note,
+          transcript: stpPost.transcript,
+          photoUrl: stpPost.photo_url,
+        });
+      });
+    }
+  }
+  return apiOk({ reported: true, report_id: reportId || null });
 }

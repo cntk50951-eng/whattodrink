@@ -1,5 +1,6 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { isPairBlocked } from "@/lib/api/blocks";
 import { canViewCheckin, parseCheckinIdParam } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
 import { buildLikeJson } from "@/lib/api/likes";
@@ -45,6 +46,9 @@ export async function POST(
     .maybeSingle();
   const post = postRaw as PostRow | null;
   if (post === null) {
+    return apiError("not_found", "打卡不存在", 404);
+  }
+  if (post.user_id !== null && post.user_id !== userId && (await isPairBlocked(await createServiceClient(), userId, post.user_id))) {
     return apiError("not_found", "打卡不存在", 404);
   }
   if (post.visibility !== "public") {

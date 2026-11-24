@@ -1,5 +1,6 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { getBlockedUserIds } from "@/lib/api/blocks";
 import {
   PINS_CHANGES_PROBE,
   PINS_RANGE_MS,
@@ -59,6 +60,8 @@ export async function GET(req: Request): Promise<Response> {
   if (scopeParsed.scope === "friends" && viewerId === null) {
     return apiError("unauthorized", "未登录", 401);
   }
+  const blockedIds =
+    viewerId !== null ? await getBlockedUserIds(await createServiceClient(), viewerId) : new Set<string>();
 
   // friends scope 好友集（空即 checkins 两类计 0，不下空 in）。
   let friendIds: string[] = [];
@@ -71,12 +74,13 @@ export async function GET(req: Request): Promise<Response> {
     friendIds = friendIdsOf(
       viewerId,
       ((fsRows ?? []) as unknown[]) as { user_id: unknown; friend_id: unknown; status: unknown }[],
-    );
+    ).filter((id) => !blockedIds.has(id));
   }
 
   const countProbe = async (
     build: () => Promise<{ data: unknown[] | null; error: { code: string; message: string } | null }>,
     tag: string,
+    ownerField: "user_id" | "host_user_id" = "user_id",
   ): Promise<number> => {
     try {
       const { data, error } = await build();
@@ -84,7 +88,13 @@ export async function GET(req: Request): Promise<Response> {
         console.error(`[api/v1/map/pins/changes] ${tag} error: code=${error.code} message=${error.message}`);
         return 0;
       }
-      return (data ?? []).length;
+      const list = data ?? [];
+      if (blockedIds.size === 0) return list.length;
+      return list.filter((row) => {
+        if (typeof row !== "object" || row === null) return true;
+        const uid = (row as Record<string, unknown>)[ownerField];
+        return typeof uid !== "string" || !blockedIds.has(uid);
+      }).length;
     } catch (e) {
       console.error(`[api/v1/map/pins/changes] ${tag} threw: ${e instanceof Error ? e.message : "unknown"}`);
       return 0;
@@ -151,14 +161,14 @@ export async function GET(req: Request): Promise<Response> {
     const mine = viewerId === null ? null : viewerId;
     const flashBase = supabase
       .from("checkins")
-      .select("id")
+      .select("id,user_id")
       .eq("visibility", "public")
       .eq("kind", "flash")
       .gt("expires_at", nowIso)
       .gt("created_at", sinceIso);
     const postBase = supabase
       .from("checkins")
-      .select("id")
+      .select("id,user_id")
       .eq("visibility", "public")
       .eq("kind", "post")
       .gte("created_at", cutoffIso)
@@ -199,10 +209,10 @@ export async function GET(req: Request): Promise<Response> {
     );
   }
 
-  // 酒局（缺省看板口径：open＋未过期＋created 下界＋bbox；host 是自己不计）。
+  // 酒局（缺省看板口径：open＋未过期＋created 下界＋bbox；host 是自己或已屏蔽不计）。
   const partyBase = supabase
     .from("parties")
-    .select("id")
+    .select("id,host_user_id")
     .eq("status", "open")
     .gt("expires_at", nowIso)
     .gt("created_at", sinceIso);
@@ -219,6 +229,7 @@ export async function GET(req: Request): Promise<Response> {
         error: { code: string; message: string } | null;
       }>,
     "parties",
+    "host_user_id",
   );
 
   const checkinRows = await Promise.all(checkinCounts);

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { adminRateLimited, auditOrThrow, auditViewOnce, checkSameOrigin } from "@/lib/ops";
 import { requireAdminPage } from "@/lib/opsPage";
+import { applyReportDecision, type ReportTargetType } from "@/lib/api/reportStp";
 import type { SnapshotLine } from "@/lib/userReports";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -41,12 +42,45 @@ export default async function UserReportDetailPage({ params }: { params: Promise
       throw new Error("操作過於頻繁，請稍後再試");
     }
     await auditOrThrow(g.svc, { admin_id: g.userId, action: `user_report_${state}`, target: id });
-    const { error } = await g.svc
+    const { data: updated, error } = await g.svc
       .from("cheers_reports")
       .update({ status: state, decided_by: g.userId, decided_at: new Date().toISOString() })
       .eq("id", id)
-      .in("status", ["pending", "reviewed"]);
-    if (error !== null) throw new Error("標記失敗（可能已被處理）");
+      .in("status", ["pending", "reviewed"])
+      .select("id,target_type,target_ref,target_user_id,reporter_id,reason_code")
+      .maybeSingle();
+    if (error !== null || updated === null) throw new Error("標記失敗（可能已被處理）");
+    if (state === "actioned" || state === "dismissed") {
+      const row = updated as {
+        target_type?: unknown;
+        target_ref?: unknown;
+        target_user_id?: unknown;
+        reporter_id?: unknown;
+        reason_code?: unknown;
+      };
+      const tt: ReportTargetType =
+        row.target_type === "post" || row.target_type === "message" ? row.target_type : "user";
+      const targetRef = typeof row.target_ref === "string" ? row.target_ref : null;
+      let placeName: string | null = null;
+      if (tt === "post" && targetRef !== null) {
+        const { data: postRow } = await g.svc.from("checkins").select("place_name").eq("id", targetRef).maybeSingle();
+        const pn = (postRow as { place_name?: unknown } | null)?.place_name;
+        if (typeof pn === "string" && pn.trim() !== "") placeName = pn.trim();
+      }
+      if (typeof row.target_user_id === "string" && typeof row.reporter_id === "string") {
+        await applyReportDecision(g.svc, {
+          reportId: id,
+          targetType: tt,
+          targetRef,
+          targetUserId: row.target_user_id,
+          reporterId: row.reporter_id,
+          reasonCode: typeof row.reason_code === "string" ? row.reason_code : null,
+          placeName,
+          decision: state,
+          note: state === "actioned" ? "經管理員審核核實違規，已處理" : "經管理員審核暫未發現違規",
+        });
+      }
+    }
   }
 
   const snapshot = Array.isArray(r.snapshot) ? (r.snapshot as SnapshotLine[]) : [];

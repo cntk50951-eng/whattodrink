@@ -1,5 +1,6 @@
-import { createClient, getAuthedClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { getBlockedUserIds } from "@/lib/api/blocks";
 import { friendIdsOf } from "@/lib/friends";
 import {
   WALL_HOT_WINDOW_CAP,
@@ -24,7 +25,7 @@ import {
  */
 
 const WALL_COLUMNS =
-  "id,photo_url,note,transcript,audio_url,audio_seconds,created_at,users(nickname,avatar_url,gender),post_likes(count)";
+  "id,user_id,photo_url,note,transcript,audio_url,audio_seconds,created_at,users(nickname,avatar_url,gender),post_likes(count)";
 
 export async function GET(req: Request) {
   const parsed = parseWallParams(new URL(req.url).searchParams);
@@ -38,28 +39,32 @@ export async function GET(req: Request) {
   let supabase = await createClient();
   let visibilities: string[] = ["public"];
   let authorIds: string[] | null = null;
+  const authedViewer = await getAuthedClient(req);
+  const blockedIds =
+    authedViewer.userId !== null
+      ? await getBlockedUserIds(await createServiceClient(), authedViewer.userId)
+      : new Set<string>();
   if (scope === "friends") {
-    const authed = await getAuthedClient(req);
-    if (authed.userId === null) {
+    if (authedViewer.userId === null) {
       return apiError("unauthorized", "未登录", 401);
     }
-    const { data: fsRows, error: fsErr } = await authed.supabase
+    const { data: fsRows, error: fsErr } = await authedViewer.supabase
       .from("friendships")
       .select("user_id,friend_id,status")
       .eq("status", "accepted")
-      .or(`user_id.eq.${authed.userId},friend_id.eq.${authed.userId}`);
+      .or(`user_id.eq.${authedViewer.userId},friend_id.eq.${authedViewer.userId}`);
     if (fsErr) {
       console.error(`[api/v1/wall] friendships error: code=${fsErr.code} message=${fsErr.message}`);
       return apiError("internal", "好友查詢失敗", 500);
     }
     const friendIds = friendIdsOf(
-      authed.userId,
+      authedViewer.userId,
       (fsRows ?? []) as { user_id: unknown; friend_id: unknown; status: unknown }[],
-    );
+    ).filter((id) => !blockedIds.has(id));
     if (friendIds.length === 0) {
       return apiOk({ posts: [], nextCursor: null });
     }
-    supabase = authed.supabase;
+    supabase = authedViewer.supabase;
     visibilities = ["friends", "public"];
     authorIds = friendIds;
   }
@@ -115,6 +120,10 @@ export async function GET(req: Request) {
     let skipped = 0;
     const mapped: WallPostJson[] = [];
     for (const row of rows) {
+      if (blockedIds.size > 0 && typeof row === "object" && row !== null) {
+        const uid = (row as Record<string, unknown>).user_id;
+        if (typeof uid === "string" && blockedIds.has(uid)) continue;
+      }
       const post = toWallPost(row);
       if (post === null) {
         skipped += 1;

@@ -1,5 +1,6 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { getBlockedUserIds, isPairBlocked } from "@/lib/api/blocks";
 import { areFriends, type FriendshipRow } from "@/lib/friends";
 import { canViewCheckin, parseCheckinIdParam } from "@/lib/api/checkins";
 import { summarizeRatings } from "@/lib/api/rating";
@@ -63,6 +64,9 @@ async function readArchived(
     return null;
   }
   const ownerId = typeof arow.user_id === "string" ? arow.user_id : null;
+  if (ownerId !== null && ownerId !== userId && (await isPairBlocked(service, userId, ownerId))) {
+    return apiError("not_found", "打卡不存在", 404);
+  }
   const visibility = arow.visibility;
   if (ownerId !== userId && visibility !== "public") {
     let friendIds: string[] = [];
@@ -182,6 +186,10 @@ export async function GET(
     return apiError("not_found", "打卡不存在", 404);
   }
   const ownerId = typeof row.user_id === "string" ? row.user_id : null;
+  const service = await createServiceClient();
+  if (ownerId !== null && ownerId !== userId && (await isPairBlocked(service, userId, ownerId))) {
+    return apiError("not_found", "打卡不存在", 404);
+  }
   const visibility = row.visibility;
   let friendIds: string[] = [];
   if (
@@ -216,7 +224,7 @@ export async function GET(
   // UR E.12 评分明细聚合走 service（路由已过可见门，沿 D.2 口径；只吐聚合＋本人行）。
   const postId = row.id as string;
   const beerId = (row.beer_id as string | null) ?? null;
-  const service = await createServiceClient();
+  const blockedIds = await getBlockedUserIds(service, userId);
   const [{ count: likeCount }, { data: likedRow }, { count: wantCount }, { data: wantedRow }, { count: commentCount }, { data: beerRow }, { data: ratingRows }, { data: savedRow }] =
     await Promise.all([
       supabase.from("post_likes").select("post_id", { count: "exact", head: true }).eq("post_id", postId),
@@ -272,7 +280,7 @@ export async function GET(
       ),
     );
     recentCheers = (cheersRows as { from_user_id: string; created_at: string }[])
-      .filter((r) => (peerMap.get(r.from_user_id)?.mode ?? "public") !== "stealth")
+      .filter((r) => !blockedIds.has(r.from_user_id) && (peerMap.get(r.from_user_id)?.mode ?? "public") !== "stealth")
       .map((r) => {
         const peer = peerMap.get(r.from_user_id);
         return {
