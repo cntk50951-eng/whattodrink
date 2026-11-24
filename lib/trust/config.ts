@@ -29,7 +29,7 @@ export const TRUST_CONFIG = {
   enforce_watch_limit: false,
   enforce_restricted: false,
   /** watch：每日最多发局数。restricted：暂停发起天数。 */
-  watch_daily_parties: 1,
+  watch_daily_parties: 3,
   restricted_days: 14,
   /** AI 自动判定（產品決定 2026-10-14：成立／駁回都可自動，靠申訴兜底；閾值見 complaintAi.ts；環境變量 COMPLAINT_AI_AUTO=off 為緊急開關）。 */
   ai_auto_decide: true,

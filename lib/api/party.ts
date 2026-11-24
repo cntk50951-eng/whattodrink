@@ -322,24 +322,22 @@ export type CancelPolicy = {
   joiners_count: number;
 };
 
-/** 撤銷政策（host 视角；非 host 即 not_host；cancelled 即 already_cancelled）。 */
+/** 撤銷政策（host 視角；非 host 即 not_host；cancelled 即 already_cancelled；已過期結束即 started；進行中酒局隨時可撤銷並通知全部已報名成員）。 */
 export function cancelPolicy(args: {
   isHost: boolean;
   status: string;
   startAtMs: number;
   joinersCount: number;
   nowMs: number;
+  expiresAtMs?: number;
 }): CancelPolicy {
-  const { isHost, status, startAtMs, joinersCount, nowMs } = args;
+  const { isHost, status, joinersCount, nowMs, expiresAtMs } = args;
   if (!isHost) return { can_cancel: false, block_reason: "not_host", joiners_count: joinersCount };
   if (status === "cancelled") {
     return { can_cancel: false, block_reason: "already_cancelled", joiners_count: joinersCount };
   }
-  if (Number.isFinite(startAtMs) && nowMs >= startAtMs) {
+  if (typeof expiresAtMs === "number" && Number.isFinite(expiresAtMs) && nowMs >= expiresAtMs) {
     return { can_cancel: false, block_reason: "started", joiners_count: joinersCount };
-  }
-  if (Number.isFinite(startAtMs) && startAtMs - nowMs < PARTY_CANCEL_CUTOFF_MIN * 60_000) {
-    return { can_cancel: false, block_reason: "too_close_to_start", joiners_count: joinersCount };
   }
   return { can_cancel: true, block_reason: null, joiners_count: joinersCount };
 }

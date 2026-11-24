@@ -1,8 +1,11 @@
-import { createServiceClient, getAuthedClient, getUserId } from "@/lib/supabase/server";
+import { after } from "next/server";
+
+import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { cancelPolicy, canDeleteExpiredParty, leavePolicy, minutesBeforeStart } from "@/lib/api/party";
 import { hostTrustMap } from "@/lib/trust/ledger";
 import { writeTrustEvent } from "@/lib/trust/ledger";
+import { sendPartyNoticePush } from "@/lib/push/send";
 
 type PartyRow = {
   id: string;
@@ -34,15 +37,14 @@ type PartyRow = {
  * （host 行由 host_user_id 合成，joined_at 取局創建；無需 joins 行）。
  */
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const { id } = await params;
   if (typeof id !== "string" || id === "" || id.length > 64) {
     return apiError("invalid_params", "id 非法", 400);
   }
-  const { supabase } = await getAuthedClient();
-  const viewerId = await getUserId().catch(() => null);
+  const { supabase, userId: viewerId } = await getAuthedClient(req);
   const BASE_COLS = "id,host_user_id,place,poi_id,city,lat,lng,start_at,expires_at,seats_total,seats_male,seats_female,min_members,bill_intent,purposes,purpose_other,host_intro,status,created_at";
   let { data: rowRaw, error } = await supabase
     .from("parties")
@@ -65,10 +67,11 @@ export async function GET(
   const jrows = ((joins ?? []) as { user_id: string; joined_at: string }[]).filter(
     (j) => typeof j.user_id === "string",
   );
+  const svc = await createServiceClient();
   const memberIds = [...new Set([row.host_user_id, ...jrows.map((j) => j.user_id)])];
   let profiles = new Map<string, { nickname: string; avatar_url: string | null; gender: string | null }>();
   if (memberIds.length > 0) {
-    const { data: users } = await supabase
+    const { data: users } = await svc
       .from("users")
       .select("id,nickname,avatar_url,gender")
       .in("id", memberIds);
@@ -96,11 +99,11 @@ export async function GET(
     };
   });
   // E.30 发起人信用徽章（与列表同形；service 读）。
-  const detailTrust = await hostTrustMap(await createServiceClient(), [row.host_user_id], nowMs);
+  const detailTrust = await hostTrustMap(svc, [row.host_user_id], nowMs);
   // 我是否已到场打卡（只对登录者；party_attendance 走 service）
   let myArrived = false;
   if (viewerId !== null) {
-    const { data: att } = await (await createServiceClient())
+    const { data: att } = await svc
       .from("party_attendance")
       .select("arrived_at")
       .eq("party_id", row.id)
@@ -153,6 +156,7 @@ export async function GET(
             isHost: row.host_user_id === viewerId,
             status: row.status,
             startAtMs: Date.parse(row.start_at),
+            expiresAtMs: Date.parse(row.expires_at),
             joinersCount: jrows.length,
             nowMs,
           }),
@@ -194,7 +198,7 @@ export async function PATCH(
   }
   const { data: rowRaw } = await supabase
     .from("parties")
-    .select("id,host_user_id,status,start_at,place")
+    .select("id,host_user_id,status,start_at,expires_at,place")
     .eq("id", id)
     .maybeSingle();
   const row = rowRaw as {
@@ -202,6 +206,7 @@ export async function PATCH(
     host_user_id: string;
     status: string;
     start_at: string;
+    expires_at: string;
     place: string;
   } | null;
   if (row === null) return apiError("not_found", "酒局不存在", 404);
@@ -226,12 +231,12 @@ export async function PATCH(
     isHost: true,
     status: row.status,
     startAtMs: Date.parse(row.start_at),
+    expiresAtMs: Date.parse(row.expires_at),
     joinersCount: joinerIds.length,
     nowMs,
   });
   if (!policy.can_cancel) {
-    // 阶段 A 无紧急通道：<1h 与已开局一律拒绝（message 照交接，iOS 原文显示）。
-    return apiError("too_close_to_start", "臨近開局不可撤銷", 409);
+    return apiError("too_close_to_start", "酒局已結束，不可撤銷", 409);
   }
   const nowIso = new Date(nowMs).toISOString();
   const { error } = await svc
@@ -295,6 +300,18 @@ export async function PATCH(
   if (nErr !== null) {
     console.error(`[api/v1/parties] notify error: code=${nErr.code} message=${nErr.message}`);
   }
+  // Android 端由 notifications INSERT trigger 進 native_push_outbox；這裡補發 iOS APNs 推播，確保雙端都能即時收到
+  after(async () => {
+    await sendPartyNoticePush({
+      kind: "party_cancelled",
+      recipientIds: joinerIds,
+      actorId: userId,
+      actorName: hostNick,
+      place: row.place,
+      partyId: id,
+      iosOnly: true,
+    });
+  });
   return apiOk({ cancelled: true, notified_count: joinerIds.length });
 }
 

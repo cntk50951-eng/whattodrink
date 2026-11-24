@@ -407,3 +407,160 @@ export async function sendGameInvitePush(args: {
     return { sent: 0, skipped: "threw" };
   }
 }
+
+export type PartyNoticePushKind =
+  | "party_cancelled"
+  | "party_completed"
+  | "invite_cancelled"
+  | "invite_completed";
+
+function partyNoticeCopy(
+  kind: PartyNoticePushKind,
+  locale: string,
+  actorName: string,
+  place: string,
+): { title: string; body: string } {
+  const p = place.trim() || (locale === "en" ? "the bar" : "酒吧");
+  const a = actorName.trim() || (locale === "en" ? "A friend" : "酒友");
+  if (locale === "en") {
+    switch (kind) {
+      case "party_cancelled":
+        return { title: "Gathering cancelled", body: `${a} cancelled the gathering at ${p}` };
+      case "party_completed":
+        return { title: "Gathering completed", body: `The gathering at ${p} is completed` };
+      case "invite_cancelled":
+        return { title: "Drink invite cancelled", body: `${a} cancelled the drink invite at ${p}` };
+      case "invite_completed":
+        return { title: "Drink invite completed", body: `${a} marked the drink invite at ${p} as completed` };
+    }
+  }
+  if (locale === "zh-Hans") {
+    switch (kind) {
+      case "party_cancelled":
+        return { title: "酒局已撤销", body: `${a} 撤销了 ${p} 的酒局` };
+      case "party_completed":
+        return { title: "酒局已完成", body: `${p} 的酒局已完成` };
+      case "invite_cancelled":
+        return { title: "约酒已撤销", body: `${a} 撤销了在 ${p} 的约酒` };
+      case "invite_completed":
+        return { title: "约酒已完成", body: `${a} 已确认在 ${p} 的约酒完成` };
+    }
+  }
+  switch (kind) {
+    case "party_cancelled":
+      return { title: "酒局已撤銷", body: `${a} 撤銷了 ${p} 的酒局` };
+    case "party_completed":
+      return { title: "酒局已完成", body: `${p} 的酒局已完成` };
+    case "invite_cancelled":
+      return { title: "約酒已撤銷", body: `${a} 撤銷了在 ${p} 的約酒` };
+    case "invite_completed":
+      return { title: "約酒已完成", body: `${a} 已確認在 ${p} 的約酒完成` };
+  }
+}
+
+/**
+ * 約局／私約撤銷與完成推送（通知全部相關參與者；支持 iOS APNs＋Android FCM；throw 永不外泄）。
+ * `iosOnly: true` 用於已走 `native_push_outbox` trigger 的事件（如 `party_cancelled`），避免 Android 重複推送。
+ */
+export async function sendPartyNoticePush(args: {
+  kind: PartyNoticePushKind;
+  recipientIds: string[];
+  actorId: string;
+  actorName: string;
+  place: string;
+  partyId?: string;
+  inviteId?: string;
+  iosOnly?: boolean;
+}): Promise<{ sent: number; skipped?: string }> {
+  const { kind, recipientIds, actorId, actorName, place, partyId, inviteId, iosOnly } = args;
+  const targets = [...new Set(recipientIds.filter((uid) => uid !== "" && uid !== actorId))];
+  if (targets.length === 0) return { sent: 0, skipped: "no-recipients" };
+  try {
+    const cfg = nativePushConfigFromEnv(process.env as Record<string, string | undefined>);
+    if (!hasPushChannel(cfg)) {
+      console.warn(`[push] ${kind} skipped: missing APNs/FCM config`);
+      return { sent: 0, skipped: "no-creds" };
+    }
+    const supa = await createServiceClient();
+    const isInvite = kind === "invite_cancelled" || kind === "invite_completed";
+    let sent = 0;
+    const nowMs = Date.now();
+    const expiresAt = String(nowMs + 24 * 3600_000);
+    for (const toUserId of targets) {
+      const { data: devices } = await supa
+        .from("devices")
+        .select("id,platform,push_token,environment,locale")
+        .eq("user_id", toUserId)
+        .in("platform", iosOnly ? ["ios"] : ["ios", "aos"])
+        .eq("enabled", true)
+        .limit(10);
+      const devs = configuredPushDevices(devices, cfg);
+      if (devs.length === 0) continue;
+      const { data: peerRow } = await supa
+        .from("users")
+        .select("push_prefs")
+        .eq("id", toUserId)
+        .maybeSingle();
+      const prefs = pushPrefsOf((peerRow as { push_prefs?: unknown } | null)?.push_prefs);
+      if (isInvite ? !prefs.invite_replies : !prefs.party) continue;
+      const badge = await computeBadge(supa, toUserId);
+      const refId = partyId ?? inviteId ?? toUserId;
+      for (const d of devs) {
+        if (d.platform === "aos" && !(await aosDeviceIsCurrent(supa, d.id, d.push_token, toUserId))) continue;
+        const loc = typeof d.locale === "string" ? d.locale : "zh-Hant";
+        const alert = partyNoticeCopy(kind, loc, actorName, place);
+        const payload: Record<string, unknown> = {
+          ...(d.platform === "aos"
+            ? {
+                recipient_id: toUserId,
+                event_id: `${kind}:${refId}:${toUserId}`,
+                expires_at: expiresAt,
+              }
+            : {}),
+          aps: {
+            alert,
+            badge: badge.badge,
+            sound: "default",
+            "thread-id": isInvite ? "invites" : "party",
+            "mutable-content": 0,
+          },
+          t: kind,
+          from_user_id: actorId,
+          ...(partyId ? { party_id: partyId } : {}),
+          ...(inviteId ? { invite_id: inviteId } : {}),
+        };
+        const env: ApnsEnv = d.environment === "sandbox" ? "sandbox" : "production";
+        const collapse = `${kind}-${refId}-${toUserId}`;
+        let res = await sendNativePush({ cfg, platform: d.platform, env, deviceToken: d.push_token, collapseId: collapse, payload });
+        let tries = 0;
+        while (!res.ok && (res.status === 429 || res.status >= 500 || res.status === 0) && tries < 2) {
+          tries += 1;
+          await sleep(tries * 1000);
+          res = await sendNativePush({ cfg, platform: d.platform, env, deviceToken: d.push_token, collapseId: collapse, payload });
+        }
+        if (!res.ok && isDeadPushReason(res.reason)) {
+          await supa.from("devices").delete().eq("id", d.id);
+          await supa.from("push_log").insert({
+            recipient_id: toUserId,
+            kind,
+            dedupe_key: `${actorId}:${toUserId}:${refId}:${kind}`,
+            status: "dead",
+          });
+          continue;
+        }
+        await supa.from("push_log").insert({
+          recipient_id: toUserId,
+          kind,
+          dedupe_key: `${actorId}:${toUserId}:${refId}:${kind}`,
+          status: res.ok ? "sent" : "failed",
+        });
+        if (res.ok) sent += 1;
+        else console.warn(`[push] ${kind} failed: status=${res.status} reason=${res.reason}`);
+      }
+    }
+    return { sent };
+  } catch (e) {
+    console.warn(`[push] ${kind} threw: ${e instanceof Error ? e.message : "unknown"}`);
+    return { sent: 0, skipped: "threw" };
+  }
+}

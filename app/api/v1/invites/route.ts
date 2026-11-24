@@ -104,18 +104,20 @@ export async function POST(req: Request): Promise<Response> {
     .from("drink_invites")
     .select("id", { count: "exact", head: true })
     .eq("from_user_id", userId)
+    .neq("status", "recalled")
     .gte("created_at", dayStart);
-  if ((dayCount ?? 0) >= 3) {
-    return apiError("rate_limited", "今日邀約已達上限（3 次）", 429);
+  if ((dayCount ?? 0) >= 10) {
+    return apiError("rate_limited", "今日邀約已達上限（10 次）", 429);
   }
   const { count: pairCount } = await supabase
     .from("drink_invites")
     .select("id", { count: "exact", head: true })
     .eq("from_user_id", userId)
     .eq("to_user_id", peer.id)
+    .neq("status", "recalled")
     .gte("created_at", dayStart);
-  if ((pairCount ?? 0) > 0) {
-    return apiError("rate_limited", "今日已約過 TA，明天再來", 429);
+  if ((pairCount ?? 0) >= 5) {
+    return apiError("rate_limited", "今日已約過 TA 太多次（上限 5 次），明天再來", 429);
   }
   // UR E.19 未成年禁约（共用 isMinorDob；同敬酒口径）。
   const { data: inviterRow } = await supabase
@@ -203,8 +205,9 @@ export async function GET(req: Request): Promise<Response> {
   let peers = new Map<string, { nickname: string; avatar_url: string | null }>();
   let friendSet = new Set<string>();
   if (peerIds.length > 0) {
+    const svc = await createServiceClient();
     const [{ data: users }, { data: fsRows }] = await Promise.all([
-      supabase.from("users").select("id,nickname,avatar_url").in("id", peerIds),
+      svc.from("users").select("id,nickname,avatar_url").in("id", peerIds),
       supabase
         .from("friendships")
         .select("user_id,friend_id,status")

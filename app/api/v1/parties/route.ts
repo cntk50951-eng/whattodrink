@@ -8,6 +8,8 @@ import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { haversineMeters } from "@/lib/geo";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * UR E.23 發攢局（🔒，匿名 401；隐身／未成年 403；3／天 429；iOS-0.57 联调）。
  * `POST /api/v1/parties` —— 總量 2–12、男女和≤總量、門檻 2..總量、
@@ -45,9 +47,10 @@ export async function POST(req: Request): Promise<Response> {
     .from("parties")
     .select("id", { count: "exact", head: true })
     .eq("host_user_id", userId)
+    .neq("status", "cancelled")
     .gte("created_at", hkDayStartISO(Date.now()));
-  if ((dayCount ?? 0) >= 3) {
-    return apiError("rate_limited", "今日發局已達上限（3 次）", 429);
+  if ((dayCount ?? 0) >= 10) {
+    return apiError("rate_limited", "今日發局已達上限（10 次）", 429);
   }
   // E.30 诚信限制（默认全关，配置开；watch 日发 1 局，restricted 停 14 天）。
   if (TRUST_CONFIG.enforce_watch_limit || TRUST_CONFIG.enforce_restricted) {
@@ -223,6 +226,47 @@ export async function GET(req: Request): Promise<Response> {
   // round-2 撤销保留：box=mine 回我发起＋我参加（含 cancelled／过期，需登录）。
   const box = q.get("box") === "mine" ? "mine" : "all";
 
+  if (box === "mine" && viewerId === null) {
+    return apiError("unauthorized", "未登录", 401);
+  }
+
+  let joinedIds: string[] = [];
+  let hiddenPartyIds = new Set<string>();
+  if (box === "mine" && viewerId !== null) {
+    // 先查「我參加的局」與「我已隱藏的終態局」，在 SQL 限頁前排除隱藏 ID，避免 51 筆藏 1 筆時首頁只回 49 筆導致客戶端提早停止翻頁
+    const [joinsRes, hidesRes] = await Promise.all([
+      supabase.from("joins").select("party_id").eq("user_id", viewerId),
+      supabase.from("party_hides").select("party_id").eq("user_id", viewerId),
+    ]);
+    if (joinsRes.error !== null) {
+      console.error(
+        `[api/v1/parties] joins error: code=${joinsRes.error.code} message=${joinsRes.error.message}`,
+      );
+      return apiError("internal", "酒局讀取失敗", 500);
+    }
+    joinedIds = ((joinsRes.data ?? []) as { party_id: unknown }[])
+      .map((j) => j.party_id)
+      .filter((id): id is string => typeof id === "string" && id !== "");
+    if (hidesRes.error !== null) {
+      // 只有 0082 遷移未跑（42P01）才降級為空集合；其餘 DB 故障不可假裝無隱藏而讓已刪除酒局復活
+      if (hidesRes.error.code !== "42P01") {
+        console.error(
+          `[api/v1/parties] hides error: code=${hidesRes.error.code} message=${hidesRes.error.message}`,
+        );
+        return apiError("internal", "酒局讀取失敗", 500);
+      }
+    } else if (Array.isArray(hidesRes.data)) {
+      hiddenPartyIds = new Set(
+        (hidesRes.data as { party_id?: unknown }[])
+          .map((h) => h.party_id)
+          .filter((v): v is string => typeof v === "string" && UUID_RE.test(v)),
+      );
+    }
+  }
+  const hiddenList = [...hiddenPartyIds];
+  const pushSqlHiddenFilter = hiddenList.length > 0 && hiddenList.length <= 200;
+  const fetchLimit = pushSqlHiddenFilter ? limit : Math.min(limit + hiddenList.length, 500);
+
   const BASE_COLS = "id,host_user_id,place,city,lat,lng,start_at,expires_at,seats_total,seats_male,seats_female,min_members,bill_intent,purposes,purpose_other,host_intro,status,created_at";
   let rows: unknown[] | null = null;
   let error: { code?: string; message?: string } | null = null;
@@ -231,19 +275,12 @@ export async function GET(req: Request): Promise<Response> {
       .from("parties")
       .select(cols)
       .order("created_at", { ascending: false })
-      .limit(limit);
-    if (box === "mine") {
-      if (viewerId === null) {
-        return apiError("unauthorized", "未登录", 401);
-      }
-      const { data: myJoins } = await supabase
-        .from("joins")
-        .select("party_id")
-        .eq("user_id", viewerId);
-      const joinedIds = ((myJoins ?? []) as { party_id: unknown }[])
-        .map((j) => j.party_id)
-        .filter((id): id is string => typeof id === "string" && id !== "");
+      .limit(fetchLimit);
+    if (box === "mine" && viewerId !== null) {
       query = query.or(mineOrCondition(viewerId, joinedIds));
+      if (pushSqlHiddenFilter) {
+        query = query.not("id", "in", `(${hiddenList.join(",")})`);
+      }
     } else {
       query = query.eq("status", "open").gt("expires_at", nowIso);
     }
@@ -258,30 +295,16 @@ export async function GET(req: Request): Promise<Response> {
     if (Number.isFinite(cursorMs)) {
       query = query.lt("created_at", new Date(cursorMs).toISOString());
     }
-      ({ data: rows, error } = await query);
-      if (error === null || error.code !== "42703") break; // 0063 未跑：缺封面列，退回不带封面的旧查询
-    }
+    ({ data: rows, error } = await query);
+    if (error === null || error.code !== "42703") break; // 0063 未跑：缺封面列，退回不带封面的旧查询
+  }
   if (error !== null) {
     console.error(`[api/v1/parties] list error: code=${error.code} message=${error.message}`);
     return apiError("internal", "酒局讀取失敗", 500);
   }
-  let hiddenPartyIds = new Set<string>();
-  if (box === "mine" && viewerId !== null) {
-    const { data: hides, error: hErr } = await supabase
-      .from("party_hides")
-      .select("party_id")
-      .eq("user_id", viewerId);
-    if (hErr === null && Array.isArray(hides)) {
-      hiddenPartyIds = new Set(
-        (hides as { party_id?: unknown }[])
-          .map((h) => h.party_id)
-          .filter((v): v is string => typeof v === "string" && v !== ""),
-      );
-    }
-  }
-  const list = ((rows ?? []) as PartyListRow[]).filter(
-    (r) => typeof r.id === "string" && !hiddenPartyIds.has(r.id),
-  );
+  const list = ((rows ?? []) as PartyListRow[])
+    .filter((r) => typeof r.id === "string" && !hiddenPartyIds.has(r.id))
+    .slice(0, limit);
   const ids = list.map((r) => r.id);
   const hostIds = [...new Set(list.map((r) => r.host_user_id))];
   let hosts = new Map<string, { nickname: string; avatar_url: string | null }>();
@@ -305,7 +328,7 @@ export async function GET(req: Request): Promise<Response> {
         const genderOf = new Map<string, string | null>();
         const joinerIds = [...new Set(jrows.map((j) => j.user_id))];
         if (joinerIds.length > 0) {
-          const { data: joiners } = await supabase
+          const { data: joiners } = await svc
             .from("users")
             .select("id,gender")
             .in("id", joinerIds);
@@ -316,7 +339,7 @@ export async function GET(req: Request): Promise<Response> {
         return { jrows, genderOf };
       })(),
       hostIds.length > 0
-        ? supabase.from("users").select("id,nickname,avatar_url").in("id", hostIds)
+        ? svc.from("users").select("id,nickname,avatar_url").in("id", hostIds)
         : Promise.resolve({ data: null }),
       viewerId !== null
         ? svc
@@ -358,6 +381,7 @@ export async function GET(req: Request): Promise<Response> {
       lng: r.lng,
       start_at: r.start_at,
       expires_at: r.expires_at,
+      created_at: r.created_at,
       seats_total: r.seats_total,
       seats_male: r.seats_male,
       seats_female: r.seats_female,
@@ -391,6 +415,7 @@ export async function GET(req: Request): Promise<Response> {
               isHost: r.host_user_id === viewerId,
               status: r.status,
               startAtMs: Date.parse(r.start_at),
+              expiresAtMs: Date.parse(r.expires_at),
               joinersCount: joinCounts.get(r.id) ?? 0,
               nowMs: Date.now(),
             }),

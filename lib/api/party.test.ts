@@ -167,15 +167,16 @@ describe("mineOrCondition", () => {
 describe("cancelPolicy／leavePolicy（階段 A）", () => {
   const NOW = Date.parse("2026-10-13T10:00:00Z");
   const H = 3600_000;
-  it("host＋2h 前可撤；59 分拒；已開局拒 started；非 host／已撤各有码", () => {
-    expect(cancelPolicy({ isHost: true, status: "open", startAtMs: NOW + 2 * H, joinersCount: 3, nowMs: NOW })).toEqual({
+  it("進行中酒局（含 60 分內與剛開局）host 均可撤銷；已過期結束拒 started；非 host／已撤各有碼", () => {
+    expect(cancelPolicy({ isHost: true, status: "open", startAtMs: NOW + 2 * H, expiresAtMs: NOW + 5 * H, joinersCount: 3, nowMs: NOW })).toEqual({
       can_cancel: true, block_reason: null, joiners_count: 3,
     });
-    expect(cancelPolicy({ isHost: true, status: "open", startAtMs: NOW + 59 * 60_000, joinersCount: 0, nowMs: NOW }).block_reason).toBe("too_close_to_start");
-    expect(cancelPolicy({ isHost: true, status: "open", startAtMs: NOW + 61 * 60_000, joinersCount: 0, nowMs: NOW }).can_cancel).toBe(true);
-    expect(cancelPolicy({ isHost: true, status: "open", startAtMs: NOW - 1, joinersCount: 2, nowMs: NOW }).block_reason).toBe("started");
-    expect(cancelPolicy({ isHost: false, status: "open", startAtMs: NOW + 2 * H, joinersCount: 0, nowMs: NOW }).block_reason).toBe("not_host");
-    expect(cancelPolicy({ isHost: true, status: "cancelled", startAtMs: NOW + 2 * H, joinersCount: 0, nowMs: NOW }).block_reason).toBe("already_cancelled");
+    expect(cancelPolicy({ isHost: true, status: "open", startAtMs: NOW + 59 * 60_000, expiresAtMs: NOW + 4 * H, joinersCount: 0, nowMs: NOW }).can_cancel).toBe(true);
+    expect(cancelPolicy({ isHost: true, status: "open", startAtMs: NOW + 15 * 60_000, expiresAtMs: NOW + 3 * H, joinersCount: 2, nowMs: NOW }).can_cancel).toBe(true);
+    expect(cancelPolicy({ isHost: true, status: "open", startAtMs: NOW - 10 * 60_000, expiresAtMs: NOW + 2 * H, joinersCount: 1, nowMs: NOW }).can_cancel).toBe(true);
+    expect(cancelPolicy({ isHost: true, status: "open", startAtMs: NOW - 4 * H, expiresAtMs: NOW - 1, joinersCount: 2, nowMs: NOW }).block_reason).toBe("started");
+    expect(cancelPolicy({ isHost: false, status: "open", startAtMs: NOW + 2 * H, expiresAtMs: NOW + 5 * H, joinersCount: 0, nowMs: NOW }).block_reason).toBe("not_host");
+    expect(cancelPolicy({ isHost: true, status: "cancelled", startAtMs: NOW + 2 * H, expiresAtMs: NOW + 5 * H, joinersCount: 0, nowMs: NOW }).block_reason).toBe("already_cancelled");
   });
   it("leavePolicy：分钟可负；<60 即 late", () => {
     expect(leavePolicy({ joined: true, startAtMs: NOW + 2 * H, nowMs: NOW })).toEqual({

@@ -1,6 +1,9 @@
+import { after } from "next/server";
+
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { canDeleteExpiredInvite } from "@/lib/api/invites";
+import { sendPartyNoticePush } from "@/lib/push/send";
 
 /**
  * UR E.16 邀约推进（🔒）。
@@ -70,25 +73,102 @@ export async function PATCH(
       console.error(`[api/v1/invites] complete error: code=${error.code} message=${error.message}`);
       return apiError("internal", "完成失敗", 500);
     }
+    const svc = await createServiceClient();
+    const { data: actorRow } = await svc.from("users").select("nickname").eq("id", userId).maybeSingle();
+    const actorNick =
+      typeof (actorRow as { nickname?: unknown } | null)?.nickname === "string" &&
+      ((actorRow as { nickname?: string }).nickname ?? "") !== ""
+        ? (actorRow as { nickname: string }).nickname
+        : "酒友";
+    const recipientId = row.to_user_id;
+    const { error: nErr } = await svc.from("notifications").insert({
+      user_id: recipientId,
+      kind: "invite_completed",
+      party_id: null,
+      actor_id: userId,
+      payload: {
+        invite_id: row.id,
+        party_place: row.place,
+        start_at: row.start_at,
+        actor_nickname: actorNick,
+      },
+    });
+    if (nErr !== null) {
+      console.error(`[api/v1/invites] complete notify error: code=${nErr.code} message=${nErr.message}`);
+    }
+    after(async () => {
+      await sendPartyNoticePush({
+        kind: "invite_completed",
+        recipientIds: [recipientId],
+        actorId: userId,
+        actorName: actorNick,
+        place: row.place,
+        inviteId: row.id,
+      });
+    });
     return apiOk({ completed: true });
-  }
-  if (row.status !== "sent") {
-    return apiError("invalid_params", "邀約已不在等待中", 400);
   }
   const expired =
     typeof row.expires_at === "string" && Date.parse(row.expires_at) < Date.now();
+  // 撤銷／取消私約：等待中（sent，發起人可撤）或已接受未過期（accepted，雙方均可撤銷）→ 寫站內通知＋推播通知對方
   if (action === "recall") {
-    if (row.from_user_id !== userId) return apiError("forbidden", "只能撤回自己發的", 403);
-    const { error } = await supabase
+    if (row.status === "recalled") return apiOk({ recalled: true });
+    if (row.status === "sent") {
+      if (row.from_user_id !== userId) return apiError("forbidden", "只能撤回自己發的", 403);
+    } else if (row.status === "accepted") {
+      if (row.from_user_id !== userId && row.to_user_id !== userId) {
+        return apiError("forbidden", "無權撤銷此邀約", 403);
+      }
+      if (expired) return apiError("invalid_params", "邀約已過期", 410);
+    } else {
+      return apiError("invalid_params", "邀約已不在可撤銷狀態", 400);
+    }
+    const svc = await createServiceClient();
+    const { error } = await svc
       .from("drink_invites")
       .update({ status: "recalled" })
       .eq("id", id)
-      .eq("status", "sent");
+      .in("status", ["sent", "accepted"]);
     if (error !== null) {
       console.error(`[api/v1/invites] recall error: code=${error.code} message=${error.message}`);
       return apiError("internal", "撤回失敗", 500);
     }
+    const { data: actorRow } = await svc.from("users").select("nickname").eq("id", userId).maybeSingle();
+    const actorNick =
+      typeof (actorRow as { nickname?: unknown } | null)?.nickname === "string" &&
+      ((actorRow as { nickname?: string }).nickname ?? "") !== ""
+        ? (actorRow as { nickname: string }).nickname
+        : "酒友";
+    const recipientId = userId === row.from_user_id ? row.to_user_id : row.from_user_id;
+    const { error: nErr } = await svc.from("notifications").insert({
+      user_id: recipientId,
+      kind: "invite_cancelled",
+      party_id: null,
+      actor_id: userId,
+      payload: {
+        invite_id: row.id,
+        party_place: row.place,
+        start_at: row.start_at,
+        actor_nickname: actorNick,
+      },
+    });
+    if (nErr !== null) {
+      console.error(`[api/v1/invites] recall notify error: code=${nErr.code} message=${nErr.message}`);
+    }
+    after(async () => {
+      await sendPartyNoticePush({
+        kind: "invite_cancelled",
+        recipientIds: [recipientId],
+        actorId: userId,
+        actorName: actorNick,
+        place: row.place,
+        inviteId: row.id,
+      });
+    });
     return apiOk({ recalled: true });
+  }
+  if (row.status !== "sent") {
+    return apiError("invalid_params", "邀約已不在等待中", 400);
   }
   if (row.to_user_id !== userId) return apiError("forbidden", "只能回應收到的邀約", 403);
   if (expired) return apiError("invalid_params", "邀約已過期", 410);
@@ -125,7 +205,7 @@ export async function PATCH(
   if (fErr !== null) {
     console.error(`[api/v1/invites] befriend error: code=${fErr.code} message=${fErr.message}`);
   }
-  const { data: peerRow } = await supabase
+  const { data: peerRow } = await service
     .from("users")
     .select("id,nickname,avatar_url")
     .eq("id", row.from_user_id)

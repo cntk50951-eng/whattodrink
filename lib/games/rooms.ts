@@ -130,7 +130,7 @@ export function parseJoinCode(raw: unknown): { code: string } | { error: string 
   if (typeof raw !== "object" || raw === null) return { error: "body 需为对象" };
   const c = (raw as Record<string, unknown>).code;
   if (typeof c !== "string" || c.trim() === "") return { error: "code 必填" };
-  const code = c.trim().toUpperCase();
+  const code = c.replace(/\s+/g, "").toUpperCase();
   if (code.length !== 6) return { error: "code 非法" };
   return { code };
 }

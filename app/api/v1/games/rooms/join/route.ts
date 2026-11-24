@@ -64,10 +64,6 @@ export async function POST(req: Request): Promise<Response> {
   if (await isGameBanned(svc, userId, nowMs)) {
     return apiError("game_banned", "你暫時不可玩酒桌遊戲", 403);
   }
-  const existing = await getActiveRoomId(svc, userId);
-  if (existing !== null) {
-    return apiError("already_in_room", "你已在一個房間裡", 409);
-  }
   const { data: roomRaw } = await svc
     .from("game_rooms")
     .select("id,code,game,host_id,status,rules,max_players,version,expires_at,ended_at")
@@ -78,12 +74,16 @@ export async function POST(req: Request): Promise<Response> {
   if (room === null) {
     return apiError("room_not_found", "房間不存在或已結束", 404);
   }
-  if (room.status !== "lobby") {
-    return apiError("room_started", "對局已開始，不可再加入", 409);
-  }
   const mine = await getPlayerRow(svc, room.id, userId);
   if (mine !== null && mine.status === "active") {
     return apiOk({ room_id: room.id });
+  }
+  const existing = await getActiveRoomId(svc, userId);
+  if (existing !== null) {
+    return apiError("already_in_room", "你已在一個房間裡", 409);
+  }
+  if (room.status !== "lobby") {
+    return apiError("room_started", "對局已開始，不可再加入", 409);
   }
   if (mine !== null && mine.status === "kicked") {
     return apiError("not_allowed", "你曾被請出該房間", 403);

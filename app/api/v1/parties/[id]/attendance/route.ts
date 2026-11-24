@@ -1,7 +1,10 @@
+import { after } from "next/server";
+
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { TRUST_CONFIG } from "@/lib/trust/config";
 import { settleParty } from "@/lib/trust/settle";
+import { sendPartyNoticePush } from "@/lib/push/send";
 
 /**
  * UR E.31 C1 出席确认读（🔒）。
@@ -203,10 +206,17 @@ export async function POST(
   const nowMs = Date.now();
   const { data: party } = await svc
     .from("parties")
-    .select("id,host_user_id,status,expires_at")
+    .select("id,host_user_id,status,expires_at,start_at,place")
     .eq("id", id)
     .maybeSingle();
-  const p = party as { id?: unknown; host_user_id?: unknown; status?: unknown; expires_at?: unknown } | null;
+  const p = party as {
+    id?: unknown;
+    host_user_id?: unknown;
+    status?: unknown;
+    expires_at?: unknown;
+    start_at?: unknown;
+    place?: unknown;
+  } | null;
   if (p === null || typeof p.id !== "string") return apiError("not_found", "酒局不存在", 404);
   const isHost = p.host_user_id === userId;
   const { data: join } = isHost
@@ -248,6 +258,54 @@ export async function POST(
       if (error !== null) {
         console.error(`[api/v1/parties/attendance] mark error: code=${error.code} message=${error.message}`);
         return apiError("internal", "標記失敗", 500);
+      }
+    }
+    // 通知所有已報名成員酒局已完成（同局每人去重一次，重複修改出席標記不重複打擾）
+    const memberIds = [...memberSet].filter((uid) => uid !== userId);
+    if (memberIds.length > 0) {
+      const { data: existing } = await svc
+        .from("notifications")
+        .select("user_id")
+        .eq("party_id", id)
+        .eq("kind", "party_completed")
+        .in("user_id", memberIds);
+      const already = new Set(
+        ((existing ?? []) as { user_id?: unknown }[])
+          .map((r) => r.user_id)
+          .filter((v): v is string => typeof v === "string"),
+      );
+      const toNotify = memberIds.filter((uid) => !already.has(uid));
+      if (toNotify.length > 0) {
+        const { data: hostRow } = await svc.from("users").select("nickname").eq("id", userId).maybeSingle();
+        const hostNick =
+          typeof (hostRow as { nickname?: unknown } | null)?.nickname === "string" &&
+          ((hostRow as { nickname?: string }).nickname ?? "") !== ""
+            ? (hostRow as { nickname: string }).nickname
+            : "酒友";
+        const place = typeof p.place === "string" ? p.place : "";
+        const startAt = typeof p.start_at === "string" ? p.start_at : null;
+        const { error: nErr } = await svc.from("notifications").insert(
+          toNotify.map((uid) => ({
+            user_id: uid,
+            kind: "party_completed",
+            party_id: id,
+            actor_id: userId,
+            payload: { party_place: place, start_at: startAt, actor_nickname: hostNick },
+          })),
+        );
+        if (nErr !== null) {
+          console.error(`[api/v1/parties/attendance] complete notify error: code=${nErr.code} message=${nErr.message}`);
+        }
+        after(async () => {
+          await sendPartyNoticePush({
+            kind: "party_completed",
+            recipientIds: toNotify,
+            actorId: userId,
+            actorName: hostNick,
+            place,
+            partyId: id,
+          });
+        });
       }
     }
     return apiOk({ ok: true });
