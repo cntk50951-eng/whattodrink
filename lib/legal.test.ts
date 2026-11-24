@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DELETE_ACCOUNT, LEGAL_CHROME, SUPPORT_EMAIL, getLegalDoc, isLegalLocale, legalPath, type LegalLocale } from "./legal";
+import { CHILD_SAFETY, DELETE_ACCOUNT, LEGAL_CHROME, SUPPORT, SUPPORT_EMAIL, getLegalDoc, isLegalLocale, legalPath, type LegalLocale } from "./legal";
 
 const LOCALES: LegalLocale[] = ["zh-Hant", "zh-Hans", "en"];
 
@@ -46,8 +46,46 @@ describe("公開法律頁內容", () => {
     }
   });
 
-  it("刪號頁不承諾人工處理信件（沒有對應流程）", () => {
-    for (const l of LOCALES) expect(JSON.stringify(DELETE_ACCOUNT[l])).not.toContain("@");
+  it("刪號頁寫明站外郵件申請（Google Play：不裝 App 也能發起），且不再要求重新安裝", () => {
+    for (const l of LOCALES) {
+      const d = DELETE_ACCOUNT[l];
+      expect(d.requestSteps).toHaveLength(4);
+      expect(d.requestSteps[0]).toContain(SUPPORT_EMAIL);
+      expect(d.requestSteps.join("")).toContain("30");
+      expect(d.cantBody).not.toMatch(/重新安裝嗨飲並登入|重新安装嗨饮并登录|^Reinstall hi drink/);
+      // 整頁只出現這一個信箱
+      const emails = JSON.stringify(d).match(/[\w.+-]+@[\w.-]+/g) ?? [];
+      expect(emails.every((e) => e === SUPPORT_EMAIL)).toBe(true);
+    }
+  });
+
+  it("客服頁與兒少安全頁：三語都有，寫明信箱，客服頁連到刪號／兒少安全／私隱", () => {
+    for (const l of LOCALES) {
+      expect(SUPPORT[l].contactBody).toContain(SUPPORT_EMAIL);
+      expect(SUPPORT[l].topics.map((t) => t.slug).filter(Boolean)).toEqual(["delete-account", "child-safety", "privacy"]);
+      expect(CHILD_SAFETY[l].sections.length).toBe(CHILD_SAFETY["zh-Hant"].sections.length);
+      expect(JSON.stringify(CHILD_SAFETY[l])).toContain(SUPPORT_EMAIL);
+      expect(JSON.stringify([SUPPORT[l], CHILD_SAFETY[l]])).not.toMatch(/TODO|TBD|待確認|【待/);
+    }
+  });
+
+  it("私隱政策具名第三方 AI，且不再宣稱 Sign in with Apple（尚未上線）", () => {
+    for (const l of LOCALES) {
+      const all = JSON.stringify(getLegalDoc("privacy", l));
+      expect(all).toContain("MiniMax");
+      expect(all).toContain("OpenAI");
+      expect(all).not.toMatch(/Sign in with Apple|Apple 登入|Apple 登录/);
+    }
+  });
+
+  it("條款含 Ivy 與兒少安全兩節，三語章節數一致；版本 1.1", () => {
+    for (const l of LOCALES) {
+      const t = getLegalDoc("terms", l);
+      expect(t.version).toBe("1.1");
+      expect(getLegalDoc("privacy", l).version).toBe("1.1");
+      expect(JSON.stringify(t)).toContain("Ivy");
+      expect(JSON.stringify(t)).toContain("/legal/child-safety");
+    }
   });
 
   it("私隱政策寫明負責人與通訊地址（PCPD 指引）", () => {

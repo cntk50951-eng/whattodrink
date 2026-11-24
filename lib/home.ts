@@ -70,7 +70,7 @@ export function resolveSiteGate(
   const localePrefix = firstSegment && locales.includes(firstSegment) ? `/${firstSegment}` : "";
   const pathWithoutLocale = clean.slice(localePrefix.length);
   // `/terms` is the app's mode guide when the site is live.
-  if (pathWithoutLocale === "/privacy" || pathWithoutLocale === "/terms") {
+  if (pathWithoutLocale === "/privacy" || pathWithoutLocale === "/terms" || pathWithoutLocale === "/support") {
     return `${localePrefix}/legal${pathWithoutLocale}`;
   }
   return `${localePrefix}/coming-soon`;

@@ -49,6 +49,7 @@ export const CLEANUP_COLUMNS: ReadonlyArray<{ table: string; col: string }> = [
   { table: "drink_invites", col: "to_user_id" },
   { table: "devices", col: "user_id" },
   { table: "post_reports", col: "reporter_id" },
+  { table: "bar_reply_reports", col: "reporter_id" },
   { table: "party_events", col: "user_id" },
   { table: "notifications", col: "actor_id" },
   { table: "game_events", col: "actor_id" },

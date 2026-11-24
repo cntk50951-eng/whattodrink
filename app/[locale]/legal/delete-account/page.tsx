@@ -62,6 +62,12 @@ export default async function DeleteAccountPage({ params }: { params: Promise<{ 
           {d.cantTitle}
         </h2>
         <p className="mt-3 leading-relaxed">{d.cantBody}</p>
+        <ol className="mt-3 list-decimal space-y-1.5 pl-5 leading-relaxed">
+          {d.requestSteps.map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ol>
+        <p className="text-muted-foreground mt-3 text-sm leading-relaxed">{d.requestNote}</p>
       </section>
       <p className="text-muted-foreground text-sm">
         {d.privacyNote}{" "}

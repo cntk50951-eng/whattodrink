@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased] — 上架審核第一輪修復（2026-11-24）
+
+### Added
+- 公開頁：`/legal/support`（客服與支援）、`/legal/child-safety`（兒少安全標準），三語；關站時 `/support` 轉 `/legal/support`。
+- 刪號說明頁改為站外郵件申請（不必重新安裝 App；確認身分後 30 天內由人工團隊處理，Google Play 要求）。
+- `POST /api/v1/bar/chat/report`：舉報 Ivy 回覆，落 `bar_reply_reports`（遷移 `0083_bar_reply_reports.sql`，已執行）；openapi 已補。
+- Ivy 回覆輸出安全審核（`moderateCheckin`；命中退還額度回 502，審核全掛放行）；`IVY_SYSTEM_PROMPT` 加未成年／過量飲酒／自傷求助底線，並改為被問時承認是 AI 酒保。
+
+### Changed
+- 私隱政策與條款 1.0→1.1（iOS／AOS 逐字節同步）：具名 MiniMax／OpenAI、遙測、性別用途、口味卡與投訴分診的 AI 處理；移除尚未上線的 Sign in with Apple 句子。
+
+### 驗證
+- vitest 全量 1,381／1,381、`tsc`、eslint、`npm run build` 通過。**未測**：OpenAI／MiniMax 真實審核對典型 Ivy 回覆的誤殺率（單測只用 mock）。
+
 ## [Unreleased]
 
 ### Fixed

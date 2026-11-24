@@ -739,13 +739,74 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
         "502":
-          description: 上游故障
+          description: 上游故障，或 Ivy 的回覆未通過輸出安全審核（不回台詞、額度已退還；客戶端顯示系統提示）
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/bar/chat/report:
+    post:
+      operationId: barChatReport
+      summary: 舉報酒保 Ivy 的某句回覆（🔒 需登入；Google Play AI 內容政策要求 App 內可舉報不當 AI 輸出；落 bar_reply_reports，每人每小時 20 次）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reply_text]
+              properties:
+                reply_text:
+                  type: string
+                  maxLength: 1000
+                  description: 被舉報的 Ivy 台詞原文
+                reason:
+                  type: string
+                  enum: [sexual, minors, harassment, dangerous_drinking, self_harm, other]
+                  description: 缺省或非法當 other
+                user_text:
+                  type: string
+                  maxLength: 500
+                  description: 可選，觸發該回覆的用戶上一句（給審核還原語境）
+                lang:
+                  type: string
+                  enum: [en, yue, zh]
+                platform:
+                  type: string
+                  enum: [ios, aos]
+      responses:
+        "201":
+          description: 已收到舉報
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+        "400":
+          description: 缺少或非法的 reply_text
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: 未登入
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: 舉報太頻繁（Retry-After 秒）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
   /api/v1/bar/credits:
     get:
       operationId: barCredits

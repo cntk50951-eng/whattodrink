@@ -17,6 +17,17 @@ describe("ivy persona", () => {
     expect(IVY_SYSTEM_PROMPT).toContain("never clingy");
   });
 
+  it("被問是不是 AI／真人要誠實承認是 AI 酒保（與同意畫面「Ivy 是 AI」一致）", () => {
+    expect(IVY_SYSTEM_PROMPT).toContain("an AI bartender");
+    expect(IVY_SYSTEM_PROMPT).not.toContain("say you are Ivy, the bartender of this bar");
+  });
+
+  it("安全底線（Google Play AI 內容政策）：未成年、勸酒、自傷求助都寫進 system", () => {
+    expect(IVY_SYSTEM_PROMPT).toContain("under 18");
+    expect(IVY_SYSTEM_PROMPT).toContain("never encourage drunk driving");
+    expect(IVY_SYSTEM_PROMPT).toContain("999 in Hong Kong");
+  });
+
   it("三个事件都有指令（非台词）", () => {
     expect(Object.keys(IVY_EVENT_INSTRUCTIONS).sort()).toEqual(["cheers", "greet", "pat"]);
   });

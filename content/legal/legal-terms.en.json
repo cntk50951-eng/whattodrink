@@ -1,6 +1,6 @@
 {
   "title": "Terms of Service",
-  "effective": "18 November 2026",
+  "effective": "24 November 2026",
   "summaryTitle": "Key points (about 1 minute)",
   "summary": [
     "You must be 18 or over to use the app.",
@@ -60,6 +60,18 @@
       ]
     },
     {
+      "title": "AI bartender Ivy",
+      "paragraphs": [
+        "Ivy is an AI character, not a real person. Her replies are generated automatically by a third-party AI service (MiniMax) and can be wrong or unsuitable. Do not rely on Ivy for medical, legal or safety advice, and do not share other people's private information with her. You can report any Ivy reply inside the app."
+      ]
+    },
+    {
+      "title": "Child safety",
+      "paragraphs": [
+        "We have zero tolerance for content that sexualises, exploits or endangers anyone under 18, and for anyone who tries to contact minors. This is banned and leads to permanent removal. You can report content or a user from inside the app. We review reports, remove content and accounts, and report confirmed child sexual abuse material to the competent authorities. Our full child safety standards: https://www.whattodrink.app/en/legal/child-safety"
+      ]
+    },
+    {
       "title": "Ending your account",
       "paragraphs": [
         "You can delete your account at any time by tapping “Delete account” at the bottom of your profile panel (tap your avatar on the home screen)."
@@ -72,5 +84,5 @@
       ]
     }
   ],
-  "version": "1.0"
+  "version": "1.1"
 }

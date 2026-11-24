@@ -15,7 +15,7 @@ import termsHant from "../content/legal/legal-terms.zh-Hant.json";
  */
 
 export type LegalLocale = "zh-Hant" | "zh-Hans" | "en";
-export type LegalSlug = "privacy" | "terms" | "delete-account";
+export type LegalSlug = "privacy" | "terms" | "delete-account" | "support" | "child-safety";
 
 export type LegalSection = {
   title: string;
@@ -60,6 +60,8 @@ export const LEGAL_CHROME: Record<
     privacy: string;
     terms: string;
     deleteAccount: string;
+    support: string;
+    childSafety: string;
     contact: string;
   }
 > = {
@@ -71,6 +73,8 @@ export const LEGAL_CHROME: Record<
     privacy: "私隱政策",
     terms: "服務條款",
     deleteAccount: "刪除帳號",
+    support: "客服與支援",
+    childSafety: "兒少安全",
     contact: "聯絡",
   },
   "zh-Hans": {
@@ -81,6 +85,8 @@ export const LEGAL_CHROME: Record<
     privacy: "隐私政策",
     terms: "服务条款",
     deleteAccount: "删除帐号",
+    support: "客服与支持",
+    childSafety: "儿童安全",
     contact: "联系",
   },
   en: {
@@ -91,6 +97,8 @@ export const LEGAL_CHROME: Record<
     privacy: "Privacy Policy",
     terms: "Terms of Service",
     deleteAccount: "Delete your account",
+    support: "Support",
+    childSafety: "Child safety",
     contact: "Contact",
   },
 };
@@ -118,6 +126,9 @@ export type DeleteAccountCopy = {
   after: string[];
   cantTitle: string;
   cantBody: string;
+  /** 站外申請刪帳的步驟（Google Play 要求：不裝 App 也能發起刪除）。 */
+  requestSteps: string[];
+  requestNote: string;
   privacyNote: string;
 };
 
@@ -156,7 +167,14 @@ export const DELETE_ACCOUNT: Record<LegalLocale, DeleteAccountCopy> = {
       "選「立即永久刪除」：資料、你上傳的檔案和登入帳號會馬上刪除，沒有恢復期。",
     ],
     cantTitle: "登入不了，或已經解除安裝 App？",
-    cantBody: "重新安裝嗨飲並登入同一個帳號，就可以按上面的步驟刪除。",
+    cantBody: "你不需要重新安裝 App。請按下面的步驟寄信給我們，核對是你本人後，我們會替你刪除。",
+    requestSteps: [
+      `用註冊嗨飲時的電郵，寄信到 ${SUPPORT_EMAIL}。`,
+      "標題寫「刪除我的帳號」，內文寫上你的暱稱。",
+      "我們會回信請你確認這是你本人的要求；如果來信電郵與註冊電郵不同，我們可能請你補充資料。",
+      "確認身分後 30 天內，我們會按「立即永久刪除」的範圍處理，完成後回信通知你。",
+    ],
+    requestNote: "為了保護你的帳號，我們不會在沒有核對身分的情況下刪除資料。",
     privacyNote: "我們如何處理你的個人資料，請見",
   },
   "zh-Hans": {
@@ -188,7 +206,14 @@ export const DELETE_ACCOUNT: Record<LegalLocale, DeleteAccountCopy> = {
       "选“立即永久删除”：资料、你上传的文件和登录帐号会马上删除，没有恢复期。",
     ],
     cantTitle: "登录不了，或已经卸载 App？",
-    cantBody: "重新安装嗨饮并登录同一个帐号，就可以按上面的步骤删除。",
+    cantBody: "你不需要重新安装 App。请按下面的步骤寄信给我们，核对是你本人后，我们会替你删除。",
+    requestSteps: [
+      `用注册嗨饮时的电邮，寄信到 ${SUPPORT_EMAIL}。`,
+      "标题写“删除我的帐号”，内文写上你的昵称。",
+      "我们会回信请你确认这是你本人的要求；如果来信电邮与注册电邮不同，我们可能请你补充资料。",
+      "确认身份后 30 天内，我们会按“立即永久删除”的范围处理，完成后回信通知你。",
+    ],
+    requestNote: "为了保护你的帐号，我们不会在没有核对身份的情况下删除资料。",
     privacyNote: "我们如何处理你的个人资料，请见",
   },
   en: {
@@ -220,7 +245,225 @@ export const DELETE_ACCOUNT: Record<LegalLocale, DeleteAccountCopy> = {
       "If you chose “delete permanently now”: your data, uploaded files and login account are deleted immediately, with no restore period.",
     ],
     cantTitle: "Can’t sign in, or already uninstalled the app?",
-    cantBody: "Reinstall hi drink and sign in with the same account, then follow the steps above.",
+    cantBody: "You do not need to reinstall the app. Email us using the steps below and, once we have confirmed it is you, we will delete the account for you.",
+    requestSteps: [
+      `Email ${SUPPORT_EMAIL} from the email address you signed up with.`,
+      "Use the subject “Delete my account” and include your nickname in the message.",
+      "We will reply to ask you to confirm the request is yours. If you wrote from a different address we may ask for more detail.",
+      "Within 30 days of confirming your identity we will delete the account as in “Delete permanently now”, and email you when it is done.",
+    ],
+    requestNote: "To protect your account we will not delete anything before we have checked it is you.",
     privacyNote: "For how we handle your personal data, see the",
+  },
+};
+
+export type SupportCopy = {
+  title: string;
+  effective: string;
+  intro: string;
+  contactTitle: string;
+  contactBody: string;
+  includeTitle: string;
+  include: string[];
+  topicsTitle: string;
+  /** slug 有值＝附站內連結到該頁。 */
+  topics: { title: string; body: string; slug?: LegalSlug }[];
+};
+
+/**
+ * 公開客服與支援頁（App Store「Support URL」／Google Play 客服資料用）。
+ * 只寫已存在的事實：客服信箱、App 內的檢舉／封鎖入口、刪號與私隱頁。不承諾回覆時限。
+ */
+export const SUPPORT: Record<LegalLocale, SupportCopy> = {
+  "zh-Hant": {
+    title: "客服與支援",
+    effective: "2026年11月24日",
+    intro: "嗨飲（hi drink）遇到問題，或想問帳號、私隱、檢舉的事，都可以聯絡我們。",
+    contactTitle: "聯絡我們",
+    contactBody: `請寄信到 ${SUPPORT_EMAIL}。我們會盡快回覆。`,
+    includeTitle: "來信時請寫上",
+    include: [
+      "你註冊用的電郵和暱稱（方便我們找到帳號）。",
+      "手機型號和系統版本，以及 App 版本（在 App 內可以看到）。",
+      "發生了什麼事、在哪個畫面；如有截圖更好。",
+    ],
+    topicsTitle: "常見問題",
+    topics: [
+      { title: "刪除帳號", body: "可以在 App 內刪除；打不開 App 時也可以用電郵申請。", slug: "delete-account" },
+      { title: "檢舉與封鎖", body: "在貼文、聊天、個人頁、邀請和遊戲房的選單裡，點「檢舉」或「封鎖」。涉及人身安全的個案我們會優先處理。" },
+      { title: "兒少安全", body: "我們對任何涉及未成年人的性化或剝削內容零容忍。", slug: "child-safety" },
+      { title: "私隱與條款", body: "我們收集什麼資料、交給哪些服務處理。", slug: "privacy" },
+    ],
+  },
+  "zh-Hans": {
+    title: "客服与支持",
+    effective: "2026年11月24日",
+    intro: "嗨饮（hi drink）遇到问题，或想问帐号、隐私、举报的事，都可以联系我们。",
+    contactTitle: "联系我们",
+    contactBody: `请寄信到 ${SUPPORT_EMAIL}。我们会尽快回复。`,
+    includeTitle: "来信时请写上",
+    include: [
+      "你注册用的电邮和昵称（方便我们找到帐号）。",
+      "手机型号和系统版本，以及 App 版本（在 App 内可以看到）。",
+      "发生了什么事、在哪个画面；如有截图更好。",
+    ],
+    topicsTitle: "常见问题",
+    topics: [
+      { title: "删除帐号", body: "可以在 App 内删除；打不开 App 时也可以用电邮申请。", slug: "delete-account" },
+      { title: "举报与封锁", body: "在帖子、聊天、个人页、邀请和游戏房的菜单里，点“举报”或“封锁”。涉及人身安全的个案我们会优先处理。" },
+      { title: "儿童安全", body: "我们对任何涉及未成年人的性化或剥削内容零容忍。", slug: "child-safety" },
+      { title: "隐私与条款", body: "我们收集什么资料、交给哪些服务处理。", slug: "privacy" },
+    ],
+  },
+  en: {
+    title: "Support",
+    effective: "24 November 2026",
+    intro: "If something goes wrong in hi drink, or you have a question about your account, privacy or a report, contact us.",
+    contactTitle: "Contact us",
+    contactBody: `Email ${SUPPORT_EMAIL}. We will reply as soon as we can.`,
+    includeTitle: "Please include",
+    include: [
+      "The email address and nickname you signed up with, so we can find your account.",
+      "Your phone model, system version and the app version (shown inside the app).",
+      "What happened and on which screen. A screenshot helps.",
+    ],
+    topicsTitle: "Common questions",
+    topics: [
+      { title: "Delete your account", body: "You can delete it inside the app, or ask by email if you cannot open the app.", slug: "delete-account" },
+      { title: "Reports and blocking", body: "Open the menu on a post, chat, profile, invite or game room and tap Report or Block. Cases involving personal safety are handled first." },
+      { title: "Child safety", body: "We have zero tolerance for content that sexualises or exploits minors.", slug: "child-safety" },
+      { title: "Privacy and terms", body: "What we collect and which services process it.", slug: "privacy" },
+    ],
+  },
+};
+
+export type ChildSafetyCopy = {
+  title: string;
+  effective: string;
+  intro: string;
+  sections: LegalSection[];
+};
+
+/**
+ * 兒少安全標準（Google Play 要求社交／約會類 App 公開 CSAE 標準、聯絡窗口與通報程序）。
+ * 只寫已存在的機制：18+ 生日檢核、App 內檢舉／封鎖、內容自動安全檢查、人工審核處置。
+ */
+export const CHILD_SAFETY: Record<LegalLocale, ChildSafetyCopy> = {
+  "zh-Hant": {
+    title: "兒少安全標準",
+    effective: "2026年11月24日",
+    intro: "嗨飲（hi drink）只供年滿 18 歲的人使用。這一頁說明我們如何防止兒童性剝削與虐待（CSAE），以及你可以怎樣舉報。",
+    sections: [
+      {
+        title: "我們的標準",
+        paragraphs: [
+          "我們對任何涉及未滿 18 歲人士的性化、剝削、虐待或危害內容零容忍，包括兒童性虐待素材（CSAM）、誘騙、索取或交換相關內容，以及試圖接觸未成年人的行為。這些行為一律禁止，違者會被永久移除。",
+        ],
+      },
+      {
+        title: "我們怎樣預防",
+        paragraphs: [],
+        bullets: [
+          "註冊時要填生日並確認年滿 18 歲，未滿 18 歲不能繼續使用。",
+          "發佈的貼文、相片、評論和暱稱會經自動安全檢查。",
+          "任何用戶都可以在 App 內檢舉內容或用戶，也可以封鎖對方。",
+          "我們一發現用戶未滿 18 歲，會停用或刪除其帳號。",
+        ],
+      },
+      {
+        title: "怎樣檢舉",
+        paragraphs: [
+          `在貼文、聊天、個人頁、邀請和遊戲房的選單裡點「檢舉」。你也可以寄信到 ${SUPPORT_EMAIL}，標題寫「兒少安全」。`,
+        ],
+      },
+      {
+        title: "我們怎樣處理",
+        paragraphs: [
+          "涉及兒少安全的檢舉會優先處理。我們會審核檢舉、移除內容、停用帳號；確認涉及兒童性虐待素材時，我們會向主管的執法機關通報。",
+        ],
+      },
+      {
+        title: "兒少安全聯絡窗口",
+        paragraphs: [`${SUPPORT_EMAIL}（標題寫「兒少安全」）。`],
+      },
+    ],
+  },
+  "zh-Hans": {
+    title: "儿童安全标准",
+    effective: "2026年11月24日",
+    intro: "嗨饮（hi drink）只供年满 18 岁的人使用。这一页说明我们如何防止儿童性剥削与虐待（CSAE），以及你可以怎样举报。",
+    sections: [
+      {
+        title: "我们的标准",
+        paragraphs: [
+          "我们对任何涉及未满 18 岁人士的性化、剥削、虐待或危害内容零容忍，包括儿童性虐待素材（CSAM）、诱骗、索取或交换相关内容，以及试图接触未成年人的行为。这些行为一律禁止，违者会被永久移除。",
+        ],
+      },
+      {
+        title: "我们怎样预防",
+        paragraphs: [],
+        bullets: [
+          "注册时要填生日并确认年满 18 岁，未满 18 岁不能继续使用。",
+          "发布的帖子、照片、评论和昵称会经自动安全检查。",
+          "任何用户都可以在 App 内举报内容或用户，也可以封锁对方。",
+          "我们一发现用户未满 18 岁，会停用或删除其帐号。",
+        ],
+      },
+      {
+        title: "怎样举报",
+        paragraphs: [
+          `在帖子、聊天、个人页、邀请和游戏房的菜单里点“举报”。你也可以寄信到 ${SUPPORT_EMAIL}，标题写“儿童安全”。`,
+        ],
+      },
+      {
+        title: "我们怎样处理",
+        paragraphs: [
+          "涉及儿童安全的举报会优先处理。我们会审核举报、移除内容、停用帐号；确认涉及儿童性虐待素材时，我们会向主管的执法机关通报。",
+        ],
+      },
+      {
+        title: "儿童安全联系窗口",
+        paragraphs: [`${SUPPORT_EMAIL}（标题写“儿童安全”）。`],
+      },
+    ],
+  },
+  en: {
+    title: "Child Safety Standards",
+    effective: "24 November 2026",
+    intro: "hi drink is only for people aged 18 or over. This page explains how we prevent child sexual abuse and exploitation (CSAE) and how you can report it.",
+    sections: [
+      {
+        title: "Our standard",
+        paragraphs: [
+          "We have zero tolerance for content that sexualises, exploits, abuses or endangers anyone under 18. That includes child sexual abuse material (CSAM), grooming, asking for or trading such material, and any attempt to contact minors. All of it is banned and leads to permanent removal.",
+        ],
+      },
+      {
+        title: "How we prevent it",
+        paragraphs: [],
+        bullets: [
+          "At sign-up you enter your date of birth and confirm you are 18 or over. Under-18s cannot continue.",
+          "Posts, photos, comments and nicknames go through automatic safety checks.",
+          "Anyone can report content or a user inside the app, and block the other person.",
+          "If we learn that a user is under 18 we suspend or delete the account.",
+        ],
+      },
+      {
+        title: "How to report",
+        paragraphs: [
+          `Open the menu on a post, chat, profile, invite or game room and tap Report. You can also email ${SUPPORT_EMAIL} with the subject “Child safety”.`,
+        ],
+      },
+      {
+        title: "How we respond",
+        paragraphs: [
+          "Child-safety reports are handled first. We review reports, remove content and suspend accounts. When we confirm child sexual abuse material, we report it to the competent law enforcement authorities.",
+        ],
+      },
+      {
+        title: "Child safety contact",
+        paragraphs: [`${SUPPORT_EMAIL} (subject “Child safety”).`],
+      },
+    ],
   },
 };

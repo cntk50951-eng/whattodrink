@@ -9,6 +9,7 @@ import {
 } from "@/lib/bartender";
 import { sanitizeBarMemory } from "@/lib/barMemory";
 import { MinimaxError, minimaxChat } from "@/lib/minimax";
+import { moderateCheckin } from "@/lib/moderation";
 import { ipRateLimit } from "@/lib/rateLimit";
 
 /**
@@ -95,6 +96,21 @@ export async function POST(req: Request): Promise<Response> {
 
   try {
     const text = await minimaxChat(toMinimaxMessages(history, { message, event, lang, memory }), { apiKey });
+    // 輸出安全（Google Play AI 內容政策）：回覆也過一遍審核。命中＝不給用戶、退還額度、回 502（客戶端顯示系統提示）。
+    // 審核服務全掛時放行（可用性優先；system prompt 的安全規則仍在）。
+    const verdict = await moderateCheckin(
+      { text },
+      {
+        openaiKey: process.env.OPENAI_API_KEY ?? process.env.OPENAI_KEY,
+        minimaxKey: apiKey,
+        minimaxBaseUrl: process.env.MINIMAX_API_BASE,
+      },
+    );
+    if (verdict.flagged) {
+      if (credits?.kind === "ok" && !credits.duplicate) await refundChatCredit(svc, userId, requestId);
+      console.warn(`[bar-chat] reply blocked by moderation: via=${verdict.via} categories=${verdict.categories.join(",")}`);
+      return apiError("internal", "Ivy 暂时没听清，请稍后再试。", 502);
+    }
     const latest = credits?.kind === "ok" ? credits.credits : ((await getBarCredits(svc, userId)) ?? undefined);
     return apiOk({ text, lang, credits: latest });
   } catch (e) {

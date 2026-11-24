@@ -10,7 +10,7 @@ import {
 } from "@/lib/legal";
 
 const LOCALES: readonly LegalLocale[] = ["zh-Hant", "zh-Hans", "en"];
-const SLUGS: readonly LegalSlug[] = ["privacy", "terms", "delete-account"];
+const SLUGS: readonly LegalSlug[] = ["privacy", "terms", "delete-account", "child-safety", "support"];
 
 /**
  * 公開法律頁共用外框（純靜態 Server Component，零客戶端 JS）：
@@ -34,7 +34,15 @@ export function LegalShell({
 }) {
   const c = LEGAL_CHROME[locale];
   const labelOf = (s: LegalSlug): string =>
-    s === "privacy" ? c.privacy : s === "terms" ? c.terms : c.deleteAccount;
+    s === "privacy"
+      ? c.privacy
+      : s === "terms"
+        ? c.terms
+        : s === "delete-account"
+          ? c.deleteAccount
+          : s === "child-safety"
+            ? c.childSafety
+            : c.support;
   return (
     <Container size="narrow" className="py-10 md:py-14">
       <article className="mx-auto max-w-2xl">

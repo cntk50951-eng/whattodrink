@@ -94,6 +94,8 @@ describe("resolveSiteGate (UR L.1)", () => {
     ["/en/terms", "/en/legal/terms"],
     ["/zh-Hans/terms", "/zh-Hans/legal/terms"],
     ["/zh-Hant/privacy", "/zh-Hant/legal/privacy"],
+    ["/support", "/legal/support"],
+    ["/en/support/", "/en/legal/support"],
   ])("關站：舊入口 %s 轉到 %s", (pathname, target) => {
     expect(resolveSiteGate(pathname, false, locales)).toBe(target);
   });
@@ -102,6 +104,7 @@ describe("resolveSiteGate (UR L.1)", () => {
     for (const p of [
       "/legal/privacy", "/legal/terms", "/legal/delete-account", "/legal/privacy/",
       "/en/legal/privacy", "/zh-Hans/legal/terms", "/zh-Hant/legal/delete-account", "/en/legal",
+      "/legal/support", "/en/legal/child-safety",
     ]) {
       expect(resolveSiteGate(p, false, locales)).toBeNull();
     }

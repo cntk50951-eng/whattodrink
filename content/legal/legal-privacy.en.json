@@ -1,6 +1,6 @@
 {
   "title": "Privacy Policy",
-  "effective": "18 November 2026",
+  "effective": "24 November 2026",
   "summaryTitle": "In one sentence",
   "summary": [
     "We only collect what the app needs to work. Your location is used to show the map and nearby friends, and you can go invisible, block people or delete your account at any time. We do not use your data to track you across apps or websites."
@@ -11,7 +11,7 @@
       "title": "Account details",
       "tag": "Friends see nickname and avatar",
       "paragraphs": [
-        "[Required] Email, nickname and date of birth (used to confirm you are 18 or over). Avatar and gender are optional. Used to sign you in and show your profile."
+        "[Required] Email, nickname, gender and date of birth (date of birth confirms you are 18 or over; gender is used for meetup gender quotas and for showing people nearby, and may appear on your profile). Avatar is optional. Used to sign you in and show your profile."
       ]
     },
     {
@@ -25,21 +25,22 @@
       "title": "Photos, videos and voice",
       "tag": "Whoever you post it to",
       "paragraphs": [
-        "[Optional] Check-in photos, chat media, and your voice when you talk to the bartender Ivy (turned into text by your phone's system speech recognition service)."
+        "[Optional] Check-in photos, chat media, and your voice when you talk to the bartender Ivy (turned into text by your phone's system speech recognition service). The text of Ivy's replies is sent to our AI voice provider to make her voice (see Third-party services)."
       ]
     },
     {
       "title": "Chat and meetup content",
       "tag": "People in the conversation",
       "paragraphs": [
-        "[Required to use the feature] Messages, meetup details and game-room records. Used to run the features and to handle reports and complaints."
+        "[Required to use the feature] Messages, meetup details and game-room records. Used to run the features and to handle reports and complaints. Posts, photos, comments, nicknames, search and Meet requests, meetup details and complaint text may also be checked automatically by AI safety services (see Third-party services)."
       ]
     },
     {
-      "title": "Device and push",
+      "title": "Device, push and usage",
       "tag": "Only us",
       "paragraphs": [
-        "[Optional] Push notification token and app version. Used to send the notifications you agree to receive."
+        "[Optional] Push notification token and app version. Used to send the notifications you agree to receive.",
+        "[Automatic] Anonymous usage events: which screens and features you use, a random anonymous ID, app version, language, theme and platform. They are linked to your account when you are signed in. They do not contain your email, message text, photos or exact location. Used to find bugs and improve the app, not for advertising or for tracking you across other apps or websites."
       ]
     },
     {
@@ -51,16 +52,17 @@
         "AMap (Gaode): maps and search. Your location is sent to its servers. You agree to this when you accept these terms on first launch.",
         "Supabase: sign-in and data storage.",
         "Google: only if you choose to sign in with Google; we receive your email and name.",
-        "Apple and Google (depending on your phone): push notifications and speech recognition; Sign in with Apple on iPhone.",
-        "AI service providers: the messages you send to the bartender Ivy, your search requests, and content that needs a safety check are sent to AI service providers to generate replies and voice, keep your preference memory and run content safety checks."
+        "Apple and Google (depending on your phone): push notifications and speech recognition.",
+        "MiniMax (AI service provider): when you talk to the bartender Ivy, your messages, recent chat history and preference memory are sent to MiniMax to write Ivy's replies and update the memory; Ivy's reply text is sent to make her voice; your search and Meet requests are sent to work out what you are looking for; your taste summary (favourites, likes and dislikes, groups of drinks from your public and friends-only check-ins, and what Ivy remembers about your taste) is sent to write your taste card; and the text and evidence photos in a meetup complaint, including the other person's reply, are sent to help sort complaints. Servers may be outside Hong Kong. You are asked before you first use Ivy or Meet search.",
+        "OpenAI and MiniMax (content safety): posts and photos, comments, nicknames, search and Meet requests, meetup details and complaint text may be checked automatically for safety. Servers may be outside Hong Kong."
       ]
     },
     {
       "title": "Your rights",
       "paragraphs": [
-        "You can request access to and correction of your personal data, and you can ask for deletion by tapping “Delete account” at the bottom of your profile panel (tap your avatar on the home screen). For access or correction requests contact support@whattodrink.app. Person in charge: freelance developer; correspondence address: Sha Tin, Hong Kong. We reply within the time required by the Ordinance."
+        "You can request access to and correction of your personal data, and you can ask for deletion by tapping “Delete account” at the bottom of your profile panel (tap your avatar on the home screen). For access or correction requests contact support@whattodrink.app. Person in charge: freelance developer; correspondence address: Sha Tin, Hong Kong. We reply within the time required by the Ordinance. If you cannot open the app, email support@whattodrink.app from the email address you signed up with, with the subject “Delete my account”. We will confirm it is you, then delete your account and the files you uploaded as in “Delete permanently now”, and reply once it is done, within 30 days of confirming your identity."
       ]
     }
   ],
-  "version": "1.0"
+  "version": "1.1"
 }
