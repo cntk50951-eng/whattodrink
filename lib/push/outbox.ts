@@ -1,4 +1,4 @@
-/** D.12 AOS-only durable dispatch. Every source/privacy read fails closed on database errors. */
+/** D.12 durable dispatch (AOS/FCM; iOS/APNs only for IOS_OUTBOX_KINDS). Every source/privacy read fails closed on database errors. */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { configuredPushDevices, isDeadPushReason, nativePushConfigFromEnv, sendNativePush } from "./native";
 import { computeBadge } from "./badge";
@@ -7,6 +7,13 @@ import { cleanName, eventPayload, retryAt, unreadMessage } from "./outboxPolicy"
 import type { CopyContext } from "./outboxPolicy";
 
 type Row = Record<string, unknown>;
+/**
+ * Kinds this dispatcher may also deliver to iOS devices via APNs. Everything else stays AOS-only.
+ * A kind belongs here only if iOS has NO direct sender for it; otherwise the recipient gets two pushes
+ * (e.g. party_cancelled/invite_* already go through sendPartyNoticePush with iosOnly:true).
+ * chat has no direct iOS sender: messages only reach iOS through this outbox.
+ */
+export const IOS_OUTBOX_KINDS: ReadonlySet<string> = new Set(["chat"]);
 export type OutboxEvent = {id:string;recipient_id:string;kind:string;source_type:"notification"|"message"|"invite";source_id:string;actor_id:string|null;payload:Row;expires_at:string;attempts:number;lease_token:string};
 async function rows(query: PromiseLike<{data:unknown;error:unknown}>): Promise<Row[]> {
  const result=await query;
@@ -115,7 +122,7 @@ async function copyContext(db:SupabaseClient,e:OutboxEvent):Promise<CopyContext>
 }
 
 export async function dispatchNativePush(db:SupabaseClient):Promise<{claimed:number;sent:number;skipped:number;retry:number;failed:number}>{
- const cfg=nativePushConfigFromEnv(process.env);if(!cfg.fcm)throw new Error("fcm-not-configured");
+ const cfg=nativePushConfigFromEnv(process.env);if(!cfg.fcm&&!cfg.apns)throw new Error("push-not-configured");
  const scheduled=await db.rpc("produce_native_push_reminders");if(scheduled.error)throw new Error("reminder-producer-failed");
  const claimed=await db.rpc("claim_native_push",{p_limit:16});if(claimed.error||!Array.isArray(claimed.data))throw new Error("claim-failed");
  const deadline=Date.now()+45_000;
@@ -131,8 +138,9 @@ export async function dispatchNativePush(db:SupabaseClient):Promise<{claimed:num
    stage="eligibility";
    if(!await eventStillEligible(db,e,Date.now())){await finish(e,"skipped");summary.skipped++;return;}
    stage="devices";
-   const devices=configuredPushDevices(await rows(db.from("devices").select("id,platform,push_token,environment,locale").eq("user_id",e.recipient_id).eq("platform","aos").eq("enabled",true).limit(10)),cfg);
-   if(!devices.length){await finish(e,"skipped","no-aos-devices");summary.skipped++;return;}
+   const deviceRows=(platform:"aos"|"ios")=>rows(db.from("devices").select("id,platform,push_token,environment,locale").eq("user_id",e.recipient_id).eq("platform",platform).eq("enabled",true).limit(10));
+   const devices=configuredPushDevices([...await deviceRows("aos"),...(IOS_OUTBOX_KINDS.has(e.kind)?await deviceRows("ios"):[])],cfg);
+   if(!devices.length){await finish(e,"skipped","no-devices");summary.skipped++;return;}
    stage="copy";
    const copyCtx=await copyContext(db,e);
    stage="badge";
@@ -149,10 +157,12 @@ export async function dispatchNativePush(db:SupabaseClient):Promise<{claimed:num
     if(!await eventStillEligible(db,e,Date.now()))continue;
     const payload=eventPayload(e,device.locale,copyCtx);
     (payload.aps as Row).badge=badge;
+    // iOS groups notifications per conversation on the lock screen; AOS keeps its existing payload.
+    if(device.platform==="ios"&&typeof e.payload.conversation_id==="string")(payload.aps as Row)["thread-id"]=`chat-${e.payload.conversation_id}`;
     let timeout: ReturnType<typeof setTimeout>|undefined;
     stage="send";
     // 15s: the first firebase-admin call on a cold function also fetches an OAuth token.
-    const result=await Promise.race([sendNativePush({cfg,platform:"aos",env:"production",deviceToken:device.push_token,collapseId:`${e.kind}-${e.payload.conversation_id??e.payload.party_id??e.payload.room_id??e.recipient_id}`,payload}),new Promise<never>((_,reject)=>{timeout=setTimeout(()=>reject(new Error("provider-timeout")),15_000);})]).finally(()=>{if(timeout)clearTimeout(timeout);});
+    const result=await Promise.race([sendNativePush({cfg,platform:device.platform,env:device.platform==="ios"&&device.environment==="sandbox"?"sandbox":"production",deviceToken:device.push_token,collapseId:`${e.kind}-${e.payload.conversation_id??e.payload.party_id??e.payload.room_id??e.recipient_id}`,payload}),new Promise<never>((_,reject)=>{timeout=setTimeout(()=>reject(new Error("provider-timeout")),15_000);})]).finally(()=>{if(timeout)clearTimeout(timeout);});
     stage="record";
     if(!result.ok)lastReason=result.reason;
     if(result.ok){await write(db.from("native_push_deliveries").upsert({event_id:e.id,device_id:device.id,status:"sent"},{onConflict:"event_id,device_id"}));successes++;}

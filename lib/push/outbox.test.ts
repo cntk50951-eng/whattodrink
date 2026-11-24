@@ -1,15 +1,15 @@
 import {beforeEach,describe,expect,it,vi} from "vitest";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {cleanName,eventPayload,isDispatchAuthorized,NOTICE_KINDS,retryAt,richPushCopy,safePushCopy,unreadMessage} from "./outboxPolicy";
-const transport=vi.hoisted(()=>({send:vi.fn()}));
+const transport=vi.hoisted(()=>({send:vi.fn(),apns:null as unknown}));
 vi.mock("./badge",()=>({computeBadge:async()=>({badge:7})}));
 vi.mock("./native",()=>({
- nativePushConfigFromEnv:()=>({fcm:{projectId:"unit"},apns:null}),
+ nativePushConfigFromEnv:()=>({fcm:{projectId:"unit"},apns:transport.apns}),
  configuredPushDevices:(rows:unknown)=>rows,
- isDeadPushReason:(s:string)=>s==="messaging/registration-token-not-registered",
+ isDeadPushReason:(s:string)=>s==="messaging/registration-token-not-registered"||s==="BadDeviceToken",
  sendNativePush:transport.send,
 }));
-import {dispatchNativePush,eventStillEligible} from "./outbox";
+import {dispatchNativePush,eventStillEligible,IOS_OUTBOX_KINDS} from "./outbox";
 import type {OutboxEvent} from "./outbox";
 
 type R=Record<string,unknown>;
@@ -39,7 +39,7 @@ function chatTables():Record<string,R[]>{return{
  conversation_members:[{conversation_id:"conv",user_id:"recipient",muted:false,last_read_at:new Date(now-2000).toISOString()},{conversation_id:"conv",user_id:"actor"}],
  conversations:[{id:"conv",expires_at:new Date(now+86_400_000).toISOString()}],friendships:[{id:"friend",status:"accepted"}],cheers_blocks:[],chat_mutes:[],
  };}
-beforeEach(()=>{vi.restoreAllMocks();transport.send.mockReset();transport.send.mockResolvedValue({ok:true});});
+beforeEach(()=>{vi.restoreAllMocks();transport.send.mockReset();transport.send.mockResolvedValue({ok:true});transport.apns=null;});
 describe("D.12 authorization and privacy",()=>{
  it("rejects absent, weak and incorrect dispatcher credentials",()=>{
   const secret="unit-test-secret-long";expect(isDispatchAuthorized(null,secret)).toBe(false);expect(isDispatchAuthorized("Bearer x","x")).toBe(false);
@@ -84,7 +84,7 @@ describe("D.12 source rechecks",()=>{
  });
 });
 describe("D.12 durable per-device delivery",()=>{
- it("retries only failed devices and never sends new events through APNs",async()=>{
+ it("retries only failed devices and never sends non-allowlisted events through APNs",async()=>{
   vi.spyOn(Date,"now").mockReturnValue(now);
   const t=chatTables();t.native_push_outbox=[{...event(),status:"processing"}];
   t.devices=[{id:"sent",platform:"aos",user_id:"recipient",enabled:true,push_token:"one",locale:"en"},{id:"retry",platform:"aos",user_id:"recipient",enabled:true,push_token:"two",locale:"en"}];
@@ -147,5 +147,51 @@ describe("coverage boundary regressions",()=>{
   const e=event({source_type:"notification",source_id:"notice",kind:"game_kicked",payload:{room_id:"room"}});
   expect(await eventStillEligible(database(t),e,now)).toBe(true);
   t.game_room_players[0].status="active";expect(await eventStillEligible(database(t),e,now)).toBe(false);
+ });
+});
+
+describe("iOS chat delivery through the outbox (Push-2a)",()=>{
+ const live=()=>{vi.spyOn(Date,"now").mockReturnValue(now);const t=chatTables();t.native_push_outbox=[{...event(),status:"processing"}];return t;};
+ const ios=(over:R={})=>({id:"ios",platform:"ios",user_id:"recipient",enabled:true,push_token:"ios-token",locale:"zh-Hant",environment:"sandbox",...over});
+ const aos=(over:R={})=>({id:"aos",platform:"aos",user_id:"recipient",enabled:true,push_token:"aos-token",locale:"en",environment:"production",...over});
+ it("sends a chat event to an iOS device through APNs with the device's own environment",async()=>{
+  transport.apns={keyId:"k"};const t=live();t.devices=[ios()];
+  const r=await dispatchNativePush(database(t));
+  expect(r.sent).toBe(1);expect(transport.send).toHaveBeenCalledTimes(1);
+  expect(transport.send).toHaveBeenCalledWith(expect.objectContaining({platform:"ios",env:"sandbox",deviceToken:"ios-token",
+   payload:expect.objectContaining({t:"chat",conversation_id:"conv",aps:expect.objectContaining({badge:7,"thread-id":"chat-conv"})})}));
+  expect(JSON.stringify(transport.send.mock.calls[0][0].payload)).not.toMatch(/secret|body text/);
+  expect(t.native_push_deliveries).toEqual([expect.objectContaining({device_id:"ios",status:"sent"})]);
+ });
+ it("uses production for an iOS device registered as production",async()=>{
+  transport.apns={keyId:"k"};const t=live();t.devices=[ios({environment:"production"})];
+  await dispatchNativePush(database(t));expect(transport.send).toHaveBeenCalledWith(expect.objectContaining({platform:"ios",env:"production"}));
+ });
+ it("delivers to both platforms; AOS keeps its production env and carries no thread-id",async()=>{
+  transport.apns={keyId:"k"};const t=live();t.devices=[aos(),ios()];
+  const r=await dispatchNativePush(database(t));expect(r.sent).toBe(2);
+  const calls=transport.send.mock.calls.map(c=>c[0]);
+  expect(calls.find(c=>c.platform==="aos")).toMatchObject({env:"production",deviceToken:"aos-token"});
+  expect((calls.find(c=>c.platform==="aos").payload as {aps:R}).aps["thread-id"]).toBeUndefined();
+  expect(calls.find(c=>c.platform==="ios")).toMatchObject({env:"sandbox",deviceToken:"ios-token"});
+ });
+ it("never sends a non-allowlisted kind to iOS (those already have a direct iOS sender)",async()=>{
+  transport.apns={keyId:"k"};vi.spyOn(Date,"now").mockReturnValue(now);const t=chatTables();
+  t.drink_invites=[{id:"inv",from_user_id:"actor",to_user_id:"recipient",status:"sent",expires_at:new Date(now+60_000).toISOString()}];
+  const e=event({source_type:"invite",source_id:"inv",kind:"invite",payload:{invite_id:"inv"}});
+  t.native_push_outbox=[{...e,status:"processing"}];t.devices=[ios()];
+  const r=await dispatchNativePush(database(t));
+  expect(transport.send).not.toHaveBeenCalled();expect(r.skipped).toBe(1);expect(t.native_push_outbox[0]).toMatchObject({status:"skipped",last_error:"no-devices"});
+  expect([...IOS_OUTBOX_KINDS]).toEqual(["chat"]);
+ });
+ it("disables an iOS device whose token APNs rejects, without retrying forever",async()=>{
+  transport.apns={keyId:"k"};const t=live();t.devices=[ios()];transport.send.mockResolvedValue({ok:false,status:400,reason:"BadDeviceToken"});
+  await dispatchNativePush(database(t));
+  expect(t.devices[0]).toMatchObject({enabled:false});expect(t.native_push_deliveries).toEqual([expect.objectContaining({device_id:"ios",status:"dead"})]);
+  expect(t.native_push_outbox[0].status).toBe("sent");
+ });
+ it("does not touch iOS devices when the recipient has none enabled",async()=>{
+  transport.apns={keyId:"k"};const t=live();t.devices=[ios({enabled:false})];
+  const r=await dispatchNativePush(database(t));expect(r.skipped).toBe(1);expect(transport.send).not.toHaveBeenCalled();
  });
 });
