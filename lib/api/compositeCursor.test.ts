@@ -8,6 +8,9 @@ describe("parseCompositeCursor", () => {
     expect(parseCompositeCursor(`2026-11-24T10:00:00.123456+00:00|${id}`)).toEqual({ createdAt: "2026-11-24T10:00:00.123456+00:00", id });
     expect(parseCompositeCursor(`2026-11-24T10:00:00Z|${id}`)?.id).toBe(id);
   });
+  it("未轉義的 + 被解成空格：換回 + 照常解析（iOS URLComponents 不轉義 +）", () => {
+    expect(parseCompositeCursor(`2026-11-24T10:00:00.123456 00:00|${id}`)).toEqual({ createdAt: "2026-11-24T10:00:00.123456+00:00", id });
+  });
   it("純時間戳（舊客戶端）／缺 id／null → null，退回舊游標", () => {
     expect(parseCompositeCursor("2026-11-24T10:00:00.123Z")).toBeNull();
     expect(parseCompositeCursor(`|${id}`)).toBeNull();

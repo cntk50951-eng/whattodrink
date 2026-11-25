@@ -6,3 +6,6 @@
 - 郵件：Resend REST（無 SDK），`Idempotency-Key`；先 CAS `support_emailed_at IS NULL` 佔位再寄，寄失敗清回 NULL；寄件網域須在 Resend 驗證，否則 403（錯誤記 `[needs-repair]`，案件照在人工隊列）。
 - 推翻 AI 自動結案：0087 唯一索引讓舉報人第二條 report_resolved 23505 → 改寫原通知 payload（decision、note、updated）＋置頂未讀。反向（成立→不成立）要還原下架與誠信分，本期未做。
 - 0090 未遷移時所有新欄位讀寫都 42703/PGRST204 降級，不擋舉報主流程。
+- 改判雙向（0091）：下架前記 `hidden_prev_visibility`（只記第一次，重跑時帖子已 private 不能蓋掉）；改判不成立用正分 `*_report_reverted` 冪等退分，通知一律改寫原行（0087 唯一索引）。0091 前的案件無原可見性 → 不猜，保持隱藏並提示。
+- 游標 `+`：URLComponents 不轉義 `+`，URLSearchParams 解成空格；parties 的純時間戳 fallback 也 NaN → 靜默回第一頁。服務端在 `parseCompositeCursor` 統一換回 `+`。
+

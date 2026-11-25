@@ -128,6 +128,20 @@ export async function applyReportDecision(
   if (args.decision === "actioned") {
     // 1. 帖文違規：立即轉為 private 下架
     if (args.targetType === "post" && args.targetRef !== null && args.targetRef !== "") {
+      // 0091：先記下下架前的可見性（只記第一次；重跑時帖子已是 private，不能蓋掉），改判不成立時才能還原
+      try {
+        const { data: post } = await svc.from("checkins").select("visibility").eq("id", args.targetRef).maybeSingle();
+        const prev = (post as { visibility?: unknown } | null)?.visibility;
+        if (prev === "public" || prev === "friends") {
+          const { error: prevErr } = await svc.from("cheers_reports").update({ hidden_prev_visibility: prev })
+            .eq("id", args.reportId).is("hidden_prev_visibility", null);
+          if (prevErr !== null && prevErr !== undefined && !isMissingColumn(prevErr)) {
+            console.error(`[reportStp] save prev visibility report=${args.reportId} code=${(prevErr as { code?: string }).code ?? "unknown"}`);
+          }
+        }
+      } catch (err) {
+        console.error(`[reportStp] read prev visibility error: ${err instanceof Error ? err.message : "unknown"}`);
+      }
       try {
         const { error } = await svc.from("checkins").update({ visibility: "private" }).eq("id", args.targetRef);
         if (error !== null && error !== undefined) {
@@ -501,11 +515,11 @@ async function emailSupportOnce(
 }
 
 /**
- * 管理員推翻 AI 自動結案（auto_dismissed → 成立）：用戶要求「dashboard 可更新人工審核結果」。
- * 1. CAS：只動仍是 dismissed＋ai_decision=auto_dismissed 的那一行（防與其他處理撞車）；
+ * 管理員把「不成立」改判成立（AI 自動結案或人工駁回皆可）：用戶要求「dashboard 可更新人工審核結果」。
+ * 1. CAS：只動仍是 dismissed 的那一行（防與其他處理撞車）；
  * 2. 照常處分（下架／扣分／通知被舉報人）；處分沒成功就把案件退回 dismissed（冪等，可再按）；
  * 3. 舉報人那條 report_resolved 受 0087 唯一索引限制不能再插一條 → 改寫原通知（decision=actioned、置頂、標未讀）。
- * 反向（成立 → 不成立）要還原下架與誠信分，本期不做。
+ * 反向（成立 → 不成立）見 `reverseActionedReport`。
  */
 export async function overrideAutoDismissal(
   svc: SupabaseClient,
@@ -526,10 +540,9 @@ export async function overrideAutoDismissal(
     .update({ status: "actioned", decided_by: args.adminId, decided_at: new Date().toISOString() })
     .eq("id", args.reportId)
     .eq("status", "dismissed")
-    .eq("ai_decision", "auto_dismissed")
     .select("id");
   if (error !== null && error !== undefined) return { ok: false, failed: ["claim"], notifyFailed: [] };
-  if (!Array.isArray(claimed) || claimed.length === 0) return { ok: false, failed: ["not_auto_dismissed"], notifyFailed: [] };
+  if (!Array.isArray(claimed) || claimed.length === 0) return { ok: false, failed: ["not_dismissed"], notifyFailed: [] };
 
   const applied = await applyReportDecision(svc, {
     reportId: args.reportId,
@@ -575,3 +588,102 @@ export async function overrideAutoDismissal(
   }
   return { ok: true, failed: [], notifyFailed: [...new Set(notifyFailed)] };
 }
+
+/**
+ * 管理員把「成立」改判不成立（還原處分）：
+ * 1. CAS actioned → dismissed；
+ * 2. 帖子：按 hidden_prev_visibility（0091）還原可見性；沒有記錄（0091 前的案件）就保持隱藏並回報 `restore_unknown`；
+ * 3. 誠信分：寫一筆等額正分（ref_id `report:<id>:revert` 冪等）；
+ * 4. 通知：舉報人原 report_resolved 改寫成 dismissed；被舉報人原 post_actioned／report_actioned 加 reverted=true（App 顯示「已撤銷」）。
+ * 還原或退分失敗 → 案件退回 actioned（各步冪等，可再按）。
+ */
+export async function reverseActionedReport(
+  svc: SupabaseClient,
+  args: {
+    reportId: string;
+    adminId: string;
+    targetType: ReportTargetType;
+    targetRef: string | null;
+    targetUserId: string;
+    reporterId: string;
+    reasonCode: string | null;
+    note: string;
+  },
+): Promise<{ ok: boolean; failed: string[]; warnings: string[]; notifyFailed: string[] }> {
+  const warnings: string[] = [];
+  const notifyFailed: string[] = [];
+  const { data: claimed, error } = await svc
+    .from("cheers_reports")
+    .update({ status: "dismissed", decided_by: args.adminId, decided_at: new Date().toISOString() })
+    .eq("id", args.reportId)
+    .eq("status", "actioned")
+    .select("id,hidden_prev_visibility");
+  let claimRows: unknown[] | null = claimed;
+  if (error !== null && error !== undefined) {
+    if (!isMissingColumn(error)) return { ok: false, failed: ["claim"], warnings, notifyFailed };
+    // 0091 未遷移：不讀原可見性再搶一次
+    const retry = await svc.from("cheers_reports")
+      .update({ status: "dismissed", decided_by: args.adminId, decided_at: new Date().toISOString() })
+      .eq("id", args.reportId).eq("status", "actioned").select("id");
+    if (retry.error !== null && retry.error !== undefined) return { ok: false, failed: ["claim"], warnings, notifyFailed };
+    claimRows = retry.data;
+  }
+  if (!Array.isArray(claimRows) || claimRows.length === 0) return { ok: false, failed: ["not_actioned"], warnings, notifyFailed };
+  const prev = (claimRows[0] as { hidden_prev_visibility?: unknown }).hidden_prev_visibility;
+  const failed: string[] = [];
+  const rollback = async () => {
+    await svc.from("cheers_reports").update({ status: "actioned" }).eq("id", args.reportId).eq("status", "dismissed");
+  };
+
+  if (args.targetType === "post" && args.targetRef !== null && args.targetRef !== "") {
+    if (prev === "public" || prev === "friends") {
+      const { error: upErr } = await svc.from("checkins").update({ visibility: prev }).eq("id", args.targetRef).eq("visibility", "private");
+      if (upErr !== null && upErr !== undefined) failed.push("restore");
+    } else {
+      warnings.push("restore_unknown");
+    }
+  }
+  if (failed.length === 0) {
+    try {
+      const trust = await writeTrustEvent(svc, {
+        user_id: args.targetUserId,
+        kind: args.targetType === "post" ? "post_report_reverted" : "user_report_reverted",
+        delta: -reportTrustDelta(args.targetType, args.reasonCode),
+        party_id: null,
+        ref_id: `report:${args.reportId}:revert`,
+        note: args.note.slice(0, 200),
+        expires_days: reportTrustExpireDays(args.targetType),
+      });
+      if (!trust.written && trust.reason === "db-error") failed.push("trust");
+    } catch {
+      failed.push("trust");
+    }
+  }
+  if (failed.length > 0) {
+    await rollback();
+    return { ok: false, failed, warnings, notifyFailed };
+  }
+
+  const rewrite = async (userId: string, kinds: string[], patch: Record<string, unknown>, who: string) => {
+    try {
+      const { data: rows, error: readErr } = await svc.from("notifications").select("id,payload")
+        .eq("user_id", userId).in("kind", kinds).eq("payload->>report_id", args.reportId).limit(1);
+      if (readErr !== null && readErr !== undefined) { notifyFailed.push(who); return; }
+      const row = Array.isArray(rows) ? (rows[0] as { id?: unknown; payload?: unknown } | undefined) : undefined;
+      if (row === undefined || typeof row.id !== "string") return;
+      const payload = { ...((row.payload ?? {}) as Record<string, unknown>), ...patch };
+      const { error: upErr } = await svc.from("notifications").update({ payload, read_at: null, created_at: new Date().toISOString() }).eq("id", row.id);
+      if (upErr !== null && upErr !== undefined) notifyFailed.push(who);
+    } catch {
+      notifyFailed.push(who);
+    }
+  };
+  const note = args.note.slice(0, 200);
+  await rewrite(args.reporterId, ["report_resolved"], { decision: "dismissed", note, updated: true }, "reporter");
+  await rewrite(args.targetUserId, ["post_actioned", "report_actioned"], { reverted: true, note }, "reported");
+  const { error: noteErr } = await svc.from("cheers_reports").update({ decision_note: note }).eq("id", args.reportId);
+  if (noteErr !== null && noteErr !== undefined && !isMissingColumn(noteErr)) warnings.push("note");
+  if (notifyFailed.length > 0) console.error(`[reportStp] [needs-repair] reverse notify report=${args.reportId} ${notifyFailed.join(",")}`);
+  return { ok: true, failed: [], warnings, notifyFailed };
+}
+

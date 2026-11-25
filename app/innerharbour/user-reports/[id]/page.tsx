@@ -10,6 +10,7 @@ import {
   findMissingReportNotifications,
   overrideAutoDismissal,
   reopenReport,
+  reverseActionedReport,
   resendMissingReportNotifications,
   type ReportDecision,
   type ReportTargetType,
@@ -203,10 +204,47 @@ export default async function UserReportDetailPage({ params }: { params: Promise
     });
     if (!res.ok) {
       throw new Error(
-        res.failed.includes("not_auto_dismissed") ? "案件已不是 AI 自動結案狀態（可能已被處理）" : `改判未完成（${res.failed.join("、")}），案件已退回 AI 結案狀態，可再試`,
+        res.failed.includes("not_dismissed") ? "案件已不是「不成立」狀態（可能已被處理）" : `改判未完成（${res.failed.join("、")}），案件已退回「不成立」，可再試`,
       );
     }
     if (res.notifyFailed.length > 0) throw new Error(`已改判並處分，但通知未全部送達（${res.notifyFailed.join("、")}），請記下案件 ${id}`);
+  }
+
+  /** 改判不成立：還原帖子可見性、退回誠信分、改寫雙方通知 */
+  async function reverseAction(formData: FormData): Promise<void> {
+    "use server";
+    const g = await requireAdminPage({ write: true, stepUp: true }, `/innerharbour/user-reports/${id}`);
+    if (!(await checkSameOrigin())) throw new Error("跨站請求被拒");
+    if (await adminRateLimited(g.svc, g.userId, ["user_report_mark"], 30, 600_000)) throw new Error("操作過於頻繁，請稍後再試");
+    await auditOrThrow(g.svc, { admin_id: g.userId, action: "user_report_reverse", target: id });
+    const { data: rowRaw } = await g.svc
+      .from("cheers_reports")
+      .select("target_type,target_ref,target_user_id,reporter_id,reason_code")
+      .eq("id", id)
+      .maybeSingle();
+    const row = rowRaw as Record<string, unknown> | null;
+    if (row === null || typeof row.target_user_id !== "string" || typeof row.reporter_id !== "string") throw new Error("案件資料不完整");
+    const tt: ReportTargetType = row.target_type === "post" || row.target_type === "message" ? row.target_type : "user";
+    const note = String(formData.get("note") ?? "").trim().slice(0, 200) || "經客服複核，暫未發現違規，已撤銷之前的處分";
+    const res = await reverseActionedReport(g.svc, {
+      reportId: id,
+      adminId: g.userId,
+      targetType: tt,
+      targetRef: typeof row.target_ref === "string" ? row.target_ref : null,
+      targetUserId: row.target_user_id,
+      reporterId: row.reporter_id,
+      reasonCode: typeof row.reason_code === "string" ? row.reason_code : null,
+      note,
+    });
+    if (!res.ok) {
+      throw new Error(
+        res.failed.includes("not_actioned") ? "案件已不是「成立」狀態（可能已被處理）" : `還原未完成（${res.failed.join("、")}），案件已退回「成立」，可再試`,
+      );
+    }
+    const msgs: string[] = [];
+    if (res.warnings.includes("restore_unknown")) msgs.push("此帖在 0091 前下架，沒有記錄原可見性，帖子仍保持隱藏，請到資料庫手動還原");
+    if (res.notifyFailed.length > 0) msgs.push(`通知未全部更新（${res.notifyFailed.join("、")}）`);
+    if (msgs.length > 0) throw new Error(`已改判不成立並退回誠信分；${msgs.join("；")}。案件 ${id}`);
   }
 
   /** 重寄人工審核郵件（上次寄失敗或想再提醒） */
@@ -296,13 +334,26 @@ export default async function UserReportDetailPage({ params }: { params: Promise
             </label>{" "}
             <button type="submit">提交</button>
           </form>
-          {r.status === "dismissed" && aiDecision === "auto_dismissed" && (
+          {r.status === "dismissed" && (
             <form action={overrideAi} style={{ marginTop: 16 }}>
-              <p style={{ color: "#b45309" }}>此案由 AI 自動結案。如複核後確認違規，可改判成立（會下架／扣分並更新舉報人的結果通知）。</p>
+              <p style={{ color: "#b45309" }}>
+                {aiDecision === "auto_dismissed" ? "此案由 AI 自動結案。" : "此案已判不成立。"}如複核後確認違規，可改判成立（會下架／扣分並更新舉報人的結果通知）。
+              </p>
               <label>
                 說明（舉報人可見，選填）：<input name="note" maxLength={200} style={{ width: 360 }} />
               </label>{" "}
-              <button type="submit">推翻 AI 結果，改判成立</button>
+              <button type="submit">改判成立</button>
+            </form>
+          )}
+          {r.status === "actioned" && (
+            <form action={reverseAction} style={{ marginTop: 16 }}>
+              <p style={{ color: "#b45309" }}>
+                {aiDecision === "auto_actioned" ? "此案由 AI 自動處分。" : "此案已判成立。"}如複核後確認不違規，可改判不成立：還原帖子可見性、退回扣掉的誠信分，並更新雙方通知。
+              </p>
+              <label>
+                說明（雙方可見，選填）：<input name="note" maxLength={200} style={{ width: 360 }} />
+              </label>{" "}
+              <button type="submit">改判不成立（還原處分）</button>
             </form>
           )}
           {aiDecision === "human" && (r.status === "pending" || r.status === "reviewed") && (

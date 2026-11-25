@@ -12,6 +12,7 @@ UI 定稿前只记录、不建表；EPIC 3.0 按 `future-schema.md` 落表。
 | `app-shell.md` | 顶栏／菜单／页脚／主题／语言／设备 | 已落＋已知缺口 |
 | `future-schema.md` | 整体回顾：未来表草图＋EPIC 映射＋替换清单 | 草图，UI 定稿后细化 |
 | `intro-marketing.md` | `/intro`／`/intro-next` 三語介紹、圖片、播放狀態與原版備份 | UR M.1／M.4，全部不進庫 |
+| `reports.md` | 舉報人「我的舉報」與後台 AI 分流欄位（0090／0091） | 已落（openapi 1.71.0） |
 
 - UR D.11／D.12 原生推送資料：`push-devices.md`（設備身份／私有token；D.12新增內部outbox／delivery與排程，App不直接讀寫）。
 

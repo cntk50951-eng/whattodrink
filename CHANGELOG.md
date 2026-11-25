@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased] — 舉報改判雙向、翻頁游標 `+` 容錯（2026-11-25）
+
+### Added
+
+- 遷移 `0091_report_reversal.sql`：`cheers_reports.hidden_prev_visibility`，處分下架帖子時記下原可見性。
+- 後台可把「成立」改判不成立（`reverseActionedReport`）：還原帖子可見性、退回扣掉的誠信分（`*_report_reverted`，ref `report:<id>:revert` 冪等）、舉報人通知改為不成立、被處分方通知加 `reverted: true`；0091 前下架的帖子沒有原可見性記錄，保持隱藏並提示人工處理。
+- 「改判成立」不再限 AI 自動結案，人工駁回的案件也可以改。
+- `docs/data/reports.md`：舉報人與後台使用的舉報資料。
+
+### Fixed
+
+- `parseCompositeCursor`：客戶端沒把時區 `+` 轉義（被解成空格）時換回 `+`；以前約局等列表翻頁會退回第一頁（重複／翻不完）。
+
 ## [Unreleased] — 舉報閉環：AI 置信度分流＋人工審核郵件＋我的舉報（2026-11-25，openapi 1.71.0）
 
 ### Added

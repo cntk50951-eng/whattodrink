@@ -6,8 +6,11 @@ const CURSOR_TS_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-
  * 格式不符回 null，呼叫端退回舊的純時間戳游標。值會被拼進 PostgREST `or()` 字串，所以嚴格限制字符集：
  * 時間戳只收 ISO-8601，id 只收 UUID。
  */
-export function parseCompositeCursor(cursor: string | null): { createdAt: string; id: string } | null {
-  if (cursor === null) return null;
+export function parseCompositeCursor(raw: string | null): { createdAt: string; id: string } | null {
+  if (raw === null) return null;
+  // 客戶端沒把時區的 `+` 轉成 %2B 時，URLSearchParams 會解成空格（iOS URLComponents 不轉義 +）。
+  // 合法游標不含空格，換回 `+` 再校驗；否則 `+00:00` 游標整條失效，翻頁退回第一頁（2026-11-25）
+  const cursor = raw.replace(/ /g, "+");
   const i = cursor.indexOf("|");
   if (i <= 0) return null;
   const createdAt = cursor.slice(0, i);

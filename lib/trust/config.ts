@@ -89,4 +89,6 @@ export const TRUST_KIND_TEXT: Record<string, string> = {
   complaint_malicious: "惡意投訴",
   post_report_upheld: "帖文經舉報核實違規",
   user_report_upheld: "帳號經舉報核實違規",
+  post_report_reverted: "帖文舉報經複核改判不成立，退回扣分",
+  user_report_reverted: "帳號舉報經複核改判不成立，退回扣分",
 };
