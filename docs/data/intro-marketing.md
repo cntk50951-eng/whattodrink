@@ -1,6 +1,6 @@
 # UR M.1／M.4 · 三語介紹頁（`/intro`／`/intro-next`）
 
-第一主線：發布照片；第二主線：與 Ivy 玩大話骰。原版保留於 `/intro-backup` 及 Git 標籤 `backup/intro-2026-11-14`；v1／v2、iOS、全站開關與 API 不變。
+首屏主張（同事回饋四點）：每一杯都是一個故事、分享更好玩（地圖只是功能之一，不作主張）、駐場酒保 Ivy 更懂你、口味相投的人更靠近；功能主線仍是發布照片優先，其次 Ivy 與大話骰。原版保留於 `/intro-backup` 及 Git 標籤 `backup/intro-2026-11-14`；v1／v2、iOS、全站開關與 API 不變。
 
 | 頁面位置 | 類型 | 當前來源 | 未來表映射 |
 | --- | --- | --- | --- |
@@ -15,13 +15,14 @@
 | 攝影／Ivy 場景底圖 | 生成素材 | `public/intro-next/source-art/`，內建 imagegen 生成／依原實機角色編輯；提示詞見同目錄上層 README | 不進庫 |
 | 大話骰中央 3D 場景 | 原截圖圖層 | `captures/ivy-dice-cups.png`／`ivy-dice-peek.png`；骰盅及骰子保留實機畫面，所有 UI 區域以對應語言原文重構 | 不進庫 |
 | 原實機參考圖 | PNG＋SHA-256 manifest | `public/intro-next/captures/`，取自用戶附件及 E2E 報告原附件；完整保留供核對，不直接當最終宣傳圖片 | 不進庫 |
-| 網頁語言 | `AppLocale` | locale route 參數＋三語入口全部明確 locale 前綴，沿現有 proxy 更新 NEXT_LOCALE cookie；切換語言時文案與圖片同步 | 不新增持久化；沿既有 cookie |
-| 播放／暫停／尺寸／圖片就緒 | React state／Remotion ref 與事件／有界預載佇列 | 當前頁面會話；優先載入品牌圖與 Ivy／照片詳情／相機三張功能圖，最多等 1.8 秒即放行；其餘每批 2 張低優先預載，單張 8 秒逾時後繼續，離頁／換語言清理計時器與回呼。播放器掛載完成才初始化並啟用控制，手動 toggle 傳入點擊事件。所有動態由 Remotion 影格推導；自動循環、無底部進度條；減少動態偏好則停在結尾，頂部可主動播放 | 不進庫；不新增 localStorage |
+| 網頁語言 | `AppLocale` | intro 專屬 next-intl 設定 localeDetection=false；裸 `/intro`／`/intro-next`／圖庫固定繁體，不讀 cookie／Accept-Language 作協商，明確三語前綴仍有效；原全站 routing 不變，切換語言時文案與圖片同步 | 不新增持久化；沿既有 cookie |
+| 播放／暫停／尺寸／圖片就緒 | React state／Remotion ref 與事件／有界預載佇列 | 當前頁面會話；優先載入品牌圖與 Ivy／照片詳情／相機三張功能圖，最多等 1.8 秒即放行；其餘每批 2 張低優先預載，單張 8 秒逾時後繼續，離頁／換語言清理計時器與回呼。播放器掛載完成才初始化並啟用控制；無聲動畫 initiallyMuted、共享 audio tags=0，初始化先 mute，避免無手勢時 AudioContext 阻塞。手動 toggle 傳入點擊事件。所有動態由 Remotion 影格推導；自動循環、無底部進度條；減少動態偏好則停在結尾，頂部可主動播放 | 不進庫；不新增 localStorage |
 | 前後回看／功能目錄／手勢 | `BrowseStop[]`／步驟 index／暫態 pointer ref／讀屏文字 | `story.tsx` 的同一時間軸衍生 25 個瀏覽位置（含開場、結尾及頁內切換）；`browse.ts` 計算完整顯示的停靠影格、首尾夾限、手勢門檻及取消處理。timeupdate／seeked 同步目前位置，手動 pause→seek；選單、箭頭及鍵盤共用，沒有定時恢復。copy.json 的 browse 物件提供三語操作文字；讀屏只回報手動選擇 | 不進庫；不記錄手勢、不新增持久化 |
-| 介紹頁底部 | 兩段靜態說明 | copy.screenshotNote／responsible；圖庫及原版入口已移除，直接預覽／備份路徑保留 | 不進庫 |
-| `?t=<秒>` 凍結 | `number \| null` | URL，非法值忽略、有效值夾在合法影格 | 不進庫 |
+| 介紹頁底部 | 兩段靜態說明（responsible 含「AI 回答僅供參考」頁尾小字提醒） | copy.screenshotNote／responsible；圖庫及原版入口已移除，直接預覽／備份路徑保留 | 不進庫 |
+| `?t=<秒>` 起播／`preview=1` 凍結 | URL 參數／`number \| null` | `initializePlayback`：普通 time link 尋址後自動播放，只有明確 preview=1 暫停於指定時間（未提供則完整首屏）；非法時間忽略，有效值夾在合法影格；減少動態／已鍵盤閱讀仍保持暫停 | 不進庫 |
 | 三語圖片預覽 | 靜態頁 | `/intro/artwork`、`/intro-next/artwork` 及其 `/zh-Hans`／`/en` 路由，按同一 locale 顯示 22 張原尺寸圖，可開大圖 | 不進庫 |
 | 原版備份／回復 | Git 標籤／原播放器／SHA-256 清單 | `/intro-backup` 使用不變的 `components/intro/` 與 `public/intro/`；`docs/intro-backup-2026-11-14.json` 記替換前 commit 及完整原素材雜湊，Git 標籤可回復原頁 | 不進庫 |
+| 分享卡（og／twitter） | `Metadata` | `components/intro-next/metadata.ts` 的 `introMetadata`：標題／描述取 copy.json，siteName `hi drink · 嗨飲`，locale zh_HK／zh_CN／en_US，圖 `hi-drink-opening-preview-v1.png`（1400×1400 深底）；twitter `summary`；預覽頁 noindex。未設 `metadataBase`，絕對網址待上線域名 | 不進庫；無持久化 |
 | 商店入口 | 靜態狀態 | 未有正式地址，三語明示即將推出 | 不進庫 |
 
 頁腳明示「依實際功能設計 · 示範內容」及其三語版本。所有畫面為真實功能的宣傳重構；沒有讀取或改寫線上帖子／帳戶／遊戲。

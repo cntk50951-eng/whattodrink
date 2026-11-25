@@ -67,10 +67,11 @@ function Atmosphere(): ReactElement {
   );
 }
 
-function Frame({ dur, children, final = false }: { dur: number; children: ReactNode; final?: boolean }): ReactElement {
+/** The outgoing frame clears in the first ~58% of the overlap and the incoming one starts at ~40%, so a leaving headline never sits under an arriving phone. */
+function Frame({ dur, children, final = false, first = false }: { dur: number; children: ReactNode; final?: boolean; first?: boolean }): ReactElement {
   const t = useCurrentFrame() / FPS;
-  const entrance = smoothProgress(t, 0, OVERLAP);
-  const exit = final ? 0 : smoothProgress(t, dur - OVERLAP, dur);
+  const entrance = smoothProgress(t, first ? 0 : OVERLAP * 0.4, OVERLAP);
+  const exit = final ? 0 : smoothProgress(t, dur - OVERLAP, dur - OVERLAP * 0.42);
   return <div className={s.sceneFrame} style={{ "--opacity": Math.min(entrance, 1 - exit), "--rise": `${(1 - entrance) * 4 - exit * 3}px` } as MotionStyle}>{children}</div>;
 }
 
@@ -168,7 +169,7 @@ function BrandOpening({ t }: { t: number }): ReactElement {
 function Title({ copy }: { copy: IntroCopy }): ReactElement {
   const t = useCurrentFrame() / FPS;
   return (
-    <Frame dur={TITLE}>
+    <Frame dur={TITLE} first>
       <div className={`${s.featureLayout} ${s.titleLayout}`}>
         <div className={s.featureCopy}>
           <Reveal t={t} at={0.1}><div className={s.eyebrow}><i className={s.liveDot} />{copy.hero.eyebrow}</div></Reveal>

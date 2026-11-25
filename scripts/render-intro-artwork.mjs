@@ -83,7 +83,7 @@ for(language of ['zh-Hant','zh-Hans','en']){
   const body=builder(demo[language]);
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="1170" height="2532" viewBox="0 0 390 844"><defs><linearGradient id="brand" x2="1" y2=".2"><stop stop-color="#F4B34F"/><stop offset="1" stop-color="#ED6680"/></linearGradient><linearGradient id="ivory" x2=".8" y2="1"><stop stop-color="#fff3d6"/><stop offset="1" stop-color="#d8bc86"/></linearGradient><linearGradient id="taste" x2="1" y2="1"><stop stop-color="#744027"/><stop offset="1" stop-color="#352722"/></linearGradient><linearGradient id="nightFade" x2="0" y2="1"><stop stop-color="#090a0f" stop-opacity=".15"/><stop offset=".52" stop-color="#090a0f" stop-opacity=".05"/><stop offset="1" stop-color="#090a0f" stop-opacity=".97"/></linearGradient><linearGradient id="topFade" x2="0" y2="1"><stop stop-color="#090a0f" stop-opacity=".9"/><stop offset="1" stop-color="#090a0f" stop-opacity="0"/></linearGradient></defs><g font-family="PingFang TC, PingFang SC, Arial, sans-serif">${rect(0,0,390,844,C.bg,0)}${body}${homeIndicator()}</g></svg>`;
   const png=new Resvg(svg,{font:{loadSystemFonts:true,defaultFontFamily:'PingFang TC',fontFiles:['/System/Library/Fonts/STHeiti Medium.ttc']}}).render().asPng();
-  const version=name.startsWith("cocktail-")||name.startsWith("trail-")?4:3;
+  const version=name==="cocktail-step"?5:name.startsWith("cocktail-")||name.startsWith("trail-")?4:3;
   const file=`${language}/${name}-v${version}.webp`;
   const webp=await sharp(png).webp({quality:94,effort:5}).toBuffer();
   await writeFile(`${root}artwork/${file}`,webp);

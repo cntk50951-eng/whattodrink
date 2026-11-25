@@ -16,3 +16,8 @@
 - 真機樣式／FCM有事件送達／點擊未驗；AOS保持Fixing／WIP，不裝機或提交。原手機及他人WIP未觸碰；臨時檔發佈核對後精確清理。
 
 - 快照建置教訓：Turbopack拒絕指向快照根目錄以外的node_modules symlink；改官方webpack模式。快照不複製.env，使用明示虛構的build.invalid及build-only-placeholder通過既有env guard；不讀後端私鑰或正式DB。
+
+## 發佈核對（2026-11-18）
+- web commit 146ae39b1524db581f708acd30b0ecdad2d76431已push origin/main；GitHub Vercel context success；Production deployment7883808053 success，Vercel AwcPCRAwQo19Y35eUYLwmfVD5Lwi，環境https://whattodrink-lbpk212d2-cntk50951-8657s-projects.vercel.app。部署的是20個push相關檔及台帳片段，其他intro／marketing WIP未提交。
+- AOS本輪修正仍未提交，品牌／前台／路由／22情境真機待用戶驗收；未操作ADB／Secret／正式SQL。既有SQL不用重跑。共享AOS HEAD／APK由同事持續更新，836 tests是本輪驗證快照，不把其他同事新包當本輪固定hash。
+- CHANGELOG、backlog、DEFECTS、資料文檔均回寫；臨時腳本／日誌／品牌預覽／獨立提交快照及其panic log已精確清理，保留repo來源、APK及報告；未動他人temp或手機舊APK。

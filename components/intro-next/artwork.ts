@@ -29,6 +29,7 @@ export type ArtworkId = (typeof ARTWORK_SCREENS)[number]["id"];
 export function artworkSrc(name: ArtworkId, locale: AppLocale): string {
   // Version the curated artwork independently of the untouched original captures.
   // Regenerated flow artwork gets fresh optimizer URLs during local review.
-  const version = name.startsWith("cocktail-") || name.startsWith("trail-") ? 4 : 3;
+  // cocktail-step is v5: the ask-Ivy pill was removed from the follow-along screen (2026-11-17).
+  const version = name === "cocktail-step" ? 5 : name.startsWith("cocktail-") || name.startsWith("trail-") ? 4 : 3;
   return `/intro-next/artwork/${locale}/${name}-v${version}.webp`;
 }

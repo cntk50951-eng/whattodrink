@@ -175,10 +175,10 @@
   {
     "locale": "zh-Hant",
     "name": "cocktail-step",
-    "file": "zh-Hant/cocktail-step-v4.webp",
+    "file": "zh-Hant/cocktail-step-v5.webp",
     "width": 1170,
     "height": 2532,
-    "sha256": "4783ddb04e6fa6bff978dacefdc7a492f9358233e03ed7111defd04fd10d0edd",
+    "sha256": "d35c3be87786b231bda9acddf91d33cf934d6faff305c4e8f65fa2c9f435de80",
     "uiKeys": [
       "cocktail.steps.progress",
       "cocktail.chip.sec",
@@ -186,8 +186,6 @@
       "cocktail.step.shake.body",
       "cocktail.steps.ivyTip",
       "cocktail.tip.shake",
-      "cocktail.ask.open",
-      "cocktail.ask.cost",
       "cocktail.steps.next"
     ],
     "content": "Faithful UI reconstruction; curated photo/caption/author and schematic demo map."
@@ -630,10 +628,10 @@
   {
     "locale": "zh-Hans",
     "name": "cocktail-step",
-    "file": "zh-Hans/cocktail-step-v4.webp",
+    "file": "zh-Hans/cocktail-step-v5.webp",
     "width": 1170,
     "height": 2532,
-    "sha256": "7728eb1be6ffed85345363927ecbf8af2eb99eba62d371e02ecc3c394943a624",
+    "sha256": "9a2daf079458d32da453845f2d0e72b616a2b3fc2f37ce699f87ff7c2c119ff3",
     "uiKeys": [
       "cocktail.steps.progress",
       "cocktail.chip.sec",
@@ -641,8 +639,6 @@
       "cocktail.step.shake.body",
       "cocktail.steps.ivyTip",
       "cocktail.tip.shake",
-      "cocktail.ask.open",
-      "cocktail.ask.cost",
       "cocktail.steps.next"
     ],
     "content": "Faithful UI reconstruction; curated photo/caption/author and schematic demo map."
@@ -1085,10 +1081,10 @@
   {
     "locale": "en",
     "name": "cocktail-step",
-    "file": "en/cocktail-step-v4.webp",
+    "file": "en/cocktail-step-v5.webp",
     "width": 1170,
     "height": 2532,
-    "sha256": "619faf7c19e2451d69c22284a8c80f8f68809d3bfba238f7d69742013e4b81f4",
+    "sha256": "03ec68ce85729cc87c20a8018c246ecb5b9586ce02cbb425fc53df9c15981e2d",
     "uiKeys": [
       "cocktail.steps.progress",
       "cocktail.chip.sec",
@@ -1096,8 +1092,6 @@
       "cocktail.step.shake.body",
       "cocktail.steps.ivyTip",
       "cocktail.tip.shake",
-      "cocktail.ask.open",
-      "cocktail.ask.cost",
       "cocktail.steps.next"
     ],
     "content": "Faithful UI reconstruction; curated photo/caption/author and schematic demo map."

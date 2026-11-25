@@ -85,6 +85,9 @@
 .productStage { height: 100%; display: flex; align-items: center; justify-content: center; position: relative; min-height: 0; perspective: 1200px; }
 .brandArtwork { width: min(66cqh, 44cqw); max-height: 100%; aspect-ratio: 1; opacity: var(--brand-opacity); transform: translateY(var(--brand-y)) scale(var(--brand-scale)); }
 .brandArtwork img { display: block; width: 100%; height: 100%; object-fit: contain; }
+/* The glow art is cropped square and keeps a faint alpha at its border; fade only the outer band so the logo and wordmark stay fully opaque. */
+.brandArtwork img { -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent), linear-gradient(0deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent), linear-gradient(0deg, transparent, #000 8%, #000 92%, transparent); -webkit-mask-composite: source-in; mask-composite: intersect; }
+.story[data-locale="en"] .titleLayout .featureCopy p { line-height: 1.7; }
 .phoneHalo { position: absolute; width: 118%; aspect-ratio: 1.1; background: radial-gradient(ellipse at 44% 42%, #ffc17b28, #ffc17b08 43%, transparent 71%), radial-gradient(ellipse at 66% 64%, #8bdae018, transparent 68%); border-radius: 50%; opacity: var(--halo-opacity, .55); transform: translate(var(--halo-x, 0%), var(--halo-y, 0%)) scale(var(--halo-scale, 1)); filter: blur(22px); pointer-events: none; }
 .phone {
   --phone-height: min(65cqh, 670px);

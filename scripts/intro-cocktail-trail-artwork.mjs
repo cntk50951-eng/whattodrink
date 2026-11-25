@@ -30,7 +30,6 @@ export function cocktailTrailBuilders(c, data) {
       +Array.from({length:8},(_,i)=>rect(20+i*44,119,39,4,i<5?C.amber:C.line,2)).join('')+rect(18,145,354,252,C.card,27,C.line)+art(data.stepArt.shake,85,155,230)+pill(284,158,74,t('cocktail.chip.sec',12),false,12,30)
       +txt(20,443,t('cocktail.step.shake.title'),29,C.ink,700,'',350)+wrap(20,481,t('cocktail.step.shake.body'),15,347,C.muted,500,1.7)
       +rect(18,577,354,144,C.card,23,'#795f3b')+ivyAvatar(32,593)+txt(77,609,t('cocktail.steps.ivyTip'),12,C.amber,700)+wrap(77,635,t('cocktail.tip.shake'),13,275,C.ink,500,1.6)
-      +pill(32,670,155,t('cocktail.ask.open'),false,13,35)+txt(354,693,t('cocktail.ask.cost'),10,C.muted,500,'text-anchor="end"',154)
       +circle(43,781,25,C.soft,C.line)+icon('back',31,769,24)+button(82,755,290,t('cocktail.steps.next'));
   }
   function done() {

@@ -22,10 +22,12 @@
 ---
 
 | ID | 标题 | 状态 | 严重度 | 发现日期 / 报告人 | 关联 UR | 确诊根因 |
-| DEF-20261122-001 | 关站时 `/privacy` 与 `/terms` 跳到 Coming Soon | Fixed | P2 | 2026-11-22 / @user | UR L.2 | `lib/home.ts` 的关站规则缺少旧入口转址 |
-| DEF-20261116-003 | 推送cron持續報configuration missing | Fixing | P1 | 2026-11-16 / @user | UR D.12 | Open→Investigating；用戶boolean結果URL與Secret均不存在，Vault缺兩項配置；待用戶補齊及驗證cron／HTTP，未呼叫HTTP |
+| DEF-20261122-001 | 关站时 `/privacy` 与 `/terms` 跳到 Coming Soon | Verified | P2 | 2026-11-22 / @user | UR L.2 | `lib/home.ts` 的关站规则缺少旧入口转址；正式站回归通过 |
 | DEF-20261114-001 | `/intro-next` 從簡中／英文切不回繁體 | Verified | P1 | 2026-11-14 / @user | UR M.2 | 繁體入口未帶 locale，next-intl 沿用 NEXT_LOCALE cookie；12 路 HTTP＋瀏覽器點擊通過，待用戶確認 |
 | DEF-20261114-002 | `/intro-next` 首次載入無法開啟播放 | Verified | P1 | 2026-11-14 / @user | UR M.3／M.4 | 有界預載、掛載後初始化；8 項慢載單測及三語實際播放回歸，隨 M.4 發布 |
+| DEF-20261116-003 | 推送cron持續報configuration missing | Verified | P1 | 2026-11-16 / @user | UR D.12 | Open→Investigating；用戶boolean結果URL與Secret均不存在，Vault缺兩項配置；待用戶補齊及驗證cron／HTTP，未呼叫HTTP |
+| DEF-20261116-001 | `/intro` 首次載入／刷新未自動播放 | Fixing | P1 | 2026-11-16 / @user | UR M.9 | Open→Investigating→Fixing；無聲介紹被未靜音 AudioContext 啟動阻塞，另將時間連結與明確凍結預覽分開；本地已修待驗 |
+| DEF-20261116-002 | 裸 `/intro` 未固定使用繁體中文 | Fixing | P2 | 2026-11-16 / @user | UR M.9 | Open→Investigating→Fixing；intro 專屬 localeDetection=false，明確三語前綴仍有效；本地 16 路 HTTP 回歸通過 |
 | DEF-20261014-001 | 投诉详情时间线／AI 建议裸 JSON＋不见双方身份 | Fixing | P1 | 2026-10-14 / @yuki | UR E.31 | 时间线／AI 两段 `JSON.stringify` 直出（review/[id]/page:175／181），见详情 |
 | DEF-20261014-002 | 投诉详情点执行跳 404，判定无效 | Fixing | P0 | 2026-10-14 / @yuki | UR E.31 | 守门失败裸 notFound（opsPage:26），见详情 |
 | DEF-20261010-001 | 好友发消息被当陌生人（3 条＋禁图音） | Fixing | P0 | 2026-10-10 / @iOS | UR D.10 | 成员表 RLS 只读己行，peerIds 恒空→isFriend 恒 false，见详情 |
@@ -78,9 +80,9 @@
 | DEF-20261003-008 | 自家快貼／帖子管理⋯位置不統一（底部 vs 頂部） | Fixed | P2 | 2026-10-03 / @user | UR E.13 | 自家 Sheet⋯上移頭像行与钉卡同位，用戶親驗通過隨本車合入，見詳情 |
 | DEF-20261006-001 | 打卡後出現兩條：一無字想喝記錄＋一正常快貼 | Fixed | P1 | 2026-10-06 / @user | UR E.2 | 同帖雙層渲染截圖實錘；三件去重隨本車合入，用戶親驗通過，見詳情 |
 | DEF-20261006-002 | iOS 好友釘 pill 无走马灯（pins 缺 note 字段） | Open | P2 | 2026-10-06 / @user | UR E.20 | 待确认，见详情 |
-
-
 | DEF-20261118-002 | `GET /api/v1/map/pins` 匿名回傳作者完整生日 `authorDob` | Fixed（本地；tsc／eslint／1328 測試過；**未部署**，需部署＋清 CDN） | P1 | 2026-11-18 / 跨端審計 `NEW-REL-03` | 見 iOS `docs/WEB_HANDOFF_PIN_AUTHOR_DOB.md` | `lib/api/pins.ts` `toPinJson` 把 `users.dob` 原樣放進回包；與 `users/[id]/profile`「他人只見 age」口徑矛盾，契約 yaml 亦無此字段。改為只回 `authorAge`。 |
+
+
 - **严重度**：P2 次要（慢＋白屏感；记录最终能出来）
 - **发现日期 / 报告人**：2026-10-03 / @user
 - **复现步骤**：
@@ -954,9 +956,29 @@
 - 修復驗證：8 項測試模擬全部圖片懸置、失敗、遲到、背景逾時、取消與響應式來源；瀏覽器繁中／簡中／英文自動播放及暫停／恢復成功；`?t=8` 保持凍結且可主動播放，控制台無應用錯誤。減少動態的停結尾分支沿用，未修改系統偏好。build 132 頁；117 檔／1,234 tests；lint 零錯／12 個既有 warnings。
 - 回歸範圍：僅新版介紹頁播放器；原 `/intro`、v1／v2、圖片素材與全站路由不變。
 
+### DEF-20261116-001 — 介紹頁首次與刷新不自動進幀
+- 狀態：Open → Investigating → Fixing；本地修復與回歸完成，未合入 main，待用戶親驗。
+- 嚴重度：P1；發現日期／報告人：2026-11-16／@user；關聯 UR M.9。
+- 復現：直接開普通 `/intro` 或刷新；初始動畫空白，右上已顯示「暫停介紹」。另有舊 `/intro?t=2.8` 連結刷新會凍結。
+- 期望 vs 實際：預期自動進入品牌首屏、繼續故事；實際普通入口的 DOM 動態樣式 --orbit 長期為 0deg，雖已 dispatchPlay 卻不進幀。
+- 確診根因：無聲動畫沿 Remotion 預設未靜音／共享音訊標籤，usePlayback 在沒有手勢時等待 AudioContext resume；時間參數亦隱式走 pause→seek。兩條原因獨立存在。
+- 修復：initiallyMuted、numberOfSharedAudioTags=0、初始化先 mute；普通 t 只指定起播位置，明確 preview=1 才凍結，保留減少動態及先前已鍵盤閱讀的暫停意圖。
+- 修復驗證：新播放啟動回歸模擬音訊被阻、首次／刷新、time link、明確預覽及閱讀／減少動態；瀏覽器普通網址／刷新及 t 連結的 --orbit 持續增加並跨幕，明確預覽可手動恢復。build 138 頁、全量 1,258 tests、lint 零錯／12 既有 warnings。
+- 回歸範圍：新版 intro／intro-next，首屏／頁內瀏覽、預載、三語、原版備份完整性；無聲動畫不新增音訊，不更改裝置設定或正式站旗標。
+
+### DEF-20261116-002 — 裸 intro 入口應固定繁體
+- 狀態：Open → Investigating → Fixing；本地已修並完成真實 HTTP 回歸，待用戶親驗／合入。
+- 嚴重度：P2；發現日期／報告人：2026-11-16／@user；關聯 UR M.9。
+- 復現：帶 NEXT_LOCALE=en 或 zh-Hans 訪問 `/intro`；原先分別跳 `/en/intro` 或 `/zh-Hans/intro`。
+- 期望 vs 實際：預期裸 `/intro` 固定繁體；實際全站 locale negotiation 優先 cookie／Accept-Language，defaultLocale 只作回退。
+- 確診根因：新版 intro 共用全站 createMiddleware(routing)，沒有對介紹頁的固定預設作區分。
+- 修復：只對 intro／intro-next／圖庫（含明確前綴）套用 localeDetection=false，保留 localePrefix=as-needed 與明確語言入口；全站 routing 及封站先行順序不動。
+- 修復驗證：policy 單測＋真實框架 HTTP 16 路：12 組 cookie／英文瀏覽器語言下裸入口繁體、2 明確英文／簡體入口刷新不變、2 個 App／原版備份仍沿舊 cookie；瀏覽器英文後返回裸 intro 為繁體。
+- 回歸範圍：proxy 的 intro 專屬協商；v1／v2／原版備份／全站預設不變，lib/home 20 項及全量測試通過。
+
 ### DEF-20261116-003 — 推送cron設定守衛失敗
 
-- **狀態**：Fixing（缺失Vault已確診；URL用戶回報已配置。web新增專用Secret支援，待用戶填值與cron／HTTP驗收）
+- **狀態**：Verified（2026-11-17：Vault五欄全true、request482 HTTP200、自動job6 UTC08:22–08:24三次succeeded；配置缺陷已驗證，未由用戶Closed）
 - **嚴重度**：P1 主要；D.12新事件首次投遞與重試均受阻。
 - **發現日期／報告人**：2026-11-16 / @user（日誌UTC 2026-11-17 07:17–07:19）
 - **復現步驟**：建native-push-dispatch job6→readiness四項true→查job6最近三次執行紀錄，均failed。
@@ -965,14 +987,24 @@
 - **已確認根因**：用戶回報兩個exists均false：push_dispatch_url與push_dispatch_secret均未建立，觸發配置守衛，尚未進入HTTP呼叫。
 - **確診證據／待核實**：supabase/push-dispatch-cron.sql的RAISE只在URL為NULL／regex不符或Secret為NULL／不足16字元觸發；net.http_post在其後，尚未呼叫。用戶只讀查詢url_exists／url_correct／secret_exists／secret_length_ok全false，確認兩個具名Vault配置均不存在；尚未修復。
 - **關聯UR**：D.12；CHANGELOG及memory同批記錄，配置修復後再核對cron succeeded及其HTTP回應。
-- **修復驗證**：尚未進行。不得將四個readiness=true當Vault正常，也不得印decrypted_secret或向用戶索取密鑰。
+- **修復驗證**：用戶提供完整Vault五欄全true、request482 HTTP200且無timeout/error、job6連續三次succeeded。僅驗證cron配置／喚醒／後端呼叫；FCM實際送達與D.12全功能未驗。未讀回任何Secret。
 - **回歸範圍**：Vault名稱／URL／Secret長度、cron執行、後端HTTP認證及dispatcher；手機仍暫停，不新增正式DB操作。
 
 - DEF-20261116-003修正驗證：新增8項真handler認證測試；build139頁、129檔／1312tests綠、lint0errors／12既有warnings；新專用Secret已配置時拒絕舊值，空／短值不回退；正式配置與cron／HTTP未驗，不能標Verified。
 
+- DEF-20261116-003追加證據（2026-11-17）：用戶已報Secret存在／長度true，但UTC08:04–08:06 job6仍同一RAISE失敗；URL存在／格式尚未收到SQL結果，不能宣稱配置已正常。先以push-dispatch-readiness.sql重查同guard五欄；具體剩餘根因待證據，保持Fixing，未進入HTTP／FCM。
+
+- DEF-20261116-003根因更新（2026-11-17）：完整五欄結果URL三欄false、Secret兩欄true，確認現階段仍缺可讀的push_dispatch_url。提供push-dispatch-set-url.sql只修公開URL，待用戶執行及cron／HTTP驗證，未標已修復。
+
+- DEF-20261116-003進度（2026-11-17）：用戶執行URL修正後Vault五欄全true，配置守衛前置條件已通過；下一步手動wake取得request_id並查其HTTP結果，及job6新run。未驗HTTP或真機前仍Fixing，不標Verified。
+
+- DEF-20261116-003驗證進度（2026-11-17）：用戶手動wake取得request482，對應HTTP200／無timeout／無error，空批次claimed0正常。Vault→認證→dispatcher已跑通；待job6自動run最新status後確認原cron配置問題解決，尚未驗FCM實送／真機，不將D12整體打✓。
+
+- DEF-20261116-003狀態流轉補記：Open→Investigating→Fixing→Fixed（web專用Secret修正3f0929f已合入且用戶補齊Vault）→Verified（用戶提供自動cron連續三次成功及先前HTTP200）。只結束配置缺陷，不代表D.12或真機已驗收。
+
 ## DEF-20261122-001 — 关站时 `/privacy` 与 `/terms` 跳到 Coming Soon
 
-- **状态**：Fixed（修正随此提交合入 main）
+- **状态**：Verified（`7956db0` 合入 main，Vercel Production 部署 `7991630588` 成功并通过 HTTP 回归）
 - **严重度**：P2 次要
 - **发现日期 / 报告人**：2026-11-22 / @user
 - **复现步骤**：在 `SITE_LIVE=false` 时用访客浏览器打开正式站 `/privacy` 与 `/terms`。
@@ -980,7 +1012,7 @@
 - **初判根因**：关站规则放行了 `/legal/*`，旧入口没有相应的转址。
 - **确诊根因**：`lib/home.ts` 的 `resolveSiteGate` 放行 `/legal/*`，其他访客路径走 Coming Soon。正式站四次请求（裸网址及 `/en` 前缀）均返回 307 到相应的 Coming Soon 页面。
 - **关联 UR**：UR L.2。
-- **修复验证**：本地 `SITE_LIVE=false` 生产预览确认两条旧入口繁／简／英均 307 到对应 200 文件，普通路径仍 307 到 Coming Soon。开站开发服务 `/terms` 200 并显示三种模式说明。Webpack build 生成 153 页，Vitest 136 档／1,368 项全绿，ESLint 0 errors／12 既有 warnings。待正式站部署验证。
+- **修复验证**：正式站两条旧入口繁／简／英均 307 到对应 200 文件，首页和 `/en/wall` 仍 307 到 Coming Soon。开站开发服务 `/terms` 200 并显示三种模式说明。提交快照 Webpack build 生成 153 页，Vitest 135 档／1,361 项全绿，ESLint 0 errors／12 既有 warnings。
 - **回归范围**：两条入口及三语路径、公开法律页、普通页面封站行为、开站时的 `/terms`。
 
 ## DEF-20261118-001 — AOS 推送覆蓋復核發現邊界流程漏送

@@ -1,7 +1,7 @@
 {
   "common": {
-    "appName": "Whattodrink",
-    "tagline": "今晚喝咩？",
+    "appName": "嗨飲",
+    "tagline": "每一杯，都是一個故事",
     "loading": "載入中…",
     "error": "出了點問題，請稍後再試"
   },
@@ -25,7 +25,7 @@
       "terms": "條款",
       "contact": "聯絡"
     },
-    "copyright": "© {year} whattodrink. 理性飲酒，未成年請勿飲酒。"
+    "copyright": "© {year} 嗨飲. 理性飲酒，未成年請勿飲酒。"
   },
   "theme": {
     "label": "主題",

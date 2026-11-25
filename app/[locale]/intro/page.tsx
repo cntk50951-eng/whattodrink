@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { ReactElement } from "react";
 
 import { INTRO_COPY } from "@/components/intro-next/copy";
+import { introMetadata } from "@/components/intro-next/metadata";
 import { IntroClient } from "@/components/intro-next/IntroClient";
 import { routing, type AppLocale } from "@/i18n/routing";
 
@@ -14,8 +15,7 @@ function getLocale(raw: string): AppLocale {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const copy = INTRO_COPY[getLocale((await params).locale)];
-  return { title: copy.title, description: copy.description, robots: { index: true, follow: true } };
+  return introMetadata(getLocale((await params).locale), true);
 }
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#090f14" };

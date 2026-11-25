@@ -5,6 +5,7 @@ import { Stack } from "@/components/layout/stack";
 
 export async function Footer() {
   const t = await getTranslations("footer");
+  const brand = (await getTranslations("common"))("appName");
 
   const links = [
     { key: "privacy", href: "/legal/privacy" },
@@ -22,7 +23,7 @@ export async function Footer() {
           align={{ base: "start", md: "center" }}
         >
           <Stack gap="2">
-            <p className="font-hand text-2xl font-bold">whattodrink</p>
+            <p className="font-hand text-2xl font-bold">{brand}</p>
             <p className="text-sm text-muted-foreground">{t("tagline")}</p>
           </Stack>
 

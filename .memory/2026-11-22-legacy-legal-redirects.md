@@ -15,3 +15,5 @@
 本機驗證時，Turbopack 在 compile 無進度，改用 `npm run build -- --webpack` 完成。`next start` 綁 `127.0.0.1` 時，預覽把預設語言 rewrite 到 `localhost`，造成自我轉址；改用 `--hostname localhost` 後正常。封站和開站合計 21 個 HTTP 回應符合預期。
 
 發布前也以 `main` 加本次變更建立獨立快照。建置環境需提供虛構的 Supabase 公開與服務端值，讓既有後台頁通過環境檢查。快照建置產出 153 頁，135 個測試檔、1,361 項測試全數通過，lint 有 12 個既有警告及 0 個錯誤。
+
+提交 `7956db0` 已推送至 `main`，Vercel Production 部署 `7991630588` 成功。正式網域兩條舊入口的繁中、簡中、英文均導向對應的 200 法律文件。首頁仍以 307 導向 `/coming-soon` 並顯示 Coming Soon。部署後驗證已記錄，獨立快照和本機預覽已清理。

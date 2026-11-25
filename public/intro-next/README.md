@@ -27,7 +27,7 @@
 | 6 | `ivy-bar` | IMG_9298；Bar 視圖 | 保留實際 Ivy 角色、聊天與遊戲入口 |
 | 7 | `cocktail-book` | HTML TC-CKT-01-01 步驟 2 | 用實際 Gin Fizz 卡、99 款目錄與原生向量插畫重構 |
 | 8 | `cocktail-recipe` | TC-CKT-02-01 企圖進配方但畫面仍在首頁；依 NightCocktailRecipeView 補足 | 真實 0.5／1／2／4 杯與 mL／oz；45 mL 金酒、30 mL 檸檬汁、10 mL 糖漿、梳打水加滿 |
-| 9 | `cocktail-step` | TC-CKT-03-01 受阻，未到內頁；依 NightCocktailStepsView、CocktailSteps.make、stepArt.shake 補足 | 真實第 5／8 步、12 秒搖勻、Ivy 預寫提示、問 Ivy 及每問扣額度提示 |
+| 9 | `cocktail-step` | TC-CKT-03-01 受阻，未到內頁；依 NightCocktailStepsView、CocktailSteps.make、stepArt.shake 補足 | 真實第 5／8 步、12 秒搖勻、Ivy 預寫提示（v5 起已移除「問 Ivy」按鈕：App 端隱藏該入口） |
 | 10 | `cocktail-done` | NightCocktailDoneView | 完成→影相發貼文／再整一杯，沿實際 UI 文案 |
 | 11–12 | `dice-cups`／`dice-peek` | IMG_9299／9300；BarDiceView | 保留原 3D 骰盅／骰子區，所有 UI 三語重排 |
 | 13–14 | `party`／`party-detail` | IMG_9302／9304／9305；NightPartyBoardView／NightPartyDetailView | 篩選→酒局詳情；示範 Amber Room、21:00、尚餘兩席 |

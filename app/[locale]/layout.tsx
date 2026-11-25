@@ -62,6 +62,7 @@ export default async function LocaleLayout({
   setRequestLocale(locale);
 
   const messages = await getMessages();
+  const brandName = (await getTranslations({ locale, namespace: "common" }))("appName");
 
   return (
     <div
@@ -76,7 +77,7 @@ export default async function LocaleLayout({
                   href="/"
                   className="font-hand text-3xl font-bold tracking-tight"
                 >
-                  whattodrink
+                  {brandName}
                 </Link>
                 <div className="flex items-center gap-2">
                   <HeaderAuth />

@@ -12,9 +12,9 @@ import s from "./coming-soon.module.css";
  * 未上線不收錄：robots noindex。
  */
 export const metadata: Metadata = {
-  title: "Coming Soon — WhatToDrink",
+  title: "Coming Soon — hi drink · 嗨飲",
   description:
-    "WhatToDrink is brewing something for Hong Kong drinkers. See you soon.",
+    "hi drink is brewing something for Hong Kong drinkers. See you soon.",
   robots: { index: false, follow: false },
 };
 
@@ -26,6 +26,7 @@ type Copy = {
   cheers: string;
   storesSoon: string;
   foot: string;
+  brand: string;
 };
 
 const COPY: Record<string, Copy> = {
@@ -36,7 +37,8 @@ const COPY: Record<string, Copy> = {
     lede: "我哋釀緊啲好嘢——為香港人而設嘅飲酒好拍檔，好快見。",
     cheers: "乾杯！",
     storesSoon: "即將上架",
-    foot: "WhatToDrink · 香港",
+    foot: "嗨飲 · 香港",
+    brand: "嗨飲",
   },
   "zh-Hans": {
     eyebrow: "即将登场",
@@ -45,7 +47,8 @@ const COPY: Record<string, Copy> = {
     lede: "我们正在酝酿——为香港人而设的饮酒好拍档，很快见。",
     cheers: "干杯！",
     storesSoon: "即将上架",
-    foot: "WhatToDrink · 香港",
+    foot: "嗨飲 · 香港",
+    brand: "嗨飲",
   },
   en: {
     eyebrow: "Almost there",
@@ -54,7 +57,8 @@ const COPY: Record<string, Copy> = {
     lede: "We're brewing something for Hong Kong drinkers. See you soon.",
     cheers: "Cheers!",
     storesSoon: "Coming to stores",
-    foot: "WhatToDrink · Hong Kong",
+    foot: "hi drink · Hong Kong",
+    brand: "hi drink",
   },
 };
 
@@ -71,12 +75,12 @@ export default async function ComingSoonPage({
   return (
     <div className={s.root}>
       {/* 讀屏／無樣式環境後備文字 */}
-      <h1 className="sr-only">WhatToDrink — Coming Soon</h1>
+      <h1 className="sr-only">{t.brand} — Coming Soon</h1>
       <p className="sr-only">{t.lede}</p>
       <nav className={s.nav} aria-hidden="true">
         <span className={s.brand}>
           <i />
-          <b>WhatToDrink</b>
+          <b>{t.brand}</b>
         </span>
       </nav>
       <main className={s.stage}>

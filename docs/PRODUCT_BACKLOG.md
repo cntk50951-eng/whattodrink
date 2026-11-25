@@ -4582,6 +4582,23 @@ UR L.2　关站时保留私隐政策与服务条款的旧入口 [WIP]
 - 2026-11-16 production 稽核：GitHub main 與 Vercel Production 記錄仍指向 `2b5ce6a`；遠端原碼確認尚無品牌首屏、仍 Ivy→調酒→骰子且保留底部兩連結。M.5／M.6／M.7 皆為本地待提交修改；SITE_LIVE 僅封站控制，正式站目前已回 coming-soon。本輪未部署或改旗標。
 - 2026-11-16 用戶明確授權「請提交部署，確保 production 最新」：本輪發布範圍合併 M.5／M.6／M.7；以 main 的新提交、同 SHA 的 Vercel Production success 與正式 alias coming-soon 驗證。提交前 build 138 頁、全量 121 檔／1,251 tests 全綠、lint 0 errors／12 既有 warnings；不更動 SITE_LIVE 或原版備份，視覺驗收狀態待用戶確認。
 
+### UR M.8 — intro 文案潤色、品牌邊緣／分享卡、換幕銜接 [WIP]
+- 用戶要求：①三語文案貼合產品與介紹用途；②圖片展示效果與動畫的品味；③確認 hi drink／嗨飲品牌已套用。
+- 範圍：copy.json 的 capture／party／trail／cocktail／dice／end 與 description；首屏品牌圖邊緣；Frame 換幕淡入淡出錯開；intro／intro-next 的 og／twitter 分享卡。不動 66 張功能圖、鏡頭運動系統、全站 appName、SITE_LIVE。
+- 驗收：三語新文案不多於原行數、品牌名一致（嗨飲／hi drink）；首屏無方形硬邊；換幕時舊標題不被新手機遮住；手機 390px 版面由用戶目測。
+*改動記錄*
+- 2026-11-16：完成並驗證（見 CHANGELOG UR M.8）。未驗證：手機寬度；og:image 絕對網址待 metadataBase；全站 messages 的 appName 仍為 Whattodrink（另案）。
+
+### UR M.9 — intro 自動播放、繁體預設與產品 slogan [WIP]
+- 用戶回報首次載入／刷新無法自動播放（DEF-20261116-001），並要求裸 `/intro` 預設繁體（DEF-20261116-002）；左上 slogan 改為喝酒、分享、交友的樂趣與 AI 懂口味。
+- 範圍：新版播放器的無聲播放設定、intro 專屬 locale 規則、三語 tagline；保留 M.8 未提交的文案／品牌邊緣／換幕及分享卡修改，原版備份與全站封站不變。
+- 驗收：普通入口首次及刷新自動進幀、手動暫停不被覆寫；`?t=` 指定起播位置，只有 `preview=1` 明確作靜態預覽；裸 `/intro` 不受 en／zh-Hans cookie 或英文瀏覽器語言影響，明確 `/en/intro`／`/zh-Hans/intro` 可切換且刷新保持；三語 slogan 同步。
+*改動記錄*
+- 2026-11-16：已落兩筆 defect 並定位：普通 `/intro` UI 顯示播放中但 Remotion 留在第 0 幀；其播放迴圈等待未靜音 AudioContext resume，而組件沒有音訊。cookie=en／zh-Hans 可重現裸入口被導向其他語言；凍結參數是另一條獨立的預期暫停路徑。
+- 本地修復：Player initiallyMuted／共享 audio tags=0，初始化先 mute；`t` 起播、`preview=1` 才凍結，保留減少動態／手動閱讀。intro 專屬語言設定忽略 locale negotiation，不改全站 routing 或封站；三語 slogan 改為「分享一杯，遇見同好 · AI 更懂你的口味」及對應翻譯。
+- 驗證：build 138 頁、全量 122 檔／1,258 tests、lint 0 errors／12 既有 warnings；16 路 HTTP 回歸。瀏覽器已見普通／刷新／t 連結實際進幀，明確預覽暫停且可手動恢復，英文 slogan 版面正常；正式站未推送，待用戶本地親驗。
+
+
 ## UR D.11 AOS FCM 基礎通道與設備 API 相容擴充（2026-11-16）[WIP]
 
 - 授權：用戶確認 Vercel FIREBASE_SERVICE_ACCOUNT_JSON 已配置，要求 AOS build 成功後增強 web API；AOS-0.137 debug build 已通過。只改 shared API／push 層，iOS 保留直接 APNs。
@@ -4598,6 +4615,7 @@ UR L.2　关站时保留私隐政策与服务条款的旧入口 [WIP]
 - D.11 驗證（2026-11-16）：build 138頁、126檔／1285 tests全綠；lint 0errors／12既有warnings；tsc通過。未送真實通知／部署，AOS完整客戶端與其他業務事件待後續；維持WIP。交接memory 2026-11-16-aos-fcm-backend.md、docs/FCM_SETUP.md。
 
 - D.11 發佈授權（2026-11-16）：用戶明確要求將web API commit／push GitHub觸發Vercel；本批只提交D.11，不帶intro M.8／M.9或AOS原生改動，SITE_LIVE保持不變。
+
 
 ## UR D.12 AOS完整業務推送、持久outbox與排程（2026-11-16）[WIP]
 - 平台：共用後端新增事件先供AOS；iOS既有APNs payload／事件掛點保留，新增事件暫不發iOS。契約先行OpenAPI1.67.0，Android data-only含recipient_id／穩定event_id／epoch-ms expires_at，App驗帳號與去重後顯示。
@@ -4616,5 +4634,13 @@ UR L.2　关站时保留私隐政策与服务条款的旧入口 [WIP]
 - D.12／DEF-20261116-003配置修正開工（2026-11-16）：用戶已設Vault URL，但舊CRON_SECRET為不可讀回的Secret。推送新增PUSH_DISPATCH_SECRET優先、未設定才相容舊CRON_SECRET，避免輪替影響帳號清理與配對；專用值空／短時拒絕、不回退。Vault仍叫push_dispatch_secret，無新SQL／表／job；只改web。驗收：實際handler認證測試、全量gate及部署；正式Secret仍由用戶配置。
 
 - D.12專用Secret gate（2026-11-16）：build139頁、129檔／1312tests綠（新8項）、lint0errors／12既有warnings；僅API認證改動，無App／DB／UI改動，正式Secret及job6執行／HTTP待用戶。
+
+- D.12／DEF-20261116-003（2026-11-17）：新增只讀push-dispatch-readiness.sql，補驗URL存在／格式／正式endpoint及Secret存在／長度。用戶最新job6仍Vault guard失敗，待五欄結果，不重建SQL或排程。
+
+- D.12／DEF-20261116-003：用戶五欄證實URL缺失、Secret正常；準備只修公開URL的push-dispatch-set-url.sql（具名create／update），不改Secret／job，待用戶執行及驗收。
+
+- D.12／DEF-20261116-003聯調：用戶手動request482回HTTP200、無timeout/error、空批次全0；目前鏈路成功，待job6自動run及真機FCM，保留WIP。
+
+- D.12／DEF-20261116-003（2026-11-17）：用戶job6 UTC08:22–08:24三次succeeded，結合Vault五欄true及request482 HTTP200，cron配置缺陷Verified；D.12保持WIP，FCM真事件與真機矩陣未驗。Supabase不需額外建立SQL。
 
 - 2026-11-18 D.12／DEF-20261118-001：現行22情境逐項追來源，修正舊memory誤判；補好友世代／酒局入席／遊戲批准與移出／Android失效邀請與冷啟身份，品牌smallIcon、大圖及前台橫幅。詳見web PUSH_COVERAGE_MATRIX；真機未驗，維持WIP。

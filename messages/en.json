@@ -1,7 +1,7 @@
 {
   "common": {
-    "appName": "Whattodrink",
-    "tagline": "Tonight's Pick",
+    "appName": "hi drink",
+    "tagline": "Every drink tells a story",
     "loading": "Loading…",
     "error": "Something went wrong. Please try again."
   },
@@ -25,7 +25,7 @@
       "terms": "Terms",
       "contact": "Contact"
     },
-    "copyright": "© {year} whattodrink. Please drink responsibly. Not for minors."
+    "copyright": "© {year} hi drink. Please drink responsibly. Not for minors."
   },
   "theme": {
     "label": "Theme",
