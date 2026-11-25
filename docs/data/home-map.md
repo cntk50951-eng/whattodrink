@@ -74,6 +74,15 @@
 | 我的足迹站（`trailStops(wantHistory)`，UR3.4 返工后） | 聚光圈＋酒名签＋浮条计数（≥2 站连虚线） | `TrailStop[]`（`lib/trail.ts`，想喝史即足迹，无则空态） | render 现算（无记录不编数据） | `checkins where user_id＝我 order by created_at`（字段直迁，无新表） |
 | `trailMode`（足迹模式开关） | 他人置灰＋浮条＋返回 | `boolean` | state，会话 | 不进库（运行时态） |
 
+### 原生「我的足跡」
+
+| 欄位 | 畫面 | 型別 | 來源 | 資料表 |
+|---|---|---|---|---|
+| `checkins`、`next_cursor` | 本人時間軸／地圖聚合點清單 | `MineRow[]`、`string \| null` | `GET /api/v1/checkins/mine/trail` | `checkins` 及 `checkins_archive`，按 `(created_at, id)` 升序 |
+| `points` 中的 `id`、`lat`、`lng`、`count`、`checkin`、`bbox` | 本人足跡地圖 | 單點摘要或計數與範圍 | `GET /api/v1/checkins/mine/trail/map` | `checkins` 及 `checkins_archive`，指定視野內即時計算 |
+
+聚合點可用其 `bbox` 打開時間軸子集，包括完全重合的站。本人精確座標只在登入後供本人讀取，列表和地圖回應均禁止共用快取。
+
 ## 九、可見模式（UR A.16，隱身先行）
 
 | 字段 | 页面位置 | 类型 | 当前来源 | 未来表映射 |
