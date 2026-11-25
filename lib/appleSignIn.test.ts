@@ -128,10 +128,10 @@ describe("appleRevocationGate", () => {
     expect(await appleRevocationGate(apple, "u", "C", env, fakeFetch([{ status: 500 }]).fn as never))
       .toMatchObject({ proceed: false, status: 503 });
   });
-  it("never blocks the user's right to delete on OUR misconfiguration (logs loudly, proceeds)", async () => {
+  it("never blocks the user's right to delete on OUR misconfiguration (logs loudly, proceeds, flags manualRevoke — round 8 R8-06)", async () => {
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(await appleRevocationGate(apple, "u", "C", {}, fakeFetch([]).fn as never)).toEqual({ proceed: true });
-    expect(await appleRevocationGate(apple, "u", "C", env, fakeFetch([{ status: 401 }]).fn as never)).toEqual({ proceed: true });
+    expect(await appleRevocationGate(apple, "u", "C", {}, fakeFetch([]).fn as never)).toEqual({ proceed: true, manualRevoke: true });
+    expect(await appleRevocationGate(apple, "u", "C", env, fakeFetch([{ status: 401 }]).fn as never)).toEqual({ proceed: true, manualRevoke: true });
     expect(err).toHaveBeenCalledTimes(2);
     expect(JSON.stringify(err.mock.calls)).not.toMatch(/BEGIN PRIVATE KEY|CODE/);
     err.mockRestore();

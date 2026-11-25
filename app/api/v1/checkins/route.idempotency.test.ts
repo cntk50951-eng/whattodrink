@@ -20,6 +20,7 @@ vi.mock("@/lib/api/envelope", () => import("../../../../lib/api/envelope"));
 vi.mock("@/lib/api/checkins", () => import("../../../../lib/api/checkins"));
 vi.mock("@/lib/api/checkinIdempotency", () => import("../../../../lib/api/checkinIdempotency"));
 vi.mock("@/lib/api/privacy", () => import("../../../../lib/api/privacy"));
+vi.mock("@/lib/api/profile", () => import("../../../../lib/api/profile"));
 vi.mock("@/lib/hashtagLibrary", () => ({ recordUserHashtags: async () => {} }));
 vi.mock("@/lib/accountDeletion", () => ({ isDeletionPending: async () => false }));
 vi.mock("@/lib/moderation", () => ({

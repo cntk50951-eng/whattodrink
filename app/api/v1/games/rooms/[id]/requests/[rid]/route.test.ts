@@ -1,5 +1,6 @@
 import {beforeEach,describe,expect,it,vi} from "vitest";
 const state=vi.hoisted(()=>({mode:"normal",status:"pending",inserted:false,notices:[] as unknown[],bumps:vi.fn()}));
+vi.mock("@/lib/api/retryWrite",()=>import("../../../../../../../../lib/api/retryWrite"));
 vi.mock("@/lib/api/envelope",()=>import("../../../../../../../../lib/api/envelope"));
 vi.mock("@/lib/games/rooms",()=>({parseJoinDecision:()=>({decision:"approve"}),loadRoomAsMember:async()=>({room:{id:"room",status:"lobby",version:4,max_players:2}}),requireHost:()=>null,claimRoomSeat:async()=>state.mode==="race"?{kind:"already",seat:1}:state.mode==="seat"?{kind:"room_full"}:{kind:"ok",seat:1},bumpRoom:state.bumps,appendEvent:async()=>{}}));
 vi.mock("@/lib/supabase/server",()=>{

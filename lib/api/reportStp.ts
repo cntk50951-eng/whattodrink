@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { moderateCheckin } from "../moderation";
 import { writeTrustEvent } from "../trust/ledger";
+import { retryWrite } from "./retryWrite";
 
 export type ReportTargetType = "user" | "post" | "message";
 export type ReportDecision = "actioned" | "dismissed";
@@ -118,8 +119,9 @@ export async function applyReportDecision(
     decision: ReportDecision;
     note?: string | null;
   },
-): Promise<{ ok: boolean; failed: string[] }> {
+): Promise<{ ok: boolean; failed: string[]; notifyFailed: string[] }> {
   const failed: string[] = [];
+  const notifyFailed: string[] = [];
   const cleanNote = typeof args.note === "string" && args.note.trim() !== "" ? args.note.trim() : null;
   if (args.decision === "actioned") {
     // 1. 帖文違規：立即轉為 private 下架
@@ -136,7 +138,7 @@ export async function applyReportDecision(
       }
     }
     // 下架失敗就先停：扣分會同時發 trust_changed 通知，不能在帖文還公開時就告訴被舉報人「已處理」。重跑時兩步都冪等
-    if (failed.length > 0) return { ok: false, failed };
+    if (failed.length > 0) return { ok: false, failed, notifyFailed };
     // 2. 扣誠信分（冪等，寫入 trust_events 並觸發 trust_changed 通知）
     const delta = reportTrustDelta(args.targetType, args.reasonCode);
     try {
@@ -155,33 +157,11 @@ export async function applyReportDecision(
       console.error(`[reportStp] trust event error: ${err instanceof Error ? err.message : "unknown"}`);
     }
     // 業務結果沒成立：不通知任何人（否則被舉報人／舉報人會收到「已處理」而實際沒下架或沒扣分）
-    if (failed.length > 0) return { ok: false, failed };
-    // 3. 匿名通知被舉報人
-    try {
-      await svc.from("notifications").insert({
-        user_id: args.targetUserId,
-        kind: args.targetType === "post" ? "post_actioned" : "report_actioned",
-        party_id: null,
-        actor_id: null,
-        payload: {
-          report_id: args.reportId,
-          target_type: args.targetType,
-          target_ref: args.targetRef,
-          reason_code: args.reasonCode,
-          party_place: args.placeName ?? null,
-          decision: "actioned",
-          note: cleanNote,
-        },
-      });
-    } catch (err) {
-      console.error(`[reportStp] notify reported actioned error: ${err instanceof Error ? err.message : "unknown"}`);
-    }
-  }
-  // 4. 通知舉報人處理結果
-  try {
-    await svc.from("notifications").insert({
-      user_id: args.reporterId,
-      kind: "report_resolved",
+    if (failed.length > 0) return { ok: false, failed, notifyFailed };
+    // 3. 匿名通知被舉報人。supabase 查詢回 {error} 不會拋，必須讀 error（第八輪 R8-03）；瞬時錯誤有界重試
+    const toReported = await retryWrite(() => svc.from("notifications").insert({
+      user_id: args.targetUserId,
+      kind: args.targetType === "post" ? "post_actioned" : "report_actioned",
       party_id: null,
       actor_id: null,
       payload: {
@@ -190,14 +170,36 @@ export async function applyReportDecision(
         target_ref: args.targetRef,
         reason_code: args.reasonCode,
         party_place: args.placeName ?? null,
-        decision: args.decision,
+        decision: "actioned",
         note: cleanNote,
       },
-    });
-  } catch (err) {
-    console.error(`[reportStp] notify reporter resolved error: ${err instanceof Error ? err.message : "unknown"}`);
+    }));
+    if (toReported.error !== null) {
+      notifyFailed.push("reported");
+      console.error(`[reportStp] [needs-repair] notify reported report=${args.reportId} code=${toReported.error.code ?? "unknown"}`);
+    }
   }
-  return { ok: true, failed };
+  // 4. 通知舉報人處理結果（同上：讀 error＋重試；處分已落地，所以不回退，只回報通知缺口供呼叫端提示／對賬）
+  const toReporter = await retryWrite(() => svc.from("notifications").insert({
+    user_id: args.reporterId,
+    kind: "report_resolved",
+    party_id: null,
+    actor_id: null,
+    payload: {
+      report_id: args.reportId,
+      target_type: args.targetType,
+      target_ref: args.targetRef,
+      reason_code: args.reasonCode,
+      party_place: args.placeName ?? null,
+      decision: args.decision,
+      note: cleanNote,
+    },
+  }));
+  if (toReporter.error !== null) {
+    notifyFailed.push("reporter");
+    console.error(`[reportStp] [needs-repair] notify reporter report=${args.reportId} code=${toReporter.error.code ?? "unknown"}`);
+  }
+  return { ok: true, failed, notifyFailed };
 }
 
 /**
@@ -294,7 +296,8 @@ export async function runPostReportStp(
       if (applied.ok) return { autoActioned: true, categories };
       // 下架或扣分沒成功：案件退回 pending 交人工隊列重跑（冪等），不發「已處理」通知
       console.error(`[reportStp] auto action incomplete report=${args.reportId} failed=${applied.failed.join(",")}`);
-      await reopenReport(svc, args.reportId, "actioned", "pending");
+      const reopened = await reopenReport(svc, args.reportId, "actioned", "pending");
+      if (!reopened) console.error(`[reportStp] [needs-repair] reopen failed report=${args.reportId} (案件停在 actioned 但處分未完成)`);
     }
   }
 

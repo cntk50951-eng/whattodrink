@@ -170,7 +170,8 @@ export async function appleRevocationGate(
   const cfg = appleSiwaConfigFromEnv(env);
   if (cfg === null) {
     console.error("[siwa] account has Apple identity but APPLE_SIWA_* is not configured; deletion proceeds WITHOUT revoking");
-    return { proceed: true };
+    // 第八輪 R8-06：沒撤銷就必須讓用戶知道要自己移除授權（TN3194），不能讓客戶端只看到「刪除成功」
+    return { proceed: true, manualRevoke: true };
   }
   if (authorizationCode === null && clientCannotAuthorize) {
     console.error("[siwa] Apple-bound account deleted from a client that cannot run Apple authorization; token NOT revoked, user must remove it in Apple ID settings");
@@ -189,7 +190,7 @@ export async function appleRevocationGate(
   }
   if (r.kind === "misconfigured") {
     console.error("[siwa] Apple rejected our client credentials (check APPLE_SIWA_KEY_ID/TEAM_ID/CLIENT_ID/KEY_P8); deletion proceeds WITHOUT revoking");
-    return { proceed: true };
+    return { proceed: true, manualRevoke: true };
   }
   return { proceed: false, status: 503, code: "internal", message: "Apple 暫時無法連線，請稍後重試" };
 }

@@ -118,23 +118,37 @@ export async function DELETE(req: Request): Promise<Response> {
   const { userId } = await getAuthedClient(req);
   if (userId === null) return apiError("unauthorized", "未登录", 401);
   const svc = await createServiceClient();
-  // 忘記＝墓碑行（rev 只增不減＋forgot_rev）；0085 沒跑（缺欄位）才退回直接刪列
-  const { row: cur, error: readErr } = await readRow(svc, userId);
-  if (readErr !== null) {
-    console.error(`[api/v1/me/bar-memory] delete read error: code=${readErr.code} message=${readErr.message}`);
-    return apiError("internal", "刪除失敗", 500);
+  // 忘記＝墓碑行（rev 只增不減＋forgot_rev）；0085 沒跑（缺欄位）才退回直接刪列。
+  // 第八輪 R8-01：墓碑 update 帶 `.eq("rev", 讀到的 rev)`（compare-and-set）——讀與寫之間若有並發 PUT 先把 rev 推進，
+  // 舊寫法會用過期的 rev+1 覆蓋，讓 rev 倒退／重複；現在 CAS 落空就重讀再來（最多 3 次）。
+  let legacy = false;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const { row: cur, error: readErr } = await readRow(svc, userId);
+    if (readErr !== null) {
+      console.error(`[api/v1/me/bar-memory] delete read error: code=${readErr.code} message=${readErr.message}`);
+      return apiError("internal", "刪除失敗", 500);
+    }
+    if (cur === null || isTombstone(cur)) return apiOk({ ok: true });
+    const curRev = typeof cur.rev === "number" ? cur.rev : 0;
+    const nowIso = new Date().toISOString();
+    const tomb = await svc
+      .from("bar_memories")
+      .update({ doc: {}, rev: curRev + 1, deleted_at: nowIso, forgot_rev: curRev + 1, updated_at: nowIso })
+      .eq("user_id", userId)
+      .eq("rev", curRev)
+      .select("rev");
+    if (tomb.error === null) {
+      if (Array.isArray(tomb.data) && tomb.data.length > 0) return apiOk({ ok: true });
+      continue; // 被並發寫入搶先改了 rev：重讀
+    }
+    if (!isMissingColumn(tomb.error)) {
+      console.error(`[api/v1/me/bar-memory] forget error: code=${tomb.error.code} message=${tomb.error.message}`);
+      return apiError("internal", "刪除失敗", 500);
+    }
+    legacy = true;
+    break; // 缺欄位（0085 沒跑）：退回直接刪列
   }
-  if (cur === null || isTombstone(cur)) return apiOk({ ok: true });
-  const curRev = typeof cur.rev === "number" ? cur.rev : 0;
-  const tomb = await svc
-    .from("bar_memories")
-    .update({ doc: {}, rev: curRev + 1, deleted_at: new Date().toISOString(), forgot_rev: curRev + 1, updated_at: new Date().toISOString() })
-    .eq("user_id", userId);
-  if (tomb.error === null) return apiOk({ ok: true });
-  if (!isMissingColumn(tomb.error)) {
-    console.error(`[api/v1/me/bar-memory] forget error: code=${tomb.error.code} message=${tomb.error.message}`);
-    return apiError("internal", "刪除失敗", 500);
-  }
+  if (!legacy) return apiError("duplicate", "同步衝突，請稍後再試", 409);
   const { error } = await svc.from("bar_memories").delete().eq("user_id", userId);
   if (error !== null) {
     console.error(`[api/v1/me/bar-memory] delete error: code=${error.code} message=${error.message}`);

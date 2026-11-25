@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased] — 第八輪審核修復（2026-11-24）
+
+### Fixed
+- 入座申請：批准改「先 CAS 申請列（pending→approved）再 `claimRoomSeat`」，佔位失敗退回 pending；拒絕只轉 pending 並讀 error，輸給取消的一方不佔位、不通知（R8-02）。
+- 舉報結果通知：兩筆 insert 讀 `{error}`＋`retryWrite`，`applyReportDecision` 回 `notifyFailed`；後台頁在通知失敗時明確報錯，不回退已落地的處分（R8-03）。
+- Ivy 忘記：DELETE 墓碑 update 加 `.eq("rev")`（compare-and-set），3 次落空回 409（R8-01）。
+- Apple 刪帳：SIWA 沒配置或 Apple 拒憑證時也回 `apple_manual_revoke:true`，客戶端須引導手動移除授權（R8-06）。
+- 修好沒被執行的 `checkins/route.idempotency.test.ts`（缺 `@/lib/api/profile` mock）。
+
+### 契約
+- OpenAPI 1.69.1：14 個操作接上 `BlockLookupUnavailable`（503）。
+
+### 驗證
+- vitest 1,485 條（含 race／reportStp／epoch 新測）；`lib/barBlackjackStore.test.ts`「已有進行中就接回」偶發失敗（隨機發牌湊成天生 21 點），重跑 6 次皆過，非本批造成。tsc 無輸出。
+- **未做**：0084／0085 尚未在 Supabase 執行；R8-07 翻頁、封鎖名單 1000 筆封頂、`base_rev=0` 離線摘要的 epoch 方案未做。
+
 ## [Unreleased] — 第七輪審核修復（2026-11-24）
 
 ### Fixed
@@ -21,6 +37,27 @@
 - vitest 全量 1,473 條全過；唯一載入失敗的 `checkins/route.idempotency.test.ts`（`@/lib/api/profile` 解析）與本批無關。tsc 無輸出。
 - **未做**：0084／0085 尚未在 Supabase 執行；沒有生產帳號、真推送、真實併發壓測。
 
+## [Unreleased] — 第六輪審核修復（2026-11-24）
+
+### Changed
+- OpenAPI 補齊與實作一致的契約：私約 `PATCH /invites/{id}` 補 409 `stale_version`；舉報 `POST /bar/chat/report` 補 500；撤局說明改為「進行中隨時可撤，已結束／已過期 409 `too_close_to_start`，同時操作輸掉轉態 409 `stale_version`」（舊文字寫的 60 分鐘限制早已不是實作）。
+
+### 驗證
+- vitest 1,403／1,403、`tsc` 通過；openapi 以 js-yaml 解析通過。
+
+## [Unreleased] — 第五輪審核修復（2026-11-24）
+
+### Fixed
+- APNs `apns-collapse-id` 超過 64 bytes（酒局／私約取消與完成實測 89／90 bytes，APNs 回 400 且不重試，通知直接丟）：`apns.ts` 統一把超限的 collapse-id 收斂成「事件類型＋SHA-256 前 40 位」（≤57 bytes、同一事件穩定），合法的原樣不動；全部發送者受保護。
+- 私約 `complete`／`recall`／`decline`／`accept` 與公開撤局：條件更新沒命中任何列（輸掉跨裝置同時操作）時不再回成功，也不寫通知、推播、好友關係或誠信：已是目標態→冪等成功；在別的終態→409 `stale_version`。新增純函數 `lib/api/transition.ts`＋路由回歸測試。
+- 公開撤局讀不到加入名單時不再當成「沒人報名」而撤局成功卻零通知，改為 500 且不撤。
+- Ivy「忘記我」：`PUT /me/bar-memory` 在記憶列不存在而 `base_rev>0`（另一台設備已忘記）時回 409，不再重建。
+- OpenAPI：私約每日上限 3／同對象 1 → 10／5；公開酒局每日 3 → 10、watch 1 → 3，與實作一致。
+
+### 驗證
+- vitest 全量 1,403／1,403、`tsc`、eslint 通過。**未測**：正式 APNs 對實際 token 的送達；邀約並發在真實資料庫上的行為（測試用 mock，只證明路由邏輯）。
+- **未處理（已確認屬實，需契約變更）**：酒局歷史 `created_at` 游標在同時間戳邊界漏項、隱藏過多（>200）時首頁偏短；遊戲房 join 容量競態；到場完成事件先查後插。
+
 ## [Unreleased] — 上架審核第一輪修復（2026-11-24）
 
 ### Added
@@ -39,17 +76,6 @@
 
 ### Fixed
 - UR L.2／`DEF-20261122-001`：封站期間，`/privacy` 和 `/terms` 以 307 導向對應的公開法律文件，並保留有效的語言前綴。網站開放時，`/terms` 照常顯示三種模式說明。
-
-## [Unreleased] — 發布冪等 C-01＋詳情補作者欄位（2026-11-19；**遷移 0078 未執行、未部署**）
-
-### Added
-- `POST /api/v1/checkins` 讀 `Idempotency-Key`：同一用戶同一個 key 只會有一則打卡；回包丟失後同 key 重送，直接回既有那則（201、同 id，**不再審核、不再發積分、不帶 bar_reward**）。header 缺席／不合法一律當沒帶（不報 400，舊客戶端每次送新 UUID 照常能發）。並發重送靠唯一索引擋，撞衝突後回先插入的那則。
-- 遷移 `0078_checkins_client_key.sql`：`checkins.client_key text`＋部分唯一索引 `(user_id, client_key) where client_key is not null`。**沒跑這條也安全**：查／插遇 `42703`（列不存在）整單降級為沒有冪等。
-- `GET /api/v1/checkins/{id}`（含歸檔分支）回包補 `user_id／nickname／avatar_url／kind／expires_at`（只暱稱與頭像，永不回 dob／bio／性別）；只有 id 的入口（動態／聊天卡／約酒／通知／深鏈）靠它補全作者。
-
-### Fixed
-- 插入時的可選列（hashtags／photo_urls／client_key）改為「錯誤點名哪個去掉哪個」的循環。原本固定的 if 鏈在 Postgres 報的缺列順序與鏈不一致時會漏掉，掉進「0007 未遷移」回退把貼文全部變私密。
-- 驗證：tsc／eslint（0 error）／vitest 1350 全過（新增 12 條：header 解析、缺列降級、重放短路、23505 並發）／`npm run build` 過。
 
 ## 公開法律頁 `/legal/*`（2026-11-19，D1）
 
@@ -72,8 +98,6 @@
 
 所有重要修改會記錄在這個檔案。格式借鑑 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/)。
 
-所有重要修改會記錄在這個檔案。格式借鑑 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/)。
-
 ## [Unreleased]
 
 ### Added — UR D.12 AOS完整業務推送與持久outbox（2026-11-16）
@@ -83,6 +107,10 @@
 - 整體驗證：build139頁、128檔／1304tests綠、lint0errors／12既有warnings；PGlite實際SQL整合通過，可重跑腳本已保留。依本次授權只發佈web push改動，SQL與手機親驗仍待用戶。
 - 啟用排查：DEF-20261116-003，job6因Vault configuration missing失敗；用戶確認Vault URL／Secret均未建立，待補齊並驗cron／HTTP，尚未修復或驗收。
 - DEF-20261116-003配置修正：推送新增PUSH_DISPATCH_SECRET優先，未設定才相容CRON_SECRET；空／短專用值拒絕、不回退。同步1.67.1／env範例／Vault說明，避免輪替其他cron共用密鑰，無新SQL或App改動。
+- DEF-20261116-003啟用排查：補只讀完整Vault readiness（含URL）；Secret兩欄true後cron仍在HTTP前守衛失敗，具體URL條件待核對，尚未驗收。
+- DEF-20261116-003：五欄診斷確認URL仍缺失，新增用戶操作腳本push-dispatch-set-url.sql，只建立／更新公開URL；Secret與cron保持，等待執行結果。
+- DEF-20261116-003驗證進度：用戶request482回HTTP200、無timeout／error；claimed0為正常空批次，待自動cron及真機驗收，不視為FCM已實送。
+- DEF-20261116-003 Verified：用戶提供自動job6連續三次succeeded，結合Vault五欄true與request482 HTTP200確認配置修復；D.12及FCM真機送達仍待驗。
 
 ### Added — UR D.11 AOS FCM 基礎通道（2026-11-16）
 - 共用devices API按平台驗證，AOS接受opaque FCM token，iOS／web保留APNs hex及原有owner／綁定／環境口徑；OpenAPI 1.66.0。
@@ -91,7 +119,38 @@
 - 首輪build138頁、126檔／1285tests綠（新27項）、lint0errors／12既有warnings；其後按用戶授權已推送fb17dcf、Vercel success。未讀私鑰／Secret值或發真通知；完整客戶端／事件接續D.12及AOS-0.138，UR仍待端到端驗收。
 
 
+### Fixed
+- **UR M.9 · intro 自動播放與預設繁體（DEF-20261116-001／002）[待親驗]**
+  - 修復普通網址顯示播放中卻停在第 0 幀：無聲 Remotion Player 預設靜音、共享音訊標籤設 0，初始化先 mute 再播放，避免瀏覽器音訊手勢限制阻塞動畫時鐘。
+  - `t` 改為起播時間，舊首屏連結刷新也會繼續播放；只有明確 `preview=1` 才凍結，減少動態與手動閱讀仍停播。
+  - intro／intro-next／圖庫使用專屬 localeDetection=false：裸網址固定繁體，不受英文／簡體 cookie 或瀏覽器語言影響；明確語言前綴仍正常，全站 App／原版備份與封站規則沿用。
+  - 三語 slogan 改為「分享一杯，遇見同好 · AI 更懂你的口味」及簡中／英文對應文案；保留 M.8 工作區調整。
+  - 驗證：build 138 頁、全量 122 檔／1,258 tests 全綠，lint 0 errors／12 個既有 warnings；16 路真實 HTTP 回歸。建置保留 M.8 已記錄的 metadataBase 警告；本輪未改分享卡。播放器實際進幀、英文切換及刷新正常；靜態預覽可手動恢復。
+
 ### Changed
+- **UR M.8（整一杯不再問 AI）· intro 同步**
+  - App 端（iOS／AOS）隱藏整一杯跟住做的「問 Ivy」入口後，介紹頁同步：cocktail 場景 `sub` 去掉「不確定就問 Ivy」三語；`cocktail-step` 截圖移除「問 Ivy／每問扣 1 次」按鈕並升 v5（腳本 `intro-cocktail-trail-artwork.mjs` 同改，`artwork.ts` 版本規則同步；重新渲染 66 張只有 3 張＋manifest 變動，舊 v4 三檔已刪）。`focus`「每一步都有配圖和 Ivy 提示」保留（預寫提示仍在）。全量 128 檔／1,312 tests、lint 通過；未提交／推送。
+- **UR M.8（微調）· AI 提醒降為頁尾小字**
+  - 用戶要求不要強調「偶爾也會出錯」、也不必放在顯著位置。Ivy 場景首句改回「Ivy 是陪你喝一杯的 AI，懂你的口味，聊聊今晚喝什麼。」（en：Ivy is an AI who keeps you company and gets your taste.）；提醒只留頁尾 `responsible`，三語縮短為「AI 回答僅供參考／AI replies are for reference only」。不承諾「聊到盡興」（聊天有額度）。intro 11 檔／126 tests、lint 通過；手機寬度未驗；未提交／推送。
+- **UR M.8（全站標語）· `common.tagline` 改為「每一杯，都是一個故事」**
+  - 用戶同意：messages 三語 `common.tagline` 由「今晚喝咩？／Tonight's Pick」改為「每一杯，都是一個故事／每一杯，都是一个故事／Every drink tells a story」，全站 `<title>` 的「嗨飲 — 標語」隨之更新；功能名「今晚喝咩？」(nav.randomPick) 不動。全量測試與 tsc 通過；未提交／推送。
+- **UR M.8（Ivy 是 AI）· 強調 AI 陪伴並提醒可能出錯**
+  - 用戶要求：不用「不是真人」，要強調 Ivy 是 AI 且陪伴、懂你，同時提醒 AI 不一定正確。Ivy 場景首句改為「Ivy 是陪你喝一杯的 AI，懂你的口味；偶爾也會出錯。」（en：Ivy is an AI who keeps you company and gets your taste, though she’s not always right.）；eyebrow 與首屏晶片改「AI 陪伴」；頁尾 `responsible` 三語加「AI 回答僅供參考，未必準確」，對齊 App 的 AI 同意字串。intro 11 檔／126 tests、lint 通過；手機寬度（頁尾可能換行）未驗；未提交／推送。
+- **UR M.8（命名）· 去掉「3D 酒吧」「AI 酒保」描述**
+  - Ivy 場景改為「推開酒吧的門，／Ivy 在吧檯等你。」（Push open the door.／Ivy’s waiting at the bar.），eyebrow 用「嗨飲酒吧 / IVY」（英文「THE BAR / IVY」）；首屏晶片改「Ivy · 駐場酒保」；description 同步改為「找到同好」。AI 身分的寫法已於下一條更正。他人新改的 intro tagline（分享一杯，遇見同好 · AI 更懂你的口味）保留。messages 與酒吧頁無相關字樣；intro 11 檔／126 tests、lint 通過；手機寬度未驗；未提交／推送。
+- **UR M.8（更正）· 首屏主張去掉「地圖上的」**
+  - 同事回饋：不要強調地圖上的故事。首屏標題改為「每一杯，／都是一個故事。」（Every drink／tells a story.），頁面 title／description 同步，說明兩行不變；「地圖上的故事」只保留在地圖那一幕（描述功能，不是產品主張）。intro 11 檔／126 tests、lint 通過；三語首屏標題兩行、說明兩行、與品牌圖無重疊。手機寬度未驗，未提交／推送。
+- **UR M.8（再續）· 首屏主張改為「每一杯，都是地圖上的故事」**
+  - 依同事回饋四點（飲酒變地圖上的故事、分享更好玩、AI 酒保更懂你、同好距離更近）重寫三語 `hero.title／accent／sub`、頁面 `title`、`description`。拉近同好的主語不是 Ivy（App 內由遇見／附近／碰杯承擔），Ivy 只負責「越聊越懂你」。標語 `tagline`、晶片、鍵名及兩行結構不變；全站 `common.tagline`（今晚喝咩？）待產品決定，未改。
+  - 驗證：intro 11 檔／126 tests、lint 通過；三語首屏標題兩行、說明兩行、與品牌圖無重疊。手機寬度未驗。未提交／推送。
+- **UR M.8（續）· 全站品牌名改 hi drink／嗨飲**
+  - 依 iOS NLS `brand.name`（繁簡中文「嗨飲」、英文 `hi drink`）：messages 三語 `common.appName` 與頁尾版權、頁首與頁尾品牌字、coming-soon 頁（標題、sr-only、導航、頁腳）已更新。技術識別（`whattodrink://`、域名、郵箱、storage key、User-Agent）不動；`tagline`「今晚喝咩？」與功能名「今晚喝什麼」保留，待產品決定是否更換。全量 128 檔／1,304 tests、tsc、lint 通過。
+- **UR M.8 · intro 文案潤色、品牌邊緣與分享卡、換幕銜接 [待親驗]**
+  - 三語 `sub` 改為先講價值：capture／party／trail／cocktail 重寫，dice 去掉固定「五粒骰」說法，結尾改為「今晚，從一聲「嗨」開始」；meta description 以「嗨飲 hi drink：」開頭。`detail`／`focus`、鍵名與 `→` 段數不變，事實已逐項對 iOS 字串核對（21 點、贏 +3 次聊天、開局前可退出、認證酒吧、永久保留）。
+  - 首屏品牌圖外緣加窄帶遮罩，去掉光影裁切成的硬方邊（圖示與字標不變）；英文首屏說明行距收緊（`data-locale="en"`）。
+  - 換幕銜接：Frame 淡出／淡入錯開（出 0–58%、入 40%–100% 的 0.6 秒重疊），舊標題不再被新手機蓋住；OVERLAP、時間軸與手動回看停靠點不變。
+  - 新增 `introMetadata`：intro 與預覽頁輸出 og／twitter（siteName hi drink · 嗨飲、zh_HK／zh_CN／en_US、深底品牌卡）；預覽頁仍 noindex。根 layout 未設 `metadataBase`，圖片網址在本機為 localhost，需上線域名決定後再設（全站決策，未動）。
+  - 驗證：全量 121 檔／1,251 tests、lint 0 errors／12 既有 warnings、build 通過；桌面三語逐幕渲染。手機 390px 未能自動驗證，待用戶目測。未提交／推送，SITE_LIVE 與 .env 不動。
 - **UR M.5／M.6／M.7 · 同步最新 intro 至 Production**
   - 2026-11-16 用戶明確授權提交部署：一併發布三語文案／地圖故事銜接、hi drink／嗨飲品牌首屏、Ivy→大話骰→調酒、底部去連結與手動回看；保留原版備份及正式站封站。
   - 提交前 build 138 頁、全量 121 檔／1,251 tests 通過；lint 0 errors／12 個既有 warnings。品牌 manifest 8 個雜湊、三語 12 幕順序與 footer 0 連結核對完成；部署以新提交的 Vercel Production 成功狀態驗證。

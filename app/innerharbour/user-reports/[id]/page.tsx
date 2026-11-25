@@ -81,8 +81,16 @@ export default async function UserReportDetailPage({ params }: { params: Promise
         });
         if (!applied.ok) {
           // 下架或扣分沒成功：退回 reviewed（頁面仍接受再按一次，處分冪等），不讓案件停在「已處理」卻沒執行
-          await reopenReport(g.svc, id, "actioned", "reviewed");
-          throw new Error(`處分未完成（${applied.failed.join("、")}），案件已退回「審核中」，請重新按一次`);
+          const reopened = await reopenReport(g.svc, id, "actioned", "reviewed");
+          throw new Error(
+            reopened
+              ? `處分未完成（${applied.failed.join("、")}），案件已退回「審核中」，請重新按一次`
+              : `處分未完成（${applied.failed.join("、")}），且案件狀態無法退回，請到資料庫核對 report=${id} 後再處理`,
+          );
+        }
+        // 處分已落地但結果通知沒寫成：不回退（下架／扣分是真的），明確報給管理員，日誌有 [needs-repair] 可對賬補發
+        if (applied.notifyFailed.length > 0) {
+          throw new Error(`處分已完成，但結果通知寫入失敗（${applied.notifyFailed.join("、")}），請記下案件 ${id} 並通知技術補發`);
         }
       }
     }

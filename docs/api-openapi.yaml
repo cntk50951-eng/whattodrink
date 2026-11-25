@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.69.0
+  version: 1.69.1
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -221,6 +221,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/BlockLookupUnavailable"
   /api/v1/friends/check:
     get:
       operationId: checkFriend
@@ -390,6 +392,8 @@ paths:
                 required: [posts]
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/BlockLookupUnavailable"
   /api/v1/users/{id}/trail:
     get:
       operationId: getUserTrail
@@ -1120,6 +1124,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/BlockLookupUnavailable"
   /api/v1/map/pins/changes:
     get:
       operationId: getMapPinsChanges
@@ -1169,6 +1175,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/BlockLookupUnavailable"
   /api/v1/checkins:
     post:
       operationId: postCheckin
@@ -1458,6 +1466,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/BlockLookupUnavailable"
     delete:
       operationId: deleteCheckin
       summary: 删除打卡（需登录；仅本人，DEF-20260929-003）
@@ -1491,6 +1501,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/BlockLookupUnavailable"
   /api/v1/checkins/mine:
     get:
       operationId: getMyCheckins
@@ -1564,6 +1576,8 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/BlockLookupUnavailable"
     post:
       operationId: createCheckinComment
       summary: 打卡帖子留言發表（免登入；匿名 mint cookie＋三檔限流＋審核，UR E.7）
@@ -1674,6 +1688,8 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/BlockLookupUnavailable"
   /api/v1/checkins/{id}/save:
     post:
       operationId: toggleCheckinSave
@@ -1710,6 +1726,8 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/BlockLookupUnavailable"
   /api/v1/checkins/{id}/want:
     post:
       operationId: toggleCheckinWant
@@ -1759,6 +1777,8 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/BlockLookupUnavailable"
   /api/v1/checkins/{id}/ratings:
     post:
       operationId: rateCheckinByOthers
@@ -1831,6 +1851,8 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/BlockLookupUnavailable"
   /api/v1/cheers:
     post:
       operationId: cheersToast
@@ -1896,6 +1918,8 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/BlockLookupUnavailable"
     delete:
       operationId: uncheersCheckin
       summary: 取消碰杯（需登录；删自己在该帖的行；有帖无行也 200 幂等，404 只＝帖不存在／无权；自己隱身 403，UR E.14 round-5）
@@ -1938,6 +1962,8 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/BlockLookupUnavailable"
   /api/v1/cheers/inbox:
     get:
       operationId: cheersInbox
@@ -6035,6 +6061,8 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/BlockLookupUnavailable"
   /api/v1/uploads/sign:
     post:
       operationId: signUpload

@@ -21,4 +21,9 @@
 - [首屏正式品牌 hi drink／嗨飲](2026-11-15-intro-brand-opening.md) — 原 POC 圖示／最新 Cormorant／文楷字標不重畫；繁簡品牌均為嗨飲，光影單獨生成，來源 SHA-256 留存
 - [Production 與本地 intro 版本核對](2026-11-16-intro-production-version-audit.md) — production／main 仍是 2b5ce6a；品牌首屏、Ivy→骰子與移除底部連結尚在工作區，SITE_LIVE 不會發布本地修改
 - [最新版 intro 提交部署授權](2026-11-16-intro-release.md) — 用戶明確要求部署 M.5／M.6／M.7；同提交 Production 成功才算完成，保持 SITE_LIVE 封站，排除 reports／research_notes
-- [第七輪審核 Web 修復（2026-11-24）](2026-11-24-audit-round7-web-fixes.md) — 封鎖 fail-closed＋withBlockGuard、舉報副作用先確認再通知、刪好友先禁言後刪、kick 先拉黑；容量 RPC、忘記世代、複合游標、Apple 刪帳旗標
+- [intro 文案潤色與截圖驗證坑](2026-11-16-intro-copy-polish-and-verification.md) — macOS 無 timeout、headless 500px 下限、DPR2 看清晰度、換幕錯開淡入淡出、手機寬度須用戶目測
+- [Intro 自動播放／繁體預設](2026-11-16-intro-autoplay-default-language.md) — 無聲 Player 必須初始化靜音以免音訊權限卡住時鐘；t 起播、preview=1 才凍結；intro 專屬 localeDetection=false
+
+- 2026-11-16：AOS完整推送outbox與Dashboard待辦，見 `2026-11-16-aos-push-outbox.md`（D.12；未SQL啟用／未真機）。
+- [intro 首屏主張四點](2026-11-16-intro-positioning.md) — 每一杯，都是一個故事（不強調地圖）；Ivy 是「陪伴、懂你」的 AI，「AI 僅供參考」只放頁尾小字；拉近同好另有主語；精簡兩行
+- [第七輪審核 Web 修復（2026-11-24）](2026-11-24-audit-round7-web-fixes.md) — 封鎖 fail-closed＋withBlockGuard、舉報副作用先確認再通知、刪好友先禁言後刪、kick 先拉黑

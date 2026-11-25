@@ -23,7 +23,7 @@ describe("reportStp trust scoring helpers", () => {
 
 import { applyReportDecision, reopenReport } from "./reportStp";
 
-type Overrides = { hideError?: boolean; trustError?: boolean };
+type Overrides = { hideError?: boolean; trustError?: boolean; notifyError?: boolean };
 /** 假 supabase：任何鏈式呼叫都回自己，await 時按 (table, op) 給結果；記錄寫入操作。回傳 `{error}` 而不是拋例外。 */
 function fakeSvc(o: Overrides = {}) {
   const log: string[] = [];
@@ -33,6 +33,7 @@ function fakeSvc(o: Overrides = {}) {
       const result = () => {
         if (table === "checkins" && op === "update" && o.hideError) return { data: null, error: { code: "XX000" } };
         if (table === "trust_events" && op === "insert" && o.trustError) return { data: null, error: { code: "XX000" } };
+        if (table === "notifications" && op === "insert" && o.notifyError) return { data: null, error: { code: "23505" } };
         return { data: [], error: null };
       };
       const q: unknown = new Proxy({}, {
@@ -89,5 +90,18 @@ describe("applyReportDecision 先確認業務結果再通知（第七輪 §3.2�
     // 假 svc 的 select 結果是空陣列 → 沒有行被退回（例如已被別人改過）→ false
     expect(await reopenReport(svc, "r1", "actioned", "pending")).toBe(false);
     expect(log).toContain("cheers_reports.update");
+  });
+
+  it("處分成功但兩筆結果通知回 {error} → ok:true 但 notifyFailed 列出雙方（第八輪 R8-03），不假裝全成功", async () => {
+    const { svc } = fakeSvc({ notifyError: true });
+    const r = await applyReportDecision(svc, { ...base, targetType: "user", targetRef: null });
+    expect(r.ok).toBe(true);
+    expect(r.notifyFailed.sort()).toEqual(["reported", "reporter"]);
+  });
+
+  it("通知正常 → notifyFailed 為空", async () => {
+    const { svc } = fakeSvc();
+    const r = await applyReportDecision(svc, { ...base, decision: "dismissed" });
+    expect(r.notifyFailed).toEqual([]);
   });
 });
