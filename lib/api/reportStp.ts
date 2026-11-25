@@ -208,23 +208,31 @@ export async function applyReportDecision(
  */
 export async function findMissingReportNotifications(
   svc: SupabaseClient,
-  args: { reportId: string; targetType: ReportTargetType; decision: ReportDecision },
+  args: {
+    reportId: string;
+    targetType: ReportTargetType;
+    decision: ReportDecision;
+    targetUserId?: string;
+    reporterId?: string;
+  },
 ): Promise<{ missingReported: boolean; missingReporter: boolean; queryError?: boolean }> {
   const reportedKind = args.targetType === "post" ? "post_actioned" : "report_actioned";
   const wantedKinds = args.decision === "actioned" ? [reportedKind, "report_resolved"] : ["report_resolved"];
   const { data, error } = await svc
     .from("notifications")
-    .select("kind")
+    .select("kind,user_id")
     .in("kind", wantedKinds)
     .eq("payload->>report_id", args.reportId);
   if (error !== null || !Array.isArray(data)) {
     console.error(`[reportStp] findMissingReportNotifications error report=${args.reportId} code=${error?.code ?? "unknown"}`);
     return { missingReported: false, missingReporter: false, queryError: true };
   }
-  const present = new Set((data as Array<{ kind?: unknown }>).map((row) => String(row.kind ?? "")));
+  const rows = data as Array<{ kind?: unknown; user_id?: unknown }>;
+  const hasMatch = (kind: string, expectedUserId?: string): boolean =>
+    rows.some((row) => String(row.kind ?? "") === kind && (expectedUserId === undefined || row.user_id === undefined || String(row.user_id) === expectedUserId));
   return {
-    missingReported: args.decision === "actioned" && !present.has(reportedKind),
-    missingReporter: !present.has("report_resolved"),
+    missingReported: args.decision === "actioned" && !hasMatch(reportedKind, args.targetUserId),
+    missingReporter: !hasMatch("report_resolved", args.reporterId),
   };
 }
 
@@ -250,6 +258,8 @@ export async function resendMissingReportNotifications(
     reportId: args.reportId,
     targetType: args.targetType,
     decision: args.decision,
+    targetUserId: args.targetUserId,
+    reporterId: args.reporterId,
   });
   if (queryError) {
     return { sent: [], failed: [], queryError: true };

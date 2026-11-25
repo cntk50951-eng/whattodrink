@@ -47,7 +47,7 @@ export async function GET(req: Request): Promise<Response> {
 export async function PUT(req: Request): Promise<Response> {
   const { userId } = await getAuthedClient(req);
   if (userId === null) return apiError("unauthorized", "未登录", 401);
-  let body: { doc?: unknown; base_rev?: unknown };
+  let body: { doc?: unknown; base_rev?: unknown; captured_at?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -56,6 +56,7 @@ export async function PUT(req: Request): Promise<Response> {
   const incoming = sanitizeBarMemory(body.doc);
   if (incoming === null) return apiError("invalid_params", "doc 非法", 400);
   const baseRev = typeof body.base_rev === "number" && Number.isInteger(body.base_rev) && body.base_rev >= 0 ? body.base_rev : 0;
+  const capturedAtMs = typeof body.captured_at === "string" && Number.isFinite(Date.parse(body.captured_at)) ? Date.parse(body.captured_at) : null;
   const svc = await createServiceClient();
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const { row: cur, error } = await readRow(svc, userId);
@@ -68,6 +69,11 @@ export async function PUT(req: Request): Promise<Response> {
     if (baseRev > 0 && baseRev <= forgotRev) return apiError("stale_version", "記憶已在另一台設備被清除", 409);
     if (cur !== null && isTombstone(cur)) {
       if (baseRev > 0) return apiError("stale_version", "記憶已在另一台設備被清除", 409);
+      // 第十一輪 §3.3：離線首次累積（base_rev=0）若帶 captured_at 且早於或等於墓碑 deleted_at，屬忘記前舊對話，拒絕復活
+      const deletedAtMs = typeof cur.deleted_at === "string" && Number.isFinite(Date.parse(cur.deleted_at)) ? Date.parse(cur.deleted_at) : null;
+      if (capturedAtMs !== null && deletedAtMs !== null && capturedAtMs <= deletedAtMs) {
+        return apiError("stale_version", "記憶已在另一台設備被清除", 409);
+      }
       // base_rev=0＝忘記後重新累積：復活墓碑，rev 接著往上走（不回到 1）
       const curRev = typeof cur.rev === "number" ? cur.rev : 0;
       const { data: rev, error: rErr } = await svc

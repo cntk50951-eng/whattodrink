@@ -108,7 +108,13 @@ export default async function UserReportDetailPage({ params }: { params: Promise
   const targetType: ReportTargetType =
     r.target_type === "post" || r.target_type === "message" ? r.target_type : "user";
   const missingNotify = decisionStatus !== null
-    ? await findMissingReportNotifications(svc, { reportId: id, targetType, decision: decisionStatus })
+    ? await findMissingReportNotifications(svc, {
+        reportId: id,
+        targetType,
+        decision: decisionStatus,
+        targetUserId: typeof r.target_user_id === "string" ? r.target_user_id : undefined,
+        reporterId: typeof r.reporter_id === "string" ? r.reporter_id : undefined,
+      })
     : { missingReported: false, missingReporter: false };
 
   async function resendNotifications(): Promise<void> {

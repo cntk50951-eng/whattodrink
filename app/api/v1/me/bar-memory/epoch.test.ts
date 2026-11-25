@@ -42,8 +42,12 @@ vi.mock("@/lib/supabase/server", () => {
 import { DELETE, GET, PUT } from "./route";
 
 const url = "https://example.invalid/api/v1/me/bar-memory";
-const put = (baseRev: number) =>
-  PUT(new Request(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ doc: { taste: { likes: ["gin"] } }, base_rev: baseRev }) }));
+const put = (baseRev: number, capturedAt?: string) =>
+  PUT(new Request(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ doc: { taste: { likes: ["gin"] } }, base_rev: baseRev, ...(capturedAt ? { captured_at: capturedAt } : {}) }),
+  }));
 const get = () => GET(new Request(url));
 const del = () => DELETE(new Request(url, { method: "DELETE" }));
 
@@ -78,10 +82,17 @@ describe("忘記我的刪除世代", () => {
 
   it("墓碑上 base_rev=0（忘記後重新累積）→ 復活，rev 接著往上（不回到 1）", async () => {
     state.row = { doc: {}, rev: 5, deleted_at: "2026-11-24T00:00:00Z", forgot_rev: 5 };
-    const res = await put(0);
+    const res = await put(0, "2026-11-24T01:00:00Z");
     expect(res.status).toBe(200);
     expect((await res.json()).rev).toBe(6);
     expect(state.updates[0]).toMatchObject({ rev: 6, deleted_at: null });
+  });
+
+  it("第十一輪 §3.3：墓碑上 base_rev=0 但 captured_at 早於 deleted_at（忘記前離線累積）→ 409 stale_version，不復活", async () => {
+    state.row = { doc: {}, rev: 5, deleted_at: "2026-11-24T12:00:00Z", forgot_rev: 5 };
+    const res = await put(0, "2026-11-24T11:00:00Z");
+    expect(res.status).toBe(409);
+    expect(state.updates).toHaveLength(0);
   });
 
   it("核心回歸：復活後舊設備的 base_rev（≤ forgot_rev）即使碰巧等於舊 rev 也 409", async () => {

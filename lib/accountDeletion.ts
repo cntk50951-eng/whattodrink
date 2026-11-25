@@ -22,6 +22,7 @@ export type Snapshot = {
 /** 恢复范围（按依赖顺序：帖子先于评论）。col＝指向 users.id 的列。 */
 export const RESTORE_TABLES: ReadonlyArray<{ table: string; col: string }> = [
   { table: "checkins", col: "user_id" },
+  { table: "checkins_archive", col: "user_id" },
   { table: "checkin_comments", col: "user_id" },
   { table: "checkin_wants", col: "user_id" },
   { table: "checkin_ratings", col: "user_id" },
@@ -155,7 +156,10 @@ async function selectAll(svc: Svc, table: string, col: string, userId: string): 
       .select("*")
       .eq(col, userId)
       .range(page * PAGE, page * PAGE + PAGE - 1);
-    if (error !== null) throw new Error(`snapshot ${table}: ${error.message}`);
+    if (error !== null) {
+      if (error.code === "42P01") return [];
+      throw new Error(`snapshot ${table}: ${error.message}`);
+    }
     const rows = (data ?? []) as SnapshotRow[];
     out.push(...rows);
     if (rows.length < PAGE) break;
@@ -183,18 +187,21 @@ export async function deleteUserData(svc: Svc, userId: string): Promise<void> {
   if (error !== null) throw new Error(`delete users: ${error.message}`);
 }
 
-/** 递归列出前缀下所有文件路径（Storage list 只列一层）。列舉失敗必拋錯，避免誤判零檔案而留下孤兒文件（第十輪 §3.2）。 */
+/** 递归列出前缀下所有文件路径（Storage list 只列一层，每页最多 1000 须翻页）。列举失败必抛错，避免误判零档案而留下孤儿文件（第十／十一轮 §3.2）。 */
 async function listFiles(svc: Svc, bucket: string, prefix: string, depth = 0): Promise<string[]> {
   if (depth > 4) return [];
-  const { data, error } = await svc.storage.from(bucket).list(prefix, { limit: 1000 });
-  if (error !== null) throw new Error(`storage list ${bucket}/${prefix}: ${error.message}`);
-  if (data === null) return [];
   const files: string[] = [];
-  for (const item of data) {
-    const path = `${prefix}/${item.name}`;
-    // 文件夹没有 id；文件有
-    if (item.id === null || item.id === undefined) files.push(...(await listFiles(svc, bucket, path, depth + 1)));
-    else files.push(path);
+  for (let offset = 0; offset < PAGE * MAX_PAGES; offset += PAGE) {
+    const { data, error } = await svc.storage.from(bucket).list(prefix, { limit: PAGE, offset });
+    if (error !== null) throw new Error(`storage list ${bucket}/${prefix}: ${error.message}`);
+    if (data === null || data.length === 0) break;
+    for (const item of data) {
+      const path = `${prefix}/${item.name}`;
+      // 文件夹没有 id；文件有
+      if (item.id === null || item.id === undefined) files.push(...(await listFiles(svc, bucket, path, depth + 1)));
+      else files.push(path);
+    }
+    if (data.length < PAGE) break;
   }
   return files;
 }
@@ -325,6 +332,8 @@ export async function purgeExpired(svc: Svc, now: Date): Promise<{ purged: numbe
   let failed = 0;
   for (const { user_id: userId } of (data ?? []) as Array<{ user_id: string }>) {
     try {
+      // 第十一輪 §3.2：補跑冪等 DB 清理，避免首次 grace 刪除 checkins_archive 等無 FK 表中途失敗後到期殘留
+      await deleteUserData(svc, userId);
       await removeUserFiles(svc, userId);
       await deleteAuthUser(svc, userId);
       const { error: e } = await svc

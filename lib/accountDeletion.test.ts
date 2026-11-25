@@ -116,9 +116,70 @@ describe("表清单不变量", () => {
   });
 });
 
-import { removeUserFiles, requestDeletion } from "./accountDeletion";
+import { purgeExpired, removeUserFiles, requestDeletion } from "./accountDeletion";
 
-describe("删帐清理容错（第十轮 §3.2）", () => {
+describe("删帐清理容错（第十／十一轮 §3.2）", () => {
+  it("RESTORE_TABLES 包含 checkins_archive，冷静期还原不丢归档足迹", () => {
+    expect(RESTORE_TABLES.some((t) => t.table === "checkins_archive" && t.col === "user_id")).toBe(true);
+  });
+
+  it("removeUserFiles 支持 >1000 个平级文件分页清理", async () => {
+    const removed: string[] = [];
+    const svc = {
+      storage: {
+        from() {
+          return {
+            list: async (_prefix: string, opts?: { limit?: number; offset?: number }) => {
+              const off = opts?.offset ?? 0;
+              if (off === 0) {
+                return { data: Array.from({ length: 1000 }, (_, i) => ({ id: `id-${i}`, name: `f${i}.jpg` })), error: null };
+              }
+              if (off === 1000) {
+                return { data: [{ id: "id-1000", name: "f1000.jpg" }], error: null };
+              }
+              return { data: [], error: null };
+            },
+            remove: async (paths: string[]) => {
+              removed.push(...paths);
+              return { error: null };
+            },
+          };
+        },
+      },
+    };
+    await removeUserFiles(svc as never, "u1");
+    expect(removed).toContain("u1/f0.jpg");
+    expect(removed).toContain("u1/f1000.jpg");
+  });
+
+  it("purgeExpired 到期清理会补跑 deleteUserData，避免前次中途失败残留归档", async () => {
+    const deletedTables: string[] = [];
+    const svc = {
+      from(table: string) {
+        let op = "select";
+        const q: unknown = new Proxy({}, {
+          get(_t, prop) {
+            if (prop === "delete") return () => { op = "delete"; deletedTables.push(table); return q; };
+            if (prop === "update") return () => { op = "update"; return q; };
+            if (prop === "then") {
+              return (res: (v: unknown) => unknown) => {
+                if (table === "account_deletions" && op === "select") return res({ data: [{ user_id: "u-exp" }], error: null });
+                return res({ data: null, error: null });
+              };
+            }
+            return () => q;
+          },
+        });
+        return q;
+      },
+      storage: { from: () => ({ list: async () => ({ data: [], error: null }), remove: async () => ({ error: null }) }) },
+      auth: { admin: { deleteUser: async () => ({ error: null }) } },
+    };
+    const r = await purgeExpired(svc as never, new Date());
+    expect(r).toEqual({ purged: 1, failed: 0 });
+    expect(deletedTables).toContain("checkins_archive");
+    expect(deletedTables).toContain("users");
+  });
   it("grace 重试时即使已有恢复期记录，也会补跑幂等的 deleteUserData", async () => {
     const deletedTables: string[] = [];
     const future = new Date(Date.now() + 86_400_000).toISOString();
