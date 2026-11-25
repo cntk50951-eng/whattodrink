@@ -1,5 +1,6 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { BlockLookupError, blockLookupUnavailable, isPairBlocked } from "@/lib/api/blocks";
 import { areFriends } from "@/lib/friends";
 import { buildReplayStops, parseTrailVisibility, TRAIL_WINDOW_MS } from "@/lib/trailReplay";
 
@@ -32,12 +33,12 @@ export async function GET(
   const setting = parseTrailVisibility((u as { trail_visibility?: unknown }).trail_visibility);
   if (targetId === userId) return apiOk({ state: "self", trail_visibility: setting });
 
-  const { data: blockRows } = await svc
-    .from("cheers_blocks")
-    .select("blocker_id")
-    .or(`and(blocker_id.eq.${userId},blocked_id.eq.${targetId}),and(blocker_id.eq.${targetId},blocked_id.eq.${userId})`)
-    .limit(1);
-  if (Array.isArray(blockRows) && blockRows.length > 0) return apiError("not_found", "用户不存在", 404);
+  try {
+    if (await isPairBlocked(svc, userId, targetId)) return apiError("not_found", "用户不存在", 404);
+  } catch (e) {
+    if (e instanceof BlockLookupError) return blockLookupUnavailable();
+    throw e;
+  }
 
   if (setting === "off") return apiOk({ state: "hidden" });
 

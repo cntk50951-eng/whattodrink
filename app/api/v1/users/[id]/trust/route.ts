@@ -1,5 +1,6 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { BlockLookupError, blockLookupUnavailable, isPairBlocked } from "@/lib/api/blocks";
 import { computeTrust, trustTier } from "@/lib/trust/score";
 import { completionRate } from "@/lib/trust/settle";
 import { buildPublicTrustDetail } from "@/lib/trust/publicDetail";
@@ -25,13 +26,11 @@ export async function GET(
   const svc = await createServiceClient();
   const { data: target } = await svc.from("users").select("id").eq("id", id).maybeSingle();
   if (target === null) return apiError("not_found", "用户不存在", 404);
-  const { data: blockRows } = await svc
-    .from("cheers_blocks")
-    .select("blocker_id")
-    .or(`and(blocker_id.eq.${userId},blocked_id.eq.${id}),and(blocker_id.eq.${id},blocked_id.eq.${userId})`)
-    .limit(1);
-  if (Array.isArray(blockRows) && blockRows.length > 0) {
-    return apiError("not_found", "用户不存在", 404);
+  try {
+    if (await isPairBlocked(svc, userId, id)) return apiError("not_found", "用户不存在", 404);
+  } catch (e) {
+    if (e instanceof BlockLookupError) return blockLookupUnavailable();
+    throw e;
   }
   const nowMs = Date.now();
   const { data: rows } = await svc

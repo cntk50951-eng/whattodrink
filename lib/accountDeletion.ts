@@ -162,9 +162,9 @@ async function selectAll(svc: Svc, table: string, col: string, userId: string): 
     }
     const rows = (data ?? []) as SnapshotRow[];
     out.push(...rows);
-    if (rows.length < PAGE) break;
+    if (rows.length < PAGE) return out;
   }
-  return out;
+  throw new Error(`snapshot ${table}: exceeded ${PAGE * MAX_PAGES} rows`);
 }
 
 export async function takeSnapshot(svc: Svc, userId: string): Promise<Snapshot> {
@@ -194,16 +194,16 @@ async function listFiles(svc: Svc, bucket: string, prefix: string, depth = 0): P
   for (let offset = 0; offset < PAGE * MAX_PAGES; offset += PAGE) {
     const { data, error } = await svc.storage.from(bucket).list(prefix, { limit: PAGE, offset });
     if (error !== null) throw new Error(`storage list ${bucket}/${prefix}: ${error.message}`);
-    if (data === null || data.length === 0) break;
+    if (data === null || data.length === 0) return files;
     for (const item of data) {
       const path = `${prefix}/${item.name}`;
       // 文件夹没有 id；文件有
       if (item.id === null || item.id === undefined) files.push(...(await listFiles(svc, bucket, path, depth + 1)));
       else files.push(path);
     }
-    if (data.length < PAGE) break;
+    if (data.length < PAGE) return files;
   }
-  return files;
+  throw new Error(`storage list ${bucket}/${prefix}: exceeded ${PAGE * MAX_PAGES} objects`);
 }
 
 export async function removeUserFiles(svc: Svc, userId: string): Promise<void> {
@@ -262,8 +262,18 @@ export async function requestDeletion(
 ): Promise<{ mode: DeleteMode; purgeAt: string | null }> {
   if (mode === "grace") {
     const existing = await getDeletionRow(svc, userId);
-    // 已在恢复期：不覆盖快照（数据已删，重拍会拍成空），但补跑一次幂等的 deleteUserData 以修复前次中途清理失败（第十轮 §3.2）
+    // 已在恢复期：不覆盖快照（数据已删，重拍会拍成空）；先原子校验状态仍为 grace（未被 restore/purge 抢占）再补跑 deleteUserData（第十二轮 §3.1）
     if (existing !== null && isRestorable(existing, now)) {
+      const { data: claimed, error: cErr } = await svc
+        .from("account_deletions")
+        .update({ status: "grace" })
+        .eq("user_id", userId)
+        .eq("status", "grace")
+        .select("user_id");
+      if (cErr !== null) throw new Error(`confirm grace: ${cErr.message}`);
+      if (Array.isArray(claimed) && claimed.length === 0) {
+        throw new Error("deletion state changed concurrently");
+      }
       await deleteUserData(svc, userId);
       return { mode, purgeAt: existing.purge_at };
     }
@@ -293,33 +303,66 @@ export type RestoreResult =
   | { ok: true; skipped: number }
   | { ok: false; reason: "not_found" | "corrupt" };
 
-/** 恢复：回填快照（逐表批量插；批量失败退到逐行，跳过插不进的行，如引用的别人帖子已不存在）。 */
+/** 恢复：先原子占领 grace→restoring（防止并发重跑或到期排程误删已还原数据），再回填快照并删状态列（失败退回 grace）。 */
 export async function restoreAccount(svc: Svc, userId: string, now: Date): Promise<RestoreResult> {
-  const row = await getDeletionRow(svc, userId);
-  if (row === null || !isRestorable(row, now)) return { ok: false, reason: "not_found" };
+  let row: DeletionRow | null = null;
+  let claimedRestoring = false;
+  const claimRes = await svc
+    .from("account_deletions")
+    .update({ status: "restoring" })
+    .eq("user_id", userId)
+    .eq("status", "grace")
+    .gt("purge_at", now.toISOString())
+    .select("user_id,status,purge_at,snapshot")
+    .maybeSingle();
+  if (claimRes.error !== null && claimRes.error.code === "23514") {
+    // 0089 尚未迁移（CHECK 不含 restoring）：退回旧读法
+    row = await getDeletionRow(svc, userId);
+    if (row === null || !isRestorable(row, now)) return { ok: false, reason: "not_found" };
+  } else if (claimRes.error !== null) {
+    if (claimRes.error.code === "42P01") return { ok: false, reason: "not_found" };
+    throw new Error(`claim restore: ${claimRes.error.message}`);
+  } else {
+    row = (claimRes.data as DeletionRow | null) ?? null;
+    if (row === null) return { ok: false, reason: "not_found" };
+    claimedRestoring = true;
+  }
   const snap = parseSnapshot(row.snapshot);
-  if (snap === null) return { ok: false, reason: "corrupt" };
+  if (snap === null) {
+    if (claimedRestoring) await svc.from("account_deletions").update({ status: "grace" }).eq("user_id", userId).eq("status", "restoring");
+    return { ok: false, reason: "corrupt" };
+  }
   const plan = planRestore(snap, userId);
-  if (plan.length === 0) return { ok: false, reason: "corrupt" };
+  if (plan.length === 0) {
+    if (claimedRestoring) await svc.from("account_deletions").update({ status: "grace" }).eq("user_id", userId).eq("status", "restoring");
+    return { ok: false, reason: "corrupt" };
+  }
   let skipped = 0;
-  for (const { table, rows } of plan) {
-    for (const batch of chunk(rows, 200)) {
-      const { error } = await svc.from(table).upsert(batch, { ignoreDuplicates: true });
-      if (error === null) continue;
-      // users 行插不进＝恢复失败（后面都依赖它）
-      if (table === "users") throw new Error(`restore users: ${error.message}`);
-      for (const one of batch) {
-        const { error: e1 } = await svc.from(table).upsert(one, { ignoreDuplicates: true });
-        if (e1 !== null) skipped += 1;
+  try {
+    for (const { table, rows } of plan) {
+      for (const batch of chunk(rows, 200)) {
+        const { error } = await svc.from(table).upsert(batch, { ignoreDuplicates: true });
+        if (error === null) continue;
+        // users 行插不进＝恢复失败（后面都依赖它）
+        if (table === "users") throw new Error(`restore users: ${error.message}`);
+        for (const one of batch) {
+          const { error: e1 } = await svc.from(table).upsert(one, { ignoreDuplicates: true });
+          if (e1 !== null) skipped += 1;
+        }
       }
     }
+  } catch (err) {
+    if (claimedRestoring) {
+      await svc.from("account_deletions").update({ status: "grace" }).eq("user_id", userId).eq("status", "restoring");
+    }
+    throw err;
   }
   const { error } = await svc.from("account_deletions").delete().eq("user_id", userId);
   if (error !== null) throw new Error(`clear deletion row: ${error.message}`);
   return { ok: true, skipped };
 }
 
-/** 排程：清到期账号（文件＋登录账号），快照置空，行留 purged 墓碑。单次最多 50 个。 */
+/** 排程：清到期账号（先原子占领 grace→purging 再删数据／文件／登录账号，避免误删刚好还原的账号）。单次最多 50 个。 */
 export async function purgeExpired(svc: Svc, now: Date): Promise<{ purged: number; failed: number }> {
   const { data, error } = await svc
     .from("account_deletions")
@@ -331,18 +374,44 @@ export async function purgeExpired(svc: Svc, now: Date): Promise<{ purged: numbe
   let purged = 0;
   let failed = 0;
   for (const { user_id: userId } of (data ?? []) as Array<{ user_id: string }>) {
+    let claimedPurging = false;
     try {
+      const claim = await svc
+        .from("account_deletions")
+        .update({ status: "purging" })
+        .eq("user_id", userId)
+        .eq("status", "grace")
+        .lt("purge_at", now.toISOString())
+        .select("user_id");
+      if (claim.error !== null && claim.error.code === "23514") {
+        // 0089 尚未迁移：兼容继续
+      } else if (claim.error !== null) {
+        throw new Error(`claim purge: ${claim.error.message}`);
+      } else if (Array.isArray(claim.data) && claim.data.length === 0) {
+        // 已被用户还原或已被另一排程占领：跳过，不碰数据
+        continue;
+      } else {
+        claimedPurging = true;
+      }
       // 第十一輪 §3.2：補跑冪等 DB 清理，避免首次 grace 刪除 checkins_archive 等無 FK 表中途失敗後到期殘留
       await deleteUserData(svc, userId);
       await removeUserFiles(svc, userId);
       await deleteAuthUser(svc, userId);
-      const { error: e } = await svc
+      const fin = await svc
         .from("account_deletions")
         .update({ status: "purged", snapshot: null, purged_at: now.toISOString() })
-        .eq("user_id", userId);
-      if (e !== null) throw new Error(e.message);
+        .eq("user_id", userId)
+        .eq("status", claimedPurging ? "purging" : "grace")
+        .select("user_id");
+      if (fin.error !== null) throw new Error(fin.error.message);
+      if (Array.isArray(fin.data) && fin.data.length === 0) {
+        throw new Error("deletion row disappeared during purge");
+      }
       purged += 1;
     } catch (err) {
+      if (claimedPurging) {
+        await svc.from("account_deletions").update({ status: "grace" }).eq("user_id", userId).eq("status", "purging");
+      }
       failed += 1;
       console.error(`[purge-accounts] ${userId}: ${err instanceof Error ? err.message : "unknown"}`);
     }

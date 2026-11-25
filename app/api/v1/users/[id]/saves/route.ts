@@ -1,5 +1,6 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { BlockLookupError, blockLookupUnavailable, isPairBlocked } from "@/lib/api/blocks";
 import { canViewCheckin, parseMineParams, toMineRow } from "@/lib/api/checkins";
 import { parseCheckinIdParam } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
@@ -36,13 +37,11 @@ export async function GET(
   const self = targetId === userId;
   const svc = await createServiceClient();
   if (!self) {
-    const { data: blockRows } = await svc
-      .from("cheers_blocks")
-      .select("blocker_id")
-      .or(`and(blocker_id.eq.${userId},blocked_id.eq.${targetId}),and(blocker_id.eq.${targetId},blocked_id.eq.${userId})`)
-      .limit(1);
-    if (Array.isArray(blockRows) && blockRows.length > 0) {
-      return apiError("not_found", "用户不存在", 404);
+    try {
+      if (await isPairBlocked(svc, userId, targetId)) return apiError("not_found", "用户不存在", 404);
+    } catch (e) {
+      if (e instanceof BlockLookupError) return blockLookupUnavailable();
+      throw e;
     }
     const { data: relRows } = await svc
       .from("friendships")

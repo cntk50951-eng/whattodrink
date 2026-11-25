@@ -220,4 +220,35 @@ describe("删帐清理容错（第十／十一轮 §3.2）", () => {
     };
     await expect(removeUserFiles(svc as never, "u1")).rejects.toThrow(/storage list/);
   });
+
+  it("第十二輪 §3.1：purgeExpired CAS 搶不到 grace（已被並發還原）時跳過清理，不刪活帳號", async () => {
+    const deletedTables: string[] = [];
+    let authDeleted = 0;
+    const svc = {
+      from(table: string) {
+        let op = "select";
+        const q: unknown = new Proxy({}, {
+          get(_t, prop) {
+            if (prop === "delete") return () => { op = "delete"; deletedTables.push(table); return q; };
+            if (prop === "update") return () => { op = "update"; return q; };
+            if (prop === "then") {
+              return (res: (v: unknown) => unknown) => {
+                if (table === "account_deletions" && op === "select") return res({ data: [{ user_id: "u-race" }], error: null });
+                if (table === "account_deletions" && op === "update") return res({ data: [], error: null });
+                return res({ data: null, error: null });
+              };
+            }
+            return () => q;
+          },
+        });
+        return q;
+      },
+      storage: { from: () => ({ list: async () => ({ data: [], error: null }), remove: async () => ({ error: null }) }) },
+      auth: { admin: { deleteUser: async () => { authDeleted += 1; return { error: null }; } } },
+    };
+    const r = await purgeExpired(svc as never, new Date());
+    expect(r).toEqual({ purged: 0, failed: 0 });
+    expect(deletedTables).toHaveLength(0);
+    expect(authDeleted).toBe(0);
+  });
 });

@@ -1,5 +1,6 @@
 import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { BlockLookupError, blockLookupUnavailable, isPairBlocked } from "@/lib/api/blocks";
 import { parseCheckinIdParam, parseMineParams } from "@/lib/api/checkins";
 import { friendsOnlyCountOf, parseSavesVisibility, savesAccess, visibleRowsFor } from "@/lib/api/privacy";
 import { friendIdsOf } from "@/lib/friends";
@@ -266,14 +267,12 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
   let myFriendIds: string[] = [];
   let targetFriendIds: string[] = [];
   if (!self) {
-    // 拉黑任一方向即 404（不泄存在，沿交接）。矩阵 C：对方隐身不再 404，主页对所有人完整。
-    const { data: blockRows } = await supa
-      .from("cheers_blocks")
-      .select("blocker_id")
-      .or(`and(blocker_id.eq.${viewerId},blocked_id.eq.${targetId}),and(blocker_id.eq.${targetId},blocked_id.eq.${viewerId})`)
-      .limit(1);
-    if (Array.isArray(blockRows) && blockRows.length > 0) {
-      return apiError("not_found", "用户不存在", 404);
+    // 拉黑任一方向即 404（不泄存在，沿交接）；封鎖查詢失敗 fail-closed 回 503（第十二輪 §3.3）
+    try {
+      if (await isPairBlocked(supa, viewerId, targetId)) return apiError("not_found", "用户不存在", 404);
+    } catch (e) {
+      if (e instanceof BlockLookupError) return blockLookupUnavailable();
+      throw e;
     }
     const { data: fsRows } = await supa
       .from("friendships")

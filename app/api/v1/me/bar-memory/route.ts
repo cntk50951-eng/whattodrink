@@ -13,19 +13,23 @@ import { mergeBarMemory, sanitizeBarMemory } from "@/lib/barMemory";
  * 表只有服務端讀寫（RLS 無策略），這裡一律按 userId 限域。
  */
 
-type Row = { doc?: unknown; rev?: unknown; deleted_at?: unknown; forgot_rev?: unknown };
+type Row = { doc?: unknown; rev?: unknown; deleted_at?: unknown; forgot_rev?: unknown; forgot_at?: unknown };
 
 type SvcClient = Awaited<ReturnType<typeof createServiceClient>>;
 const isMissingColumn = (e: { code?: string } | null): boolean => e !== null && (e.code === "42703" || e.code === "PGRST204");
 
-/** 讀記憶行；0085 沒跑（缺欄位）就退回舊欄位集，行為同改前。 */
+/** 讀記憶行；依序兼容 0089（含 forgot_at）→ 0085（deleted_at/forgot_rev）→ 舊表結構。 */
 async function readRow(svc: SvcClient, userId: string): Promise<{ row: Row | null; error: { code?: string; message?: string } | null }> {
-  const full = await svc.from("bar_memories").select("doc,rev,deleted_at,forgot_rev").eq("user_id", userId).maybeSingle();
-  if (full.error !== null && isMissingColumn(full.error)) {
-    const legacy = await svc.from("bar_memories").select("doc,rev").eq("user_id", userId).maybeSingle();
-    return { row: legacy.data as Row | null, error: legacy.error };
+  const withForgotAt = await svc.from("bar_memories").select("doc,rev,deleted_at,forgot_rev,forgot_at").eq("user_id", userId).maybeSingle();
+  if (withForgotAt.error !== null && isMissingColumn(withForgotAt.error)) {
+    const full = await svc.from("bar_memories").select("doc,rev,deleted_at,forgot_rev").eq("user_id", userId).maybeSingle();
+    if (full.error !== null && isMissingColumn(full.error)) {
+      const legacy = await svc.from("bar_memories").select("doc,rev").eq("user_id", userId).maybeSingle();
+      return { row: legacy.data as Row | null, error: legacy.error };
+    }
+    return { row: full.data as Row | null, error: full.error };
   }
-  return { row: full.data as Row | null, error: full.error };
+  return { row: withForgotAt.data as Row | null, error: withForgotAt.error };
 }
 const isTombstone = (r: Row | null): boolean => r !== null && r.deleted_at !== null && r.deleted_at !== undefined;
 
@@ -67,14 +71,18 @@ export async function PUT(req: Request): Promise<Response> {
     const forgotRev = cur !== null && typeof cur.forgot_rev === "number" ? cur.forgot_rev : 0;
     // 忘記之前的寫入（base_rev 落在 (0, forgot_rev]）：即使目前 rev 碰巧等於它，也不能當最新版覆蓋
     if (baseRev > 0 && baseRev <= forgotRev) return apiError("stale_version", "記憶已在另一台設備被清除", 409);
+    // 第十一／十二輪 §3.2：無論目前是墓碑或已復活成活列，只要有忘記時間屏障（forgot_at ?? deleted_at），
+    // 離線首次累積（base_rev=0）且 captured_at <= 忘記時間者一律 409，避免忘記後被另一台復活再合併舊摘要
+    const barrierIso = cur !== null
+      ? (typeof cur.forgot_at === "string" ? cur.forgot_at : (typeof cur.deleted_at === "string" ? cur.deleted_at : null))
+      : null;
+    const barrierMs = barrierIso !== null && Number.isFinite(Date.parse(barrierIso)) ? Date.parse(barrierIso) : null;
+    if (baseRev === 0 && capturedAtMs !== null && barrierMs !== null && capturedAtMs <= barrierMs) {
+      return apiError("stale_version", "記憶已在另一台設備被清除", 409);
+    }
     if (cur !== null && isTombstone(cur)) {
       if (baseRev > 0) return apiError("stale_version", "記憶已在另一台設備被清除", 409);
-      // 第十一輪 §3.3：離線首次累積（base_rev=0）若帶 captured_at 且早於或等於墓碑 deleted_at，屬忘記前舊對話，拒絕復活
-      const deletedAtMs = typeof cur.deleted_at === "string" && Number.isFinite(Date.parse(cur.deleted_at)) ? Date.parse(cur.deleted_at) : null;
-      if (capturedAtMs !== null && deletedAtMs !== null && capturedAtMs <= deletedAtMs) {
-        return apiError("stale_version", "記憶已在另一台設備被清除", 409);
-      }
-      // base_rev=0＝忘記後重新累積：復活墓碑，rev 接著往上走（不回到 1）
+      // base_rev=0＝忘記後重新累積：復活墓碑，rev 接著往上走（不回到 1），forgot_at 維持原值繼續擋舊離線摘要
       const curRev = typeof cur.rev === "number" ? cur.rev : 0;
       const { data: rev, error: rErr } = await svc
         .from("bar_memories")
@@ -134,15 +142,40 @@ export async function DELETE(req: Request): Promise<Response> {
       console.error(`[api/v1/me/bar-memory] delete read error: code=${readErr.code} message=${readErr.message}`);
       return apiError("internal", "刪除失敗", 500);
     }
-    if (cur === null || isTombstone(cur)) return apiOk({ ok: true });
+    if (cur === null) {
+      // 第十二輪 §3.2：遠端原本無列時「忘記我」也建立墓碑屏障（rev=1, forgot_rev=1, deleted_at/forgot_at=now），
+      // 阻擋另一台離線裝置稍後上傳忘記前的 rev=0 摘要
+      const nowIso = new Date().toISOString();
+      let ins = await svc
+        .from("bar_memories")
+        .insert({ user_id: userId, doc: {}, rev: 1, deleted_at: nowIso, forgot_rev: 1, forgot_at: nowIso });
+      if (ins.error !== null && isMissingColumn(ins.error)) {
+        ins = await svc
+          .from("bar_memories")
+          .insert({ user_id: userId, doc: {}, rev: 1, deleted_at: nowIso, forgot_rev: 1 });
+      }
+      if (ins.error === null || isMissingColumn(ins.error)) return apiOk({ ok: true });
+      if (ins.error.code === "23505") continue; // 並發先插入了：重讀再標墓碑
+      console.error(`[api/v1/me/bar-memory] forget empty insert error: code=${ins.error.code} message=${ins.error.message}`);
+      return apiError("internal", "刪除失敗", 500);
+    }
+    if (isTombstone(cur)) return apiOk({ ok: true });
     const curRev = typeof cur.rev === "number" ? cur.rev : 0;
     const nowIso = new Date().toISOString();
-    const tomb = await svc
+    let tomb = await svc
       .from("bar_memories")
-      .update({ doc: {}, rev: curRev + 1, deleted_at: nowIso, forgot_rev: curRev + 1, updated_at: nowIso })
+      .update({ doc: {}, rev: curRev + 1, deleted_at: nowIso, forgot_rev: curRev + 1, forgot_at: nowIso, updated_at: nowIso })
       .eq("user_id", userId)
       .eq("rev", curRev)
       .select("rev");
+    if (tomb.error !== null && isMissingColumn(tomb.error)) {
+      tomb = await svc
+        .from("bar_memories")
+        .update({ doc: {}, rev: curRev + 1, deleted_at: nowIso, forgot_rev: curRev + 1, updated_at: nowIso })
+        .eq("user_id", userId)
+        .eq("rev", curRev)
+        .select("rev");
+    }
     if (tomb.error === null) {
       if (Array.isArray(tomb.data) && tomb.data.length > 0) return apiOk({ ok: true });
       continue; // 被並發寫入搶先改了 rev：重讀

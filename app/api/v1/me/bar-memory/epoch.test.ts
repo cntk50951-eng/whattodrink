@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // 第七輪 §3.4：「忘記我」留墓碑、rev 只增不減；forget 之前的 base_rev 不能被碰巧對上。
-type Row = { doc: unknown; rev: number; deleted_at?: string | null; forgot_rev?: number };
+type Row = { doc: unknown; rev: number; deleted_at?: string | null; forgot_rev?: number; forgot_at?: string | null };
 const state = vi.hoisted(() => ({
   row: null as Row | null,
   updates: [] as Array<Record<string, unknown>>,
+  inserts: [] as Array<Record<string, unknown>>,
   deletes: 0,
   missingColumns: false,
 }));
@@ -21,7 +22,7 @@ vi.mock("@/lib/supabase/server", () => {
         eq: () => q,
         update: (v: Record<string, unknown>) => { op = "update"; state.updates.push(v); return q; },
         delete: () => { op = "delete"; state.deletes += 1; return q; },
-        insert: async () => ({ error: null }),
+        insert: async (v: Record<string, unknown>) => { state.inserts.push(v); return { error: null }; },
         maybeSingle: async () => {
           if (state.missingColumns && cols.includes("deleted_at")) return { data: null, error: { code: "42703", message: "no col" } };
           return { data: state.row, error: null };
@@ -54,6 +55,7 @@ const del = () => DELETE(new Request(url, { method: "DELETE" }));
 beforeEach(() => {
   state.row = null;
   state.updates.splice(0);
+  state.inserts.splice(0);
   state.deletes = 0;
   state.missingColumns = false;
   vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -95,6 +97,13 @@ describe("忘記我的刪除世代", () => {
     expect(state.updates).toHaveLength(0);
   });
 
+  it("第十二輪 §3.2：墓碑復活後（deleted_at=null 但保留 forgot_at），早於 forgot_at 的離線 rev=0 仍回 409 不合併", async () => {
+    state.row = { doc: { taste: { likes: ["new"] } }, rev: 6, deleted_at: null, forgot_rev: 5, forgot_at: "2026-11-24T12:00:00Z" };
+    const res = await put(0, "2026-11-24T11:30:00Z");
+    expect(res.status).toBe(409);
+    expect(state.updates).toHaveLength(0);
+  });
+
   it("核心回歸：復活後舊設備的 base_rev（≤ forgot_rev）即使碰巧等於舊 rev 也 409", async () => {
     // 忘記前舊設備停在 rev 1；忘記時 rev 1→2、forgot_rev=2；復活後 rev=3。舊設備帶 base_rev=1 或 2 都必須被擋
     state.row = { doc: { taste: { likes: ["new"] } }, rev: 3, deleted_at: null, forgot_rev: 2 };
@@ -103,6 +112,15 @@ describe("忘記我的刪除世代", () => {
     expect(state.updates).toHaveLength(0);
     // 忘記後才同步過的設備（base_rev=3）正常覆蓋
     expect((await put(3)).status).toBe(200);
+  });
+
+  it("第十二輪 §3.2：空列 DELETE 也寫空墓碑（rev:1, forgot_rev:1, deleted_at, forgot_at），擋住忘記前離線上傳", async () => {
+    state.row = null;
+    expect((await del()).status).toBe(200);
+    expect(state.inserts).toHaveLength(1);
+    expect(state.inserts[0]).toMatchObject({ user_id: "u1", doc: {}, rev: 1, forgot_rev: 1 });
+    expect(state.inserts[0].deleted_at).toBeTruthy();
+    expect(state.inserts[0].forgot_at).toBeTruthy();
   });
 
   it("0085 沒跑（缺欄位）→ 退回舊行為：DELETE 直接刪列", async () => {

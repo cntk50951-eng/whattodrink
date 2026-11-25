@@ -607,6 +607,10 @@ paths:
                 base_rev:
                   type: integer
                   minimum: 0
+                captured_at:
+                  type: string
+                  format: date-time
+                  description: 可選，該批待摘要對話建立時間（ISO8601）；當 base_rev=0 且早於或等於遠端最後「忘記我」時間時，服務端回 409 stale_version 拒絕復活舊摘要
       responses:
         "200":
           description: "{doc, rev, merged: boolean}；客户端用回包替换本地"

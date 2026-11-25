@@ -11,7 +11,12 @@ export async function GET(req: Request): Promise<Response> {
   if (userId === null) return apiError("unauthorized", "未登录", 401);
   const svc = await createServiceClient();
   const { data, error } = await svc.from("users").select("trail_visibility").eq("id", userId).maybeSingle();
-  if (error !== null) return apiOk({ trail_visibility: "off" });
+  if (error !== null) {
+    // 僅缺欄位（0060 沒跑）退回 off；一般 DB 錯誤回 500 避免客戶端誤以為確認關閉（第十二輪 §3.4）
+    if (error.code === "42703" || error.code === "PGRST204") return apiOk({ trail_visibility: "off" });
+    console.error(`[me/trail] get failed: ${error.code} ${error.message}`);
+    return apiError("internal", "讀取失敗", 500);
+  }
   return apiOk({ trail_visibility: parseTrailVisibility((data as { trail_visibility?: unknown } | null)?.trail_visibility) });
 }
 

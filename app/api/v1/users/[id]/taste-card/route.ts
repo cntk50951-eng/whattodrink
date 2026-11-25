@@ -1,5 +1,6 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { BlockLookupError, blockLookupUnavailable, isPairBlocked } from "@/lib/api/blocks";
 import { loadCardRow, loadTasteInputs } from "@/lib/tasteCardData";
 import { tasteCardNeedsRefresh, tasteCardReady, tasteInputsHash, tasteRefreshesLeft, type TasteCard } from "@/lib/tasteCard";
 
@@ -23,12 +24,12 @@ export async function GET(
   const row = await loadCardRow(svc, targetId);
   const card = row !== null && typeof row.payload === "object" && row.payload !== null ? (row.payload as TasteCard) : null;
   if (targetId !== userId) {
-    const { data: blockRows } = await svc
-      .from("cheers_blocks")
-      .select("blocker_id")
-      .or(`and(blocker_id.eq.${userId},blocked_id.eq.${targetId}),and(blocker_id.eq.${targetId},blocked_id.eq.${userId})`)
-      .limit(1);
-    if (Array.isArray(blockRows) && blockRows.length > 0) return apiError("not_found", "用户不存在", 404);
+    try {
+      if (await isPairBlocked(svc, userId, targetId)) return apiError("not_found", "用户不存在", 404);
+    } catch (e) {
+      if (e instanceof BlockLookupError) return blockLookupUnavailable();
+      throw e;
+    }
     return apiOk({ card: row !== null && row.visible ? card : null });
   }
   // 本人：告诉 App 现在是否值得（后台）生成一次
