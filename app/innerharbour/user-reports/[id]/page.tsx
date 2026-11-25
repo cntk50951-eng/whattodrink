@@ -3,7 +3,14 @@ import { notFound } from "next/navigation";
 
 import { adminRateLimited, auditOrThrow, auditViewOnce, checkSameOrigin } from "@/lib/ops";
 import { requireAdminPage } from "@/lib/opsPage";
-import { applyReportDecision, reopenReport, type ReportTargetType } from "@/lib/api/reportStp";
+import {
+  applyReportDecision,
+  findMissingReportNotifications,
+  reopenReport,
+  resendMissingReportNotifications,
+  type ReportDecision,
+  type ReportTargetType,
+} from "@/lib/api/reportStp";
 import type { SnapshotLine } from "@/lib/userReports";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -96,6 +103,66 @@ export default async function UserReportDetailPage({ params }: { params: Promise
     }
   }
 
+  const decisionStatus: ReportDecision | null =
+    r.status === "actioned" || r.status === "dismissed" ? r.status : null;
+  const targetType: ReportTargetType =
+    r.target_type === "post" || r.target_type === "message" ? r.target_type : "user";
+  const missingNotify = decisionStatus !== null
+    ? await findMissingReportNotifications(svc, { reportId: id, targetType, decision: decisionStatus })
+    : { missingReported: false, missingReporter: false };
+
+  async function resendNotifications(): Promise<void> {
+    "use server";
+    const g = await requireAdminPage({ write: true, stepUp: true }, `/innerharbour/user-reports/${id}`);
+    if (!(await checkSameOrigin())) throw new Error("跨站請求被拒");
+    await auditOrThrow(g.svc, { admin_id: g.userId, action: "user_report_resend_notify", target: id });
+    const { data: rowRaw } = await g.svc
+      .from("cheers_reports")
+      .select("status,target_type,target_ref,target_user_id,reporter_id,reason_code")
+      .eq("id", id)
+      .maybeSingle();
+    const row = rowRaw as {
+      status?: unknown;
+      target_type?: unknown;
+      target_ref?: unknown;
+      target_user_id?: unknown;
+      reporter_id?: unknown;
+      reason_code?: unknown;
+    } | null;
+    if (row === null || (row.status !== "actioned" && row.status !== "dismissed")) {
+      throw new Error("僅已處理或駁回的案件可補發通知");
+    }
+    if (typeof row.target_user_id !== "string" || typeof row.reporter_id !== "string") {
+      throw new Error("案件缺少收件人資料");
+    }
+    const tt: ReportTargetType =
+      row.target_type === "post" || row.target_type === "message" ? row.target_type : "user";
+    const targetRef = typeof row.target_ref === "string" ? row.target_ref : null;
+    let placeName: string | null = null;
+    if (tt === "post" && targetRef !== null) {
+      const { data: postRow } = await g.svc.from("checkins").select("place_name").eq("id", targetRef).maybeSingle();
+      const pn = (postRow as { place_name?: unknown } | null)?.place_name;
+      if (typeof pn === "string" && pn.trim() !== "") placeName = pn.trim();
+    }
+    const res = await resendMissingReportNotifications(g.svc, {
+      reportId: id,
+      targetType: tt,
+      targetRef,
+      targetUserId: row.target_user_id,
+      reporterId: row.reporter_id,
+      reasonCode: typeof row.reason_code === "string" ? row.reason_code : null,
+      placeName,
+      decision: row.status,
+      note: row.status === "actioned" ? "經管理員審核核實違規，已處理" : "經管理員審核暫未發現違規",
+    });
+    if (res.queryError) {
+      throw new Error("無法查詢既有通知紀錄，請稍後重試");
+    }
+    if (res.failed.length > 0) {
+      throw new Error(`補發通知失敗（${res.failed.join("、")}），請稍後再試`);
+    }
+  }
+
   const snapshot = Array.isArray(r.snapshot) ? (r.snapshot as SnapshotLine[]) : [];
   return (
     <main style={{ padding: 24 }}>
@@ -124,17 +191,36 @@ export default async function UserReportDetailPage({ params }: { params: Promise
         </ul>
       )}
       {role === "moderator" ? (
-        <form action={mark}>
-          <label>
-            標記：
-            <select name="state" defaultValue="reviewed">
-              <option value="reviewed">已看</option>
-              <option value="actioned">已處理</option>
-              <option value="dismissed">駁回</option>
-            </select>
-          </label>{" "}
-          <button type="submit">提交</button>
-        </form>
+        <>
+          <form action={mark}>
+            <label>
+              標記：
+              <select name="state" defaultValue="reviewed">
+                <option value="reviewed">已看</option>
+                <option value="actioned">已處理</option>
+                <option value="dismissed">駁回</option>
+              </select>
+            </label>{" "}
+            <button type="submit">提交</button>
+          </form>
+          {missingNotify.queryError ? (
+            <form action={resendNotifications} style={{ marginTop: 16 }}>
+              <p style={{ color: "#dc2626" }}>無法確認結果通知是否齊全（資料庫讀取失敗），請重試對賬並補發缺漏通知。</p>
+              <button type="submit">重試對賬並補發通知</button>
+            </form>
+          ) : (missingNotify.missingReported || missingNotify.missingReporter) ? (
+            <form action={resendNotifications} style={{ marginTop: 16 }}>
+              <p style={{ color: "#b45309" }}>
+                偵測到缺漏結果通知：
+                {[
+                  missingNotify.missingReported ? "被舉報人" : null,
+                  missingNotify.missingReporter ? "舉報人" : null,
+                ].filter(Boolean).join("、")}
+              </p>
+              <button type="submit">補發缺漏通知</button>
+            </form>
+          ) : null}
+        </>
       ) : (
         <p>只讀權限：標記請找 moderator。</p>
       )}

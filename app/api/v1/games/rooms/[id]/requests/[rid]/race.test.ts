@@ -15,6 +15,7 @@ vi.mock("@/lib/games/rooms", () => ({
   parseJoinDecision: (raw: { decision: string }) => ({ decision: raw.decision }),
   loadRoomAsMember: async () => ({ room: { id: "room", status: "lobby", version: 4, max_players: 6 } }),
   requireHost: () => null,
+  approveJoinRequestAtomic: async () => null,
   claimRoomSeat: async () => { st.claims += 1; return st.claim; },
   bumpRoom: async () => 5,
   appendEvent: async () => undefined,

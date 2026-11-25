@@ -3,6 +3,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { retryWrite } from "@/lib/api/retryWrite";
 import {
   appendEvent,
+  approveJoinRequestAtomic,
   bumpRoom,
   claimRoomSeat,
   loadRoomAsMember,
@@ -41,6 +42,41 @@ export async function POST(
   if ("response" in loaded) return loaded.response;
   const hostErr = requireHost(loaded, userId);
   if (hostErr !== null) return hostErr.response;
+  // 第九輪 §3.1：approve 優先走 0086 單一交易 RPC（同時鎖房間與申請、寫席位、遞增版本與標記 approved），
+  // 杜絕「先 approved 後佔位」的中間態 404 與回滾失敗卡死；0086 未套用時回傳 null 退回既有流程。
+  if (parsed.decision === "approve" && typeof approveJoinRequestAtomic === "function") {
+    const atomic = await approveJoinRequestAtomic(svc, loaded.room.id, rid, userId);
+    if (atomic !== null) {
+      if (atomic.kind === "not_found") return apiError("not_found", "申請不存在", 404);
+      if (atomic.kind === "not_host") return apiError("not_host", "只有房主可以審批", 403);
+      if (atomic.kind === "room_not_found") return apiError("room_not_found", "房間不存在或已結束", 404);
+      if (atomic.kind === "room_full") return apiError("room_full", "房間已滿", 409);
+      if (atomic.kind === "room_started") return apiError("room_started", "對局已開始，不可再加入", 409);
+      if (atomic.kind === "kicked") return apiError("forbidden", "該玩家不可重新加入", 403);
+      if (atomic.kind === "already_approved") {
+        return apiOk({ version: atomic.version || loaded.room.version, status: "approved" as const });
+      }
+      if (atomic.kind === "not_pending") {
+        return apiOk({ version: atomic.version || loaded.room.version, status: atomic.status });
+      }
+      if (atomic.kind !== "ok") {
+        return apiError("internal", "同意失敗", 500);
+      }
+      if (atomic.inserted) {
+        await appendEvent(svc, loaded.room.id, atomic.version, "member_joined", atomic.applicantId, { seat: atomic.seat, via: "request" });
+      }
+      if (atomic.applicantId) {
+        const { error: nErr } = await retryWrite(() => svc.from("notifications").insert({
+          user_id: atomic.applicantId,
+          kind: "game_join_result",
+          actor_id: userId,
+          payload: { decision: "approved", room_id: loaded.room.id },
+        }));
+        if (nErr) console.error(`[games/requests] [needs-repair] approve notify request=${rid} code=${nErr.code}`);
+      }
+      return apiOk({ version: atomic.version || loaded.room.version, status: "approved" as const });
+    }
+  }
   const { data: reqRaw } = await svc
     .from("game_join_requests")
     .select("id,room_id,user_id,status")
@@ -52,6 +88,30 @@ export async function POST(
     return apiError("not_found", "申請不存在", 404);
   }
   if (joinReq.status === "approved") {
+    // 補洞（第九輪 §3.1）：舊路徑若上次批准後佔位與回滾皆失敗，重按 approve 時檢查是否真的已入座；已入座才冪等早退
+    if (parsed.decision === "approve") {
+      const { data: existingSeat } = await svc.from("game_room_players")
+        .select("user_id,status").eq("room_id", loaded.room.id).eq("user_id", joinReq.user_id).maybeSingle();
+      if (existingSeat && existingSeat.status === "active") {
+        return apiOk({ version: loaded.room.version, status: "approved" as const });
+      }
+      if (existingSeat && existingSeat.status !== "active") {
+        return apiError("forbidden", "該玩家不可重新加入", 403);
+      }
+      const repair = await claimRoomSeat(svc, loaded.room.id, joinReq.user_id, Date.now());
+      if (repair.kind !== "ok" && repair.kind !== "already") {
+        if (repair.kind === "room_full") return apiError("room_full", "房間已滿", 409);
+        if (repair.kind === "room_started") return apiError("room_started", "對局已開始，不可再加入", 409);
+        if (repair.kind === "kicked") return apiError("forbidden", "該玩家不可重新加入", 403);
+        if (repair.kind === "room_not_found") return apiError("room_not_found", "房間不存在或已結束", 404);
+        return apiError("internal", "同意失敗", 500);
+      }
+      const ver = repair.kind === "ok" ? await bumpRoom(svc, loaded.room.id, loaded.room.version, Date.now()) : null;
+      if (ver !== null) {
+        await appendEvent(svc, loaded.room.id, ver, "member_joined", joinReq.user_id, { seat: repair.seat, via: "request" });
+      }
+      return apiOk({ version: ver ?? loaded.room.version, status: "approved" as const });
+    }
     return apiOk({ version: loaded.room.version, status: "approved" as const });
   }
   if (joinReq.status !== "pending") {

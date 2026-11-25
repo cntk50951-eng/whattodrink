@@ -1536,6 +1536,86 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/checkins/mine/trail:
+    get:
+      operationId: listMyTrail
+      summary: 本人足跡時間軸，含已歸檔快貼
+      description: 依發佈時間和 ID 升序。可使用地圖聚合點回傳的 bbox 查該區站點。本人可見的精確坐標只供本人，回應禁止共用快取。
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 30
+        - name: cursor
+          in: query
+          description: 同一篩選條件下，原樣傳回上一頁的 next_cursor。
+          schema:
+            type: string
+        - name: bbox
+          in: query
+          description: WGS-84 west,south,east,north，包含四邊。可跨換日線，也可查重合站的零寬／高範圍。
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 升序足跡與下一頁游標；原圖、音訊和語音轉錄不隨列表回傳。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyTrailPage"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/checkins/mine/trail/map:
+    get:
+      operationId: getMyTrailMap
+      summary: 本人足跡地圖單點與聚合點
+      description: 按視窗及縮放回傳有界的單點／聚合點；包含主表及歸檔。本人精確坐標只供本人，回應禁止共用快取。
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bbox
+          in: query
+          required: true
+          description: WGS-84 west,south,east,north，可跨換日線，視窗寬和高須大於零。
+          schema:
+            type: string
+        - name: zoom
+          in: query
+          required: true
+          description: 地圖縮放級數，支援小數，同一整數級用同一縮放網格。
+          schema:
+            type: number
+            minimum: 0
+            maximum: 24
+      responses:
+        "200":
+          description: 地圖符號陣列。單點回傳不含媒體的打卡摘要。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [points]
+                properties:
+                  points:
+                    type: array
+                    maxItems: 200
+                    items:
+                      $ref: "#/components/schemas/MyTrailMapPoint"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
   /api/v1/checkins/{id}/comments:
     get:
       operationId: listCheckinComments
@@ -3229,7 +3309,9 @@ paths:
                     description: grace 时为到期清除时间（申请后 30 天）；now 时为 null
                   apple_manual_revoke:
                     type: boolean
-                    description: 只在請求帶 `apple_unavailable:true` 且帳號綁了 Apple 時出現（`true`）：Apple 授權沒被撤銷，需用戶自行移除
+                    description: >
+                      帳號綁了 Apple 且服務端未能自動撤銷 Apple 授權時出現（`true`），包含請求帶 `apple_unavailable:true`、
+                      服務端未配置 SIWA 憑證、或 Apple 拒絕服務端憑證等情境：客戶端須引導用戶到 Apple ID 設定自行移除授權。
         "400":
           description: >
             body 非法／缺 confirm:true；或 `code=apple_code_invalid`＝Apple 拒絕了 `apple_authorization_code`（已用過／過期）。
@@ -4336,12 +4418,21 @@ paths:
             format: uuid
       responses:
         "200":
-          description: 已取消
+          description: 取消結果（若在取消前已被房主批准／拒絕／過期，回傳 cancelled=false 與真實終態）
           content:
             application/json:
               schema:
                 type: object
                 required: [cancelled]
+                properties:
+                  cancelled:
+                    type: boolean
+                  status:
+                    type: string
+                    enum: [approved, rejected, expired, cancelled]
+                  room_id:
+                    type: string
+                    format: uuid
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
@@ -7140,6 +7231,49 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MineRow"
+    MyTrailPage:
+      type: object
+      required: [checkins, next_cursor]
+      properties:
+        checkins:
+          type: array
+          maxItems: 50
+          items:
+            allOf:
+              - $ref: "#/components/schemas/MineRow"
+              - type: object
+                properties:
+                  photo_url:
+                    type: [string, "null"]
+                    description: 列表只回傳縮圖，原圖按需由打卡詳情取用。
+                  note:
+                    type: [string, "null"]
+        next_cursor:
+          type: [string, "null"]
+          description: 下一頁游標，已到最後一頁時為 null。
+    MyTrailMapPoint:
+      type: object
+      required: [id, lat, lng, count, checkin, bbox]
+      properties:
+        id:
+          type: string
+          description: 單點為打卡 ID，聚合點為本視野中的網格 ID。
+        lat:
+          type: number
+        lng:
+          type: number
+        count:
+          type: integer
+          minimum: 1
+          description: 此點代表的打卡筆數。
+        checkin:
+          description: 單點的打卡摘要。聚合點為 null。
+          anyOf:
+            - $ref: "#/components/schemas/MineRow"
+            - type: "null"
+        bbox:
+          type: [string, "null"]
+          description: 聚合點含站點的 WGS-84 west,south,east,north 範圍（邊界包含，重合點可退化為單一位置），可用於足跡列表查詢。單點為 null。
     Comment:
       type: object
       required: [id, checkin_id, body, status, created_at, author]

@@ -115,3 +115,48 @@ describe("表清单不变量", () => {
     expect(order.indexOf("checkins")).toBeLessThan(order.indexOf("checkin_comments"));
   });
 });
+
+import { removeUserFiles, requestDeletion } from "./accountDeletion";
+
+describe("删帐清理容错（第十轮 §3.2）", () => {
+  it("grace 重试时即使已有恢复期记录，也会补跑幂等的 deleteUserData", async () => {
+    const deletedTables: string[] = [];
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    const svc = {
+      from(table: string) {
+        let op = "select";
+        const q: unknown = new Proxy({}, {
+          get(_t, prop) {
+            if (prop === "delete") return () => { op = "delete"; deletedTables.push(table); return q; };
+            if (prop === "maybeSingle") {
+              return async () => table === "account_deletions"
+                ? { data: { user_id: "u1", status: "grace", purge_at: future, snapshot: {} }, error: null }
+                : { data: null, error: null };
+            }
+            if (prop === "then") return (res: (v: unknown) => unknown) => res({ data: null, error: null });
+            return () => q;
+          },
+        });
+        return q;
+      },
+    };
+    const r = await requestDeletion(svc as never, "u1", "grace", new Date());
+    expect(r.purgeAt).toBe(future);
+    expect(deletedTables).toContain("checkins");
+    expect(deletedTables).toContain("users");
+  });
+
+  it("removeUserFiles 在 Storage list 返回错误时抛出，不静默当零文件", async () => {
+    const svc = {
+      storage: {
+        from() {
+          return {
+            list: async () => ({ data: null, error: { message: "storage unavailable" } }),
+            remove: async () => ({ error: null }),
+          };
+        },
+      },
+    };
+    await expect(removeUserFiles(svc as never, "u1")).rejects.toThrow(/storage list/);
+  });
+});

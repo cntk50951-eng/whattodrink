@@ -255,6 +255,67 @@ export async function claimRoomSeat(svc: SupabaseClient, roomId: string, userId:
   return legacyClaimSeat(svc, roomId, userId, nowMs);
 }
 
+export type AtomicApproveResult =
+  | { kind: "ok"; seat: number; inserted: boolean; version: number; applicantId: string }
+  | { kind: "already_approved"; version: number; seat: number }
+  | { kind: "not_pending"; status: string; version: number }
+  | { kind: "not_found" | "not_host" | "room_not_found" | "room_started" | "kicked" | "room_full" | "error" };
+
+/**
+ * 第九輪 §3.1：單一交易完成「批准申請＋佔位＋遞增房號」（0086）。
+ * 若 0086 尚未遷移（42883／PGRST202）或測試夾具未實作 rpc，回傳 null 讓呼叫端退回既有流程。
+ */
+export async function approveJoinRequestAtomic(
+  svc: SupabaseClient,
+  roomId: string,
+  requestId: string,
+  hostId: string,
+): Promise<AtomicApproveResult | null> {
+  if (typeof (svc as { rpc?: unknown }).rpc !== "function") return null;
+  const { data, error } = await svc.rpc("game_room_approve_request", {
+    p_room: roomId,
+    p_request: requestId,
+    p_host: hostId,
+  });
+  if (error === null || error === undefined) {
+    const r = (data ?? {}) as { result?: unknown; seat?: unknown; inserted?: unknown; version?: unknown; status?: unknown; applicant_id?: unknown };
+    const seat = typeof r.seat === "number" ? r.seat : 0;
+    const version = typeof r.version === "number" ? r.version : 0;
+    switch (r.result) {
+      case "ok":
+        return {
+          kind: "ok",
+          seat,
+          inserted: r.inserted === true,
+          version,
+          applicantId: typeof r.applicant_id === "string" ? r.applicant_id : "",
+        };
+      case "already_approved":
+        return { kind: "already_approved", version, seat };
+      case "not_pending":
+        return { kind: "not_pending", status: typeof r.status === "string" ? r.status : "cancelled", version };
+      case "not_found":
+        return { kind: "not_found" };
+      case "not_host":
+        return { kind: "not_host" };
+      case "room_not_found":
+        return { kind: "room_not_found" };
+      case "room_started":
+        return { kind: "room_started" };
+      case "kicked":
+        return { kind: "kicked" };
+      case "room_full":
+        return { kind: "room_full" };
+      default:
+        return { kind: "error" };
+    }
+  }
+  const code = (error as { code?: string }).code;
+  if (code === "42883" || code === "PGRST202") return null;
+  console.error(`[games/approveAtomic] rpc error: code=${code ?? "unknown"}`);
+  return { kind: "error" };
+}
+
 async function legacyClaimSeat(svc: SupabaseClient, roomId: string, userId: string, nowMs: number): Promise<SeatClaim> {
   const mine = await getPlayerRow(svc, roomId, userId);
   if (mine !== null && mine.status === "active") return { kind: "already", seat: mine.seat };

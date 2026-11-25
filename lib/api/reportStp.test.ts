@@ -21,7 +21,7 @@ describe("reportStp trust scoring helpers", () => {
   });
 });
 
-import { applyReportDecision, reopenReport } from "./reportStp";
+import { applyReportDecision, findMissingReportNotifications, reopenReport, resendMissingReportNotifications } from "./reportStp";
 
 type Overrides = { hideError?: boolean; trustError?: boolean; notifyError?: boolean };
 /** 假 supabase：任何鏈式呼叫都回自己，await 時按 (table, op) 給結果；記錄寫入操作。回傳 `{error}` 而不是拋例外。 */
@@ -33,7 +33,7 @@ function fakeSvc(o: Overrides = {}) {
       const result = () => {
         if (table === "checkins" && op === "update" && o.hideError) return { data: null, error: { code: "XX000" } };
         if (table === "trust_events" && op === "insert" && o.trustError) return { data: null, error: { code: "XX000" } };
-        if (table === "notifications" && op === "insert" && o.notifyError) return { data: null, error: { code: "23505" } };
+        if (table === "notifications" && op === "insert" && o.notifyError) return { data: null, error: { code: "XX000" } };
         return { data: [], error: null };
       };
       const q: unknown = new Proxy({}, {
@@ -97,6 +97,82 @@ describe("applyReportDecision 先確認業務結果再通知（第七輪 §3.2�
     const r = await applyReportDecision(svc, { ...base, targetType: "user", targetRef: null });
     expect(r.ok).toBe(true);
     expect(r.notifyFailed.sort()).toEqual(["reported", "reporter"]);
+  });
+
+  it("resendMissingReportNotifications 只補發缺漏一方，不重複寫入已存在的通知（第九輪 §3.4）", async () => {
+    const insertedKinds: string[] = [];
+    const svc = {
+      from() {
+        let op = "select";
+        const q: unknown = new Proxy({}, {
+          get(_t, prop) {
+            if (prop === "then") {
+              return (res: (v: unknown) => unknown) => {
+                if (op === "select") return res({ data: [{ kind: "post_actioned" }], error: null });
+                return res({ data: [], error: null });
+              };
+            }
+            if (prop === "insert") {
+              return (payload: { kind?: string }) => {
+                op = "insert";
+                if (payload?.kind) insertedKinds.push(payload.kind);
+                return q;
+              };
+            }
+            return () => q;
+          },
+        });
+        return q;
+      },
+    };
+    const missing = await findMissingReportNotifications(svc as never, {
+      reportId: "r1", targetType: "post", decision: "actioned",
+    });
+    expect(missing).toEqual({ missingReported: false, missingReporter: true });
+    const resent = await resendMissingReportNotifications(svc as never, base);
+    expect(resent).toEqual({ sent: ["reporter"], failed: [] });
+    expect(insertedKinds).toEqual(["report_resolved"]);
+  });
+
+  it("findMissingReportNotifications 查詢失敗回 queryError:true，不靜默當無缺漏（第十輪 §3.4）", async () => {
+    const errSvc = {
+      from() {
+        const q: unknown = new Proxy({}, {
+          get(_t, prop) {
+            if (prop === "then") return (res: (v: unknown) => unknown) => res({ data: null, error: { code: "XX000" } });
+            return () => q;
+          },
+        });
+        return q;
+      },
+    };
+    const missing = await findMissingReportNotifications(errSvc as never, {
+      reportId: "r1", targetType: "post", decision: "actioned",
+    });
+    expect(missing.queryError).toBe(true);
+    const resent = await resendMissingReportNotifications(errSvc as never, base);
+    expect(resent.queryError).toBe(true);
+  });
+
+  it("補發通知遇 0087 唯一索引 23505 視為已送達成功（第十輪 §3.4）", async () => {
+    const dupSvc = {
+      from() {
+        let op = "select";
+        const q: unknown = new Proxy({}, {
+          get(_t, prop) {
+            if (prop === "then") {
+              return (res: (v: unknown) => unknown) =>
+                op === "select" ? res({ data: [], error: null }) : res({ data: null, error: { code: "23505" } });
+            }
+            if (prop === "insert") return () => { op = "insert"; return q; };
+            return () => q;
+          },
+        });
+        return q;
+      },
+    };
+    const resent = await resendMissingReportNotifications(dupSvc as never, base);
+    expect(resent).toEqual({ sent: ["reported", "reporter"], failed: [] });
   });
 
   it("通知正常 → notifyFailed 為空", async () => {

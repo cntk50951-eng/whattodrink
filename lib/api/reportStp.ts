@@ -174,12 +174,12 @@ export async function applyReportDecision(
         note: cleanNote,
       },
     }));
-    if (toReported.error !== null) {
+    if (toReported.error !== null && toReported.error.code !== "23505") {
       notifyFailed.push("reported");
       console.error(`[reportStp] [needs-repair] notify reported report=${args.reportId} code=${toReported.error.code ?? "unknown"}`);
     }
   }
-  // 4. 通知舉報人處理結果（同上：讀 error＋重試；處分已落地，所以不回退，只回報通知缺口供呼叫端提示／對賬）
+  // 4. 通知舉報人處理結果（同上：讀 error＋重試；23505 代表已寫入，視為冪等成功）
   const toReporter = await retryWrite(() => svc.from("notifications").insert({
     user_id: args.reporterId,
     kind: "report_resolved",
@@ -195,11 +195,110 @@ export async function applyReportDecision(
       note: cleanNote,
     },
   }));
-  if (toReporter.error !== null) {
+  if (toReporter.error !== null && toReporter.error.code !== "23505") {
     notifyFailed.push("reporter");
     console.error(`[reportStp] [needs-repair] notify reporter report=${args.reportId} code=${toReporter.error.code ?? "unknown"}`);
   }
   return { ok: true, failed, notifyFailed };
+}
+
+/**
+ * 第九／十輪 §3.4：檢查已結案舉報是否缺漏任一方結果通知。
+ * 查詢失敗時顯式回傳 `queryError: true`，絕不靜默當成「無缺漏」。
+ */
+export async function findMissingReportNotifications(
+  svc: SupabaseClient,
+  args: { reportId: string; targetType: ReportTargetType; decision: ReportDecision },
+): Promise<{ missingReported: boolean; missingReporter: boolean; queryError?: boolean }> {
+  const reportedKind = args.targetType === "post" ? "post_actioned" : "report_actioned";
+  const wantedKinds = args.decision === "actioned" ? [reportedKind, "report_resolved"] : ["report_resolved"];
+  const { data, error } = await svc
+    .from("notifications")
+    .select("kind")
+    .in("kind", wantedKinds)
+    .eq("payload->>report_id", args.reportId);
+  if (error !== null || !Array.isArray(data)) {
+    console.error(`[reportStp] findMissingReportNotifications error report=${args.reportId} code=${error?.code ?? "unknown"}`);
+    return { missingReported: false, missingReporter: false, queryError: true };
+  }
+  const present = new Set((data as Array<{ kind?: unknown }>).map((row) => String(row.kind ?? "")));
+  return {
+    missingReported: args.decision === "actioned" && !present.has(reportedKind),
+    missingReporter: !present.has("report_resolved"),
+  };
+}
+
+/**
+ * 第九／十輪 §3.4：僅補發缺漏的那一方舉報結果通知；對賬查詢失敗直接回報 `queryError: true`，
+ * 寫入遇 0087 唯一索引衝突（23505）視為已送達成功，避免並發／重試重複通知。
+ */
+export async function resendMissingReportNotifications(
+  svc: SupabaseClient,
+  args: {
+    reportId: string;
+    targetType: ReportTargetType;
+    targetRef: string | null;
+    targetUserId: string;
+    reporterId: string;
+    reasonCode: string | null;
+    placeName?: string | null;
+    decision: ReportDecision;
+    note?: string | null;
+  },
+): Promise<{ sent: ("reported" | "reporter")[]; failed: ("reported" | "reporter")[]; queryError?: boolean }> {
+  const { missingReported, missingReporter, queryError } = await findMissingReportNotifications(svc, {
+    reportId: args.reportId,
+    targetType: args.targetType,
+    decision: args.decision,
+  });
+  if (queryError) {
+    return { sent: [], failed: [], queryError: true };
+  }
+  const cleanNote = typeof args.note === "string" && args.note.trim() !== "" ? args.note.trim().slice(0, 200) : null;
+  const sent: ("reported" | "reporter")[] = [];
+  const failed: ("reported" | "reporter")[] = [];
+
+  if (missingReported) {
+    const res = await retryWrite(() => svc.from("notifications").insert({
+      user_id: args.targetUserId,
+      kind: args.targetType === "post" ? "post_actioned" : "report_actioned",
+      party_id: null,
+      actor_id: null,
+      payload: {
+        report_id: args.reportId,
+        target_type: args.targetType,
+        target_ref: args.targetRef,
+        reason_code: args.reasonCode,
+        party_place: args.placeName ?? null,
+        decision: "actioned",
+        note: cleanNote,
+      },
+    }));
+    if (res.error === null || res.error.code === "23505") sent.push("reported");
+    else failed.push("reported");
+  }
+
+  if (missingReporter) {
+    const res = await retryWrite(() => svc.from("notifications").insert({
+      user_id: args.reporterId,
+      kind: "report_resolved",
+      party_id: null,
+      actor_id: null,
+      payload: {
+        report_id: args.reportId,
+        target_type: args.targetType,
+        target_ref: args.targetRef,
+        reason_code: args.reasonCode,
+        party_place: args.placeName ?? null,
+        decision: args.decision,
+        note: cleanNote,
+      },
+    }));
+    if (res.error === null || res.error.code === "23505") sent.push("reporter");
+    else failed.push("reporter");
+  }
+
+  return { sent, failed };
 }
 
 /**

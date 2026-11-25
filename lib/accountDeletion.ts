@@ -183,11 +183,12 @@ export async function deleteUserData(svc: Svc, userId: string): Promise<void> {
   if (error !== null) throw new Error(`delete users: ${error.message}`);
 }
 
-/** 递归列出前缀下所有文件路径（Storage list 只列一层）。 */
+/** 递归列出前缀下所有文件路径（Storage list 只列一层）。列舉失敗必拋錯，避免誤判零檔案而留下孤兒文件（第十輪 §3.2）。 */
 async function listFiles(svc: Svc, bucket: string, prefix: string, depth = 0): Promise<string[]> {
   if (depth > 4) return [];
   const { data, error } = await svc.storage.from(bucket).list(prefix, { limit: 1000 });
-  if (error !== null || data === null) return [];
+  if (error !== null) throw new Error(`storage list ${bucket}/${prefix}: ${error.message}`);
+  if (data === null) return [];
   const files: string[] = [];
   for (const item of data) {
     const path = `${prefix}/${item.name}`;
@@ -254,8 +255,11 @@ export async function requestDeletion(
 ): Promise<{ mode: DeleteMode; purgeAt: string | null }> {
   if (mode === "grace") {
     const existing = await getDeletionRow(svc, userId);
-    // 已在恢复期：幂等回原到期时间，不覆盖快照（数据已删，重拍会拍成空）
-    if (existing !== null && isRestorable(existing, now)) return { mode, purgeAt: existing.purge_at };
+    // 已在恢复期：不覆盖快照（数据已删，重拍会拍成空），但补跑一次幂等的 deleteUserData 以修复前次中途清理失败（第十轮 §3.2）
+    if (existing !== null && isRestorable(existing, now)) {
+      await deleteUserData(svc, userId);
+      return { mode, purgeAt: existing.purge_at };
+    }
     const snap = await takeSnapshot(svc, userId);
     const purgeAt = purgeAtFrom(now).toISOString();
     const { error } = await svc.from("account_deletions").upsert({
