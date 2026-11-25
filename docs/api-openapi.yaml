@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.70.0
+  version: 1.71.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -3547,6 +3547,87 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           $ref: "#/components/responses/Internal"
+  /api/v1/me/reports:
+    get:
+      operationId: listMyReports
+      summary: 我的舉報（需登录；1.71.0；新到舊，複合游標 created_at|id；舉報人視角狀態，不含 AI 分數）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+          description: 上一頁回的 next_cursor（`<created_at>|<id>`）
+      responses:
+        "200":
+          description: 我的舉報列表
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/MyReport" }
+                  next_cursor: { type: string, nullable: true }
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/me/reports/{id}:
+    get:
+      operationId: getMyReport
+      summary: 我的舉報詳情（需登录；1.71.0；非本人提交的案件 404）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 舉報詳情（列表欄位＋證據快照＋時間線）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/MyReport"
+                  - type: object
+                    required: [evidence, timeline]
+                    properties:
+                      evidence:
+                        type: array
+                        items:
+                          type: object
+                          required: [who, kind, text]
+                          properties:
+                            who: { type: string, enum: [reported, reporter, other] }
+                            kind: { type: string }
+                            text: { type: string }
+                            at: { type: string, format: date-time, nullable: true }
+                      timeline:
+                        type: array
+                        items:
+                          type: object
+                          required: [step]
+                          properties:
+                            step: { type: string, enum: [submitted, human_review, actioned, dismissed] }
+                            at: { type: string, format: date-time, nullable: true }
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/Internal"
   /api/v1/me/complaints:
     get:
       operationId: listMyComplaints
@@ -6611,6 +6692,25 @@ components:
           type: boolean
           nullable: true
           description: 被搜到同意（null＝未问过，UR I.1）
+    MyReport:
+      type: object
+      description: 舉報人視角的一宗舉報（1.71.0）。status＝reviewing（處理中）｜actioned（成立已處理）｜dismissed（未發現違規）；stage 細分處理中。AI 分數與審核人身份不外露。
+      required: [id, target_type, status, stage, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        target_type: { type: string, enum: [user, post, message] }
+        target_ref: { type: string, nullable: true }
+        target_name: { type: string, nullable: true }
+        target_avatar_url: { type: string, nullable: true }
+        place_name: { type: string, nullable: true, description: 帖子舉報的地點 }
+        reason_code: { type: string, nullable: true, enum: [harassment, inappropriate, spam, underage, other, null] }
+        reason: { type: string, nullable: true }
+        status: { type: string, enum: [reviewing, actioned, dismissed] }
+        stage: { type: string, enum: [submitted, human_review, closed] }
+        decided_by: { type: string, nullable: true, enum: [system, staff, null], description: system＝AI 高置信自動結案；staff＝客服人工 }
+        decision_note: { type: string, nullable: true, description: 結案說明（舉報人可見） }
+        created_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time, nullable: true }
     MeetCriteria:
       type: object
       description: 遇見搜索条件（白名单；超界丢弃记 ignored，UR I.1）

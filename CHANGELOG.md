@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased] — 舉報閉環：AI 置信度分流＋人工審核郵件＋我的舉報（2026-11-25，openapi 1.71.0）
+
+### Added
+
+- 遷移 `0090_report_triage.sql`：`cheers_reports` 加 `ai_decision`／`ai_score`／`ai_categories`／`ai_route_reason`／`ai_checked_at`／`support_emailed_at`／`decision_note`。
+- 帖子／用戶／訊息三類舉報都跑 AI 初審（`lib/reportTriage.ts`）：OpenAI 最高類別分數 ≥0.85 自動處分、≤0.10 且未標記自動結案並通知舉報人；其餘、AI 判斷不了的理由（垃圾訊息／未成年／其他）、AI 不可用一律轉人工。
+- 轉人工時經 Resend 寄信到 support@whattodrink.app（`lib/email/supportEmail.ts`；先佔位再寄防重寄，失敗可在後台重寄）。
+- `GET /api/v1/me/reports`、`GET /api/v1/me/reports/{id}`：舉報人看自己的舉報狀態、結果說明、進度與舉報時內容（不含 AI 分數）。
+- 後台 `/innerharbour/user-reports`：AI 結果／分數／轉人工原因、「待人工」篩選、結案說明（舉報人可見）、推翻 AI 自動結案改判成立、重寄客服郵件。
+
 ## [Unreleased] — iOS 上線前反饋：訪客看公開主頁、遇見按暱稱找人（2026-11-25，openapi 1.70.0）
 
 ### Added

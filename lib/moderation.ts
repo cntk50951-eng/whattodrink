@@ -37,7 +37,19 @@ export type ModerationVerdict = {
   flagged: boolean;
   /** 被命中的類別（如 violence、sexual），空＝乾淨。 */
   categories: string[];
+  /** 最高類別分數 0–1（OpenAI `category_scores`；Minimax 無分數＝undefined）。舉報分流用作置信度。 */
+  score?: number;
 };
+
+/** OpenAI `category_scores` 取最大值（缺／非數字回 undefined）。 */
+export function maxCategoryScore(scores: unknown): number | undefined {
+  if (scores === null || typeof scores !== "object") return undefined;
+  let max: number | undefined = undefined;
+  for (const v of Object.values(scores as Record<string, unknown>)) {
+    if (typeof v === "number" && Number.isFinite(v)) max = max === undefined ? v : Math.max(max, v);
+  }
+  return max === undefined ? undefined : Math.min(1, Math.max(0, max));
+}
 
 /** 純組裝（可單測）：空輸入回空數組（調用方直接放行，零請求）。 */
 export function buildModerationInput(input: ModerationInput): unknown[] {
@@ -69,7 +81,8 @@ function parseVerdict(json: unknown): ModerationVerdict {
       if (v === true) categories.push(k);
     }
   }
-  return { flagged, categories };
+  const score = maxCategoryScore(first.category_scores);
+  return score === undefined ? { flagged, categories } : { flagged, categories, score };
 }
 
 /**
@@ -226,12 +239,15 @@ export type ModerationChainResult =
       skipped?: false;
       via: "openai" | "minimax";
       primaryError?: ModerationVendorFailure;
+      /** 最高類別分數（只有 OpenAI 有） */
+      score?: number;
     }
   | {
       flagged: true;
       categories: string[];
       via: "openai" | "minimax";
       primaryError?: ModerationVendorFailure;
+      score?: number;
     };
 
 /**
@@ -279,9 +295,10 @@ export async function moderateCheckin(
         apiKey: opts.openaiKey,
         fetchFn: opts.fetchFn,
       });
+      const scored = v.score !== undefined ? { score: v.score } : {};
       if (v.flagged)
-        return { flagged: true as const, categories: v.categories, via: "openai" as const };
-      return { flagged: false as const, via: "openai" as const };
+        return { flagged: true as const, categories: v.categories, via: "openai" as const, ...scored };
+      return { flagged: false as const, via: "openai" as const, ...scored };
     } catch (err) {
       // 下沉兜底（地域封锁／429／5xx／斷網全走這裡；錯誤記下來給路由大聲打出來）
       primaryError = toFailure("openai", err);

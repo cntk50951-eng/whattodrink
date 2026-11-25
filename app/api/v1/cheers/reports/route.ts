@@ -2,7 +2,8 @@ import { after } from "next/server";
 
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { notifyReportSubmitted, runPostReportStp } from "@/lib/api/reportStp";
+import { notifyReportSubmitted, runReportStp } from "@/lib/api/reportStp";
+import { reportedTextFromSnapshot } from "@/lib/reportTriage";
 import {
   messageEvidence,
   parseReportBody,
@@ -169,25 +170,34 @@ export async function POST(req: Request): Promise<Response> {
       placeName: postForStp?.place_name ?? null,
       targetName,
     });
-    if (p.targetType === "post" && postForStp !== null && p.targetRef !== null) {
-      const stpTargetRef = p.targetRef;
-      const stpTargetUserId = targetUserId;
-      const stpPost = postForStp;
-      after(async () => {
-        const bgSvc = await createServiceClient();
-        await runPostReportStp(bgSvc, {
-          reportId,
-          targetRef: stpTargetRef,
-          targetUserId: stpTargetUserId,
-          reporterId: userId,
-          reasonCode: p.reasonCode,
-          placeName: stpPost.place_name,
-          note: stpPost.note,
-          transcript: stpPost.transcript,
-          photoUrl: stpPost.photo_url,
-        });
+    // 三類舉報都走 AI 初審＋置信度分流（DEF-20261125-020〜024）：帖子審原文＋圖，用戶／訊息審快照裡被舉報人說的話
+    const stpTargetUserId = targetUserId;
+    const stpPost = postForStp;
+    const stpContent =
+      stpPost !== null
+        ? {
+            text: [stpPost.place_name, stpPost.note, stpPost.transcript]
+              .filter((x): x is string => typeof x === "string" && x.trim() !== "")
+              .join("\n") || undefined,
+            imageDataUrl:
+              typeof stpPost.photo_url === "string" && stpPost.photo_url.startsWith("data:image/") ? stpPost.photo_url : undefined,
+          }
+        : { text: reportedTextFromSnapshot(snapshot) || undefined };
+    after(async () => {
+      const bgSvc = await createServiceClient();
+      await runReportStp(bgSvc, {
+        reportId,
+        targetType: p.targetType,
+        targetRef: p.targetRef,
+        targetUserId: stpTargetUserId,
+        reporterId: userId,
+        reasonCode: p.reasonCode,
+        reasonText: p.reason,
+        placeName: stpPost?.place_name ?? null,
+        targetName,
+        content: stpContent,
       });
-    }
+    });
   }
   return apiOk({ reported: true, report_id: reportId || null });
 }

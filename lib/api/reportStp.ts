@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { moderateCheckin } from "../moderation";
+import { moderateCheckin, type ModerationChainResult, type ModerationInput } from "../moderation";
+import { buildReportEmail, sendSupportEmail } from "../email/supportEmail";
+import { routeReport, type ReportAiDecision } from "../reportTriage";
 import { writeTrustEvent } from "../trust/ledger";
 import { retryWrite } from "./retryWrite";
 
@@ -199,7 +201,24 @@ export async function applyReportDecision(
     notifyFailed.push("reporter");
     console.error(`[reportStp] [needs-repair] notify reporter report=${args.reportId} code=${toReporter.error.code ?? "unknown"}`);
   }
+  // 5. 結案說明存回案件（「我的舉報」詳情顯示；0090 前沒有該欄位就略過，不影響處分結果）
+  if (cleanNote !== null) {
+    try {
+      const { error } = await svc.from("cheers_reports").update({ decision_note: cleanNote.slice(0, 200) }).eq("id", args.reportId);
+      if (error !== null && error !== undefined && !isMissingColumn(error)) {
+        console.error(`[reportStp] save decision_note report=${args.reportId} code=${(error as { code?: string }).code ?? "unknown"}`);
+      }
+    } catch (err) {
+      console.error(`[reportStp] save decision_note error: ${err instanceof Error ? err.message : "unknown"}`);
+    }
+  }
   return { ok: true, failed, notifyFailed };
+}
+
+/** 0090 未遷移時新欄位不存在：42703（PostgREST 轉發）／PGRST204（schema cache 無此欄） */
+function isMissingColumn(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === "42703" || code === "PGRST204";
 }
 
 /**
@@ -335,88 +354,224 @@ export async function reopenReport(
   }
 }
 
+export const REPORT_AUTO_ACTION_NOTE = "系統自動審核核實違規，已處理";
+export const REPORT_AUTO_DISMISS_NOTE = "系統審核暫未發現違規；如之後有新情況，24 小時後可再次舉報";
+
 /**
- * 帖文舉報 AI STP（Straight-Through Processing）自動分診：
- * 在 POST /api/v1/cheers/reports 回應後的 after() 內執行，不拖慢舉報提交。
- * 調用既有 OpenAI omni-moderation-latest → Minimax 審核鏈審核帖文文字／轉寫／圖片：
- * - 明確違規（flagged）：自動將舉報標為 actioned → 下架帖文 → 扣誠信分 → 通知雙方；
- * - 未命中或審核服務暫不可用：保留 pending 進 /innerharbour/user-reports 人工審核，並匿名通知帖文作者「審核中」。
+ * 舉報 AI STP（Straight-Through Processing）＋置信度分流（iOS DEF-20261125-020〜024）：
+ * 在 POST /api/v1/cheers/reports 回應後的 after() 內執行，帖子／用戶／訊息三類都走。
+ * 1. AI 初審（理由是 AI 判斷不了的直接跳過，省一次調用）→ `routeReport` 分流；
+ * 2. 結果寫回 ai_*（0090 未遷移則略過）；
+ * 3. auto_actioned：CAS pending→actioned 後處分（下架／扣分／通知雙方），處分沒成功退回 pending 轉人工；
+ *    auto_dismissed：CAS pending→dismissed，通知舉報人「未發現違規」；
+ *    human：帖子匿名通知作者「審核中」，並寄郵件到 support（support_emailed_at 先 CAS 佔位，寄失敗清回可重寄）。
  */
-export async function runPostReportStp(
+export async function runReportStp(
   svc: SupabaseClient,
   args: {
     reportId: string;
-    targetRef: string;
+    targetType: ReportTargetType;
+    targetRef: string | null;
     targetUserId: string;
     reporterId: string;
     reasonCode: string | null;
+    reasonText: string | null;
     placeName: string | null;
-    note: string | null;
-    transcript: string | null;
-    photoUrl: string | null;
+    targetName: string | null;
+    content: ModerationInput;
+    /** 單測注入 */
+    moderate?: (input: ModerationInput) => Promise<ModerationChainResult>;
+    sendEmail?: typeof sendSupportEmail;
   },
-): Promise<{ autoActioned: boolean; categories: string[] }> {
-  const textParts = [args.placeName, args.note, args.transcript]
-    .filter((s): s is string => typeof s === "string" && s.trim() !== "")
-    .join("\n");
-  const imageDataUrl =
-    typeof args.photoUrl === "string" && args.photoUrl.startsWith("data:image/") ? args.photoUrl : undefined;
-
-  let flagged = false;
-  let categories: string[] = [];
-  try {
-    const verdict = await moderateCheckin(
-      { text: textParts || undefined, imageDataUrl },
-      {
-        openaiKey: process.env.OPENAI_API_KEY,
-        minimaxKey: process.env.MINIMAX_API_KEY ?? process.env.minimaxi_api_key,
-        minimaxBaseUrl: process.env.MINIMAX_BASE_URL,
-      },
-    );
-    if (verdict.flagged) {
-      flagged = true;
-      categories = verdict.categories;
+): Promise<{ decision: ReportAiDecision; emailed: boolean }> {
+  const judgeable = args.reasonCode === null || args.reasonCode === "harassment" || args.reasonCode === "inappropriate";
+  let verdict: ModerationChainResult | null = null;
+  if (judgeable) {
+    try {
+      verdict = await (args.moderate ?? ((input: ModerationInput) =>
+        moderateCheckin(input, {
+          openaiKey: process.env.OPENAI_API_KEY,
+          minimaxKey: process.env.MINIMAX_API_KEY ?? process.env.minimaxi_api_key,
+          minimaxBaseUrl: process.env.MINIMAX_BASE_URL,
+        })))(args.content);
+    } catch (err) {
+      console.warn(`[reportStp] AI moderation failed, routing to human: ${err instanceof Error ? err.message : "unknown"}`);
     }
-  } catch (err) {
-    console.warn(`[reportStp] AI moderation failed, falling back to manual queue: ${err instanceof Error ? err.message : "unknown"}`);
   }
+  let route = routeReport({ reasonCode: args.reasonCode, verdict });
 
-  if (flagged) {
-    const nowIso = new Date().toISOString();
+  const saveRoute = async (decision: ReportAiDecision): Promise<void> => {
+    const { error } = await svc.from("cheers_reports").update({
+      ai_decision: decision,
+      ai_score: route.score,
+      ai_categories: route.categories.length > 0 ? route.categories : null,
+      ai_route_reason: route.reason,
+      ai_checked_at: new Date().toISOString(),
+    }).eq("id", args.reportId);
+    if (error !== null && error !== undefined && !isMissingColumn(error)) {
+      console.error(`[reportStp] save ai route report=${args.reportId} code=${(error as { code?: string }).code ?? "unknown"}`);
+    }
+  };
+
+  if (route.decision === "auto_actioned" || route.decision === "auto_dismissed") {
+    const target = route.decision === "auto_actioned" ? "actioned" : "dismissed";
     const { data: updated } = await svc
       .from("cheers_reports")
-      .update({ status: "actioned", decided_at: nowIso })
+      .update({ status: target, decided_at: new Date().toISOString() })
       .eq("id", args.reportId)
       .eq("status", "pending")
       .select("id");
     if (Array.isArray(updated) && updated.length > 0) {
-      const catText = categories.length > 0 ? `（${categories.join(", ")}）` : "";
+      await saveRoute(route.decision);
+      const catText = route.categories.length > 0 ? `（${route.categories.join(", ")}）` : "";
       const applied = await applyReportDecision(svc, {
         reportId: args.reportId,
-        targetType: "post",
+        targetType: args.targetType,
         targetRef: args.targetRef,
         targetUserId: args.targetUserId,
         reporterId: args.reporterId,
         reasonCode: args.reasonCode,
         placeName: args.placeName,
-        decision: "actioned",
-        note: `系統自動審核核實違規${catText}，已下架處理`,
+        decision: target,
+        note: target === "actioned" ? `${REPORT_AUTO_ACTION_NOTE}${catText}` : REPORT_AUTO_DISMISS_NOTE,
       });
-      if (applied.ok) return { autoActioned: true, categories };
-      // 下架或扣分沒成功：案件退回 pending 交人工隊列重跑（冪等），不發「已處理」通知
-      console.error(`[reportStp] auto action incomplete report=${args.reportId} failed=${applied.failed.join(",")}`);
-      const reopened = await reopenReport(svc, args.reportId, "actioned", "pending");
-      if (!reopened) console.error(`[reportStp] [needs-repair] reopen failed report=${args.reportId} (案件停在 actioned 但處分未完成)`);
+      if (applied.ok) return { decision: route.decision, emailed: false };
+      // 處分沒做完：退回 pending 轉人工（冪等可重跑），不發「已處理」
+      console.error(`[reportStp] auto ${target} incomplete report=${args.reportId} failed=${applied.failed.join(",")}`);
+      const reopened = await reopenReport(svc, args.reportId, target, "pending");
+      if (!reopened) console.error(`[reportStp] [needs-repair] reopen failed report=${args.reportId} (案件停在 ${target} 但處分未完成)`);
     }
+    // 沒搶到（已被人工處理）或處分失敗：當人工案件處理
+    route = { ...route, decision: "human", reason: "ai_unavailable" };
   }
 
-  // 未觸發 AI 自動處置：留待人工審核，並匿名通知帖文作者已被舉報審核中
-  await notifyPostReportedUnderReview(svc, {
-    targetUserId: args.targetUserId,
+  await saveRoute("human");
+  if (args.targetType === "post") {
+    await notifyPostReportedUnderReview(svc, {
+      targetUserId: args.targetUserId,
+      reportId: args.reportId,
+      targetRef: args.targetRef,
+      reasonCode: args.reasonCode,
+      placeName: args.placeName,
+    });
+  }
+  const emailed = await emailSupportOnce(svc, args, route);
+  return { decision: "human", emailed };
+}
+
+/** 人工案件寄一次郵件：先把 support_emailed_at 從 NULL 佔位（並發只有一方寄），寄失敗清回 NULL 以便重寄 */
+async function emailSupportOnce(
+  svc: SupabaseClient,
+  args: { reportId: string; targetType: ReportTargetType; reasonCode: string | null; reasonText: string | null; targetName: string | null; sendEmail?: typeof sendSupportEmail },
+  route: ReturnType<typeof routeReport>,
+): Promise<boolean> {
+  let claimed = true;
+  const { data: claim, error: claimError } = await svc
+    .from("cheers_reports")
+    .update({ support_emailed_at: new Date().toISOString() })
+    .eq("id", args.reportId)
+    .is("support_emailed_at", null)
+    .select("id");
+  if (claimError !== null && claimError !== undefined) {
+    // 0090 未遷移：無法去重，但 after() 每宗只跑一次，照寄；其他錯誤不寄（避免重複），記日誌
+    if (!isMissingColumn(claimError)) {
+      console.error(`[reportStp] [needs-repair] email claim failed report=${args.reportId} code=${(claimError as { code?: string }).code ?? "unknown"}`);
+      return false;
+    }
+  } else if (!Array.isArray(claim) || claim.length === 0) {
+    claimed = false;
+  }
+  if (!claimed) return false;
+  const mail = buildReportEmail({
     reportId: args.reportId,
-    targetRef: args.targetRef,
+    targetType: args.targetType,
     reasonCode: args.reasonCode,
-    placeName: args.placeName,
+    reasonText: args.reasonText,
+    targetName: args.targetName,
+    routeReason: route.reason,
+    score: route.score,
+    categories: route.categories,
+    siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
   });
-  return { autoActioned: false, categories: [] };
+  const sent = await (args.sendEmail ?? sendSupportEmail)(mail, { idempotencyKey: `report-human-${args.reportId}` });
+  if (sent.ok) return true;
+  console.error(`[reportStp] [needs-repair] support email failed report=${args.reportId} status=${sent.status ?? "none"} ${sent.error}`);
+  await svc.from("cheers_reports").update({ support_emailed_at: null }).eq("id", args.reportId);
+  return false;
+}
+
+/**
+ * 管理員推翻 AI 自動結案（auto_dismissed → 成立）：用戶要求「dashboard 可更新人工審核結果」。
+ * 1. CAS：只動仍是 dismissed＋ai_decision=auto_dismissed 的那一行（防與其他處理撞車）；
+ * 2. 照常處分（下架／扣分／通知被舉報人）；處分沒成功就把案件退回 dismissed（冪等，可再按）；
+ * 3. 舉報人那條 report_resolved 受 0087 唯一索引限制不能再插一條 → 改寫原通知（decision=actioned、置頂、標未讀）。
+ * 反向（成立 → 不成立）要還原下架與誠信分，本期不做。
+ */
+export async function overrideAutoDismissal(
+  svc: SupabaseClient,
+  args: {
+    reportId: string;
+    adminId: string;
+    targetType: ReportTargetType;
+    targetRef: string | null;
+    targetUserId: string;
+    reporterId: string;
+    reasonCode: string | null;
+    placeName?: string | null;
+    note: string;
+  },
+): Promise<{ ok: boolean; failed: string[]; notifyFailed: string[] }> {
+  const { data: claimed, error } = await svc
+    .from("cheers_reports")
+    .update({ status: "actioned", decided_by: args.adminId, decided_at: new Date().toISOString() })
+    .eq("id", args.reportId)
+    .eq("status", "dismissed")
+    .eq("ai_decision", "auto_dismissed")
+    .select("id");
+  if (error !== null && error !== undefined) return { ok: false, failed: ["claim"], notifyFailed: [] };
+  if (!Array.isArray(claimed) || claimed.length === 0) return { ok: false, failed: ["not_auto_dismissed"], notifyFailed: [] };
+
+  const applied = await applyReportDecision(svc, {
+    reportId: args.reportId,
+    targetType: args.targetType,
+    targetRef: args.targetRef,
+    targetUserId: args.targetUserId,
+    reporterId: args.reporterId,
+    reasonCode: args.reasonCode,
+    placeName: args.placeName ?? null,
+    decision: "actioned",
+    note: args.note,
+  });
+  if (!applied.ok) {
+    await svc.from("cheers_reports").update({ status: "dismissed", decided_by: null })
+      .eq("id", args.reportId).eq("status", "actioned");
+    return applied;
+  }
+  const notifyFailed = [...applied.notifyFailed];
+  try {
+    const { data: rows, error: readErr } = await svc
+      .from("notifications")
+      .select("id,payload")
+      .eq("user_id", args.reporterId)
+      .eq("kind", "report_resolved")
+      .eq("payload->>report_id", args.reportId)
+      .limit(1);
+    const row = Array.isArray(rows) ? (rows[0] as { id?: unknown; payload?: unknown } | undefined) : undefined;
+    if (readErr !== null && readErr !== undefined) {
+      notifyFailed.push("reporter");
+    } else if (row !== undefined && typeof row.id === "string") {
+      const payload = { ...((row.payload ?? {}) as Record<string, unknown>), decision: "actioned", note: args.note.slice(0, 200), updated: true };
+      const { error: upErr } = await svc
+        .from("notifications")
+        .update({ payload, read_at: null, created_at: new Date().toISOString() })
+        .eq("id", row.id);
+      if (upErr !== null && upErr !== undefined) notifyFailed.push("reporter");
+    }
+  } catch {
+    notifyFailed.push("reporter");
+  }
+  if (notifyFailed.includes("reporter")) {
+    console.error(`[reportStp] [needs-repair] override notify reporter report=${args.reportId}`);
+  }
+  return { ok: true, failed: [], notifyFailed: [...new Set(notifyFailed)] };
 }

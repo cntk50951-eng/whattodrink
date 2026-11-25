@@ -3,9 +3,12 @@ import { notFound } from "next/navigation";
 
 import { adminRateLimited, auditOrThrow, auditViewOnce, checkSameOrigin } from "@/lib/ops";
 import { requireAdminPage } from "@/lib/opsPage";
+import { buildReportEmail, sendSupportEmail } from "@/lib/email/supportEmail";
+import { REPORT_ROUTE_REASON_TEXT, type ReportRouteReason } from "@/lib/reportTriage";
 import {
   applyReportDecision,
   findMissingReportNotifications,
+  overrideAutoDismissal,
   reopenReport,
   resendMissingReportNotifications,
   type ReportDecision,
@@ -45,6 +48,8 @@ export default async function UserReportDetailPage({ params }: { params: Promise
     if (!(await checkSameOrigin())) throw new Error("跨站請求被拒");
     const state = String(formData.get("state") ?? "");
     if (!(STATES as readonly string[]).includes(state)) throw new Error("狀態非法");
+    // 結案說明（舉報人在「我的舉報」看得到；留空用預設文案）
+    const customNote = String(formData.get("note") ?? "").trim().slice(0, 200);
     if (await adminRateLimited(g.svc, g.userId, ["user_report_mark"], 30, 600_000)) {
       throw new Error("操作過於頻繁，請稍後再試");
     }
@@ -84,7 +89,7 @@ export default async function UserReportDetailPage({ params }: { params: Promise
           reasonCode: typeof row.reason_code === "string" ? row.reason_code : null,
           placeName,
           decision: state,
-          note: state === "actioned" ? "經管理員審核核實違規，已處理" : "經管理員審核暫未發現違規",
+          note: customNote !== "" ? customNote : state === "actioned" ? "經管理員審核核實違規，已處理" : "經管理員審核暫未發現違規",
         });
         if (!applied.ok) {
           // 下架或扣分沒成功：退回 reviewed（頁面仍接受再按一次，處分冪等），不讓案件停在「已處理」卻沒執行
@@ -169,6 +174,72 @@ export default async function UserReportDetailPage({ params }: { params: Promise
     }
   }
 
+  /** 推翻 AI 自動結案：改判成立（處分＋改寫舉報人原通知） */
+  async function overrideAi(formData: FormData): Promise<void> {
+    "use server";
+    const g = await requireAdminPage({ write: true, stepUp: true }, `/innerharbour/user-reports/${id}`);
+    if (!(await checkSameOrigin())) throw new Error("跨站請求被拒");
+    if (await adminRateLimited(g.svc, g.userId, ["user_report_mark"], 30, 600_000)) throw new Error("操作過於頻繁，請稍後再試");
+    await auditOrThrow(g.svc, { admin_id: g.userId, action: "user_report_override_ai", target: id });
+    const { data: rowRaw } = await g.svc
+      .from("cheers_reports")
+      .select("target_type,target_ref,target_user_id,reporter_id,reason_code")
+      .eq("id", id)
+      .maybeSingle();
+    const row = rowRaw as Record<string, unknown> | null;
+    if (row === null || typeof row.target_user_id !== "string" || typeof row.reporter_id !== "string") throw new Error("案件資料不完整");
+    const tt: ReportTargetType = row.target_type === "post" || row.target_type === "message" ? row.target_type : "user";
+    const targetRef = typeof row.target_ref === "string" ? row.target_ref : null;
+    const note = String(formData.get("note") ?? "").trim().slice(0, 200) || "經客服複核，確認違規並已處理";
+    const res = await overrideAutoDismissal(g.svc, {
+      reportId: id,
+      adminId: g.userId,
+      targetType: tt,
+      targetRef,
+      targetUserId: row.target_user_id,
+      reporterId: row.reporter_id,
+      reasonCode: typeof row.reason_code === "string" ? row.reason_code : null,
+      note,
+    });
+    if (!res.ok) {
+      throw new Error(
+        res.failed.includes("not_auto_dismissed") ? "案件已不是 AI 自動結案狀態（可能已被處理）" : `改判未完成（${res.failed.join("、")}），案件已退回 AI 結案狀態，可再試`,
+      );
+    }
+    if (res.notifyFailed.length > 0) throw new Error(`已改判並處分，但通知未全部送達（${res.notifyFailed.join("、")}），請記下案件 ${id}`);
+  }
+
+  /** 重寄人工審核郵件（上次寄失敗或想再提醒） */
+  async function resendSupportMail(): Promise<void> {
+    "use server";
+    const g = await requireAdminPage({ write: true, stepUp: true }, `/innerharbour/user-reports/${id}`);
+    if (!(await checkSameOrigin())) throw new Error("跨站請求被拒");
+    if (await adminRateLimited(g.svc, g.userId, ["user_report_mail"], 10, 600_000)) throw new Error("操作過於頻繁，請稍後再試");
+    await auditOrThrow(g.svc, { admin_id: g.userId, action: "user_report_resend_mail", target: id });
+    const { data: rowRaw } = await g.svc.from("cheers_reports").select("*").eq("id", id).maybeSingle();
+    const row = rowRaw as Record<string, unknown> | null;
+    if (row === null) throw new Error("找不到案件");
+    const mail = buildReportEmail({
+      reportId: id,
+      targetType: String(row.target_type ?? "user"),
+      reasonCode: typeof row.reason_code === "string" ? row.reason_code : null,
+      reasonText: typeof row.reason === "string" ? row.reason : null,
+      targetName: null,
+      routeReason: (typeof row.ai_route_reason === "string" ? row.ai_route_reason : "ai_unavailable") as ReportRouteReason,
+      score: typeof row.ai_score === "number" ? row.ai_score : null,
+      categories: Array.isArray(row.ai_categories) ? (row.ai_categories as string[]) : [],
+      siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
+    });
+    // 冪等 key 跟上次寄出時間走：每次成功寄出後 key 都會變，連點同一次不會重寄
+    const lastSent = typeof row.support_emailed_at === "string" ? row.support_emailed_at : "never";
+    const sent = await sendSupportEmail(mail, { idempotencyKey: `report-human-${id}-manual-${lastSent}` });
+    if (!sent.ok) throw new Error(`寄信失敗：${sent.error}`);
+    await g.svc.from("cheers_reports").update({ support_emailed_at: new Date().toISOString() }).eq("id", id);
+  }
+
+  const aiDecision = typeof r.ai_decision === "string" ? r.ai_decision : null;
+  const aiReason = typeof r.ai_route_reason === "string" ? (REPORT_ROUTE_REASON_TEXT[r.ai_route_reason as ReportRouteReason] ?? r.ai_route_reason) : null;
+  const AI_DECISION_LABEL: Record<string, string> = { auto_actioned: "AI 自動處分", auto_dismissed: "AI 自動結案（未發現違規）", human: "轉人工審核" };
   const snapshot = Array.isArray(r.snapshot) ? (r.snapshot as SnapshotLine[]) : [];
   return (
     <main style={{ padding: 24 }}>
@@ -184,6 +255,18 @@ export default async function UserReportDetailPage({ params }: { params: Promise
       </p>
       <p>此被舉報人另有 {others ?? 0} 條其他舉報。</p>
       <p>說明：{typeof r.reason === "string" && r.reason !== "" ? r.reason : "（無）"}</p>
+      <h2>AI 初審</h2>
+      {aiDecision === null ? (
+        <p>（無 AI 紀錄：0090 前的案件或初審尚未完成）</p>
+      ) : (
+        <ul>
+          <li>結果：{AI_DECISION_LABEL[aiDecision] ?? aiDecision}{aiReason !== null ? `（${aiReason}）` : ""}</li>
+          <li>分數：{typeof r.ai_score === "number" ? r.ai_score.toFixed(2) : "無（AI 未給分）"}{Array.isArray(r.ai_categories) && r.ai_categories.length > 0 ? ` · ${(r.ai_categories as string[]).join(", ")}` : ""}</li>
+          <li>時間：{typeof r.ai_checked_at === "string" ? r.ai_checked_at : "—"}</li>
+          <li>客服郵件：{typeof r.support_emailed_at === "string" ? `已寄（${r.support_emailed_at}）` : aiDecision === "human" ? "未寄出" : "不需要"}</li>
+          {typeof r.decision_note === "string" && r.decision_note !== "" && <li>結案說明（舉報人可見）：{r.decision_note}</li>}
+        </ul>
+      )}
       <h2>證據快照</h2>
       {snapshot.length === 0 ? (
         <p>（無快照：用戶級舉報，或證據已過期清理）</p>
@@ -207,8 +290,26 @@ export default async function UserReportDetailPage({ params }: { params: Promise
                 <option value="dismissed">駁回</option>
               </select>
             </label>{" "}
+            <label>
+              結案說明（舉報人可見，選填，≤200 字）：
+              <input name="note" maxLength={200} style={{ width: 360 }} />
+            </label>{" "}
             <button type="submit">提交</button>
           </form>
+          {r.status === "dismissed" && aiDecision === "auto_dismissed" && (
+            <form action={overrideAi} style={{ marginTop: 16 }}>
+              <p style={{ color: "#b45309" }}>此案由 AI 自動結案。如複核後確認違規，可改判成立（會下架／扣分並更新舉報人的結果通知）。</p>
+              <label>
+                說明（舉報人可見，選填）：<input name="note" maxLength={200} style={{ width: 360 }} />
+              </label>{" "}
+              <button type="submit">推翻 AI 結果，改判成立</button>
+            </form>
+          )}
+          {aiDecision === "human" && (r.status === "pending" || r.status === "reviewed") && (
+            <form action={resendSupportMail} style={{ marginTop: 16 }}>
+              <button type="submit">{typeof r.support_emailed_at === "string" ? "再寄一次客服郵件" : "寄出客服郵件"}</button>
+            </form>
+          )}
           {missingNotify.queryError ? (
             <form action={resendNotifications} style={{ marginTop: 16 }}>
               <p style={{ color: "#dc2626" }}>無法確認結果通知是否齊全（資料庫讀取失敗），請重試對賬並補發缺漏通知。</p>
