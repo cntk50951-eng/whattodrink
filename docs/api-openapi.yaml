@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.69.1
+  version: 1.70.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -3890,8 +3890,13 @@ paths:
   /api/v1/users/{id}/profile:
     get:
       operationId: getUserProfile
-      summary: 个人主页（需登录；id 或 me；拉黑／不存在 404；矩阵 C：对所有人完整，统计只计可见，UR E.27）
+      summary: 个人主页（id 或 me；拉黑／不存在 404；矩阵 C：对所有人完整，统计只计可见，UR E.27；1.70.0 起匿名可看 mode=public 的他人）
+      description: >
+        匿名（不带 token）：`me` 回 401；他人且对方 mode=public 回陌生人视角（relationship=none、只含 public 帖、
+        mutual_friends_count=null、info 按陌生人可见）；对方 friends／stealth 回 401（客户端显示「登录后查看」）。
+        其他 `/users/{id}/*`（saves／trail／trust／taste-card）仍需登录。
       security:
+        - {}
         - bearerAuth: []
       parameters:
         - name: id
@@ -6646,6 +6651,10 @@ components:
           type: integer
         online_only:
           type: boolean
+        nickname:
+          type: string
+          maxLength: 30
+          description: 1.70.0 起；暱稱關鍵字硬過濾（包含匹配、不分大小寫；只在可被搜到的陌生人＋好友內找）
     MeetResult:
       type: object
       required: [user_id, nickname, score, reasons, relationship]

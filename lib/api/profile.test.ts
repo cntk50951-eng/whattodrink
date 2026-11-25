@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NICKNAME_MAX, ageOf, avatarPublicUrl, collectNightStats, defaultNicknameFrom, hkAge, infoVisibilityOf, nightKeyHK, parseProfileBody, parseProfileInfoBody, shouldOnboard, weekNights, weekStartHK, weekStreak } from "./profile";
+import { NICKNAME_MAX, ageOf, avatarPublicUrl, collectNightStats, defaultNicknameFrom, hkAge, infoVisibilityOf, nightKeyHK, parseProfileBody, parseProfileInfoBody, shouldOnboard, weekNights, weekStartHK, weekStreak, guestCanViewProfile } from "./profile";
 
 describe("ageOf", () => {
   // 2026-10-04（UTC）为锚。
@@ -189,3 +189,17 @@ describe("defaultNicknameFrom（新帳號預設暱稱）", () => {
     expect(parseProfileBody({ nickname: long })).toEqual({ nickname: long });   // 預設值本身通過校驗
   });
 });
+
+describe("guestCanViewProfile", () => {
+  it("只有 public 模式訪客可看", () => {
+    expect(guestCanViewProfile("public")).toBe(true);
+  });
+  it("好友模式、隱身、缺值都要登入", () => {
+    expect(guestCanViewProfile("friends")).toBe(false);
+    expect(guestCanViewProfile("stealth")).toBe(false);
+    expect(guestCanViewProfile(null)).toBe(false);
+    expect(guestCanViewProfile(undefined)).toBe(false);
+    expect(guestCanViewProfile("PUBLIC")).toBe(false);
+  });
+});
+

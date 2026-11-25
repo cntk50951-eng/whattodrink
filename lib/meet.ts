@@ -26,7 +26,27 @@ export type MeetCriteria = {
   taste_keys?: string[];
   nearby_km?: number;
   online_only?: boolean;
+  /** 暱稱關鍵字（2026-11-25，iOS DEF-20261125-017：「找暱稱為 Chris 的人」）；硬過濾、包含匹配、不分大小寫。 */
+  nickname?: string;
 };
+
+/** 暱稱關鍵字上限（與暱稱本身上限 NICKNAME_MAX 同為 30 字符）。 */
+export const MEET_NICKNAME_MAX = 30;
+
+/** 模型給的暱稱關鍵字 → 清洗後字串；非字串／空／超長／含控制字元回 null。去掉開頭 @ 與首尾引號。 */
+export function meetNicknameKeyword(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const t = v.trim().replace(/^@+/, "").replace(/^["'「『“]+|["'」』”]+$/g, "").trim();
+  if (t === "") return null;
+  if (/[\u0000-\u001f\u007f]/.test(t)) return null;
+  if (Array.from(t).length > MEET_NICKNAME_MAX) return null;
+  return t;
+}
+
+/** 暱稱關鍵字 → PostgREST ilike 包含匹配模式（轉義 \\ % _，避免用戶字元變萬用字元）。 */
+export function meetNicknamePattern(keyword: string): string {
+  return `%${keyword.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+}
 
 const TASTE_GROUP_KEYS = Object.keys(TASTE_GROUPS);
 
@@ -60,7 +80,7 @@ export function sanitizeCriteria(raw: unknown): { criteria: MeetCriteria; droppe
   const r = raw as Record<string, unknown>;
   const KNOWN = new Set([
     "gender", "age_min", "age_max", "height_min", "height_max", "occupations",
-    "languages", "interests", "taste_groups", "taste_keys", "nearby_km", "online_only",
+    "languages", "interests", "taste_groups", "taste_keys", "nearby_km", "online_only", "nickname",
   ]);
   for (const k of Object.keys(r)) {
     if (!KNOWN.has(k) && !dropped.includes(k)) dropped.push(k);
@@ -145,6 +165,11 @@ export function sanitizeCriteria(raw: unknown): { criteria: MeetCriteria; droppe
   else if (near !== null) criteria.nearby_km = near;
   if (r.online_only === true) criteria.online_only = true;
   else if (r.online_only !== undefined && r.online_only !== false) dropped.push("online_only");
+  if (r.nickname !== undefined) {
+    const nick = meetNicknameKeyword(r.nickname);
+    if (nick === null) dropped.push("nickname");
+    else criteria.nickname = nick;
+  }
   return { criteria, dropped };
 }
 
@@ -459,6 +484,7 @@ export function meetCriteriaSchemaText(): string {
     `taste_keys: 大类或子类 key（如 lager、japanese_whisky；子→大类映射见下）`,
     `nearby_km: 1-100 整数（提到附近/距离才给）`,
     `online_only: true（明确说只要在线才给）`,
+    `nickname: 暱称／用户名关键字（用户明说要找叫某某、暱称为某某、用户某某的人才给；原样照抄，不翻译不改大小写，≤30 字）`,
     `大类→子类：\n${subMap}`,
   ].join("\n");
 }
@@ -474,6 +500,8 @@ export function meetParsePrompt(): { system: string } {
     `输入：想搵人一齊睇波，唔介意男定女\n输出：{"criteria": {"interests": ["ball_sports"]}, "ignored": []}`,
     `输入：二十幾歲、識講廣東話嘅女仔\n输出：{"criteria": {"gender": "female", "age_min": 20, "age_max": 29, "languages": ["yue"]}, "ignored": []}`,
     `输入：喺中環附近、而家喺線\n输出：{"criteria": {"nearby_km": 5, "online_only": true}, "ignored": []}`,
+    `输入：找一個暱稱為Chris的人\n输出：{"criteria": {"nickname": "Chris"}, "ignored": []}`,
+    `输入：找用戶 阿明\n输出：{"criteria": {"nickname": "阿明"}, "ignored": []}`,
   ].join("\n");
   return {
     system: [
@@ -486,6 +514,7 @@ export function meetParsePrompt(): { system: string } {
       "3. 性别：女生／女仔／女／靚女／lady→female；男生／男仔／男／靚仔→male；「唔介意／男女都得」→不给 gender。",
       "4. 泛指「鍾意飲酒／飲嘢」不给 interests、不给 taste（无法区分人）；只有具体酒种／兴趣才给。",
       "5. 附近／在线：用户明说才给。",
+      "5b. 暱称：用户说「暱称为／叫／用户／名叫 X」才给 nickname=X（原样照抄）；泛指「找人」不给。",
       "6. ignored 只记确实无法映射的片段；已翻成条件的词不要再记进去。",
       "示例：",
       shots,

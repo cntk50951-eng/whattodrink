@@ -142,6 +142,7 @@ export function searchPlanPrompt(peopleSchema: string): { system: string } {
     `输入：今晚附近有咩酒局\n输出：{"intents":[{"type":"parties","when":"tonight","near_me":true}],"ignored":[]}`,
     `输入：想搵人一齊飲威士忌，同埋睇下大家飲過咩威士忌\n输出：{"intents":[{"type":"people","criteria":{"taste_keys":["whisky"]}},{"type":"posts","tags":["whisky"],"near_me":false}],"ignored":[]}`,
     `输入：香港仔有冇通宵嘅bar\n输出：{"intents":[{"type":"places","keywords":["香港仔","bar"],"near_me":false,"open_24h":true}],"ignored":[]}`,
+    `输入：找一個暱稱為Chris的人\n输出：{"intents":[{"type":"people","criteria":{"nickname":"Chris"}}],"ignored":[]}`,
     `输入：#微醺 嘅帖子\n输出：{"intents":[{"type":"posts","hashtags":["微醺"],"near_me":false}],"ignored":[]}`,
   ].join("\n");
   return {

@@ -27,3 +27,4 @@
 - 2026-11-16：AOS完整推送outbox與Dashboard待辦，見 `2026-11-16-aos-push-outbox.md`（D.12；未SQL啟用／未真機）。
 - [intro 首屏主張四點](2026-11-16-intro-positioning.md) — 每一杯，都是一個故事（不強調地圖）；Ivy 是「陪伴、懂你」的 AI，「AI 僅供參考」只放頁尾小字；拉近同好另有主語；精簡兩行
 - [第七輪審核 Web 修復（2026-11-24）](2026-11-24-audit-round7-web-fixes.md) — 封鎖 fail-closed＋withBlockGuard、舉報副作用先確認再通知、刪好友先禁言後刪、kick 先拉黑
+- [訪客看公開主頁＋遇見按暱稱找人（2026-11-25）](2026-11-25-guest-profile-and-meet-nickname.md) — 匿名只放行 mode=public 陌生人視角；ilike 轉義 % _ \；加 MeetCriteria 欄位須同步客戶端定長解碼

@@ -12,8 +12,7 @@ import {
   sanitizeCriteria,
   scoreCandidate,
   tasteHeadline,
-  tasteLevel,
-} from "./meet";
+  tasteLevel, meetNicknameKeyword, meetNicknamePattern } from "./meet";
 
 describe("sanitizeCriteria（白名单丢弃）", () => {
   it("合法透过；非法键丢弃记 dropped；min>max 双删", () => {
@@ -142,3 +141,32 @@ describe("parseMeetReply", () => {
     expect(preferredHeadline({}, { favorites: [], likes: [], dislikes: [] }, "wine")).toBe("葡萄酒派");
   });
 });
+
+describe("暱稱關鍵字（DEF-20261125-017）", () => {
+  it("sanitizeCriteria 收 nickname，原樣保留大小寫", () => {
+    const { criteria, dropped } = sanitizeCriteria({ nickname: "Chris" });
+    expect(criteria.nickname).toBe("Chris");
+    expect(dropped).toEqual([]);
+  });
+  it("清掉開頭 @ 與首尾引號、空白", () => {
+    expect(meetNicknameKeyword("  @Chris ")).toBe("Chris");
+    expect(meetNicknameKeyword("「阿明」")).toBe("阿明");
+  });
+  it("非字串／空／超過 30 字／控制字元 → 丟棄並記 dropped", () => {
+    expect(meetNicknameKeyword(42)).toBeNull();
+    expect(meetNicknameKeyword("   ")).toBeNull();
+    expect(meetNicknameKeyword("a".repeat(31))).toBeNull();
+    expect(meetNicknameKeyword("🍺".repeat(30))).toBe("🍺".repeat(30));
+    expect(meetNicknameKeyword("a\u0000b")).toBeNull();
+    expect(sanitizeCriteria({ nickname: "" }).dropped).toContain("nickname");
+  });
+  it("ilike 模式轉義 % _ \\，不讓用戶字元變萬用字元", () => {
+    expect(meetNicknamePattern("Chris")).toBe("%Chris%");
+    expect(meetNicknamePattern("50%_off")).toBe("%50\\%\\_off%");
+    expect(meetNicknamePattern("a\\b")).toBe("%a\\\\b%");
+  });
+  it("放寬條件不會丟掉暱稱", () => {
+    expect(relaxedCriteria({ nickname: "Chris", online_only: true }).criteria.nickname).toBe("Chris");
+  });
+});
+

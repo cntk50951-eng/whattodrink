@@ -16,6 +16,7 @@ import {
   declaredTasteOf,
   dropNoisyGroups,
   isFullMatch,
+  meetNicknamePattern,
   meetParsePrompt,
   parseMeetReply,
   preferredHeadline,
@@ -255,12 +256,15 @@ async function runSearch(
   }
   const friendIn = [...preFriends].slice(0, 500).map((id) => `"${id}"`).join(",");
   // 候选池：discoverable＝true 的陌生人＋全部好友（NULL／false 的陌生人永不入池）。
-  const { data: pool } = await svc
+  let poolQuery = svc
     .from("users")
     .select("id,nickname,avatar_url,gender,dob,height_cm,occupation,languages,interests,preferences,info_visibility,discoverable,mode,last_seen_at,live_lat,live_lng")
     .neq("id", userId)
     .neq("mode", "stealth")
-    .or(friendIn !== "" ? `discoverable.eq.true,id.in.(${friendIn})` : `discoverable.eq.true`)
+    .or(friendIn !== "" ? `discoverable.eq.true,id.in.(${friendIn})` : `discoverable.eq.true`);
+  // 暱稱關鍵字是硬過濾（包含、不分大小寫）；仍只在可被搜到的陌生人＋好友內找，封鎖在下面照常排除
+  if (criteria.nickname !== undefined) poolQuery = poolQuery.ilike("nickname", meetNicknamePattern(criteria.nickname));
+  const { data: pool } = await poolQuery
     .order("last_seen_at", { ascending: false, nullsFirst: false })
     .limit(200);
   const cands = (((pool ?? []) as unknown[]) as CandRow[]).filter((c) => typeof c.id === "string");

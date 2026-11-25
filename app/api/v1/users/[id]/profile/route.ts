@@ -4,7 +4,7 @@ import { BlockLookupError, blockLookupUnavailable, isPairBlocked } from "@/lib/a
 import { parseCheckinIdParam, parseMineParams } from "@/lib/api/checkins";
 import { friendsOnlyCountOf, parseSavesVisibility, savesAccess, visibleRowsFor } from "@/lib/api/privacy";
 import { friendIdsOf } from "@/lib/friends";
-import { hkAge, collectNightStats, infoVisibilityOf, weekNights, weekStreak } from "@/lib/api/profile";
+import { guestCanViewProfile, hkAge, collectNightStats, infoVisibilityOf, weekNights, weekStreak } from "@/lib/api/profile";
 import { aggregateTaste, TAXONOMY_VERSION } from "@/lib/api/taste";
 
 type UserRow = {
@@ -222,7 +222,9 @@ async function tasteInferenceForFriend(
 type FsRow = { user_id: unknown; friend_id: unknown; status: unknown };
 
 /**
- * UR E.27 个人主页（🔒，匿名 401；iOS profile 输入）。
+ * UR E.27 个人主页（iOS profile 输入）。
+ * 匿名（2026-11-25，iOS DEF-20261125-005）：`me` 仍 401；看别人时对方 mode=public 才回陌生人视角
+ * （relationship=none、只 public 帖、info 按陌生人可见），对方好友模式／隐身回 401（登录后查看）。
  * `GET /api/v1/users/:id/profile` —— id 或 `me`（自己视角完整）；
  * PRIVACY_MODE_MATRIX 矩阵 C（2026-10-11）：主页对所有人完整，不再 404 整页锁定；
  * 足迹按 visibility 过滤（本人全见；好友 public＋friends；陌生人 public；private 永不见）；
@@ -234,10 +236,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const { userId } = await getAuthedClient(req);
-  if (userId === null) {
-    return apiError("unauthorized", "未登录", 401);
-  }
   const { id: rawId } = await params;
+  if (userId === null) {
+    if (rawId === "me") return apiError("unauthorized", "未登录", 401);
+    const guestTarget = parseCheckinIdParam(rawId);
+    if ("error" in guestTarget) return apiError("invalid_params", guestTarget.error, 400);
+    return profileOf(req, null, guestTarget.id);
+  }
   if (rawId === "me") {
     return profileOf(req, userId, userId);
   }
@@ -248,7 +253,8 @@ export async function GET(
   return profileOf(req, userId, parsedId.id);
 }
 
-async function profileOf(req: Request, viewerId: string, targetId: string): Promise<Response> {
+/** viewerId=null＝訪客（只在對方 mode=public 時放行，陌生人視角）。 */
+async function profileOf(req: Request, viewerId: string | null, targetId: string): Promise<Response> {
   const supa = await createServiceClient();
   const nowMs = Date.now();
   const { data: userRaw } = await supa
@@ -260,13 +266,18 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
   if (u === null || typeof u.id !== "string") {
     return apiError("not_found", "用户不存在", 404);
   }
-  const self = targetId === viewerId;
+  if (viewerId === null && !guestCanViewProfile(u.mode)) {
+    return apiError("unauthorized", "登录后查看", 401);
+  }
+  const self = viewerId !== null && targetId === viewerId;
 
   // 关系（accepted 双向任一＝好友；pending 按方向；blocked 行视而不见，沿交接口径只认 cheers_blocks）。
   let relationship: "self" | "friend" | "pending_out" | "pending_in" | "none" = self ? "self" : "none";
   let myFriendIds: string[] = [];
   let targetFriendIds: string[] = [];
-  if (!self) {
+  if (viewerId === null) {
+    // 訪客：無封鎖／好友關係可言，陌生人視角（myFriendIds 空＝只見 public 帖）
+  } else if (!self) {
     // 拉黑任一方向即 404（不泄存在，沿交接）；封鎖查詢失敗 fail-closed 回 503（第十二輪 §3.3）
     try {
       if (await isPairBlocked(supa, viewerId, targetId)) return apiError("not_found", "用户不存在", 404);
@@ -323,7 +334,7 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
     );
   }
 
-  const mutualCount = self
+  const mutualCount = self || viewerId === null
     ? null
     : myFriendIds.filter((id) => targetFriendIds.includes(id)).length;
   // 矩阵 C：主页对所有人完整（stats／preferences／recent 全给，不再整页锁定）。
@@ -464,7 +475,8 @@ async function profileOf(req: Request, viewerId: string, targetId: string): Prom
     });
     // 矩阵 C：本人全见（含 private，前端加锁）；好友 public＋friends；陌生人 public；
     // private 永不见。「另有 N 条」只数 friends（不含 private，不泄露存在）。
-    const visible = visibleRowsFor(viewerId, targetId, all, myFriendIds);
+    // 訪客用空字串 viewer：不等於任何用戶 id，canViewCheckin 只放行 public
+    const visible = visibleRowsFor(viewerId ?? "", targetId, all, myFriendIds);
     if (!self && relationship !== "friend") {
       friends_only_count = friendsOnlyCountOf(all);
     }

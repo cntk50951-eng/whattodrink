@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased] — iOS 上線前反饋：訪客看公開主頁、遇見按暱稱找人（2026-11-25，openapi 1.70.0）
+
+### Added
+
+- `GET /api/v1/users/{id}/profile` 允許匿名：對方 mode=public 回陌生人視角（只含 public 帖、無座標、無共同好友數）；對方好友模式／隱身回 401「登录后查看」；`me` 與其他 `/users/{id}/*` 仍需登入（iOS DEF-20261125-005）。
+- 遇見／智能搜索 `MeetCriteria.nickname`：暱稱關鍵字硬過濾（包含、不分大小寫，轉義 `%` `_` `\`），只在可被搜到的陌生人＋好友內找、封鎖照排除；兩個解析 prompt 補「找暱稱為 X」例子（iOS DEF-20261125-017）。
+
 ## [Unreleased] — 第八輪審核修復（2026-11-24）
 
 ### Fixed

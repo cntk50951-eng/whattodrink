@@ -351,3 +351,12 @@ export function parseProfileInfoBody(raw: unknown): ProfileInfoBody | { error: s
   }
   return out;
 }
+
+/**
+ * 訪客（未登入）能否看某人主頁（2026-11-25，iOS DEF-20261125-005）：
+ * 只限對方帳號模式為 public；好友模式／隱身需登入後才看（登入後仍按矩陣 C 對所有人完整）。
+ */
+export function guestCanViewProfile(mode: unknown): boolean {
+  return mode === "public";
+}
+
