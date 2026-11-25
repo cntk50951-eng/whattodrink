@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { adminRateLimited, auditOrThrow, auditViewOnce, checkSameOrigin } from "@/lib/ops";
 import { requireAdminPage } from "@/lib/opsPage";
-import { applyReportDecision, type ReportTargetType } from "@/lib/api/reportStp";
+import { applyReportDecision, reopenReport, type ReportTargetType } from "@/lib/api/reportStp";
 import type { SnapshotLine } from "@/lib/userReports";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -68,7 +68,7 @@ export default async function UserReportDetailPage({ params }: { params: Promise
         if (typeof pn === "string" && pn.trim() !== "") placeName = pn.trim();
       }
       if (typeof row.target_user_id === "string" && typeof row.reporter_id === "string") {
-        await applyReportDecision(g.svc, {
+        const applied = await applyReportDecision(g.svc, {
           reportId: id,
           targetType: tt,
           targetRef,
@@ -79,6 +79,11 @@ export default async function UserReportDetailPage({ params }: { params: Promise
           decision: state,
           note: state === "actioned" ? "經管理員審核核實違規，已處理" : "經管理員審核暫未發現違規",
         });
+        if (!applied.ok) {
+          // 下架或扣分沒成功：退回 reviewed（頁面仍接受再按一次，處分冪等），不讓案件停在「已處理」卻沒執行
+          await reopenReport(g.svc, id, "actioned", "reviewed");
+          throw new Error(`處分未完成（${applied.failed.join("、")}），案件已退回「審核中」，請重新按一次`);
+        }
       }
     }
   }

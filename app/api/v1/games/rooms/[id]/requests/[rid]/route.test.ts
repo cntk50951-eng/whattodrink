@@ -1,7 +1,7 @@
 import {beforeEach,describe,expect,it,vi} from "vitest";
 const state=vi.hoisted(()=>({mode:"normal",status:"pending",inserted:false,notices:[] as unknown[],bumps:vi.fn()}));
 vi.mock("@/lib/api/envelope",()=>import("../../../../../../../../lib/api/envelope"));
-vi.mock("@/lib/games/rooms",()=>({parseJoinDecision:()=>({decision:"approve"}),loadRoomAsMember:async()=>({room:{id:"room",status:"lobby",version:4,max_players:2}}),requireHost:()=>null,getActiveMembers:async()=>state.mode==="existing"?[{seat:0},{seat:1}]:[{seat:0}],bumpRoom:state.bumps,appendEvent:async()=>{}}));
+vi.mock("@/lib/games/rooms",()=>({parseJoinDecision:()=>({decision:"approve"}),loadRoomAsMember:async()=>({room:{id:"room",status:"lobby",version:4,max_players:2}}),requireHost:()=>null,claimRoomSeat:async()=>state.mode==="race"?{kind:"already",seat:1}:state.mode==="seat"?{kind:"room_full"}:{kind:"ok",seat:1},bumpRoom:state.bumps,appendEvent:async()=>{}}));
 vi.mock("@/lib/supabase/server",()=>{
  const db={from:(table:string)=>{let op="read";let values:Record<string,unknown>={};let pending=false;
   const q={select:()=>q,eq:(key:string,value:unknown)=>{if(key==="status"&&value==="pending")pending=true;return q;},

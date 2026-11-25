@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.68.2
+  version: 1.69.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -15,7 +15,7 @@ x-native-push-payloads:
     transport: FCM data-only
     description: >
       所有data值皆字串；客戶端核對recipient_id等於當前登入者、expires_at未到期及event_id未處理後才顯示。
-      不使用FCM notification自動展示，避免登出／換帳號後顯示舊通知。iOS原APNs payload不變。
+      不使用FCM notification自動展示，避免登出／換帳號後顯示舊通知。iOS payload：outbox 發的（聊天／邀約／酒局／投訴／誠信／遊戲入座）帶 recipient_id＋expires_at＋event_id；直發的（碰杯／好友請求／好友接受／遊戲邀請／酒局撤銷完成）只帶 recipient_id，不帶 expires_at（通知中心裡的舊通知仍須可點）。iOS 點擊時：欄位在就必須對得上當前登入者／未過期，欄位缺當舊 payload 放行。
       聊天正文、語音、位置坐標、投訴證據與自由文本不進payload。
     required: [t, title, body, recipient_id, event_id, expires_at, collapse_id]
     fields:
@@ -807,6 +807,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+        "500":
+          $ref: "#/components/responses/Internal"
   /api/v1/bar/credits:
     get:
       operationId: barCredits
@@ -2139,7 +2141,7 @@ paths:
   /api/v1/invites:
     post:
       operationId: sendInvite
-      summary: 發約喝酒（需登录；對象二选一＋店＋時段＋買單必填；custom 帶 custom_time；自約／自己隱身 403；3／天＋同對象1／天 429，UR E.16 round-2）
+      summary: 發約喝酒（需登录；對象二选一＋店＋時段＋買單必填；custom 帶 custom_time；自約／自己隱身 403；每日 10 次（不計已撤回）＋同對象每日 5 次 429，UR E.16 round-2；上限於 2026-11-23 由 3／1 調整）
       security:
         - cookieAuth: []
       requestBody:
@@ -2199,7 +2201,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
         "429":
-          description: 3／天或同對象1／天
+          description: 每日 10 次（不計已撤回）或同對象每日 5 次
           content:
             application/json:
               schema:
@@ -2225,7 +2227,7 @@ paths:
   /api/v1/parties:
     post:
       operationId: createParty
-      summary: 發攢局（需登录；總量2–12＋名額和≤總量＋門檻2..總量＋start未來14天；目的1–3＋介绍10–140必填且过审；隱身／未成年 403；3／天 429；host 不占席，UR E.23）
+      summary: 發攢局（需登录；總量2–12＋名額和≤總量＋門檻2..總量＋start未來14天；目的1–3＋介绍10–140必填且过审；隱身／未成年 403；每日 10 次（不計已撤銷）429；host 不占席，UR E.23；上限於 2026-11-23 由 3 調整）
       security:
         - cookieAuth: []
       requestBody:
@@ -2310,7 +2312,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
         "429":
-          description: 3／天；watch 每日 1 局（默认关闭）
+          description: 每日 10 次（不計已撤銷）；watch 每日 3 局（默认关闭）
           content:
             application/json:
               schema:
@@ -2350,11 +2352,14 @@ paths:
             type: integer
         - name: cursor
           in: query
+          description: >
+            翻頁游標。優先傳上一頁回包的 `next_cursor`（`<created_at>|<id>`，按 created_at、id 倒序的複合 keyset，
+            同一時間戳的多行跨頁不漏不重）；舊客戶端傳純 created_at ISO 仍可用（只按 created_at 嚴格小於）。格式不符的複合游標按純時間戳處理。
           schema:
             type: string
       responses:
         "200":
-          description: 酒局行（含 status／joined_count／male_count／female_count／host／joined_by_me／is_mine／distance_m／purposes＋cover_url／cover_source（可空；无封面为 null）＋登录才回 purpose_other／host_intro；登录行加 my_arrived（我是否已到场打卡）／cancel_policy，参加行加 leave_policy；sync_cursor 服务端 ms，UR E.29）
+          description: 酒局行（含 status／joined_count／male_count／female_count／host／joined_by_me／is_mine／distance_m／purposes＋cover_url／cover_source（可空；无封面为 null）＋登录才回 purpose_other／host_intro；登录行加 my_arrived（我是否已到场打卡）／cancel_policy，参加行加 leave_policy；sync_cursor 服务端 ms，UR E.29；next_cursor＝下一頁複合游標（`<created_at>|<id>`，本頁最後一行；空頁為 null））
           content:
             application/json:
               schema:
@@ -2391,7 +2396,7 @@ paths:
           $ref: "#/components/responses/Internal"
     patch:
       operationId: cancelParty
-      summary: 撤局（需登录；仅 host；<60min／已开局 409 too_close_to_start；无人随时可撤；重复撤幂等 notified_count:0，阶段 A）
+      summary: 撤局（需登录；仅 host；酒局進行中（未過 expires_at）host 隨時可撤並通知全部在場者；已結束／已過期 409 too_close_to_start；同時操作輸掉轉態 409 stale_version；重复撤幂等 notified_count:0；讀不到加入名單 500 且不撤）
       security:
         - cookieAuth: []
       requestBody:
@@ -2431,7 +2436,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
-          description: 临近开局／已开局不可撤（code=too_close_to_start；本期无紧急通道）
+          description: 酒局已結束／已過期不可撤（code=too_close_to_start），或另一個裝置同時改了狀態（code=stale_version，客戶端重新整理）
           content:
             application/json:
               schema:
@@ -2706,6 +2711,12 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "410":
           description: 已過期（讀時判，無 cron）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 同時操作輸掉轉態（對方或另一裝置先撤回／完成／接受了；code=stale_version，客戶端重新整理；同一終態重送則冪等 200）
           content:
             application/json:
               schema:
@@ -3080,7 +3091,7 @@ paths:
                   type: object
                   description: >
                     推送偏好**整体替换**（UR D.9）：9 个已知键（cheers／invites／invite_replies／chat／stranger_invites／stranger_chat／friends／party／game_invites），
-                    值须 boolean，未知键或非 boolean 400。**缺的键不保留旧值，按默认重置**（默认**全 true**；stranger_invites／stranger_chat 原默认 false，2026-11-24 起也默认 true），客户端缺键须镜像同一组默认。
+                    值须 boolean，未知键或非 boolean 400。**缺的键不保留旧值，按默认重置**（默认**全 true**；stranger_invites／stranger_chat 原默认 false，2026-11-24 起也默认 true）；客户端缺键须镜像同一组默认，
                     所以客户端要写就带齐全部 9 个键（AOS 已如此；iOS 目前没有分类设置入口，不写此字段）。
                   additionalProperties: false
                   properties:
@@ -3164,8 +3175,14 @@ paths:
                     用 Apple 登入的帳號刪除前須再授權一次（Apple TN3194：刪帳號必須撤銷 Sign in with Apple token）。
                     iOS 用 `ASAuthorizationAppleIDProvider` 再授權後取 `authorizationCode`（UTF-8 字串）帶來；一次性、約 5 分鐘內有效。
                     服務端用 SIWA key 簽 client secret → 換 token → 撤銷，**不存任何 Apple token**；先撤銷後刪資料，撤銷失敗不動資料。
-                    必須是登入時綁定的那個 Apple ID 授權的，否則回 400 `apple_code_invalid`。
                     沒綁 Apple 的帳號不用帶；帶了也忽略。恢復期內重複 grace 是冪等回原到期日，不再要求。
+                apple_unavailable:
+                  type: boolean
+                  description: >
+                    客戶端做不了 Sign in with Apple 授權（例如 Android）時，在收到 `409 apple_reauth_required` 並讓用戶確認後，
+                    帶 `true` 重送同一請求：服務端**不撤銷** Apple 授權、仍履行刪除（Apple TN3194：拿不到憑證也不能不刪），
+                    200 回包帶 `apple_manual_revoke:true`，客戶端須引導用戶到 Apple ID 設定（登入與安全 → 使用 Apple 登入）自行移除授權。
+                    帶了 `apple_authorization_code` 時照常撤銷；沒綁 Apple 的帳號忽略。
       responses:
         "200":
           description: 已注销
@@ -3184,9 +3201,12 @@ paths:
                     type: [string, "null"]
                     format: date-time
                     description: grace 时为到期清除时间（申请后 30 天）；now 时为 null
+                  apple_manual_revoke:
+                    type: boolean
+                    description: 只在請求帶 `apple_unavailable:true` 且帳號綁了 Apple 時出現（`true`）：Apple 授權沒被撤銷，需用戶自行移除
         "400":
           description: >
-            body 非法／缺 confirm:true；或 `code=apple_code_invalid`＝Apple 拒絕了 `apple_authorization_code`（已用過／過期／不是登入時綁定的 Apple ID）。
+            body 非法／缺 confirm:true；或 `code=apple_code_invalid`＝Apple 拒絕了 `apple_authorization_code`（已用過／過期）。
             後者客戶端應重新做一次 Apple 授權再重試，資料沒有被動。
           content:
             application/json:
@@ -7481,6 +7501,15 @@ components:
             $ref: "#/components/schemas/ErrorBody"
     NotFound:
       description: 對象不存在（不可見行同此回，fail-closed 不辨真假）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    BlockLookupUnavailable:
+      description: >
+        暫時無法確認封鎖／禁言狀態（資料庫錯誤）。回 `503 {error:{code:"internal"}}`＋`Retry-After`：判定未知就不繼續，
+        讀路徑（地圖／牆／搜尋／帖文／留言）與寫路徑（碰杯／讚／收藏／評分／留言／聊天發送）同一口徑；客戶端按可重試處理，不當成「沒有封鎖」。
+        涉及端點：/cheers、/wall、/search/posts、/map/pins、/map/pins/changes、/checkins/{id}（GET／DELETE）及其 comments／like／save／want／ratings、/conversations/{id}/messages（POST）。
       content:
         application/json:
           schema:

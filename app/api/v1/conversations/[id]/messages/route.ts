@@ -227,11 +227,18 @@ export async function POST(
         `and(blocker_id.eq.${pid},blocked_id.eq.${userId})`,
       ])
       .join(",");
-    const [{ data: blockRows }, { data: muteRows }] = await Promise.all([
+    const [{ data: blockRows, error: blockErr }, { data: muteRows, error: muteErr }] = await Promise.all([
       svc.from("cheers_blocks").select("blocker_id").or(ors).limit(1),
-      // chat_mutes 未迁移（0041 未跑）即 data null→不断链 fail-open，DELETE 侧同。
+      // chat_mutes 未迁移（0041 未跑，42P01）才容忍为空；其他错误＝禁言状态未知。
       svc.from("chat_mutes").select("blocker_id").or(ors).limit(1),
     ]);
+    // 第七輪 §3.2：查詢出錯不能當「沒被禁言」放行——判定未知就回可重試 503，不發送
+    if (blockErr !== null || (muteErr !== null && muteErr.code !== "42P01")) {
+      console.error(
+        `[api/v1/conversations/messages] mute lookup failed: block=${blockErr?.code ?? "-"} mute=${muteErr?.code ?? "-"}`,
+      );
+      return apiError("internal", "暫時未能確認聊天狀態，請稍後再試", 503, { "Retry-After": "2" });
+    }
     if (
       (Array.isArray(blockRows) && blockRows.length > 0) ||
       (Array.isArray(muteRows) && muteRows.length > 0)

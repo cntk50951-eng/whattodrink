@@ -15,6 +15,15 @@ import {
 const UID = "11111111-1111-1111-1111-111111111111";
 const OTHER = "22222222-2222-2222-2222-222222222222";
 
+describe("parseDeleteBody apple_unavailable（Android 做不了 Apple 授權）", () => {
+  it("只認布爾 true；缺省／false 不帶旗；其他型別 400", () => {
+    expect(parseDeleteBody({ mode: "now", confirm: true, apple_unavailable: true })).toEqual({ mode: "now", appleUnavailable: true });
+    expect(parseDeleteBody({ mode: "now", confirm: true, apple_unavailable: false })).toEqual({ mode: "now" });
+    expect(parseDeleteBody({ mode: "grace", confirm: true, apple_unavailable: null })).toEqual({ mode: "grace" });
+    expect(parseDeleteBody({ mode: "now", confirm: true, apple_unavailable: "yes" })).toHaveProperty("error");
+  });
+});
+
 describe("parseDeleteBody", () => {
   it("需要 confirm:true 与合法 mode", () => {
     expect(parseDeleteBody({ mode: "now", confirm: true })).toEqual({ mode: "now" });

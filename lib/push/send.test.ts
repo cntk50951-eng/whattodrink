@@ -22,10 +22,10 @@ it("keeps a stable Android receipt within one request generation and changes it 
  state.created=new Date(now).toISOString();await sendFriendPush("request",args);
  expect(state.sent.mock.calls[4][0].payload.event_id).not.toBe(first.event_id);
 });
-it("keeps iOS APNs payload free of Android receipt metadata",async()=>{
+it("iOS APNs payload carries only recipient_id (account guard, round 7); no Android event_id/expires_at",async()=>{
  await sendFriendPush("request",args);const payload=state.sent.mock.calls[1][0].payload;
- expect(payload).toMatchObject({t:"friend_request",from:"actor"});
- for(const key of ["event_id","recipient_id","expires_at"])expect(payload).not.toHaveProperty(key);
+ expect(payload).toMatchObject({t:"friend_request",from:"actor",recipient_id:args.toUserId});
+ for(const key of ["event_id","expires_at"])expect(payload).not.toHaveProperty(key);
 });
 it("does not expire a new acceptance because its original request was sent days ago",async()=>{
  state.created=new Date(now-3*86_400_000).toISOString();

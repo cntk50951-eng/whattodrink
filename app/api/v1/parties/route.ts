@@ -1,5 +1,6 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { parseCompositeCursor } from "@/lib/api/compositeCursor";
 import { isMinorDob } from "@/lib/api/cheers";
 import { countGenders, cancelPolicy, hkDayStartISO, isAllowedPoiCoverUrl, leavePolicy, mineOrCondition, parsePartyBody, partyCoverUploadPath, partyExpiresAt, PARTY_POI_IMAGE_HOSTS_DEFAULT } from "@/lib/api/party";
 import { hostTrustMap, readTrust } from "@/lib/trust/ledger";
@@ -194,7 +195,8 @@ type PartyListRow = {
  * 只回未过期非 cancelled；`box=mine` 回我发起＋我参加（含 cancelled／过期，
  * 需登录，匿名 401）；行含 status＋計數＋host＋本人旗＋距離
  * （`near` 一次性查询用，不存储）。
- * cursor＝created_at ISO（keyset 下一页；仍按 created 倒序）。
+ * cursor：優先用回包的 `next_cursor`（`<created_at>|<id>` 複合 keyset，按 created_at、id 倒序，
+ *   同一時間戳的多行跨頁不漏不重）；舊客戶端傳純 created_at ISO 仍可用（只按 created_at 嚴格小於，行為同前）。
  */
 export async function GET(req: Request): Promise<Response> {
   const q = new URL(req.url).searchParams;
@@ -219,7 +221,8 @@ export async function GET(req: Request): Promise<Response> {
     }
   }
   const cursor = q.get("cursor");
-  const cursorMs = cursor !== null ? Date.parse(cursor) : NaN;
+  const composite = parseCompositeCursor(cursor);
+  const cursorMs = cursor !== null && composite === null ? Date.parse(cursor) : NaN;
 
   const { supabase, userId: viewerId } = await getAuthedClient(req);
   const nowIso = new Date(Date.now()).toISOString();
@@ -275,6 +278,7 @@ export async function GET(req: Request): Promise<Response> {
       .from("parties")
       .select(cols)
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(fetchLimit);
     if (box === "mine" && viewerId !== null) {
       query = query.or(mineOrCondition(viewerId, joinedIds));
@@ -292,7 +296,10 @@ export async function GET(req: Request): Promise<Response> {
         .gte("lng", bbox.west)
         .lte("lng", bbox.east);
     }
-    if (Number.isFinite(cursorMs)) {
+    if (composite !== null) {
+      // 值已由 parseCompositeCursor 嚴格校驗（時間戳字符集＋UUID），可安全拼進 or()
+      query = query.or(`created_at.lt.${composite.createdAt},and(created_at.eq.${composite.createdAt},id.lt.${composite.id})`);
+    } else if (Number.isFinite(cursorMs)) {
       query = query.lt("created_at", new Date(cursorMs).toISOString());
     }
     ({ data: rows, error } = await query);
@@ -433,7 +440,9 @@ export async function GET(req: Request): Promise<Response> {
     };
   });
   // UR E.29 同步游标（服务端 ms；changes 的 since 原样回传，与翻页 cursor 区分命名）。
-  return apiOk({ items, sync_cursor: Date.now() });
+  const lastRow = list.length > 0 ? list[list.length - 1] : null;
+  const next_cursor = lastRow !== null && typeof lastRow.created_at === "string" ? `${lastRow.created_at}|${lastRow.id}` : null;
+  return apiOk({ items, sync_cursor: Date.now(), next_cursor });
 }
 
 /** 取自家封面文件转 data URL 送图审（取不到／超 8MB 即 null，调用方按不可用处理）。 */

@@ -20,3 +20,74 @@ describe("reportStp trust scoring helpers", () => {
     expect(reportTrustExpireDays("user")).toBe(180);
   });
 });
+
+import { applyReportDecision, reopenReport } from "./reportStp";
+
+type Overrides = { hideError?: boolean; trustError?: boolean };
+/** 假 supabase：任何鏈式呼叫都回自己，await 時按 (table, op) 給結果；記錄寫入操作。回傳 `{error}` 而不是拋例外。 */
+function fakeSvc(o: Overrides = {}) {
+  const log: string[] = [];
+  const svc = {
+    from(table: string) {
+      let op = "select";
+      const result = () => {
+        if (table === "checkins" && op === "update" && o.hideError) return { data: null, error: { code: "XX000" } };
+        if (table === "trust_events" && op === "insert" && o.trustError) return { data: null, error: { code: "XX000" } };
+        return { data: [], error: null };
+      };
+      const q: unknown = new Proxy({}, {
+        get(_t, prop) {
+          if (prop === "then") return (res: (v: unknown) => unknown) => res(result());
+          if (prop === "insert" || prop === "update" || prop === "delete" || prop === "upsert") {
+            return () => {
+              op = String(prop);
+              log.push(`${table}.${op}`);
+              return q;
+            };
+          }
+          return () => q;
+        },
+      });
+      return q;
+    },
+  };
+  return { svc: svc as never, log };
+}
+
+const base = {
+  reportId: "r1", targetType: "post" as const, targetRef: "c1", targetUserId: "u2", reporterId: "u1",
+  reasonCode: "inappropriate", decision: "actioned" as const,
+};
+
+describe("applyReportDecision 先確認業務結果再通知（第七輪 §3.2）", () => {
+  it("下架回 {error} → ok:false，且不發任何通知", async () => {
+    const { svc, log } = fakeSvc({ hideError: true });
+    const r = await applyReportDecision(svc, base);
+    expect(r.ok).toBe(false);
+    expect(r.failed).toContain("hide");
+    expect(log.filter((l) => l.startsWith("notifications."))).toEqual([]);
+  });
+
+  it("扣分 db-error → ok:false，且不發通知", async () => {
+    const { svc, log } = fakeSvc({ trustError: true });
+    const r = await applyReportDecision(svc, base);
+    expect(r.ok).toBe(false);
+    expect(r.failed).toContain("trust");
+    expect(log.filter((l) => l.startsWith("notifications."))).toEqual([]);
+  });
+
+  it("駁回不涉及下架／扣分，照常通知舉報人", async () => {
+    const { svc, log } = fakeSvc({ hideError: true, trustError: true });
+    const r = await applyReportDecision(svc, { ...base, decision: "dismissed" });
+    expect(r.ok).toBe(true);
+    expect(log).toContain("notifications.insert");
+    expect(log).not.toContain("checkins.update");
+  });
+
+  it("reopenReport 只退回仍是我們寫入的終態那一行", async () => {
+    const { svc, log } = fakeSvc();
+    // 假 svc 的 select 結果是空陣列 → 沒有行被退回（例如已被別人改過）→ false
+    expect(await reopenReport(svc, "r1", "actioned", "pending")).toBe(false);
+    expect(log).toContain("cheers_reports.update");
+  });
+});

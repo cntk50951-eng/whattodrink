@@ -217,6 +217,65 @@ export async function getActiveMembers(
   return asPlayerRows(data);
 }
 
+/** 入房佔位結果（`game_room_claim_seat` RPC 的口徑；舊後備路徑回同樣形狀）。 */
+export type SeatClaim =
+  | { kind: "ok"; seat: number }
+  | { kind: "already"; seat: number }
+  | { kind: "room_not_found" }
+  | { kind: "room_started" }
+  | { kind: "kicked" }
+  | { kind: "room_full" }
+  | { kind: "error" };
+
+/**
+ * 原子佔位（第七輪 §3.4）：鎖房間行 → 數人 → 算席號 → 寫入，在 `game_room_claim_seat` 內一次完成，
+ * 並發加入最後一個空位只會有一人成功、席號不重複。join／bump-join／同意入房申請都走這裡。
+ * 遷移 0084 沒跑（RPC 不存在：42883／PGRST202）時退回舊的「讀 → 算 → 寫」，行為同改前，不阻斷上線。
+ */
+export async function claimRoomSeat(svc: SupabaseClient, roomId: string, userId: string, nowMs: number): Promise<SeatClaim> {
+  const { data, error } = await svc.rpc("game_room_claim_seat", { p_room: roomId, p_user: userId });
+  if (error === null || error === undefined) {
+    const r = (data ?? {}) as { result?: unknown; seat?: unknown };
+    const seat = typeof r.seat === "number" ? r.seat : 0;
+    switch (r.result) {
+      case "ok": return { kind: "ok", seat };
+      case "already": return { kind: "already", seat };
+      case "room_not_found": return { kind: "room_not_found" };
+      case "room_started": return { kind: "room_started" };
+      case "kicked": return { kind: "kicked" };
+      case "room_full": return { kind: "room_full" };
+      default: return { kind: "error" };
+    }
+  }
+  const code = (error as { code?: string }).code;
+  if (code !== "42883" && code !== "PGRST202") {
+    console.error(`[games/claimSeat] rpc error: code=${code ?? "unknown"}`);
+    return { kind: "error" };
+  }
+  return legacyClaimSeat(svc, roomId, userId, nowMs);
+}
+
+async function legacyClaimSeat(svc: SupabaseClient, roomId: string, userId: string, nowMs: number): Promise<SeatClaim> {
+  const mine = await getPlayerRow(svc, roomId, userId);
+  if (mine !== null && mine.status === "active") return { kind: "already", seat: mine.seat };
+  if (mine !== null && mine.status === "kicked") return { kind: "kicked" };
+  const members = await getActiveMembers(svc, roomId);
+  const { data: room } = await svc.from("game_rooms").select("max_players").eq("id", roomId).maybeSingle();
+  const max = (room as { max_players?: unknown } | null)?.max_players;
+  if (typeof max === "number" && members.length >= max) return { kind: "room_full" };
+  const seat = members.reduce((mx, m) => Math.max(mx, m.seat), -1) + 1;
+  const res = mine !== null
+    ? await svc.from("game_room_players")
+        .update({ status: "active", seat, ready: false, last_seen_at: new Date(nowMs).toISOString() })
+        .eq("room_id", roomId).eq("user_id", userId)
+    : await svc.from("game_room_players").insert({ room_id: roomId, user_id: userId, seat, ready: false, status: "active" });
+  if (res.error !== null && res.error !== undefined) {
+    console.error(`[games/claimSeat] legacy write error: code=${(res.error as { code?: string }).code ?? "unknown"}`);
+    return { kind: "error" };
+  }
+  return { kind: "ok", seat };
+}
+
 export async function getPlayerRow(
   svc: SupabaseClient,
   roomId: string,

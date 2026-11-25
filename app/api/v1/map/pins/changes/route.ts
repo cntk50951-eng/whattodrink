@@ -1,6 +1,6 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { getBlockedUserIds } from "@/lib/api/blocks";
+import { getBlockedUserIds, withBlockGuard } from "@/lib/api/blocks";
 import {
   PINS_CHANGES_PROBE,
   PINS_RANGE_MS,
@@ -32,7 +32,7 @@ function bboxOf(b: BBox): BBoxFilter {
   return { south: b.south, north: b.north, west: b.west, east: b.east };
 }
 
-export async function GET(req: Request): Promise<Response> {
+async function getHandler(req: Request): Promise<Response> {
   const q = new URL(req.url).searchParams;
   const bboxParsed = parseBbox(q.get("bbox"));
   if ("error" in bboxParsed) {
@@ -239,3 +239,5 @@ export async function GET(req: Request): Promise<Response> {
   const cacheControl = viewerId === null ? "public, max-age=10" : "private, max-age=10";
   return apiOk({ checkins, parties, cursor: nowMs }, 200, { "Cache-Control": cacheControl });
 }
+
+export const GET = withBlockGuard(getHandler);

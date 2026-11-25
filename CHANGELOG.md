@@ -1,5 +1,26 @@
 # Changelog
 
+## [Unreleased] — 第七輪審核修復（2026-11-24）
+
+### Fixed
+- 封鎖查詢出錯不再放行：`getBlockedUserIds`／`isPairBlocked` 出錯改拋 `BlockLookupError`，11 個路由以 `withBlockGuard` 統一回 503＋`Retry-After`；聊天發送的禁言查詢出錯（chat_mutes 缺表 42P01 除外）同樣回 503。
+- 舉報結案先確認業務結果再通知：`applyReportDecision` 回 `{ok,failed}`，下架或扣分失敗不發「已處理」通知；自動分支退回 pending、後台頁退回 reviewed 可重按（冪等）。
+- 解除好友：先查有好友行→先寫雙向禁言→才刪關係；禁言失敗回 500 關係不動，刪除失敗補償撤禁言。
+- 遊戲房踢人拉黑：`block:true` 先寫 cheers_blocks 再移出，拉黑失敗回 500。
+- 遊戲房容量／席號原子化：遷移 `0084_game_room_claim_seat.sql`（鎖房間行的 RPC）＋`claimRoomSeat`，join／bump-join／同意入房申請走同一入口；遷移未跑時退回舊寫法。
+- Ivy「忘記我」刪除世代：遷移 `0085_bar_memory_forget_epoch.sql`（墓碑行＋forgot_rev），rev 只增不減，忘記之前的 base_rev 一律 409；缺欄位時退回舊刪列。
+- 看板複合游標：`GET /parties` 回 `next_cursor`（`<created_at>|<id>`），舊純時間戳游標照舊可用。
+- Apple 綁定帳號在 Android 刪帳：`DELETE /me` 增 `apple_unavailable:true`（不撤銷、仍刪除、回 `apple_manual_revoke`）。
+- iOS 直發推送（碰杯／好友請求／遊戲邀請／酒局撤銷）payload 補 `recipient_id`（不帶 `expires_at`）。
+- 邀約／撤局通知與接受時的好友行：`retryWrite` 有界重試，仍失敗留 `[needs-repair]` 日誌（非持久 outbox）。
+
+### 契約
+- OpenAPI 1.69.0：`BlockLookupUnavailable`（503）、parties `next_cursor`／`cursor` 說明、`DELETE /me` 的 `apple_unavailable`／`apple_manual_revoke`、iOS 推送 payload 說明。
+
+### 驗證
+- vitest 全量 1,473 條全過；唯一載入失敗的 `checkins/route.idempotency.test.ts`（`@/lib/api/profile` 解析）與本批無關。tsc 無輸出。
+- **未做**：0084／0085 尚未在 Supabase 執行；沒有生產帳號、真推送、真實併發壓測。
+
 ## [Unreleased] — 上架審核第一輪修復（2026-11-24）
 
 ### Added

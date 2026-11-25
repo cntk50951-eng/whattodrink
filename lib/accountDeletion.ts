@@ -65,18 +65,24 @@ export function purgeAtFrom(now: Date): Date {
 
 export function parseDeleteBody(
   raw: unknown,
-): { mode: DeleteMode; appleAuthorizationCode?: string } | { error: string } {
+): { mode: DeleteMode; appleAuthorizationCode?: string; appleUnavailable?: boolean } | { error: string } {
   if (typeof raw !== "object" || raw === null) return { error: "body 需为对象" };
   const r = raw as Record<string, unknown>;
   if (r.confirm !== true) return { error: "需要 confirm:true（防误触）" };
   if (r.mode !== "now" && r.mode !== "grace") return { error: "mode 非法：只要 now|grace" };
+  // 第七輪 §3.3：Android 等沒有 Sign in with Apple 授權框的客戶端，用 apple_authorization_code 之外的另一條路：
+  // 明確聲明 apple_unavailable:true（用戶已被告知要自行到 Apple ID 設定移除授權），服務端照 Apple TN3194 仍履行刪除
+  if (r.apple_unavailable !== undefined && r.apple_unavailable !== null && typeof r.apple_unavailable !== "boolean") {
+    return { error: "apple_unavailable 需为布尔值" };
+  }
+  const unavailable = r.apple_unavailable === true ? { appleUnavailable: true } : {};
   // Apple 登入帳號刪除前的一次性授權碼（可選；沒綁 Apple 的帳號不用帶）
   const code = r.apple_authorization_code;
-  if (code === undefined || code === null) return { mode: r.mode };
+  if (code === undefined || code === null) return { mode: r.mode, ...unavailable };
   if (typeof code !== "string" || code.trim() === "" || code.length > 4096) {
     return { error: "apple_authorization_code 需为 1–4096 字符的字符串" };
   }
-  return { mode: r.mode, appleAuthorizationCode: code.trim() };
+  return { mode: r.mode, appleAuthorizationCode: code.trim(), ...unavailable };
 }
 
 /** 恢复期内才可恢复（status=grace 且未过 purge_at）。 */

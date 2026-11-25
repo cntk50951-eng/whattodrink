@@ -1,6 +1,6 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { isPairBlocked } from "@/lib/api/blocks";
+import { isPairBlocked, withBlockGuard } from "@/lib/api/blocks";
 import { canViewCheckin, parseCheckinIdParam } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
 import { buildWantJson } from "@/lib/api/wants";
@@ -16,7 +16,7 @@ type PostRow = { id: string; user_id: string | null; visibility: unknown };
  * 可见门沿 batch2 like 口径（public 直过；friends 走互好友；不可见 404）；
  * 隐身 403（计数公开，点即暴露，沿 E.7）。
  */
-export async function POST(
+async function postHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -118,3 +118,5 @@ export async function POST(
     .eq("checkin_id", parsedId.id);
   return apiOk(buildWantJson(wanted, count ?? 0));
 }
+
+export const POST = withBlockGuard(postHandler);

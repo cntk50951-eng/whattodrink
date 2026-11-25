@@ -385,13 +385,15 @@ export async function DELETE(req: Request): Promise<Response> {
     // 恢復期內重複 grace＝冪等回原到期日，資料早已刪、Apple 也已處理過：不再要求重新授權
     const existing = parsed.mode === "grace" ? await getDeletionRow(svc, userId) : null;
     const alreadyInGrace = existing !== null && isRestorable(existing, now);
+    let manualRevoke = false;
     if (!alreadyInGrace) {
       // Apple TN3194：用 Apple 登入的帳號刪除時必須撤銷 token。先撤銷後刪資料，撤銷失敗不動資料
-      const gate = await appleRevocationGate(svc, userId, parsed.appleAuthorizationCode ?? null);
+      const gate = await appleRevocationGate(svc, userId, parsed.appleAuthorizationCode ?? null, undefined, undefined, parsed.appleUnavailable === true);
       if (!gate.proceed) return apiError(gate.code, gate.message, gate.status);
+      manualRevoke = gate.manualRevoke === true;
     }
     const r = await requestDeletion(svc, userId, parsed.mode, now);
-    return apiOk({ deleted: true, mode: r.mode, purge_at: r.purgeAt });
+    return apiOk({ deleted: true, mode: r.mode, purge_at: r.purgeAt, ...(manualRevoke ? { apple_manual_revoke: true } : {}) });
   } catch (err) {
     console.error(`[api/v1/me] delete error: ${err instanceof Error ? err.message : "unknown"}`);
     return apiError("internal", "注销失败，请稍后重试", 500);

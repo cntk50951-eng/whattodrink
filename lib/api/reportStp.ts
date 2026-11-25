@@ -100,6 +100,10 @@ export async function notifyPostReportedUnderReview(
  *   4. 通知舉報人結果（report_resolved，decision: actioned）。
  * - dismissed（駁回）：
  *   1. 通知舉報人結果（report_resolved，decision: dismissed）。
+ *
+ * 第七輪 §3.2：回傳 `{ ok }`。下架（checkins.update 回 `{error}` 不會拋）或扣分（writeTrustEvent 回 `db-error`）
+ * 沒成功，就**不發任何結果通知**並回 `ok:false`，由呼叫端把案件退回待處理重跑——下架與扣分都是冪等的
+ * （update 同值、trust_events 以 `report:<id>` 去重），重跑安全；通知只在業務結果成立後發。
  */
 export async function applyReportDecision(
   svc: SupabaseClient,
@@ -114,28 +118,44 @@ export async function applyReportDecision(
     decision: ReportDecision;
     note?: string | null;
   },
-): Promise<void> {
+): Promise<{ ok: boolean; failed: string[] }> {
+  const failed: string[] = [];
   const cleanNote = typeof args.note === "string" && args.note.trim() !== "" ? args.note.trim() : null;
   if (args.decision === "actioned") {
     // 1. 帖文違規：立即轉為 private 下架
     if (args.targetType === "post" && args.targetRef !== null && args.targetRef !== "") {
       try {
-        await svc.from("checkins").update({ visibility: "private" }).eq("id", args.targetRef);
+        const { error } = await svc.from("checkins").update({ visibility: "private" }).eq("id", args.targetRef);
+        if (error !== null && error !== undefined) {
+          failed.push("hide");
+          console.error(`[reportStp] hide checkin error: code=${(error as { code?: string }).code ?? "unknown"}`);
+        }
       } catch (err) {
+        failed.push("hide");
         console.error(`[reportStp] hide checkin error: ${err instanceof Error ? err.message : "unknown"}`);
       }
     }
+    // 下架失敗就先停：扣分會同時發 trust_changed 通知，不能在帖文還公開時就告訴被舉報人「已處理」。重跑時兩步都冪等
+    if (failed.length > 0) return { ok: false, failed };
     // 2. 扣誠信分（冪等，寫入 trust_events 並觸發 trust_changed 通知）
     const delta = reportTrustDelta(args.targetType, args.reasonCode);
-    await writeTrustEvent(svc, {
-      user_id: args.targetUserId,
-      kind: reportTrustKind(args.targetType),
-      delta,
-      party_id: null,
-      ref_id: `report:${args.reportId}`,
-      note: cleanNote,
-      expires_days: reportTrustExpireDays(args.targetType),
-    });
+    try {
+      const trust = await writeTrustEvent(svc, {
+        user_id: args.targetUserId,
+        kind: reportTrustKind(args.targetType),
+        delta,
+        party_id: null,
+        ref_id: `report:${args.reportId}`,
+        note: cleanNote,
+        expires_days: reportTrustExpireDays(args.targetType),
+      });
+      if (!trust.written && trust.reason === "db-error") failed.push("trust");
+    } catch (err) {
+      failed.push("trust");
+      console.error(`[reportStp] trust event error: ${err instanceof Error ? err.message : "unknown"}`);
+    }
+    // 業務結果沒成立：不通知任何人（否則被舉報人／舉報人會收到「已處理」而實際沒下架或沒扣分）
+    if (failed.length > 0) return { ok: false, failed };
     // 3. 匿名通知被舉報人
     try {
       await svc.from("notifications").insert({
@@ -176,6 +196,31 @@ export async function applyReportDecision(
     });
   } catch (err) {
     console.error(`[reportStp] notify reporter resolved error: ${err instanceof Error ? err.message : "unknown"}`);
+  }
+  return { ok: true, failed };
+}
+
+/**
+ * 處分沒做完時把案件退回可重跑的狀態（只退「還是我們剛寫入的終態」的那一行，避免蓋掉別人的處理）。
+ * 自動分支退回 pending（進人工隊列）；人工分支退回 reviewed（頁面只接受 pending／reviewed，可再按一次）。
+ */
+export async function reopenReport(
+  svc: SupabaseClient,
+  reportId: string,
+  from: ReportDecision,
+  to: "pending" | "reviewed",
+): Promise<boolean> {
+  try {
+    const { data, error } = await svc
+      .from("cheers_reports")
+      .update({ status: to, decided_at: null })
+      .eq("id", reportId)
+      .eq("status", from)
+      .select("id");
+    return (error === null || error === undefined) && Array.isArray(data) && data.length > 0;
+  } catch (err) {
+    console.error(`[reportStp] reopen report error: ${err instanceof Error ? err.message : "unknown"}`);
+    return false;
   }
 }
 
@@ -235,7 +280,7 @@ export async function runPostReportStp(
       .select("id");
     if (Array.isArray(updated) && updated.length > 0) {
       const catText = categories.length > 0 ? `（${categories.join(", ")}）` : "";
-      await applyReportDecision(svc, {
+      const applied = await applyReportDecision(svc, {
         reportId: args.reportId,
         targetType: "post",
         targetRef: args.targetRef,
@@ -246,7 +291,10 @@ export async function runPostReportStp(
         decision: "actioned",
         note: `系統自動審核核實違規${catText}，已下架處理`,
       });
-      return { autoActioned: true, categories };
+      if (applied.ok) return { autoActioned: true, categories };
+      // 下架或扣分沒成功：案件退回 pending 交人工隊列重跑（冪等），不發「已處理」通知
+      console.error(`[reportStp] auto action incomplete report=${args.reportId} failed=${applied.failed.join(",")}`);
+      await reopenReport(svc, args.reportId, "actioned", "pending");
     }
   }
 

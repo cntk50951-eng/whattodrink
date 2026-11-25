@@ -1,0 +1,13 @@
+# 2026-11-24 / 第七輪審核：Web 共享後端 fail-open 與部分提交
+
+- 封鎖查詢：`getBlockedUserIds`／`isPairBlocked` 出錯原回空集合／false（fail-open）。改拋 `BlockLookupError`；11 個路由用 `withBlockGuard` 包起來統一回 503＋Retry-After（讀寫同口徑，判定未知不繼續）。撞 1000 筆讀取上限記錯誤但不丟。
+- 聊天 POST 禁言查詢：兩表 `{error}` 原被丟棄；現 cheers_blocks 錯誤或 chat_mutes 錯誤（42P01 未遷移除外）回 503。
+- 舉報結案：`applyReportDecision` 現回 `{ok,failed}`；下架（`checkins.update` 的 `{error}` 不會拋）或扣分（`writeTrustEvent` db-error）失敗就不發任何結果通知；自動分支把案件退回 pending 入人工隊列，後台頁退回 reviewed 並丟錯讓管理員重按（頁面只接受 pending／reviewed）。下架失敗時連扣分都不做（扣分會發 trust_changed）。重跑冪等：update 同值、trust_events 以 `report:<id>` 去重。
+- 刪好友：原先刪關係後才寫禁言，失敗只記 log 仍回 removed:true，重試又因「無好友行不禁言」早退補不回。改成先查有好友行 → 先寫雙向禁言 → 才刪關係；禁言失敗回 500 關係不動，刪除失敗補償撤禁言。42P01 沿舊行為容忍。
+- 遊戲房 kick：block:true 時先寫 cheers_blocks 再移出，拉黑失敗回 500。
+- 沒做（需遷移／契約）：Ivy 刪除世代、席位交易、複合游標、邀約副作用 outbox。`docs/api-openapi.yaml`／CHANGELOG 有別的 session 的未提交改動，沒碰；503 回包待該 session 收口後補契約。
+- 驗證：vitest 1445 全綠；`app/api/v1/checkins/route.idempotency.test.ts` 載入失敗（`@/lib/api/profile` 解析不到）與本次無關，未改動該路徑。教訓：Supabase 回 `{error}` 不拋例外，try/catch 抓不到，一定要讀 error。
+- 追加：iOS 直發推送（cheers／friend_request／friend_accepted／game_invite／party 系 `sendPartyNoticePush`）payload 補 `recipient_id`（只補收件人，不補 `expires_at`／`event_id`：通知中心裡的舊通知仍須可點）。原測試「iOS payload 不含 Android 回執欄位」改為「只有 recipient_id」。舊版 iOS 客戶端忽略未知鍵，向後相容；新版 iOS 對有欄位的通知做帳號校驗。
+- 追加（同日，第二批）：①遊戲房容量：遷移 `0084_game_room_claim_seat.sql`（RPC 鎖房間行→數人→算席號→寫入）＋`claimRoomSeat`，join／bump-join／同意入房申請三處改走它；RPC 不存在（42883／PGRST202）退回舊三步寫法，所以可先部署程式再跑遷移。未加 UNIQUE(room_id,seat)：既有資料可能有重複席號，要先用遷移文末查詢核對。②Ivy 忘記世代：遷移 `0085_bar_memory_forget_epoch.sql`（deleted_at＋forgot_rev）；DELETE 改留墓碑（rev 只增不減），base_rev∈(0,forgot_rev] 的 PUT 一律 409，GET 墓碑＝doc:null/rev:0；缺欄位退回舊刪列。與別的 session 對同檔的「無列且 base_rev>0 → 409」互補不衝突。③看板複合游標：`next_cursor=<created_at>|<id>`（`lib/api/compositeCursor.ts` 嚴格校驗字符集，因為會拼進 PostgREST or()），舊純時間戳游標照舊可用；iOS／AOS 已採用。④Apple 刪帳：`DELETE /me` 增 `apple_unavailable:true`（Android 做不了 SIWA 授權）→ 不撤銷、仍刪除、200 回 `apple_manual_revoke:true`；openapi 已補（該檔有別的 session 未提交改動，我的是新增段落）。⑤沒碰：invites／parties/[id] 的副作用 outbox——別的 session 正在改同兩檔（CAS＋classifyTransition），要等它收口後再議。
+- 教訓：Next 路由檔不能 export 非 HTTP 方法的名字，helper 要放 lib。測試 mock 整個 `@/lib/games/rooms` 時，新增的匯出要同步補進 mock。
+- 追加（同日，第三批）：邀約／酒局副作用補強——`lib/api/retryWrite.ts`（有界重試 3 次、退避 150ms×n，不重試 23xxx／42xxx／PGRST1xx 永久錯）套到 `invites/[id]` 的完成／撤回通知與接受時的好友 upsert、`parties/[id]` 撤局通知；仍失敗留 `[needs-repair]` 日誌（邀約／酒局 id）供對賬。這**不是**持久 outbox（跨請求不重放），只擋瞬時錯誤；要做到「保證送達」得另開 outbox 表＋worker，需用戶決定是否值得。該兩檔有別的 session 的 CAS／transition 未提交改動，我只做了小段落替換；它的 invites 測試需補 `vi.mock("@/lib/api/retryWrite", …)`（已加）。OpenAPI：新增 `components.responses.BlockLookupUnavailable`（503）、parties `next_cursor`、iOS 推送 payload 說明（原「iOS payload 不變」已不成立）。聊天 POST 禁言判定補了路由測試。

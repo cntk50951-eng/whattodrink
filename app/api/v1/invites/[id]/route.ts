@@ -3,7 +3,20 @@ import { after } from "next/server";
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { canDeleteExpiredInvite } from "@/lib/api/invites";
+import { retryWrite } from "@/lib/api/retryWrite";
+import { classifyTransition, updatedRowCount } from "@/lib/api/transition";
 import { sendPartyNoticePush } from "@/lib/push/send";
+
+type ServiceDb = Awaited<ReturnType<typeof createServiceClient>>;
+
+/** 條件更新沒命中任何列時，讀一次現態來分辨「別人先做了同一件事」與「已在別的終態」。 */
+async function currentInviteStatus(svc: ServiceDb, id: string): Promise<string | null> {
+  const { data } = await svc.from("drink_invites").select("status").eq("id", id).maybeSingle();
+  const status = (data as { status?: unknown } | null)?.status;
+  return typeof status === "string" ? status : null;
+}
+
+const staleTransition = (): Response => apiError("stale_version", "邀約狀態已變更，請重新整理", 409);
 
 /**
  * UR E.16 邀约推进（🔒）。
@@ -64,16 +77,21 @@ export async function PATCH(
     if (typeof row.expires_at === "string" && Date.parse(row.expires_at) < Date.now()) {
       return apiError("invalid_params", "邀約已過期", 410);
     }
-    const { error } = await supabase
+    const svc = await createServiceClient();
+    const { data: doneRows, error } = await supabase
       .from("drink_invites")
       .update({ status: "completed" })
       .eq("id", id)
-      .eq("status", "accepted");
+      .eq("status", "accepted")
+      .select("id");
     if (error !== null) {
       console.error(`[api/v1/invites] complete error: code=${error.code} message=${error.message}`);
       return apiError("internal", "完成失敗", 500);
     }
-    const svc = await createServiceClient();
+    // 輸掉轉態（對方同時撤銷了）的一方不寫通知、不推播
+    const completeOutcome = classifyTransition(updatedRowCount(doneRows), updatedRowCount(doneRows) > 0 ? null : await currentInviteStatus(svc, id), "completed");
+    if (completeOutcome === "already") return apiOk({ completed: true });
+    if (completeOutcome === "conflict") return staleTransition();
     const { data: actorRow } = await svc.from("users").select("nickname").eq("id", userId).maybeSingle();
     const actorNick =
       typeof (actorRow as { nickname?: unknown } | null)?.nickname === "string" &&
@@ -81,7 +99,8 @@ export async function PATCH(
         ? (actorRow as { nickname: string }).nickname
         : "酒友";
     const recipientId = row.to_user_id;
-    const { error: nErr } = await svc.from("notifications").insert({
+    // 狀態已轉態，通知是對方唯一的提示：瞬時錯誤有界重試，仍失敗留 [needs-repair] 日誌可對賬
+    const { error: nErr } = await retryWrite(() => svc.from("notifications").insert({
       user_id: recipientId,
       kind: "invite_completed",
       party_id: null,
@@ -92,9 +111,9 @@ export async function PATCH(
         start_at: row.start_at,
         actor_nickname: actorNick,
       },
-    });
+    }));
     if (nErr !== null) {
-      console.error(`[api/v1/invites] complete notify error: code=${nErr.code} message=${nErr.message}`);
+      console.error(`[api/v1/invites] [needs-repair] complete notify invite=${row.id} code=${nErr.code} message=${nErr.message}`);
     }
     after(async () => {
       await sendPartyNoticePush({
@@ -124,15 +143,20 @@ export async function PATCH(
       return apiError("invalid_params", "邀約已不在可撤銷狀態", 400);
     }
     const svc = await createServiceClient();
-    const { error } = await svc
+    const { data: recalledRows, error } = await svc
       .from("drink_invites")
       .update({ status: "recalled" })
       .eq("id", id)
-      .in("status", ["sent", "accepted"]);
+      .in("status", ["sent", "accepted"])
+      .select("id");
     if (error !== null) {
       console.error(`[api/v1/invites] recall error: code=${error.code} message=${error.message}`);
       return apiError("internal", "撤回失敗", 500);
     }
+    // 另一個裝置（或對方）已先撤銷／已完成：不重複通知，也不把「已完成」說成撤回成功
+    const recallOutcome = classifyTransition(updatedRowCount(recalledRows), updatedRowCount(recalledRows) > 0 ? null : await currentInviteStatus(svc, id), "recalled");
+    if (recallOutcome === "already") return apiOk({ recalled: true });
+    if (recallOutcome === "conflict") return staleTransition();
     const { data: actorRow } = await svc.from("users").select("nickname").eq("id", userId).maybeSingle();
     const actorNick =
       typeof (actorRow as { nickname?: unknown } | null)?.nickname === "string" &&
@@ -140,7 +164,7 @@ export async function PATCH(
         ? (actorRow as { nickname: string }).nickname
         : "酒友";
     const recipientId = userId === row.from_user_id ? row.to_user_id : row.from_user_id;
-    const { error: nErr } = await svc.from("notifications").insert({
+    const { error: nErr } = await retryWrite(() => svc.from("notifications").insert({
       user_id: recipientId,
       kind: "invite_cancelled",
       party_id: null,
@@ -151,9 +175,9 @@ export async function PATCH(
         start_at: row.start_at,
         actor_nickname: actorNick,
       },
-    });
+    }));
     if (nErr !== null) {
-      console.error(`[api/v1/invites] recall notify error: code=${nErr.code} message=${nErr.message}`);
+      console.error(`[api/v1/invites] [needs-repair] recall notify invite=${row.id} code=${nErr.code} message=${nErr.message}`);
     }
     after(async () => {
       await sendPartyNoticePush({
@@ -173,37 +197,46 @@ export async function PATCH(
   if (row.to_user_id !== userId) return apiError("forbidden", "只能回應收到的邀約", 403);
   if (expired) return apiError("invalid_params", "邀約已過期", 410);
   if (action === "decline") {
-    const { error } = await supabase
+    const { data: declinedRows, error } = await supabase
       .from("drink_invites")
       .update({ status: "declined" })
       .eq("id", id)
-      .eq("status", "sent");
+      .eq("status", "sent")
+      .select("id");
     if (error !== null) {
       console.error(`[api/v1/invites] decline error: code=${error.code} message=${error.message}`);
       return apiError("internal", "操作失敗", 500);
+    }
+    if (updatedRowCount(declinedRows) === 0) {
+      const declineOutcome = classifyTransition(0, await currentInviteStatus(await createServiceClient(), id), "declined");
+      return declineOutcome === "already" ? apiOk({ declined: true }) : staleTransition();
     }
     return apiOk({ declined: true });
   }
   // accept：置 accepted＋双向 accepted 落库（service 凭明确同意事件；RLS 只许 pending）。
   const service = await createServiceClient();
-  const { error: uErr } = await supabase
+  const { data: acceptedRows, error: uErr } = await supabase
     .from("drink_invites")
     .update({ status: "accepted" })
     .eq("id", id)
-    .eq("status", "sent");
+    .eq("status", "sent")
+    .select("id");
   if (uErr !== null) {
     console.error(`[api/v1/invites] accept error: code=${uErr.code} message=${uErr.message}`);
     return apiError("internal", "接受失敗", 500);
   }
+  // 沒轉到 accepted（對方同時撤回了）就不能寫好友關係，否則兩人會在沒有成局的情況下變好友
+  if (updatedRowCount(acceptedRows) === 0) return staleTransition();
   const pair = [
     { user_id: row.from_user_id, friend_id: row.to_user_id, status: "accepted" },
     { user_id: row.to_user_id, friend_id: row.from_user_id, status: "accepted" },
   ];
-  const { error: fErr } = await service.from("friendships").upsert(pair, {
+  const { error: fErr } = await retryWrite(() => service.from("friendships").upsert(pair, {
     onConflict: "user_id,friend_id",
-  });
+  }));
   if (fErr !== null) {
-    console.error(`[api/v1/invites] befriend error: code=${fErr.code} message=${fErr.message}`);
+    // 邀約已是 accepted 但好友行沒寫成：upsert 冪等，對賬時可按此日誌補寫
+    console.error(`[api/v1/invites] [needs-repair] befriend invite=${row.id} code=${fErr.code} message=${fErr.message}`);
   }
   const { data: peerRow } = await service
     .from("users")

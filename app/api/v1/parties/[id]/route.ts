@@ -1,8 +1,10 @@
+import { retryWrite } from "@/lib/api/retryWrite";
 import { after } from "next/server";
 
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { cancelPolicy, canDeleteExpiredParty, leavePolicy, minutesBeforeStart } from "@/lib/api/party";
+import { classifyTransition, updatedRowCount } from "@/lib/api/transition";
 import { hostTrustMap } from "@/lib/trust/ledger";
 import { writeTrustEvent } from "@/lib/trust/ledger";
 import { sendPartyNoticePush } from "@/lib/push/send";
@@ -216,10 +218,15 @@ export async function PATCH(
   if (row.status === "cancelled") return apiOk({ cancelled: true, notified_count: 0 });
   const svc = await createServiceClient();
   const nowMs = Date.now();
-  const { data: joinRows } = await svc
+  const { data: joinRows, error: joinReadErr } = await svc
     .from("joins")
     .select("user_id")
     .eq("party_id", id);
+  // 讀不到加入名單不能當成「沒人報名」：否則撤局成功卻一個人都沒通知
+  if (joinReadErr !== null) {
+    console.error(`[api/v1/parties] cancel joins read error: code=${joinReadErr.code} message=${joinReadErr.message}`);
+    return apiError("internal", "撤局失敗", 500);
+  }
   const joinerIds = [
     ...new Set(
       ((joinRows ?? []) as { user_id?: unknown }[])
@@ -239,14 +246,23 @@ export async function PATCH(
     return apiError("too_close_to_start", "酒局已結束，不可撤銷", 409);
   }
   const nowIso = new Date(nowMs).toISOString();
-  const { error } = await svc
+  const { data: cancelledRows, error } = await svc
     .from("parties")
     .update({ status: "cancelled", cancelled_at: nowIso })
     .eq("id", id)
-    .eq("status", "open");
+    .eq("status", "open")
+    .select("id");
   if (error !== null) {
     console.error(`[api/v1/parties] cancel error: code=${error.code} message=${error.message}`);
     return apiError("internal", "撤局失敗", 500);
+  }
+  // 另一個裝置同時撤局（或局已被別的流程結束）：不重複記誠信、不重複通知
+  if (updatedRowCount(cancelledRows) === 0) {
+    const { data: nowRow } = await svc.from("parties").select("status").eq("id", id).maybeSingle();
+    const now = (nowRow as { status?: unknown } | null)?.status;
+    const outcome = classifyTransition(0, typeof now === "string" ? now : null, "cancelled");
+    if (outcome === "already") return apiOk({ cancelled: true, notified_count: 0 });
+    return apiError("stale_version", "酒局狀態已變更，請重新整理", 409);
   }
   if (joinerIds.length === 0) {
     await svc.from("party_events").insert({
@@ -288,7 +304,7 @@ export async function PATCH(
     ((hostRow as { nickname?: string }).nickname ?? "") !== ""
       ? (hostRow as { nickname: string }).nickname
       : "酒友";
-  const { error: nErr } = await svc.from("notifications").insert(
+  const { error: nErr } = await retryWrite(() => svc.from("notifications").insert(
     joinerIds.map((uid) => ({
       user_id: uid,
       kind: "party_cancelled",
@@ -296,9 +312,9 @@ export async function PATCH(
       actor_id: userId,
       payload: { party_place: row.place, start_at: row.start_at, actor_nickname: hostNick },
     })),
-  );
+  ));
   if (nErr !== null) {
-    console.error(`[api/v1/parties] notify error: code=${nErr.code} message=${nErr.message}`);
+    console.error(`[api/v1/parties] [needs-repair] cancel notify party=${id} code=${nErr.code} message=${nErr.message}`);
   }
   // Android 端由 notifications INSERT trigger 進 native_push_outbox；這裡補發 iOS APNs 推播，確保雙端都能即時收到
   after(async () => {

@@ -317,16 +317,47 @@ export async function DELETE(req: Request): Promise<Response> {
     return apiError("invalid_params", "friend_id 非法", 400);
   }
   const svc = await createServiceClient();
-  const { data: removed, error } = await svc
+  const pairFilter = `and(user_id.eq.${userId},friend_id.eq.${fid}),and(user_id.eq.${fid},friend_id.eq.${userId})`;
+  // 第七輪 §3.2：「已解除」必須代表對端也發不了信。順序：先確認有好友行 → 先寫雙向禁言 → 才刪關係。
+  // 禁言寫失敗：關係原封不動回 500，客戶端可直接重試；刪除失敗：補償撤掉剛寫的禁言，同樣可重試。
+  // 反過來（先刪後禁言）一旦禁言失敗，重試因「無好友行即不禁言」早退，永遠補不回來。
+  const { data: existing, error: lookupErr } = await svc
     .from("friendships")
-    .delete()
-    .or(`and(user_id.eq.${userId},friend_id.eq.${fid}),and(user_id.eq.${fid},friend_id.eq.${userId})`)
-    .select("user_id");
-  if (error !== null) {
-    console.error(`[api/v1/friends] remove error: code=${error.code} message=${error.message}`);
+    .select("user_id")
+    .or(pairFilter)
+    .limit(1);
+  if (lookupErr !== null) {
+    console.error(`[api/v1/friends] remove lookup error: code=${lookupErr.code}`);
     return apiError("internal", "解除好友失败", 500);
   }
   // 非好友调即幂等 200，不写禁言（无好友行即无"前好友"可禁；防陌生人被误禁言）。
+  if (!Array.isArray(existing) || existing.length === 0) {
+    return apiOk({ removed: true });
+  }
+  // 双向禁言（chat_mutes，删好友专用；碰杯／打卡不受影响，用户定案；service 写）。
+  const { error: bErr } = await svc.from("chat_mutes").upsert(
+    [
+      { blocker_id: userId, blocked_id: fid },
+      { blocker_id: fid, blocked_id: userId },
+    ],
+    { onConflict: "blocker_id,blocked_id" },
+  );
+  // 42P01＝chat_mutes 未遷移（0041 沒跑）：沿舊行為只記錄不攔（否則整個解除好友不可用）；其餘錯誤＝禁言沒寫成，不能回已解除
+  if (bErr !== null && bErr.code !== "42P01") {
+    console.error(`[api/v1/friends] mute error: code=${bErr.code} message=${bErr.message}`);
+    return apiError("internal", "解除好友失败，請稍後再試", 500);
+  }
+  const { data: removed, error } = await svc.from("friendships").delete().or(pairFilter).select("user_id");
+  if (error !== null) {
+    console.error(`[api/v1/friends] remove error: code=${error.code} message=${error.message}`);
+    // 補償：關係還在就不該留禁言（盡力而為；失敗只記錄，下次重試會再 upsert）
+    const { error: undoErr } = await svc
+      .from("chat_mutes")
+      .delete()
+      .or(`and(blocker_id.eq.${userId},blocked_id.eq.${fid}),and(blocker_id.eq.${fid},blocked_id.eq.${userId})`);
+    if (undoErr !== null) console.error(`[api/v1/friends] mute rollback error: code=${undoErr.code}`);
+    return apiError("internal", "解除好友失败", 500);
+  }
   if (!Array.isArray(removed) || removed.length === 0) {
     return apiOk({ removed: true });
   }
@@ -348,17 +379,6 @@ export async function DELETE(req: Request): Promise<Response> {
     if (cErr !== null) {
       console.error(`[api/v1/friends] unmark error: code=${cErr.code} message=${cErr.message}`);
     }
-  }
-  // 双向禁言（chat_mutes，删好友专用；碰杯／打卡不受影响，用户定案；service 写）。
-  const { error: bErr } = await svc.from("chat_mutes").upsert(
-    [
-      { blocker_id: userId, blocked_id: fid },
-      { blocker_id: fid, blocked_id: userId },
-    ],
-    { onConflict: "blocker_id,blocked_id" },
-  );
-  if (bErr !== null) {
-    console.error(`[api/v1/friends] mute error: code=${bErr.code} message=${bErr.message}`);
   }
   return apiOk({ removed: true });
 }

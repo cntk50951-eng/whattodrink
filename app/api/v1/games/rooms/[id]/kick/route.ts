@@ -48,6 +48,19 @@ export async function POST(
   if (!loaded.members.some((m) => m.user_id === parsed.userId)) {
     return apiError("not_found", "該成員不在房間", 404);
   }
+  // 踢人并拉黑（block:true 即写 cheers_blocks，沿现有口径；之后双方互不可见／互不可入）。
+  // 第七輪 §3.3：先寫拉黑再移出——拉黑沒寫成就回 500、房間狀態不動（房主看到失敗可重試），
+  // 不能回「已移出」卻沒拉黑；移出若隨後失敗，拉黑行是冪等 upsert，重試安全。
+  if (parsed.block) {
+    const { error: bErr } = await svc.from("cheers_blocks").upsert(
+      { blocker_id: userId, blocked_id: parsed.userId },
+      { onConflict: "blocker_id,blocked_id" },
+    );
+    if (bErr !== null) {
+      console.error(`[games/kick] block error: code=${bErr.code} message=${bErr.message}`);
+      return apiError("internal", "拉黑失敗，請稍後再試", 500);
+    }
+  }
   const { error } = await svc
     .from("game_room_players")
     .update({ status: "kicked" })
@@ -59,16 +72,6 @@ export async function POST(
   }
   const done = await applyDeparture(svc, loaded, parsed.userId, "member_kicked", userId, Date.now());
   if ("response" in done) return done.response;
-  // 踢人并拉黑（block:true 即写 cheers_blocks，沿现有口径；之后双方互不可见／互不可入）。
-  if (parsed.block) {
-    const { error: bErr } = await svc.from("cheers_blocks").upsert(
-      { blocker_id: userId, blocked_id: parsed.userId },
-      { onConflict: "blocker_id,blocked_id" },
-    );
-    if (bErr !== null) {
-      console.error(`[games/kick] block error: code=${bErr.code} message=${bErr.message}`);
-    }
-  }
   await svc.from("notifications").insert({
     user_id: parsed.userId,
     kind: "game_kicked",

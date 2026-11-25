@@ -1,6 +1,6 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { isPairBlocked } from "@/lib/api/blocks";
+import { isPairBlocked, withBlockGuard } from "@/lib/api/blocks";
 import { canViewCheckin, parseCheckinIdParam } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
 import { buildSaveJson } from "@/lib/api/saves";
@@ -13,7 +13,7 @@ type PostRow = { id: string; user_id: string | null; visibility: unknown };
  * 可见门沿 E.7（public 直过；friends 走互好友；不可见 404 不泄归属）。
  * 无未成年门（E.19 私人书签不触发）／无 stealth 门（无公开计数，不泄存在）。
  */
-export async function POST(
+async function postHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -95,3 +95,5 @@ export async function POST(
   }
   return apiOk(buildSaveJson(saved));
 }
+
+export const POST = withBlockGuard(postHandler);

@@ -1,6 +1,6 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { getBlockedUserIds, isPairBlocked } from "@/lib/api/blocks";
+import { getBlockedUserIds, isPairBlocked, withBlockGuard } from "@/lib/api/blocks";
 import { areFriends, type FriendshipRow } from "@/lib/friends";
 import { canViewCheckin, parseCheckinIdParam } from "@/lib/api/checkins";
 import { summarizeRatings } from "@/lib/api/rating";
@@ -146,7 +146,7 @@ async function readArchived(
   });
 }
 
-export async function GET(
+async function getHandler(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -350,7 +350,7 @@ export async function GET(
  * `DELETE /api/v1/checkins/:id`（🔒）：只删自己的（`eq user_id`＋RLS owner delete
  * 双保险；非本人／不存在一律 404，不泄露归属）。
  */
-export async function DELETE(
+async function deleteHandler(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -388,3 +388,6 @@ export async function DELETE(
   }
   return apiOk({ deleted: true });
 }
+
+export const GET = withBlockGuard(getHandler);
+export const DELETE = withBlockGuard(deleteHandler);

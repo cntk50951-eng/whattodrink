@@ -144,7 +144,7 @@ export async function userHasAppleIdentity(svc: Svc, userId: string): Promise<bo
 }
 
 export type AppleRevocationOutcome =
-  | { proceed: true }
+  | { proceed: true; manualRevoke?: boolean }
   | { proceed: false; status: 400 | 409 | 503; code: "apple_code_invalid" | "apple_reauth_required" | "internal"; message: string };
 
 /**
@@ -154,6 +154,8 @@ export type AppleRevocationOutcome =
  * - 綁了、配置正常、沒帶 code：409 apple_reauth_required，客戶端再授權後重試。
  * - code 被 Apple 拒（過期／已用）：400 apple_code_invalid，客戶端重新授權。
  * - Apple 暫時不可達：503，稍後重試（資料還沒動）。
+ * - 客戶端聲明做不了 Apple 授權（`clientCannotAuthorize`，例如 Android）且沒帶 code：放行、不撤銷，回 `manualRevoke:true`，
+ *   客戶端須引導用戶到 Apple ID 設定自行移除授權。Apple TN3194：拿不到憑證也必須履行刪除，不能把用戶卡在 409。
  */
 export async function appleRevocationGate(
   svc: Svc,
@@ -161,6 +163,7 @@ export async function appleRevocationGate(
   authorizationCode: string | null,
   env: Record<string, string | undefined> = process.env,
   fetchFn?: FetchFn,
+  clientCannotAuthorize = false,
 ): Promise<AppleRevocationOutcome> {
   const identity = await findAppleIdentity(svc, userId);
   if (identity === null) return { proceed: true };
@@ -168,6 +171,10 @@ export async function appleRevocationGate(
   if (cfg === null) {
     console.error("[siwa] account has Apple identity but APPLE_SIWA_* is not configured; deletion proceeds WITHOUT revoking");
     return { proceed: true };
+  }
+  if (authorizationCode === null && clientCannotAuthorize) {
+    console.error("[siwa] Apple-bound account deleted from a client that cannot run Apple authorization; token NOT revoked, user must remove it in Apple ID settings");
+    return { proceed: true, manualRevoke: true };
   }
   if (authorizationCode === null) {
     return { proceed: false, status: 409, code: "apple_reauth_required", message: "此帳號用 Apple 登入，刪除前需要再用 Apple 授權一次" };

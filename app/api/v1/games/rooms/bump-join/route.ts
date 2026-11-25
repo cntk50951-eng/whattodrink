@@ -5,6 +5,7 @@ import { ipRateLimit } from "@/lib/rateLimit";
 import {
   appendEvent,
   bumpRoom,
+  claimRoomSeat,
   getActiveMembers,
   getActiveRoomId,
   getPlayerRow,
@@ -96,30 +97,14 @@ export async function POST(req: Request): Promise<Response> {
       return apiError("not_allowed", "你暫時不可加入該房間", 403);
     }
   }
-  const seat = members.reduce((mx, m) => Math.max(mx, m.seat), -1) + 1;
-  if (mine !== null && mine.status === "left") {
-    const { error: rErr } = await svc
-      .from("game_room_players")
-      .update({ status: "active", seat, ready: false, last_seen_at: new Date(nowMs).toISOString() })
-      .eq("room_id", room.id)
-      .eq("user_id", userId);
-    if (rErr !== null) {
-      console.error(`[games/bump-join] rejoin error: code=${rErr.code} message=${rErr.message}`);
-      return apiError("internal", "加入失敗", 500);
-    }
-  } else {
-    const { error: jErr } = await svc.from("game_room_players").insert({
-      room_id: room.id,
-      user_id: userId,
-      seat,
-      ready: false,
-      status: "active",
-    });
-    if (jErr !== null) {
-      console.error(`[games/bump-join] join error: code=${jErr.code} message=${jErr.message}`);
-      return apiError("internal", "加入失敗", 500);
-    }
-  }
+  const claim = await claimRoomSeat(svc, room.id, userId, nowMs);
+  if (claim.kind === "already") return apiOk(summary);
+  if (claim.kind === "room_full") return apiError("room_full", "房間已滿", 409);
+  if (claim.kind === "room_started") return apiError("room_started", "對局已開始，不可再加入", 409);
+  if (claim.kind === "kicked") return apiError("not_allowed", "你曾被請出該房間", 403);
+  if (claim.kind === "room_not_found") return apiError("room_not_found", "房間不存在或已結束", 404);
+  if (claim.kind === "error") return apiError("internal", "加入失敗", 500);
+  const seat = claim.seat;
   const version = await bumpRoom(svc, room.id, room.version, nowMs);
   if (version !== null) {
     await appendEvent(svc, room.id, version, "member_joined", userId, { seat, via: "bump" });

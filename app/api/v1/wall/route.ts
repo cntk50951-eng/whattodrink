@@ -1,6 +1,6 @@
 import { createClient, createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { getBlockedUserIds } from "@/lib/api/blocks";
+import { getBlockedUserIds, withBlockGuard } from "@/lib/api/blocks";
 import { friendIdsOf } from "@/lib/friends";
 import {
   WALL_HOT_WINDOW_CAP,
@@ -27,7 +27,7 @@ import {
 const WALL_COLUMNS =
   "id,user_id,photo_url,note,transcript,audio_url,audio_seconds,created_at,users(nickname,avatar_url,gender),post_likes(count)";
 
-export async function GET(req: Request) {
+async function getHandler(req: Request) {
   const parsed = parseWallParams(new URL(req.url).searchParams);
   if ("error" in parsed) {
     return apiError("invalid_params", parsed.error, 400);
@@ -165,3 +165,5 @@ export async function GET(req: Request) {
     );
   }
 }
+
+export const GET = withBlockGuard(getHandler);

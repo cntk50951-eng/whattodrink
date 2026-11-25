@@ -1,6 +1,6 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { isPairBlocked } from "@/lib/api/blocks";
+import { isPairBlocked, withBlockGuard } from "@/lib/api/blocks";
 import { canViewCheckin, parseCheckinIdParam } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
 import { parseRatingBody, summarizeRatings } from "@/lib/api/rating";
@@ -18,7 +18,7 @@ type PostRow = { id: string; user_id: string | null; visibility: unknown };
  * 聚合走 service client（路由已过可见门，沿 D.2 口径；RLS 只做纵深），
  * 只吐聚合＋本人行，不吐谁投几分。
  */
-export async function POST(
+async function postHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -144,3 +144,5 @@ export async function POST(
     rating_count: count,
   });
 }
+
+export const POST = withBlockGuard(postHandler);

@@ -27,7 +27,7 @@ function copyFor(locale: string): Record<string, string> {
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-/** Android account/expiry guard; iOS keeps its original payload byte-for-byte shape. */
+/** Android account/expiry guard. iOS direct payloads carry only `recipient_id` (account guard, round 7); no expires_at — an old notification still in Notification Center must stay tappable. */
 async function aosEventMeta(db: SupabaseClient, table: string, filters: Record<string,string>, recipientId: string, kind: string): Promise<Record<string,string>|null> {
  const receiver=await db.from("users").select("id,push_prefs").eq("id",recipientId).maybeSingle();
  if(receiver.error||!receiver.data)return null;
@@ -164,7 +164,7 @@ export async function sendCheersPush(args: {
         alert.body = fillPushTemplate(t("pushCheersBody"), { beer: beerName });
       }
       const payload = {
-        ...(d.platform === "aos" ? aosMeta : {}),
+        ...(d.platform === "aos" ? aosMeta : { recipient_id: toUserId }),
         aps: {
           alert,
           badge: badge.badge,
@@ -265,7 +265,7 @@ export async function sendCheersPush(args: {
       const t = (k: string): string => copyFor(typeof d.locale === "string" ? d.locale : "zh-Hant")[k] ?? copyFor("zh-Hant")[k] ?? k;
       const titleKey = kind === "request" ? "pushFriendRequestTitle" : "pushFriendAcceptedTitle";
       const payload = {
-        ...(d.platform === "aos" ? aosMeta : {}),
+        ...(d.platform === "aos" ? aosMeta : { recipient_id: toUserId }),
         aps: {
           alert: { title: fillPushTemplate(t(titleKey), { name: fromName }) },
           badge: badge.badge,
@@ -360,7 +360,7 @@ export async function sendGameInvitePush(args: {
       if(d.platform==="aos"&&(!aosMeta||!await aosDeviceIsCurrent(supa,d.id,d.push_token,toUserId)))continue;
       const t = (k: string): string => copyFor(typeof d.locale === "string" ? d.locale : "zh-Hant")[k] ?? copyFor("zh-Hant")[k] ?? k;
       const payload = {
-        ...(d.platform === "aos" ? aosMeta : {}),
+        ...(d.platform === "aos" ? aosMeta : { recipient_id: toUserId }),
         aps: {
           alert: { title: fillPushTemplate(t("pushGameInviteTitle"), { name: fromName }) },
           badge: badge.badge,
@@ -516,7 +516,7 @@ export async function sendPartyNoticePush(args: {
                 event_id: `${kind}:${refId}:${toUserId}`,
                 expires_at: expiresAt,
               }
-            : {}),
+            : { recipient_id: toUserId }),
           aps: {
             alert,
             badge: badge.badge,

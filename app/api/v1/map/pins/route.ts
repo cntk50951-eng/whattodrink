@@ -1,6 +1,6 @@
 import { createClient, createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { getBlockedUserIds } from "@/lib/api/blocks";
+import { getBlockedUserIds, withBlockGuard } from "@/lib/api/blocks";
 import { PINS_RANGE_MS, parsePinsParams, toPinJson } from "@/lib/api/pins";
 import type { BBox } from "@/lib/api/pins";
 import { friendIdsOf, hideOnlineForViewer } from "@/lib/friends";
@@ -20,7 +20,7 @@ import { friendIdsOf, hideOnlineForViewer } from "@/lib/friends";
 const PINS_COLUMNS =
   "id,lat,lng,place_name,created_at,kind,expires_at,user_id,photo_thumb,note,users!checkins_user_id_fkey(nickname,avatar_url,gender,dob,bio,last_seen_at,mode),beers(name,emoji)";
 
-export async function GET(req: Request): Promise<Response> {
+async function getHandler(req: Request): Promise<Response> {
   const parsed = parsePinsParams(new URL(req.url).searchParams);
   if ("error" in parsed) {
     return apiError("invalid_params", parsed.error, 400);
@@ -285,3 +285,5 @@ async function friendsScopePins(
     return apiError("internal", err instanceof Error ? err.message : "unknown", 500);
   }
 }
+
+export const GET = withBlockGuard(getHandler);

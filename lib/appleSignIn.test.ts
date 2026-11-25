@@ -110,6 +110,14 @@ describe("appleRevocationGate", () => {
     expect(await appleRevocationGate(apple, "u", null, env, fn as never)).toMatchObject({ proceed: false, status: 409, code: "apple_reauth_required" });
     expect(fn).not.toHaveBeenCalled();
   });
+  it("client that cannot run Apple authorization (Android): proceeds without calling Apple, flags manual revoke (TN3194)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { fn } = fakeFetch([]);
+    expect(await appleRevocationGate(apple, "u", null, env, fn as never, true)).toEqual({ proceed: true, manualRevoke: true });
+    expect(fn).not.toHaveBeenCalled();
+    // 非 Apple 帳號不受影響；有帶 code 時仍照常撤銷，不走手動
+    expect(await appleRevocationGate(svcWith([{ provider: "google" }]), "u", null, env, fn as never, true)).toEqual({ proceed: true });
+  });
   it("proceeds after a successful revoke", async () => {
     const { fn } = fakeFetch([{ status: 200, body: { refresh_token: "R" } }, { status: 200 }]);
     expect(await appleRevocationGate(apple, "u", "CODE", env, fn as never)).toEqual({ proceed: true });

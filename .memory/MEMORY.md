@@ -21,3 +21,4 @@
 - [首屏正式品牌 hi drink／嗨飲](2026-11-15-intro-brand-opening.md) — 原 POC 圖示／最新 Cormorant／文楷字標不重畫；繁簡品牌均為嗨飲，光影單獨生成，來源 SHA-256 留存
 - [Production 與本地 intro 版本核對](2026-11-16-intro-production-version-audit.md) — production／main 仍是 2b5ce6a；品牌首屏、Ivy→骰子與移除底部連結尚在工作區，SITE_LIVE 不會發布本地修改
 - [最新版 intro 提交部署授權](2026-11-16-intro-release.md) — 用戶明確要求部署 M.5／M.6／M.7；同提交 Production 成功才算完成，保持 SITE_LIVE 封站，排除 reports／research_notes
+- [第七輪審核 Web 修復（2026-11-24）](2026-11-24-audit-round7-web-fixes.md) — 封鎖 fail-closed＋withBlockGuard、舉報副作用先確認再通知、刪好友先禁言後刪、kick 先拉黑；容量 RPC、忘記世代、複合游標、Apple 刪帳旗標

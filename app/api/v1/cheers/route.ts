@@ -1,7 +1,7 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { after } from "next/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { isPairBlocked } from "@/lib/api/blocks";
+import { isPairBlocked, withBlockGuard } from "@/lib/api/blocks";
 import { canViewCheckin } from "@/lib/api/checkins";
 import { type FriendshipRow, friendIdsOf } from "@/lib/friends";
 import { cheersQuota, isMinorDob, parseCheersBody, parseCheersMessage } from "@/lib/api/cheers";
@@ -44,7 +44,7 @@ async function friendIdsFor(
  * 前者敬该帖作者，后者回敬（服务端解对方最新可见帖，无帖 404）。
  * 自敬 403；15／天（HK）超限 429；回 `{cheered, remaining, cheers_count}`。
  */
-export async function POST(req: Request): Promise<Response> {
+async function postHandler(req: Request): Promise<Response> {
   const { supabase, userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
@@ -195,7 +195,7 @@ export async function POST(req: Request): Promise<Response> {
  * 有帖无行也 200 幂等（`{cheered:false, cheers_count}`）；404 只＝帖不存在／无权
  * （沿 POST 不泄归属口径；iOS 404＝帖问题，toast 对齐此口径）。
  */
-export async function DELETE(req: Request): Promise<Response> {
+async function deleteHandler(req: Request): Promise<Response> {
   const { supabase, userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
@@ -267,3 +267,6 @@ export async function DELETE(req: Request): Promise<Response> {
     cheers_count: typeof count === "number" && count > 0 ? count : 0,
   });
 }
+
+export const POST = withBlockGuard(postHandler);
+export const DELETE = withBlockGuard(deleteHandler);

@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { getBlockedUserIds, isPairBlocked } from "@/lib/api/blocks";
+import { getBlockedUserIds, isPairBlocked, withBlockGuard } from "@/lib/api/blocks";
 import { isMinorDob } from "@/lib/api/cheers";
 import { canViewCheckin, parseCheckinIdParam } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
@@ -97,7 +97,7 @@ async function gateNonPublic(
   return null;
 }
 
-export async function GET(
+async function getHandler(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -216,7 +216,7 @@ function readAnonId(req: Request): string | null {
   return null;
 }
 
-export async function POST(
+async function postHandler(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -450,3 +450,5 @@ export async function POST(
   }
 }
 
+export const GET = withBlockGuard(getHandler);
+export const POST = withBlockGuard(postHandler);

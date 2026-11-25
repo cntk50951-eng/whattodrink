@@ -1,6 +1,6 @@
 import { createClient, createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { getBlockedUserIds } from "@/lib/api/blocks";
+import { getBlockedUserIds, withBlockGuard } from "@/lib/api/blocks";
 import { toPinJson } from "@/lib/api/pins";
 import { haversineMeters } from "@/lib/geo";
 import { groupOfKey } from "@/lib/api/taste";
@@ -16,7 +16,7 @@ const COLUMNS =
 
 const KW_RE = /^[\p{L}\p{N}_\-·]+$/u;
 
-export async function POST(req: Request): Promise<Response> {
+async function postHandler(req: Request): Promise<Response> {
   const { userId } = await getAuthedClient(req);
   if (userId === null) return apiError("unauthorized", "未登录", 401);
   let raw: unknown = null;
@@ -96,3 +96,5 @@ export async function POST(req: Request): Promise<Response> {
   );
   return apiOk({ posts: out.slice(0, 20) });
 }
+
+export const POST = withBlockGuard(postHandler);

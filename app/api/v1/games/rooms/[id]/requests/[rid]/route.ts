@@ -3,7 +3,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import {
   appendEvent,
   bumpRoom,
-  getActiveMembers,
+  claimRoomSeat,
   loadRoomAsMember,
   parseJoinDecision,
   requireHost,
@@ -83,20 +83,15 @@ export async function POST(
   let inserted = false;
   let seat = 0;
   if (!existing) {
-    const members = await getActiveMembers(svc, loaded.room.id);
-    if (members.length >= loaded.room.max_players) return apiError("room_full", "房間已滿", 409);
-    seat = members.reduce((mx, m) => Math.max(mx, m.seat), -1) + 1;
-    const { error: jErr } = await svc.from("game_room_players").insert({
-      room_id: loaded.room.id, user_id: joinReq.user_id, seat, ready: false, status: "active",
-    });
-    if (jErr) {
-      if (jErr.code !== "23505") return apiError("internal", "同意失敗", 500);
-      // A unique seat collision with a DIFFERENT player must not approve this request.
-      const { data: raced, error: racedErr } = await svc.from("game_room_players")
-        .select("status").eq("room_id", loaded.room.id).eq("user_id", joinReq.user_id).maybeSingle();
-      if (racedErr) return apiError("internal", "讀取成員失敗", 500);
-      if (raced?.status !== "active") return apiError("room_full", "席位已變更，請重試", 409);
-    } else inserted = true;
+    // 原子佔位（第七輪 §3.4）：與 join／bump-join 同一個 RPC，鎖房間行後數人與算席號，並發同意不會超員或同席
+    const claim = await claimRoomSeat(svc, loaded.room.id, joinReq.user_id, Date.now());
+    if (claim.kind === "room_full") return apiError("room_full", "房間已滿", 409);
+    if (claim.kind === "room_started") return apiError("room_started", "對局已開始，不可再加入", 409);
+    if (claim.kind === "kicked") return apiError("forbidden", "該玩家不可重新加入", 403);
+    if (claim.kind === "room_not_found") return apiError("room_not_found", "房間不存在或已結束", 404);
+    if (claim.kind === "error") return apiError("internal", "同意失敗", 500);
+    seat = claim.seat;
+    inserted = claim.kind === "ok";
   }
   const { data: decided, error: decisionErr } = await svc
     .from("game_join_requests")
