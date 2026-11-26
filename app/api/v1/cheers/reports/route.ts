@@ -3,7 +3,13 @@ import { after } from "next/server";
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { notifyReportSubmitted, runReportStp } from "@/lib/api/reportStp";
-import { reportedTextFromSnapshot } from "@/lib/reportTriage";
+import {
+  buildUserProfileModerationText,
+  collectPostImageDataUrls,
+  extractChatImagePaths,
+  reportedTextFromSnapshot,
+  type ReportModerationInput,
+} from "@/lib/reportTriage";
 import {
   messageEvidence,
   parseReportBody,
@@ -13,7 +19,15 @@ import {
   type SnapshotLine,
 } from "@/lib/userReports";
 
-type MessageRow = { id: string; conversation_id: string; sender_id: string; kind: string; body: string | null; created_at: string | null };
+type MessageRow = {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  kind: string;
+  body: string | null;
+  attachments?: unknown;
+  created_at: string | null;
+};
 type PostRow = {
   id: string;
   user_id: string;
@@ -21,6 +35,7 @@ type PostRow = {
   note: string | null;
   transcript: string | null;
   photo_url: string | null;
+  photo_urls?: unknown;
   kind: string | null;
   created_at: string | null;
 };
@@ -57,11 +72,12 @@ export async function POST(req: Request): Promise<Response> {
   let targetUserId = p.targetUserId;
   let snapshot: SnapshotLine[] | null = null;
   let postForStp: PostRow | null = null;
+  let chatImagePaths: string[] = [];
 
   if (p.targetType === "message" && p.targetRef !== null) {
     const { data } = await supabase
       .from("messages")
-      .select("id,conversation_id,sender_id,kind,body,created_at")
+      .select("id,conversation_id,sender_id,kind,body,attachments,created_at")
       .eq("id", p.targetRef)
       .maybeSingle();
     const msg = data as MessageRow | null;
@@ -70,20 +86,28 @@ export async function POST(req: Request): Promise<Response> {
     targetUserId = msg.sender_id;
     const { data: ctx } = await supabase
       .from("messages")
-      .select("id,conversation_id,sender_id,kind,body,created_at")
+      .select("id,conversation_id,sender_id,kind,body,attachments,created_at")
       .eq("conversation_id", msg.conversation_id)
       .lte("created_at", msg.created_at ?? new Date().toISOString())
       .order("created_at", { ascending: false })
       .limit(MESSAGE_CONTEXT + 1);
     const rows = ((ctx ?? []) as MessageRow[]).slice().reverse();
     snapshot = rows.map((m) => messageEvidence(m, msg.sender_id, userId));
+    chatImagePaths = extractChatImagePaths(rows, msg.sender_id);
   } else if (p.targetType === "post" && p.targetRef !== null) {
-    const { data } = await supabase
+    let postRes = await supabase
       .from("checkins")
-      .select("id,user_id,place_name,note,transcript,photo_url,kind,created_at")
+      .select("id,user_id,place_name,note,transcript,photo_url,photo_urls,kind,created_at")
       .eq("id", p.targetRef)
       .maybeSingle();
-    const post = data as PostRow | null;
+    if (postRes.error?.code === "42703") {
+      postRes = await supabase
+        .from("checkins")
+        .select("id,user_id,place_name,note,transcript,photo_url,kind,created_at")
+        .eq("id", p.targetRef)
+        .maybeSingle();
+    }
+    const post = postRes.data as PostRow | null;
     if (post === null) return apiError("not_found", "找不到這則帖子", 404);
     if (post.user_id === userId) return apiError("invalid_params", "不能舉報自己", 400);
     targetUserId = post.user_id;
@@ -106,14 +130,16 @@ export async function POST(req: Request): Promise<Response> {
   ) {
     const { data: evRows } = await supabase
       .from("messages")
-      .select("id,conversation_id,sender_id,kind,body,created_at")
+      .select("id,conversation_id,sender_id,kind,body,attachments,created_at")
       .in("id", p.evidenceMessageIds)
       .eq("conversation_id", p.conversationId)
       .eq("sender_id", targetUserId)
       .order("created_at", { ascending: true })
       .limit(REPORT_EVIDENCE_MAX);
-    const lines = ((evRows ?? []) as MessageRow[]).map((m) => messageEvidence(m, targetUserId, userId));
+    const rows = (evRows ?? []) as MessageRow[];
+    const lines = rows.map((m) => messageEvidence(m, targetUserId, userId));
     if (lines.length > 0) snapshot = lines;
+    chatImagePaths = extractChatImagePaths(rows, targetUserId);
   }
 
   // 24h 內同一人對同一對象的重複舉報不再入庫（回成功，免洗版；證據以第一次為準）
@@ -151,13 +177,20 @@ export async function POST(req: Request): Promise<Response> {
   }
   const reportId = typeof (inserted as { id?: unknown } | null)?.id === "string" ? (inserted as { id: string }).id : "";
 
-  // 寫入舉報人「已提交舉報」動態紀錄，並對帖文舉報啟動背景 AI STP 自動分診（不拖慢 HTTP 回包）
+  // 寫入舉報人「已提交舉報」動態紀錄，並啟動背景 AI STP 自動分診（不拖慢 HTTP 回包）
   const svc = await createServiceClient();
   let targetName: string | null = null;
+  let targetBio: string | null = null;
+  let targetAvatar: string | null = null;
   try {
-    const { data: tu } = await svc.from("users").select("nickname").eq("id", targetUserId).maybeSingle();
-    const n = (tu as { nickname?: unknown } | null)?.nickname;
-    if (typeof n === "string" && n.trim() !== "") targetName = n.trim();
+    let tuRes = await svc.from("users").select("nickname,bio,avatar_url").eq("id", targetUserId).maybeSingle();
+    if (tuRes.error?.code === "42703") {
+      tuRes = await svc.from("users").select("nickname,avatar_url").eq("id", targetUserId).maybeSingle();
+    }
+    const tu = tuRes.data as { nickname?: unknown; bio?: unknown; avatar_url?: unknown } | null;
+    if (typeof tu?.nickname === "string" && tu.nickname.trim() !== "") targetName = tu.nickname.trim();
+    if (typeof tu?.bio === "string" && tu.bio.trim() !== "") targetBio = tu.bio.trim();
+    if (typeof tu?.avatar_url === "string" && tu.avatar_url.startsWith("data:image/")) targetAvatar = tu.avatar_url;
   } catch {}
 
   if (reportId !== "") {
@@ -170,19 +203,32 @@ export async function POST(req: Request): Promise<Response> {
       placeName: postForStp?.place_name ?? null,
       targetName,
     });
-    // 三類舉報都走 AI 初審＋置信度分流（DEF-20261125-020〜024）：帖子審原文＋圖，用戶／訊息審快照裡被舉報人說的話
+    // 三類舉報都走 MiniMax-M3 初審＋置信度分流：
+    //   post：原文＋多圖（photo_urls／photo_url）；
+    //   message：被舉報人文字＋私聊圖片附件（chat-images）；
+    //   user：已勾聊天記錄（文字＋圖）＋被舉報人公開檔案（暱稱／簡介／頭像）
     const stpTargetUserId = targetUserId;
     const stpPost = postForStp;
-    const stpContent =
+    const stpContent: ReportModerationInput =
       stpPost !== null
         ? {
             text: [stpPost.place_name, stpPost.note, stpPost.transcript]
               .filter((x): x is string => typeof x === "string" && x.trim() !== "")
               .join("\n") || undefined,
-            imageDataUrl:
-              typeof stpPost.photo_url === "string" && stpPost.photo_url.startsWith("data:image/") ? stpPost.photo_url : undefined,
+            imageDataUrls: collectPostImageDataUrls(stpPost),
           }
-        : { text: reportedTextFromSnapshot(snapshot) || undefined };
+        : p.targetType === "user"
+          ? {
+              text: [
+                reportedTextFromSnapshot(snapshot),
+                buildUserProfileModerationText({ nickname: targetName, bio: targetBio }),
+              ]
+                .filter((x) => x.trim() !== "")
+                .join("\n\n") || undefined,
+              imageDataUrls: targetAvatar !== null ? [targetAvatar] : undefined,
+            }
+          : { text: reportedTextFromSnapshot(snapshot) || undefined };
+    const stpChatImagePaths = chatImagePaths;
     after(async () => {
       const bgSvc = await createServiceClient();
       await runReportStp(bgSvc, {
@@ -196,6 +242,7 @@ export async function POST(req: Request): Promise<Response> {
         placeName: stpPost?.place_name ?? null,
         targetName,
         content: stpContent,
+        chatImagePaths: stpChatImagePaths,
       });
     });
   }

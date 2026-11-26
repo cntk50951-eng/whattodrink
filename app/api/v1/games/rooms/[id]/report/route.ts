@@ -1,6 +1,6 @@
 import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { moderateCheckin, moderationAction } from "@/lib/moderation";
+import { REPORT_AUTO_ACTION_MIN, scoreReportWithMinimax } from "@/lib/reportTriage";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** 每人每日举报上限（滚动 24h）。 */
@@ -125,7 +125,7 @@ export async function POST(
 
 /**
  * 被举报人 AI 复核（UR H.2 §3：成本只随举报量发生）。
- * 用现有 moderateCheckin（OpenAI 主审＋MiniMax 兜底），最近 10 条文本逐条判定。
+ * 與 Ivy Bar／舉報分流統一走 MiniMax-M3 評分，最近 10 条文本逐条判定；高置信違規（flagged 且 score ≥ 0.85）自動撤回。
  */
 async function reviewReportedUser(
   svc: SupabaseClient,
@@ -155,18 +155,22 @@ async function reviewReportedUser(
       (m): m is { id: string; body: string } =>
         typeof m.id === "string" && typeof m.body === "string" && m.body.trim() !== "",
     );
+    const minimaxKey = process.env.minimaxi_api_key ?? process.env.MINIMAXI_API_KEY ?? process.env.MINIMAX_API_KEY;
+    const minimaxBaseUrl = process.env.MINIMAX_API_BASE ?? process.env.MINIMAX_BASE_URL;
     let hit = false;
     for (const m of texts) {
       try {
-        const verdict = await moderateCheckin(
+        const verdict = await scoreReportWithMinimax(
           { text: m.body },
           {
-            openaiKey: process.env.OPENAI_API_KEY ?? process.env.OPENAI_KEY,
-            minimaxKey: process.env.minimaxi_api_key,
-            minimaxBaseUrl: process.env.MINIMAX_API_BASE,
+            apiKey: minimaxKey,
+            baseUrl: minimaxBaseUrl,
+            targetType: "message",
+            reasonCode: "harassment",
           },
         );
-        if (moderationAction(verdict) !== "reject") continue;
+        const score = "score" in verdict && typeof verdict.score === "number" ? verdict.score : 0;
+        if (!verdict.flagged || score < REPORT_AUTO_ACTION_MIN) continue;
         hit = true;
         await svc
           .from("game_room_messages")

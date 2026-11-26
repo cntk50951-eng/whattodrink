@@ -1,8 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { ModerationChainResult, ModerationInput } from "../moderation";
+import type { ModerationChainResult } from "../moderation";
 import { buildReportEmail, sendSupportEmail } from "../email/supportEmail";
-import { routeReport, scoreReportWithMinimax, type ReportAiDecision } from "../reportTriage";
+import {
+  isAiJudgeableReason,
+  REPORT_MAX_AI_IMAGES,
+  routeReport,
+  scoreReportWithMinimax,
+  type ReportAiDecision,
+  type ReportModerationInput,
+} from "../reportTriage";
 import { writeTrustEvent } from "../trust/ledger";
 import { retryWrite } from "./retryWrite";
 
@@ -380,6 +387,33 @@ export const REPORT_AUTO_DISMISS_NOTE = "系統審核暫未發現違規；如之
  *    auto_dismissed：CAS pending→dismissed，通知舉報人「未發現違規」；
  *    human：帖子匿名通知作者「審核中」，並寄郵件到 support（support_emailed_at 先 CAS 佔位，寄失敗清回可重寄）。
  */
+const MAX_CHAT_IMAGE_BYTES = 4 * 1024 * 1024;
+
+function imageMimeOf(path: string, blobType: string): string {
+  if (blobType.startsWith("image/")) return blobType;
+  const ext = path.split(".").pop()?.toLowerCase();
+  return ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : ext === "gif" ? "image/gif" : "image/jpeg";
+}
+
+async function downloadChatImagesAsDataUrls(svc: SupabaseClient, paths: string[], max: number): Promise<string[]> {
+  if (paths.length === 0 || max <= 0) return [];
+  const storage = (svc as unknown as { storage?: { from?: (b: string) => { download?: (p: string) => Promise<{ data: Blob | null; error: unknown }> } } }).storage;
+  const bucket = storage?.from?.("chat-images");
+  if (bucket?.download === undefined) return [];
+  const out: string[] = [];
+  for (const p of paths.slice(0, max)) {
+    try {
+      const { data, error } = await bucket.download(p);
+      if (error !== null || data === null || data.size === 0 || data.size > MAX_CHAT_IMAGE_BYTES) continue;
+      const buf = Buffer.from(await data.arrayBuffer());
+      out.push(`data:${imageMimeOf(p, data.type)};base64,${buf.toString("base64")}`);
+    } catch {
+      // 單張取圖失敗不中斷整案，讓其餘文字／圖片照常審核
+    }
+  }
+  return out;
+}
+
 export async function runReportStp(
   svc: SupabaseClient,
   args: {
@@ -392,26 +426,38 @@ export async function runReportStp(
     reasonText: string | null;
     placeName: string | null;
     targetName: string | null;
-    content: ModerationInput;
+    content: ReportModerationInput;
+    /** 私聊圖片附件路徑（`chat-images` bucket），於背景下載轉 data:image/ 併入審核 */
+    chatImagePaths?: string[];
     /** 單測注入 */
-    moderate?: (input: ModerationInput) => Promise<ModerationChainResult>;
+    moderate?: (input: ReportModerationInput) => Promise<ModerationChainResult>;
     sendEmail?: typeof sendSupportEmail;
   },
 ): Promise<{ decision: ReportAiDecision; emailed: boolean }> {
-  const judgeable = args.reasonCode === null || args.reasonCode === "harassment" || args.reasonCode === "inappropriate";
+  const judgeable = isAiJudgeableReason(args.reasonCode);
   let verdict: ModerationChainResult | null = null;
   if (judgeable) {
     try {
+      let input: ReportModerationInput = args.content;
+      if (Array.isArray(args.chatImagePaths) && args.chatImagePaths.length > 0) {
+        const existing = [...(args.content.imageDataUrls ?? []), ...(args.content.imageDataUrl ? [args.content.imageDataUrl] : [])];
+        const remaining = Math.max(0, REPORT_MAX_AI_IMAGES - existing.length);
+        const downloaded = await downloadChatImagesAsDataUrls(svc, args.chatImagePaths, remaining);
+        if (downloaded.length > 0) {
+          input = { ...args.content, imageDataUrls: [...existing, ...downloaded] };
+        }
+      }
       // 與 Ivy Bar 共用同一套 MiniMax-M3 API（大小寫環境變數皆認，Vercel 常見 minimaxi_api_key / MINIMAXI_API_KEY）
       const minimaxKey = process.env.minimaxi_api_key ?? process.env.MINIMAXI_API_KEY ?? process.env.MINIMAX_API_KEY;
       const minimaxBaseUrl = process.env.MINIMAX_API_BASE ?? process.env.MINIMAX_BASE_URL;
-      verdict = await (args.moderate ?? ((input: ModerationInput) =>
-        scoreReportWithMinimax(input, {
+      verdict = await (args.moderate ?? ((modInput: ReportModerationInput) =>
+        scoreReportWithMinimax(modInput, {
           apiKey: minimaxKey,
           baseUrl: minimaxBaseUrl,
+          targetType: args.targetType,
           reasonCode: args.reasonCode,
           reasonText: args.reasonText,
-        })))(args.content);
+        })))(input);
     } catch (err) {
       console.warn(`[reportStp] AI moderation failed, routing to human: ${err instanceof Error ? err.message : "unknown"}`);
     }

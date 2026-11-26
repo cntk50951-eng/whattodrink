@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased] — 舉報審核涵蓋多圖、私聊圖與用戶檔案（2026-11-26）
+
+### Changed
+
+- 舉報 AI 初審改看更多材料：帖文收 `photo_urls` 加封面（最多 4 張 `data:image/`）；私聊舉報下載被舉報人的 `chat-images` 附件；用戶舉報帶已勾聊天紀錄，並加上公開暱稱、簡介與頭像。
+- `spam` 改由 MiniMax-M3 評分（與騷擾／不當內容同一套門檻）；`underage`／`other` 仍強制人工。
+- 遊戲房舉報复核改走同一套 MiniMax-M3，高置信違規（flagged 且分數 ≥0.85）才自動撤回訊息。
+
 ## [Unreleased] — 舉報 AI 分流改走 MiniMax-M3（2026-11-26）
 
 ### Changed

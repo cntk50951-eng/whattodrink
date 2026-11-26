@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  buildUserProfileModerationText,
+  collectPostImageDataUrls,
+  extractChatImagePaths,
   parseMinimaxReportScore,
   REPORT_AUTO_ACTION_MIN,
   REPORT_AUTO_DISMISS_MAX,
@@ -27,8 +30,10 @@ describe("routeReport 置信度分流（DEF-20261125-020〜024）", () => {
     // 被標記但分數不到門檻：也不自動處分
     expect(routeReport({ reasonCode: null, verdict: minimax(true, 0.6) }).decision).toBe("human");
   });
-  it("AI 判斷不了的理由（垃圾訊息／未成年／其他）一律人工，即使分數很低", () => {
-    for (const code of ["spam", "underage", "other"]) {
+  it("spam 也納入 AI 可判理由；underage／other 一律人工", () => {
+    expect(routeReport({ reasonCode: "spam", verdict: minimax(true, 0.92) }).decision).toBe("auto_actioned");
+    expect(routeReport({ reasonCode: "spam", verdict: minimax(false, 0.04) }).decision).toBe("auto_dismissed");
+    for (const code of ["underage", "other"]) {
       expect(routeReport({ reasonCode: code, verdict: minimax(false, 0.01) })).toMatchObject({ decision: "human", reason: "reason_needs_human" });
     }
   });
@@ -108,7 +113,7 @@ describe("parseMinimaxReportScore & scoreReportWithMinimax（與 Ivy Bar 同源 
   });
 });
 
-describe("reportedTextFromSnapshot", () => {
+describe("reportedTextFromSnapshot 與多媒體／檔案輔助函數", () => {
   it("只取被舉報人說的話", () => {
     const snap = [
       { who: "reporter", kind: "text", text: "你好", at: null },
@@ -118,5 +123,30 @@ describe("reportedTextFromSnapshot", () => {
     ];
     expect(reportedTextFromSnapshot(snap)).toBe("罵人的話");
     expect(reportedTextFromSnapshot(null)).toBe("");
+  });
+
+  it("collectPostImageDataUrls 去重、過濾非 data:image/ 並上限 4 張", () => {
+    const a = "data:image/jpeg;base64,AAA";
+    const b = "data:image/png;base64,BBB";
+    const c = "data:image/webp;base64,CCC";
+    const d = "data:image/jpeg;base64,DDD";
+    const e = "data:image/jpeg;base64,EEE";
+    expect(collectPostImageDataUrls({ photo_url: a, photo_urls: [a, "https://bad.example/x.jpg", b, c, d, e] })).toEqual([a, b, c, d]);
+    expect(collectPostImageDataUrls({ photo_url: b, photo_urls: null })).toEqual([b]);
+  });
+
+  it("extractChatImagePaths 只收被舉報人的有效 chat-images 路徑，攔路徑穿越", () => {
+    const paths = extractChatImagePaths([
+      { sender_id: "u2", kind: "image", attachments: [{ bucket: "chat-images", path: "u2/a.jpg" }] },
+      { sender_id: "u1", kind: "image", attachments: [{ bucket: "chat-images", path: "u1/mine.jpg" }] },
+      { sender_id: "u2", kind: "image", attachments: [{ bucket: "chat-images", path: "../secret/x.jpg" }, { bucket: "chat-voice", path: "u2/v.m4a" }] },
+      { sender_id: "u2", kind: "image", attachments: [{ bucket: "chat-images", path: "u2/a.jpg" }, { bucket: "chat-images", path: "u2/b.png" }] },
+    ], "u2");
+    expect(paths).toEqual(["u2/a.jpg", "u2/b.png"]);
+  });
+
+  it("buildUserProfileModerationText 組裝暱稱與簡介", () => {
+    expect(buildUserProfileModerationText({ nickname: "  酒鬼小王 ", bio: "加微信買幣" })).toBe("用戶暱稱：酒鬼小王\n個人簡介：加微信買幣");
+    expect(buildUserProfileModerationText({ nickname: " ", bio: null })).toBe("");
   });
 });

@@ -116,6 +116,34 @@ describe("runReportStp 置信度分流", () => {
     const sendEmail = vi.fn(async () => ({ ok: true as const, id: null }));
     expect((await runReportStp(svc, { ...base, moderate: minimax(false, 0.4), sendEmail })).emailed).toBe(true);
   });
+
+  it("chatImagePaths 會從 chat-images 下載轉 data:image/ 後送給 AI 審核", async () => {
+    const { svc } = fakeSvc();
+    (svc as unknown as Record<string, unknown>).storage = {
+      from: (bucket: string) => ({
+        download: async (path: string) => {
+          expect(bucket).toBe("chat-images");
+          expect(path).toBe("u2/pic.jpg");
+          return { data: new Blob([new Uint8Array([1, 2, 3])], { type: "image/jpeg" }), error: null };
+        },
+      }),
+    };
+    let receivedImages: string[] | undefined;
+    const moderate = vi.fn(async (input: { imageDataUrls?: string[] }) => {
+      receivedImages = input.imageDataUrls;
+      return { flagged: true as const, categories: ["sexual"], via: "minimax" as const, score: 0.93 };
+    });
+    const r = await runReportStp(svc, {
+      ...base,
+      targetType: "message",
+      content: {},
+      chatImagePaths: ["u2/pic.jpg"],
+      moderate,
+      sendEmail: vi.fn(),
+    });
+    expect(r).toEqual({ decision: "auto_actioned", emailed: false });
+    expect(receivedImages).toEqual(["data:image/jpeg;base64,AQID"]);
+  });
 });
 
 describe("overrideAutoDismissal 推翻 AI 自動結案", () => {
