@@ -146,6 +146,53 @@ describe("runReportStp 置信度分流", () => {
   });
 });
 
+describe("iOS DEF-20261126-009／010", () => {
+  it("用戶舉報 profileOnly：AI 判乾淨也不自動結案，轉人工寄信", async () => {
+    const { svc, writes } = fakeSvc();
+    const sendEmail = vi.fn(async () => ({ ok: true }));
+    const r = await runReportStp(svc, { ...base, targetType: "user", targetRef: null, content: { text: "用戶暱稱：Chris" }, profileOnly: true, moderate: minimax(false, 0.02), sendEmail: sendEmail as never });
+    expect(r.decision).toBe("human");
+    expect(writes.some((w) => w.table === "notifications" && (w.values as { kind?: string }).kind === "report_resolved")).toBe(false);
+  });
+  it("頭像路徑從 avatars bucket 下載後送審，排在聊天圖之後", async () => {
+    const { svc } = fakeSvc();
+    const seen: string[] = [];
+    (svc as unknown as Record<string, unknown>).storage = {
+      from: (bucket: string) => ({
+        download: async (path: string) => {
+          seen.push(`${bucket}:${path}`);
+          return { data: new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" }), error: null };
+        },
+      }),
+    };
+    let received: string[] | undefined;
+    const moderate = vi.fn(async (input: { imageDataUrls?: string[] }) => {
+      received = input.imageDataUrls;
+      return { flagged: false as const, via: "minimax" as const, score: 0.4 };
+    });
+    await runReportStp(svc, { ...base, targetType: "user", targetRef: null, content: {}, chatImagePaths: ["u2/c.jpg"], avatarPath: "u2/a.png", moderate, sendEmail: vi.fn(async () => ({ ok: true })) as never });
+    expect(seen).toEqual(["chat-images:u2/c.jpg", "avatars:u2/a.png"]);
+    expect(received?.length).toBe(2);
+  });
+  it("自動結案的舉報人通知帶被舉報人暱稱 actor_nickname", async () => {
+    const { svc, writes } = fakeSvc();
+    await runReportStp(svc, { ...base, moderate: minimax(false, 0.02), sendEmail: vi.fn() as never });
+    const resolved = writes.find((w) => w.table === "notifications" && (w.values as { kind?: string }).kind === "report_resolved");
+    expect((resolved?.values as { payload?: { actor_nickname?: string } }).payload?.actor_nickname).toBe("Chris");
+  });
+});
+
+describe("酒局舉報（0093）一律人工", () => {
+  it("不調 AI、不自動結案或處分，轉人工寄信", async () => {
+    const { svc } = fakeSvc();
+    const moderate = vi.fn(minimax(true, 0.99));
+    const sendEmail = vi.fn(async () => ({ ok: true }));
+    const r = await runReportStp(svc, { ...base, targetType: "party", targetRef: "p1", reasonCode: "harassment", content: {}, moderate, sendEmail: sendEmail as never });
+    expect(r.decision).toBe("human");
+    expect(moderate).not.toHaveBeenCalled();
+  });
+});
+
 describe("overrideAutoDismissal 推翻 AI 自動結案", () => {
   it("改判成立：處分並改寫舉報人原通知（置頂、標未讀）", async () => {
     const { svc, writes } = fakeSvc({ resolvedRow: true });

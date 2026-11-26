@@ -15,7 +15,8 @@ import {
   type ReportDecision,
   type ReportTargetType,
 } from "@/lib/api/reportStp";
-import type { SnapshotLine } from "@/lib/userReports";
+import { asReportTargetType, type SnapshotLine } from "@/lib/userReports";
+import { reportPlaceName } from "@/lib/api/partyReport";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -72,14 +73,9 @@ export default async function UserReportDetailPage({ params }: { params: Promise
         reason_code?: unknown;
       };
       const tt: ReportTargetType =
-        row.target_type === "post" || row.target_type === "message" ? row.target_type : "user";
+        asReportTargetType(row.target_type);
       const targetRef = typeof row.target_ref === "string" ? row.target_ref : null;
-      let placeName: string | null = null;
-      if (tt === "post" && targetRef !== null) {
-        const { data: postRow } = await g.svc.from("checkins").select("place_name").eq("id", targetRef).maybeSingle();
-        const pn = (postRow as { place_name?: unknown } | null)?.place_name;
-        if (typeof pn === "string" && pn.trim() !== "") placeName = pn.trim();
-      }
+      const placeName = await reportPlaceName(g.svc, tt, targetRef);
       if (typeof row.target_user_id === "string" && typeof row.reporter_id === "string") {
         const applied = await applyReportDecision(g.svc, {
           reportId: id,
@@ -112,7 +108,7 @@ export default async function UserReportDetailPage({ params }: { params: Promise
   const decisionStatus: ReportDecision | null =
     r.status === "actioned" || r.status === "dismissed" ? r.status : null;
   const targetType: ReportTargetType =
-    r.target_type === "post" || r.target_type === "message" ? r.target_type : "user";
+    asReportTargetType(r.target_type);
   const missingNotify = decisionStatus !== null
     ? await findMissingReportNotifications(svc, {
         reportId: id,
@@ -148,14 +144,9 @@ export default async function UserReportDetailPage({ params }: { params: Promise
       throw new Error("案件缺少收件人資料");
     }
     const tt: ReportTargetType =
-      row.target_type === "post" || row.target_type === "message" ? row.target_type : "user";
+      asReportTargetType(row.target_type);
     const targetRef = typeof row.target_ref === "string" ? row.target_ref : null;
-    let placeName: string | null = null;
-    if (tt === "post" && targetRef !== null) {
-      const { data: postRow } = await g.svc.from("checkins").select("place_name").eq("id", targetRef).maybeSingle();
-      const pn = (postRow as { place_name?: unknown } | null)?.place_name;
-      if (typeof pn === "string" && pn.trim() !== "") placeName = pn.trim();
-    }
+    const placeName = await reportPlaceName(g.svc, tt, targetRef);
     const res = await resendMissingReportNotifications(g.svc, {
       reportId: id,
       targetType: tt,
@@ -189,7 +180,7 @@ export default async function UserReportDetailPage({ params }: { params: Promise
       .maybeSingle();
     const row = rowRaw as Record<string, unknown> | null;
     if (row === null || typeof row.target_user_id !== "string" || typeof row.reporter_id !== "string") throw new Error("案件資料不完整");
-    const tt: ReportTargetType = row.target_type === "post" || row.target_type === "message" ? row.target_type : "user";
+    const tt: ReportTargetType = asReportTargetType(row.target_type);
     const targetRef = typeof row.target_ref === "string" ? row.target_ref : null;
     const note = String(formData.get("note") ?? "").trim().slice(0, 200) || "經客服複核，確認違規並已處理";
     const res = await overrideAutoDismissal(g.svc, {
@@ -224,7 +215,7 @@ export default async function UserReportDetailPage({ params }: { params: Promise
       .maybeSingle();
     const row = rowRaw as Record<string, unknown> | null;
     if (row === null || typeof row.target_user_id !== "string" || typeof row.reporter_id !== "string") throw new Error("案件資料不完整");
-    const tt: ReportTargetType = row.target_type === "post" || row.target_type === "message" ? row.target_type : "user";
+    const tt: ReportTargetType = asReportTargetType(row.target_type);
     const note = String(formData.get("note") ?? "").trim().slice(0, 200) || "經客服複核，暫未發現違規，已撤銷之前的處分";
     const res = await reverseActionedReport(g.svc, {
       reportId: id,
@@ -292,6 +283,11 @@ export default async function UserReportDetailPage({ params }: { params: Promise
         {typeof r.target_ref === "string" ? ` ｜ 目標：${r.target_ref}` : ""}
       </p>
       <p>此被舉報人另有 {others ?? 0} 條其他舉報。</p>
+      {r.target_type === "party" && (
+        <p style={{ color: "#b45309" }}>
+          酒局舉報（被舉報＝發起人）：標「已處理」＝成立 → 未結束的酒局會被平台取消並通知全部成員，發起人扣誠信分；已結束的局只扣分。取消後即使改判也不會自動恢復酒局。
+        </p>
+      )}
       <p>說明：{typeof r.reason === "string" && r.reason !== "" ? r.reason : "（無）"}</p>
       <h2>AI 初審</h2>
       {aiDecision === null ? (

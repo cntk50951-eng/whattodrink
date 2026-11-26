@@ -24,6 +24,8 @@ export type NoticePayload = {
   response_due_at?: string | null;
   decision?: string | null;
   note?: string | null;
+  /** party_cancelled：violation＝酒局經舉報核實違規、由平台取消（0093） */
+  cancel_reason?: string | null;
 };
 
 export type PartyNotice = {
@@ -80,6 +82,7 @@ export function parseNotice(raw: unknown): PartyNotice | null {
       response_due_at: str(p.response_due_at),
       decision: str(p.decision),
       note: str(p.note),
+      cancel_reason: str(p.cancel_reason),
     },
     created_at: str(r.created_at),
     read: r.read === true,
@@ -166,7 +169,9 @@ export type TextKey = { key: string; params?: Record<string, string | number> };
 export function noticeTitle(n: PartyNotice, place: string, actor: string): TextKey {
   switch (n.kind) {
     case "party_cancelled":
-      return { key: "noticeTitleCancelled", params: { place } };
+      return n.payload.cancel_reason === "violation"
+        ? { key: "noticeTitleCancelledViolation", params: { place } }
+        : { key: "noticeTitleCancelled", params: { place } };
     case "member_left":
       return { key: "noticeTitleLeft", params: { actor, place } };
     case "member_left_late": {

@@ -572,6 +572,7 @@
     "noticeGameRequestHint": "到游戏房间的「入座申请」处理",
     "noticeComplaintTag": "投诉",
     "noticeTitleCancelled": "「{place}」酒局已被发起人撤销",
+    "noticeTitleCancelledViolation": "「{place}」酒局因违反社区规则已被平台取消",
     "noticeTitleLeft": "{actor} 退出了你的酒局「{place}」",
     "noticeTitleLeftLate": "{actor} 在开局前 {minutes} 分钟退出了「{place}」",
     "noticeTitleLeftLateSoon": "{actor} 临近开局退出了「{place}」",

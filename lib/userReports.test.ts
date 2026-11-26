@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  asReportTargetType,
   messageEvidence,
+  PARTY_REPORT_REASON_CODES,
   parseReportBody,
   reportPriority,
   reportRank,
@@ -10,6 +12,7 @@ import {
   REPORT_REASON_MAX,
   REPORT_SNAPSHOT_TEXT_MAX,
   splitLegacyReason,
+  USER_REPORT_REASON_CODES,
 } from "./userReports";
 
 const ME = "11111111-1111-1111-1111-111111111111";
@@ -82,7 +85,8 @@ describe("隊列排序", () => {
   });
 
   it("原因碼清單與 iOS 端一致（漂移即紅）", () => {
-    expect([...REPORT_REASON_CODES]).toEqual(["harassment", "inappropriate", "spam", "underage", "other"]);
+    expect([...USER_REPORT_REASON_CODES]).toEqual(["harassment", "inappropriate", "spam", "underage", "other"]);
+    expect([...REPORT_REASON_CODES]).toEqual([...USER_REPORT_REASON_CODES, "fake", "dangerous"]);
   });
 });
 
@@ -136,5 +140,32 @@ describe("舉報附聊天記錄（evidence_message_ids）", () => {
   it("空陣列／null 視為沒附，不要求會話 id", () => {
     expect(parseReportBody({ target_user_id: OTHER, evidence_message_ids: [] }, ME).ok).toBe(true);
     expect(parseReportBody({ target_user_id: OTHER, evidence_message_ids: null }, ME).ok).toBe(true);
+  });
+});
+
+describe("酒局舉報（0093；iOS DEF-20261126-006 ④）", () => {
+  const PARTY = "33333333-3333-3333-3333-333333333333";
+  it("target_type=party 帶 target_id；原因必填且只能是酒局那五種", () => {
+    const ok = parseReportBody({ target_type: "party", target_id: PARTY, reason_code: "fake", reason: "  沒有這個局 " }, ME);
+    expect(ok).toEqual({ ok: true, value: { targetType: "party", targetUserId: null, targetRef: PARTY, reasonCode: "fake", reason: "沒有這個局" } });
+    expect(parseReportBody({ target_type: "party", target_id: PARTY }, ME).ok).toBe(false);
+    expect(parseReportBody({ target_type: "party", target_id: PARTY, reason_code: "spam" }, ME).ok).toBe(false);
+    expect(parseReportBody({ target_type: "party", reason_code: "fake" }, ME).ok).toBe(false);
+    for (const code of PARTY_REPORT_REASON_CODES) {
+      expect(parseReportBody({ target_type: "party", target_id: PARTY, reason_code: code }, ME).ok).toBe(true);
+    }
+  });
+  it("fake／dangerous 不能用在用戶／帖子／訊息", () => {
+    expect(parseReportBody({ target_user_id: OTHER, reason_code: "fake" }, ME).ok).toBe(false);
+    expect(parseReportBody({ target_type: "post", target_id: "c1", reason_code: "dangerous" }, ME).ok).toBe(false);
+  });
+  it("違法或危險與未成年同為最高優先；虛假與騷擾同級", () => {
+    expect(reportPriority("dangerous")).toBe(0);
+    expect(reportPriority("fake")).toBe(reportPriority("harassment"));
+  });
+  it("asReportTargetType 認 party，未知當 user", () => {
+    expect(asReportTargetType("party")).toBe("party");
+    expect(asReportTargetType("weird")).toBe("user");
+    expect(asReportTargetType(null)).toBe("user");
   });
 });

@@ -13,13 +13,15 @@ export const metadata = { robots: { index: false, follow: false } };
 /** 已處理的舉報，證據快照保留天數（過期即清；待處理的不清，免得還沒審就沒證據）。 */
 const SNAPSHOT_KEEP_DAYS = 7;
 
-const TYPE_LABEL: Record<string, string> = { user: "用戶", post: "帖子", message: "聊天訊息" };
+const TYPE_LABEL: Record<string, string> = { user: "用戶", post: "帖子", message: "聊天訊息", party: "酒局" };
 const REASON_LABEL: Record<string, string> = {
   harassment: "騷擾／言語冒犯",
   inappropriate: "不當內容",
   spam: "垃圾訊息／詐騙",
   underage: "疑似未滿 18 歲",
   other: "其他",
+  fake: "虛假酒局／詐騙",
+  dangerous: "違法或危險",
 };
 
 /**

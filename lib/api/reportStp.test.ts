@@ -3,6 +3,14 @@ import { describe, expect, it } from "vitest";
 import { reportTrustDelta, reportTrustExpireDays, reportTrustKind } from "./reportStp";
 
 describe("reportStp trust scoring helpers", () => {
+  it("酒局（0093）：虛假／違法危險 -10，其餘 -6，180 天", () => {
+    expect(reportTrustDelta("party", "fake")).toBe(-10);
+    expect(reportTrustDelta("party", "dangerous")).toBe(-10);
+    expect(reportTrustDelta("party", "harassment")).toBe(-6);
+    expect(reportTrustKind("party")).toBe("party_report_upheld");
+    expect(reportTrustExpireDays("party")).toBe(180);
+  });
+
   it("deducts -6 for upheld post reports with 90d expiry", () => {
     expect(reportTrustDelta("post", "inappropriate")).toBe(-6);
     expect(reportTrustDelta("post", "other")).toBe(-6);

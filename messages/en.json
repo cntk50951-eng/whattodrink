@@ -572,6 +572,7 @@
     "noticeGameRequestHint": "Handle in the game room's join requests",
     "noticeComplaintTag": "Complaint",
     "noticeTitleCancelled": "“{place}” was cancelled by the host",
+    "noticeTitleCancelledViolation": "“{place}” was cancelled for breaking community rules",
     "noticeTitleLeft": "{actor} left your party “{place}”",
     "noticeTitleLeftLate": "{actor} left “{place}” {minutes} min before start",
     "noticeTitleLeftLateSoon": "{actor} left “{place}” right before start",

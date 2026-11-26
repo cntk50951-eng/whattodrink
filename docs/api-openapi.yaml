@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.72.0
+  version: 1.73.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -2195,6 +2195,10 @@ paths:
         UR E.15＋Apple 1.2）。用户：传 target_user_id；帖子／消息：target_type＋target_id，
         作者由服务端反查（不信客户端），并留证据快照（消息含前 5 条上下文）。
         24h 内同一人对同一对象重复举报不再入库，仍回 reported:true。
+        1.73.0（0093）酒局：target_type=party＋target_id=parties.id（举报人须看得到该局；不能举报自己发起的局），
+        reason_code 必填且只能是 fake｜dangerous｜inappropriate｜harassment｜other（fake／dangerous 只给酒局用）。
+        酒局举报一律人工审核，成立时未结束的局被平台取消（成员收 party_cancelled，payload.cancel_reason=violation），
+        发起人扣诚信分；同一人对同一局永远只算一次（重复仍回 reported:true）；每人 24h 最多举报 10 个酒局，超出 429 rate_limited。
         旧客户端只传 target_user_id＋reason 照旧可用；reason 若形如 `harassment: 说明` 会拆出 reason_code。
       security:
         - cookieAuth: []
@@ -2207,7 +2211,7 @@ paths:
               properties:
                 target_type:
                   type: string
-                  enum: [user, post, message]
+                  enum: [user, post, message, party]
                   default: user
                 target_user_id:
                   type: string
@@ -2215,10 +2219,11 @@ paths:
                   description: target_type=user 必填；post／message 忽略
                 target_id:
                   type: string
-                  description: target_type=post 时为 checkins.id，message 时为 messages.id（须是举报人看得到的）
+                  description: target_type=post 时为 checkins.id，message 时为 messages.id，party 时为 parties.id（须是举报人看得到的）
                 reason_code:
                   type: string
-                  enum: [harassment, inappropriate, spam, underage, other]
+                  enum: [harassment, inappropriate, spam, underage, other, fake, dangerous]
+                  description: fake（虚假／诈骗）、dangerous（违法或危险）只用于 target_type=party
                 reason:
                   type: string
                   maxLength: 200
@@ -2245,12 +2250,17 @@ paths:
                 properties:
                   reported:
                     type: boolean
+                  report_id:
+                    type: string
+                    description: 新入庫的舉報 id（重複舉報時為 null）
         "400":
           $ref: "#/components/responses/InvalidParams"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          description: 酒局舉報超過每日上限（rate_limited）
         "500":
           $ref: "#/components/responses/Internal"
   /api/v1/invites:
@@ -6703,12 +6713,12 @@ components:
       required: [id, target_type, status, stage, created_at]
       properties:
         id: { type: string, format: uuid }
-        target_type: { type: string, enum: [user, post, message] }
+        target_type: { type: string, enum: [user, post, message, party] }
         target_ref: { type: string, nullable: true }
         target_name: { type: string, nullable: true }
         target_avatar_url: { type: string, nullable: true }
-        place_name: { type: string, nullable: true, description: 帖子舉報的地點 }
-        reason_code: { type: string, nullable: true, enum: [harassment, inappropriate, spam, underage, other, null] }
+        place_name: { type: string, nullable: true, description: 帖子／酒局舉報的地點（1.73.0 起含酒局；酒局的 target_name 為發起人暱稱） }
+        reason_code: { type: string, nullable: true, enum: [harassment, inappropriate, spam, underage, other, fake, dangerous, null] }
         reason: { type: string, nullable: true }
         status: { type: string, enum: [reviewing, actioned, dismissed] }
         stage: { type: string, enum: [submitted, human_review, closed] }

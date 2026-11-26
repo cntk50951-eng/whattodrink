@@ -9,6 +9,8 @@ import {
   REPORT_AUTO_DISMISS_MAX,
   reportedTextFromSnapshot,
   routeReport,
+  avatarStoragePath,
+  isPlatformBlocked,
   scoreReportWithMinimax,
 } from "./reportTriage";
 
@@ -148,5 +150,38 @@ describe("reportedTextFromSnapshot 與多媒體／檔案輔助函數", () => {
   it("buildUserProfileModerationText 組裝暱稱與簡介", () => {
     expect(buildUserProfileModerationText({ nickname: "  酒鬼小王 ", bio: "加微信買幣" })).toBe("用戶暱稱：酒鬼小王\n個人簡介：加微信買幣");
     expect(buildUserProfileModerationText({ nickname: " ", bio: null })).toBe("");
+  });
+});
+
+describe("iOS DEF-20261126-010：只有公開檔案的用戶舉報、頭像送審", () => {
+  it("profileOnly：低分不自動結案（轉人工 profile_only），高分仍可自動處分", () => {
+    expect(routeReport({ reasonCode: "harassment", verdict: minimax(false, 0.02), profileOnly: true })).toMatchObject({ decision: "human", reason: "profile_only" });
+    expect(routeReport({ reasonCode: "harassment", verdict: minimax(true, 0.5), profileOnly: true })).toMatchObject({ decision: "human", reason: "profile_only" });
+    expect(routeReport({ reasonCode: "inappropriate", verdict: minimax(true, 0.9), profileOnly: true }).decision).toBe("auto_actioned");
+    // 有互動證據時照舊可自動結案
+    expect(routeReport({ reasonCode: "harassment", verdict: minimax(false, 0.02), profileOnly: false }).decision).toBe("auto_dismissed");
+  });
+  it("avatarStoragePath 只認本站 avatars 公開連結，攔路徑穿越", () => {
+    expect(avatarStoragePath("https://x.supabase.co/storage/v1/object/public/avatars/u1/a.jpg?t=1")).toBe("u1/a.jpg");
+    expect(avatarStoragePath("https://x.supabase.co/storage/v1/object/public/avatars/u1/%E5%9C%96.jpg")).toBe("u1/圖.jpg");
+    expect(avatarStoragePath("https://x.supabase.co/storage/v1/object/public/party-covers/u1/a.jpg")).toBeNull();
+    expect(avatarStoragePath("https://x.supabase.co/storage/v1/object/public/avatars/../secret")).toBeNull();
+    expect(avatarStoragePath("https://x.supabase.co/storage/v1/object/public/avatars/")).toBeNull();
+    expect(avatarStoragePath(null)).toBeNull();
+    expect(avatarStoragePath("data:image/png;base64,AAA")).toBeNull();
+  });
+});
+
+describe("iOS DEF-20261126-010：MiniMax 平台過濾攔截一律轉人工", () => {
+  const blocked = { flagged: true as const, categories: ["minimax:porn"], via: "minimax" as const, score: 0.95 };
+  it("平台攔截（0.95）不自動處分，帖文／用戶／profileOnly 都轉人工 platform_blocked", () => {
+    expect(isPlatformBlocked(blocked)).toBe(true);
+    expect(routeReport({ reasonCode: "inappropriate", verdict: blocked })).toMatchObject({ decision: "human", reason: "platform_blocked" });
+    expect(routeReport({ reasonCode: "harassment", verdict: blocked, profileOnly: true })).toMatchObject({ decision: "human", reason: "platform_blocked" });
+  });
+  it("模型自己評的高分照舊自動處分；模型回包冒用 minimax: 前綴的類別會被丟掉", () => {
+    expect(isPlatformBlocked(minimax(true, 0.95))).toBe(false);
+    expect(routeReport({ reasonCode: "inappropriate", verdict: minimax(true, 0.95) }).decision).toBe("auto_actioned");
+    expect(parseMinimaxReportScore('{"flagged":true,"score":0.9,"categories":["minimax:porn","sexual"]}')?.categories).toEqual(["sexual"]);
   });
 });

@@ -4,11 +4,23 @@
  * 舊客戶端只傳 `{target_user_id, reason}`：照舊可用，`reason` 若形如 `harassment: 補充` 會拆出 reason_code。
  */
 
-export const REPORT_TARGET_TYPES = ["user", "post", "message"] as const;
+export const REPORT_TARGET_TYPES = ["user", "post", "message", "party"] as const;
 export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
 
-export const REPORT_REASON_CODES = ["harassment", "inappropriate", "spam", "underage", "other"] as const;
+/** 用戶／帖子／訊息舉報可選原因（與 iOS `UserReportReason` 一致） */
+export const USER_REPORT_REASON_CODES = ["harassment", "inappropriate", "spam", "underage", "other"] as const;
+export const REPORT_REASON_CODES = [...USER_REPORT_REASON_CODES, "fake", "dangerous"] as const;
 export type ReportReasonCode = (typeof REPORT_REASON_CODES)[number];
+
+/** 酒局舉報可選原因（0093）：虛假／詐騙、違法或危險、色情或不當、騷擾性內容、其他。fake／dangerous 只給酒局用 */
+export const PARTY_REPORT_REASON_CODES = ["fake", "dangerous", "inappropriate", "harassment", "other"] as const;
+/** 每人每 24h 最多舉報幾個酒局（防濫用；同一局只能舉報一次由 0093 唯一索引兜底） */
+export const PARTY_REPORT_DAILY_MAX = 10;
+
+/** DB 讀回的 target_type 正規化（未知值當 user，與舊行默認一致） */
+export function asReportTargetType(v: unknown): ReportTargetType {
+  return isOneOf(REPORT_TARGET_TYPES, v) ? v : "user";
+}
 
 export const REPORT_STATUSES = ["pending", "reviewed", "actioned", "dismissed"] as const;
 export type ReportStatus = (typeof REPORT_STATUSES)[number];
@@ -76,6 +88,9 @@ export function parseReportBody(raw: unknown, selfId: string): ParseResult {
     if (legacy.code !== null) reason = legacy.detail;
   }
 
+  // 酒局專用原因（0093）不能用在用戶／帖子／訊息
+  if (targetType !== "party" && (reasonCode === "fake" || reasonCode === "dangerous")) return { ok: false, message: "reason_code 非法" };
+
   if (targetType === "user") {
     if (!idOk(r.target_user_id) || r.target_user_id === selfId) return { ok: false, message: "target_user_id 非法" };
     const value: ParsedReport = { targetType, targetUserId: r.target_user_id, targetRef: null, reasonCode, reason };
@@ -90,6 +105,10 @@ export function parseReportBody(raw: unknown, selfId: string): ParseResult {
     return { ok: true, value };
   }
   if (!idOk(r.target_id)) return { ok: false, message: "target_id 非法" };
+  // 酒局舉報必須選原因，且只能選酒局那五種
+  if (targetType === "party" && (reasonCode === null || !isOneOf(PARTY_REPORT_REASON_CODES, reasonCode))) {
+    return { ok: false, message: "reason_code 非法" };
+  }
   return { ok: true, value: { targetType, targetUserId: null, targetRef: r.target_id, reasonCode, reason } };
 }
 
@@ -111,7 +130,9 @@ export function parseEvidenceIds(v: unknown): string[] | null {
 /** 隊列排序：未成年最前，其次騷擾／不當內容，再垃圾訊息，最後其他／未填。數字小＝優先。 */
 export function reportPriority(code: string | null | undefined): number {
   switch (code) {
-    case "underage": return 0;
+    case "underage":
+    case "dangerous": return 0;
+    case "fake":
     case "harassment":
     case "inappropriate": return 1;
     case "spam": return 2;

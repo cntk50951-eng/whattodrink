@@ -414,14 +414,21 @@ export type PartyNoticePushKind =
   | "invite_cancelled"
   | "invite_completed";
 
-function partyNoticeCopy(
+export function partyNoticeCopy(
   kind: PartyNoticePushKind,
   locale: string,
   actorName: string,
   place: string,
+  reason?: "violation",
 ): { title: string; body: string } {
   const p = place.trim() || (locale === "en" ? "the bar" : "酒吧");
   const a = actorName.trim() || (locale === "en" ? "A friend" : "酒友");
+  // 酒局經舉報核實違規、由平台取消（0093）：不寫成「發起人撤銷了」
+  if (kind === "party_cancelled" && reason === "violation") {
+    if (locale === "en") return { title: "Gathering cancelled", body: `The gathering at ${p} was cancelled for breaking community rules` };
+    if (locale === "zh-Hans") return { title: "酒局已取消", body: `${p} 的酒局因违反社区规则已被平台取消` };
+    return { title: "酒局已取消", body: `${p} 的酒局因違反社區規則已被平台取消` };
+  }
   if (locale === "en") {
     switch (kind) {
       case "party_cancelled":
@@ -471,8 +478,10 @@ export async function sendPartyNoticePush(args: {
   partyId?: string;
   inviteId?: string;
   iosOnly?: boolean;
+  /** 平台因違規取消（party_cancelled 專用）：換文案 */
+  reason?: "violation";
 }): Promise<{ sent: number; skipped?: string }> {
-  const { kind, recipientIds, actorId, actorName, place, partyId, inviteId, iosOnly } = args;
+  const { kind, recipientIds, actorId, actorName, place, partyId, inviteId, iosOnly, reason } = args;
   const targets = [...new Set(recipientIds.filter((uid) => uid !== "" && uid !== actorId))];
   if (targets.length === 0) return { sent: 0, skipped: "no-recipients" };
   try {
@@ -508,7 +517,7 @@ export async function sendPartyNoticePush(args: {
       for (const d of devs) {
         if (d.platform === "aos" && !(await aosDeviceIsCurrent(supa, d.id, d.push_token, toUserId))) continue;
         const loc = typeof d.locale === "string" ? d.locale : "zh-Hant";
-        const alert = partyNoticeCopy(kind, loc, actorName, place);
+        const alert = partyNoticeCopy(kind, loc, actorName, place, reason);
         const payload: Record<string, unknown> = {
           ...(d.platform === "aos"
             ? {

@@ -29,3 +29,4 @@
 - [第七輪審核 Web 修復（2026-11-24）](2026-11-24-audit-round7-web-fixes.md) — 封鎖 fail-closed＋withBlockGuard、舉報副作用先確認再通知、刪好友先禁言後刪、kick 先拉黑
 - [訪客看公開主頁＋遇見按暱稱找人（2026-11-25）](2026-11-25-guest-profile-and-meet-nickname.md) — 匿名只放行 mode=public 陌生人視角；ilike 轉義 % _ \；加 MeetCriteria 欄位須同步客戶端定長解碼
 - [舉報閉環：AI 置信度分流＋人工郵件（2026-11-25）](2026-11-25-report-triage-and-support-email.md) — 0.85／0.10 門檻、Minimax 無分數一律人工、Resend 先佔位再寄、推翻 AI 結案改寫原通知（0087 唯一索引）
+- [舉報分流：只有檔案不自動結案、頭像送審（2026-11-26）](2026-11-26-report-triage-profile-only-avatar.md) — 頭像是 https 不是 data URL、檔案乾淨≠沒騷擾、report_resolved 帶 actor_nickname

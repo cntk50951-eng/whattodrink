@@ -31,7 +31,13 @@ export type ReportRouteReason =
   | "low_confidence"
   | "reason_needs_human"
   | "ai_unavailable"
-  | "no_content";
+  | "no_content"
+  /** 用戶舉報只有對方公開檔案（暱稱／簡介／頭像）、沒有任何互動證據：檔案乾淨不代表沒騷擾，不准自動結案（iOS DEF-20261126-010） */
+  | "profile_only"
+  /** MiniMax 平台層過濾（input_sensitive）攔下：模型沒評分、沒理由，標準是平台自己的而非社區規則 → 不自動處分（iOS DEF-20261126-010） */
+  | "platform_blocked"
+  /** 酒局舉報（0093）：成立即取消整局，一律人工 */
+  | "party_human_only";
 
 export type ReportRoute = {
   decision: ReportAiDecision;
@@ -41,20 +47,38 @@ export type ReportRoute = {
   categories: string[];
 };
 
-export function routeReport(args: { reasonCode: string | null; verdict: ModerationChainResult | null }): ReportRoute {
+export function routeReport(args: {
+  reasonCode: string | null;
+  verdict: ModerationChainResult | null;
+  /** 只審了被舉報人公開檔案（沒附聊天／沒有訊息原文）：可因檔案本身違規而自動處分，但不可自動結案 */
+  profileOnly?: boolean;
+  /** 一律人工（酒局舉報）：不看 AI 結果 */
+  humanOnly?: boolean;
+}): ReportRoute {
   const v = args.verdict;
   const categories = v !== null && v.flagged ? v.categories : [];
   const score = v !== null && "score" in v && typeof v.score === "number" && Number.isFinite(v.score) ? v.score : null;
   const human = (reason: ReportRouteReason): ReportRoute => ({ decision: "human", reason, score, categories });
 
+  if (args.humanOnly === true) return human("party_human_only");
   if (!isAiJudgeableReason(args.reasonCode)) return human("reason_needs_human");
   if (v === null) return human("ai_unavailable");
   if ("skipped" in v && v.skipped) return human(v.reason === "no-input" ? "no_content" : "ai_unavailable");
   // 未給分數（例如舊兜底模式）一律交人工，不據此自動結案或處分
   if (score === null) return human("ai_unavailable");
+  if (isPlatformBlocked(v)) return human("platform_blocked");
   if (score >= REPORT_AUTO_ACTION_MIN) return { decision: "auto_actioned", reason: "high_confidence", score, categories };
+  if (args.profileOnly === true) return human("profile_only");
   if (!v.flagged && score <= REPORT_AUTO_DISMISS_MAX) return { decision: "auto_dismissed", reason: "high_confidence", score, categories };
   return human("low_confidence");
+}
+
+/** `minimax:` 前綴類別只由平台層 input_sensitive 產生（模型回包的同前綴類別在解析時丟掉），據此識別「平台攔截」 */
+export const MINIMAX_PLATFORM_PREFIX = "minimax:";
+
+/** 判定結果是否來自 MiniMax 平台過濾（不是模型評分）：這類結果一律不自動處分／撤回 */
+export function isPlatformBlocked(v: ModerationChainResult | null): boolean {
+  return v !== null && v.flagged && "categories" in v && Array.isArray(v.categories) && v.categories.some((c) => c.startsWith(MINIMAX_PLATFORM_PREFIX));
 }
 
 const MINIMAX_SENSITIVE_LABELS: Record<number, string> = {
@@ -111,6 +135,7 @@ export function parseMinimaxReportScore(raw: string): { flagged: boolean; score:
     ? r.categories
         .filter((c): c is string => typeof c === "string" && c.trim() !== "")
         .map((c) => c.trim().toLowerCase().slice(0, 40))
+        .filter((c) => !c.startsWith(MINIMAX_PLATFORM_PREFIX))
         .slice(0, 6)
     : [];
   return { flagged: r.flagged, score, categories };
@@ -241,7 +266,29 @@ export const REPORT_ROUTE_REASON_TEXT: Record<ReportRouteReason, string> = {
   reason_needs_human: "此舉報理由需人工判斷",
   ai_unavailable: "AI 審核暫不可用",
   no_content: "沒有可供 AI 審核的內容",
+  profile_only: "只有對方公開檔案、沒有互動證據，不自動結案",
+  platform_blocked: "MiniMax 平台過濾攔截（無分數、無理由），不自動處分",
+  party_human_only: "酒局舉報一律人工（成立即取消酒局）",
 };
+
+/**
+ * 頭像公開 URL（`…/storage/v1/object/public/avatars/<path>`）→ avatars bucket 內路徑；不是本站 avatars 公開 URL、
+ * 或路徑可疑（空、`..`、反斜線）回 null。頭像存的是 https 連結而非 data:image/，要在背景下載後才能送審（iOS DEF-20261126-010）。
+ */
+export function avatarStoragePath(url: string | null | undefined): string | null {
+  if (typeof url !== "string") return null;
+  const marker = "/storage/v1/object/public/avatars/";
+  const i = url.indexOf(marker);
+  if (i === -1) return null;
+  let path = url.slice(i + marker.length).split(/[?#]/)[0] ?? "";
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    return null;
+  }
+  if (path === "" || path.includes("..") || path.includes("\\") || path.startsWith("/")) return null;
+  return path;
+}
 
 /** 用戶／訊息舉報：從證據快照取被舉報人說的話給 AI 審（帖子另有原文） */
 export function reportedTextFromSnapshot(snapshot: unknown): string {

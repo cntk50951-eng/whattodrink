@@ -43,6 +43,8 @@ describe("noticeTitle", () => {
   it("撤銷／退出／臨近退出", () => {
     const c = parseNotice({ id: "1", kind: "party_cancelled", payload: {} })!;
     expect(noticeTitle(c, "Bar", "M")).toEqual({ key: "noticeTitleCancelled", params: { place: "Bar" } });
+    const v = parseNotice({ id: "1v", kind: "party_cancelled", payload: { cancel_reason: "violation" } })!;
+    expect(noticeTitle(v, "Bar", "M")).toEqual({ key: "noticeTitleCancelledViolation", params: { place: "Bar" } });
     const l = parseNotice({ id: "2", kind: "member_left", payload: {} })!;
     expect(noticeTitle(l, "Bar", "Mandy")).toEqual({ key: "noticeTitleLeft", params: { actor: "Mandy", place: "Bar" } });
     const ll = parseNotice({ id: "3", kind: "member_left_late", payload: { minutes_before_start: 30 } })!;

@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased] — 酒局舉報（2026-11-26，openapi 1.73.0，migration 0093；iOS-0.205）
+
+### Added
+
+- `POST /api/v1/cheers/reports` 支持 `target_type=party`（`target_id`＝parties.id，舉報人須看得到該局，不能舉報自己發起的局）；原因碼新增 `fake`（虛假／詐騙）、`dangerous`（違法或危險），只給酒局用，酒局舉報原因必填。
+- 酒局舉報一律人工（新分流原因 `party_human_only`，不調 AI）。後台標「已處理」＝成立：未結束的局由平台取消（`cancelPartyForViolation`：CAS open→cancelled、通知全部成員 `party_cancelled`＋`cancel_reason=violation`、補發 iOS 推送「因違反社區規則已被平台取消」），發起人扣誠信分（`party_report_upheld`，虛假／危險 -10，其餘 -6，180 天）；已結束的局只扣分。改判不成立只退分，不恢復酒局。
+- 防濫用：同一人對同一局永遠只算一次（0093 部分唯一索引＋查重，重複仍回 reported:true）；每人 24h 最多舉報 10 個酒局（429 rate_limited）。
+- 「我的舉報」酒局類型帶地點；後台列表／詳情顯示「酒局」與新原因，詳情提示成立會取消酒局；修正後台把非 post／message 一律當 user 的舊寫法（`asReportTargetType`）。
+- web 動態：`noticeTitleCancelledViolation` 三語。
+- 部署前執行 `supabase/migrations/0093_party_reports.sql`（可重放）。**本機未用 PGlite 實跑**。
+- 驗證：vitest 161 檔 1,586/1,586、`tsc --noEmit`、改動檔 eslint 0 error；openapi redocly 錯誤數與 HEAD 相同（206，皆既有）。
+
+## [Unreleased] — 舉報審核：只有公開檔案的用戶舉報不再自動結案、頭像實際送審、結果通知點名對象（2026-11-26，iOS DEF-20261126-009／010）
+
+### Fixed
+
+- 用戶舉報沒附任何聊天文字或圖片時，AI 只看得到對方暱稱、簡介、頭像；檔案乾淨不代表沒有騷擾，以前低分會在幾秒內自動結案成「未發現違規」。現在這類舉報只會在檔案本身明顯違規（≥0.85）時自動處分，其餘一律轉人工（新分流原因 `profile_only`）。
+- 頭像存的是 avatars bucket 的 https 公開連結，舊代碼只收 `data:image/`，頭像其實從未送審；現在在背景從 avatars bucket 下載後送審（排在聊天圖之後，總數仍上限 4 張）。
+- 舉報人的 `report_resolved` 通知 payload 加 `actor_nickname`（被舉報人暱稱；人工結案沒帶時查 users），App 的結果通知可寫明是對誰的舉報。補發缺漏通知同樣帶上。
+- MiniMax 平台層過濾（`input_sensitive`）攔下時，以前代碼當 0.95 分直接自動處分（扣誠信分＋違規通知）；這是平台自己的標準、沒有模型評分和理由，現在一律轉人工（新分流原因 `platform_blocked`）。遊戲房舉報同樣不再因平台攔截自動撤回訊息，只標 `ai_flagged`。模型回包裡冒用 `minimax:` 前綴的類別在解析時丟掉。
+- 驗證：vitest 160 檔 1,574/1,574、`tsc --noEmit`、改動檔 eslint 0 error。
+
 ## [Unreleased] — 舉報審核涵蓋多圖、私聊圖與用戶檔案（2026-11-26）
 
 ### Changed

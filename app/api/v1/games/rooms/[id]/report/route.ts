@@ -1,6 +1,6 @@
 import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { REPORT_AUTO_ACTION_MIN, scoreReportWithMinimax } from "@/lib/reportTriage";
+import { REPORT_AUTO_ACTION_MIN, isPlatformBlocked, scoreReportWithMinimax } from "@/lib/reportTriage";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** 每人每日举报上限（滚动 24h）。 */
@@ -172,6 +172,8 @@ async function reviewReportedUser(
         const score = "score" in verdict && typeof verdict.score === "number" ? verdict.score : 0;
         if (!verdict.flagged || score < REPORT_AUTO_ACTION_MIN) continue;
         hit = true;
+        // MiniMax 平台過濾攔下（無模型評分）：只標 ai_flagged 給後台看，不自動撤回（iOS DEF-20261126-010）
+        if (isPlatformBlocked(verdict)) continue;
         await svc
           .from("game_room_messages")
           .update({ removed_at: new Date().toISOString(), removed_reason: "ai_flagged" })

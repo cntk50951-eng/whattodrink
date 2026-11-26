@@ -3,6 +3,8 @@
  * 只給舉報人看得懂的狀態與結案說明：不回 AI 分數、類別、被舉報人的其他舉報數、審核人身份。
  */
 
+import { asReportTargetType } from "../userReports";
+
 export const MY_REPORTS_LIMIT_DEFAULT = 20;
 export const MY_REPORTS_LIMIT_MAX = 50;
 
@@ -60,14 +62,14 @@ export function myReportDecidedBy(row: Pick<MyReportRow, "status" | "ai_decision
 export type MyReportTarget = { nickname: string | null; avatar_url: string | null; place_name: string | null };
 
 export function toMyReportItem(row: MyReportRow, target: MyReportTarget | undefined): Record<string, unknown> {
-  const tt = row.target_type === "post" || row.target_type === "message" ? row.target_type : "user";
+  const tt = asReportTargetType(row.target_type);
   return {
     id: row.id,
     target_type: tt,
     target_ref: str(row.target_ref),
     target_name: target?.nickname ?? null,
     target_avatar_url: target?.avatar_url ?? null,
-    place_name: tt === "post" ? (target?.place_name ?? null) : null,
+    place_name: tt === "post" || tt === "party" ? (target?.place_name ?? null) : null,
     reason_code: str(row.reason_code),
     reason: str(row.reason),
     status: myReportStatus(row.status),
@@ -113,10 +115,12 @@ type SvcLike = {
 /** 一次查完列表裡的被舉報人暱稱／頭像與帖子地點（查不到就留空，不擋列表） */
 export async function loadMyReportTargets(svc: SvcLike, rows: MyReportRow[]): Promise<Map<string, MyReportTarget>> {
   const userIds = [...new Set(rows.map((r) => str(r.target_user_id)).filter((x): x is string => x !== null))];
-  const postIds = [...new Set(rows.filter((r) => r.target_type === "post").map((r) => str(r.target_ref)).filter((x): x is string => x !== null))];
-  const [users, posts] = await Promise.all([
+  const postIds = [...new Set(rows.filter((r) => r.target_type === "post").map((r) => str(r.target_ref)).filter((x): x is string => x !== null))]
+  const partyIds = [...new Set(rows.filter((r) => r.target_type === "party").map((r) => str(r.target_ref)).filter((x): x is string => x !== null))];
+  const [users, posts, parties] = await Promise.all([
     userIds.length > 0 ? svc.from("users").select("id,nickname,avatar_url").in("id", userIds) : Promise.resolve({ data: [], error: null }),
     postIds.length > 0 ? svc.from("checkins").select("id,place_name").in("id", postIds) : Promise.resolve({ data: [], error: null }),
+    partyIds.length > 0 ? svc.from("parties").select("id,place").in("id", partyIds) : Promise.resolve({ data: [], error: null }),
   ]);
   const userById = new Map<string, { nickname: string | null; avatar_url: string | null }>();
   for (const u of (Array.isArray(users.data) ? users.data : []) as Array<Record<string, unknown>>) {
@@ -126,6 +130,10 @@ export async function loadMyReportTargets(svc: SvcLike, rows: MyReportRow[]): Pr
   for (const p of (Array.isArray(posts.data) ? posts.data : []) as Array<Record<string, unknown>>) {
     if (typeof p.id === "string") placeById.set(p.id, str(p.place_name));
   }
+  const partyPlaceById = new Map<string, string | null>();
+  for (const p of (Array.isArray(parties.data) ? parties.data : []) as Array<Record<string, unknown>>) {
+    if (typeof p.id === "string") partyPlaceById.set(p.id, str(p.place));
+  }
   const out = new Map<string, MyReportTarget>();
   for (const r of rows) {
     const u = userById.get(str(r.target_user_id) ?? "");
@@ -133,7 +141,9 @@ export async function loadMyReportTargets(svc: SvcLike, rows: MyReportRow[]): Pr
     out.set(r.id, {
       nickname: u?.nickname ?? null,
       avatar_url: u?.avatar_url ?? null,
-      place_name: r.target_type === "post" && ref !== null ? (placeById.get(ref) ?? null) : null,
+      place_name: ref === null ? null
+        : r.target_type === "post" ? (placeById.get(ref) ?? null)
+        : r.target_type === "party" ? (partyPlaceById.get(ref) ?? null) : null,
     });
   }
   return out;

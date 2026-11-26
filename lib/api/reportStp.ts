@@ -11,9 +11,10 @@ import {
   type ReportModerationInput,
 } from "../reportTriage";
 import { writeTrustEvent } from "../trust/ledger";
+import { cancelPartyForViolation } from "./partyReport";
 import { retryWrite } from "./retryWrite";
 
-export type ReportTargetType = "user" | "post" | "message";
+export type ReportTargetType = "user" | "post" | "message" | "party";
 export type ReportDecision = "actioned" | "dismissed";
 
 const SEVERE_REASONS = new Set(["harassment", "inappropriate", "spam", "underage"]);
@@ -21,12 +22,14 @@ const SEVERE_REASONS = new Set(["harassment", "inappropriate", "spam", "underage
 /** 舉報核實成立後的誠信扣分（純函數，可單測）：帖文 -6；用戶／訊息嚴重違規 -10，其餘 -6。 */
 export function reportTrustDelta(targetType: ReportTargetType, reasonCode: string | null): number {
   if (targetType === "post") return -6;
+  // 酒局（0093）：虛假／詐騙、違法或危險 -10，其餘 -6
+  if (targetType === "party") return reasonCode === "fake" || reasonCode === "dangerous" ? -10 : -6;
   if (reasonCode !== null && SEVERE_REASONS.has(reasonCode)) return -10;
   return -6;
 }
 
 export function reportTrustKind(targetType: ReportTargetType): string {
-  return targetType === "post" ? "post_report_upheld" : "user_report_upheld";
+  return targetType === "post" ? "post_report_upheld" : targetType === "party" ? "party_report_upheld" : "user_report_upheld";
 }
 
 export function reportTrustExpireDays(targetType: ReportTargetType): number {
@@ -115,6 +118,17 @@ export async function notifyPostReportedUnderReview(
  * 沒成功，就**不發任何結果通知**並回 `ok:false`，由呼叫端把案件退回待處理重跑——下架與扣分都是冪等的
  * （update 同值、trust_events 以 `report:<id>` 去重），重跑安全；通知只在業務結果成立後發。
  */
+/** 被舉報人暱稱（結果通知點名對象用）；查不到回 null，不阻斷處分 */
+async function lookupNickname(svc: SupabaseClient, userId: string): Promise<string | null> {
+  try {
+    const { data } = await svc.from("users").select("nickname").eq("id", userId).maybeSingle();
+    const n = (data as { nickname?: unknown } | null)?.nickname;
+    return typeof n === "string" && n.trim() !== "" ? n.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function applyReportDecision(
   svc: SupabaseClient,
   args: {
@@ -125,6 +139,8 @@ export async function applyReportDecision(
     reporterId: string;
     reasonCode: string | null;
     placeName?: string | null;
+    /** 被舉報人暱稱：寫進舉報人 report_resolved 的 actor_nickname，App 結果通知才能點名對象；未傳則查 users（iOS DEF-20261126-009） */
+    targetName?: string | null;
     decision: ReportDecision;
     note?: string | null;
   },
@@ -132,6 +148,7 @@ export async function applyReportDecision(
   const failed: string[] = [];
   const notifyFailed: string[] = [];
   const cleanNote = typeof args.note === "string" && args.note.trim() !== "" ? args.note.trim() : null;
+  const targetName = args.targetName !== undefined ? args.targetName : await lookupNickname(svc, args.targetUserId);
   if (args.decision === "actioned") {
     // 1. 帖文違規：立即轉為 private 下架
     if (args.targetType === "post" && args.targetRef !== null && args.targetRef !== "") {
@@ -159,6 +176,11 @@ export async function applyReportDecision(
         failed.push("hide");
         console.error(`[reportStp] hide checkin error: ${err instanceof Error ? err.message : "unknown"}`);
       }
+    }
+    // 1b. 酒局違規（0093）：未結束的局由平台取消並通知成員；寫狀態失敗就停（不扣分、不說已處理），重跑冪等
+    if (args.targetType === "party" && args.targetRef !== null && args.targetRef !== "") {
+      const cancel = await cancelPartyForViolation(svc, { partyId: args.targetRef, reportId: args.reportId });
+      if (cancel.outcome === "error") failed.push("cancel");
     }
     // 下架失敗就先停：扣分會同時發 trust_changed 通知，不能在帖文還公開時就告訴被舉報人「已處理」。重跑時兩步都冪等
     if (failed.length > 0) return { ok: false, failed, notifyFailed };
@@ -214,6 +236,7 @@ export async function applyReportDecision(
       target_ref: args.targetRef,
       reason_code: args.reasonCode,
       party_place: args.placeName ?? null,
+      actor_nickname: targetName,
       decision: args.decision,
       note: cleanNote,
     },
@@ -329,6 +352,7 @@ export async function resendMissingReportNotifications(
   }
 
   if (missingReporter) {
+    const targetName = await lookupNickname(svc, args.targetUserId);
     const res = await retryWrite(() => svc.from("notifications").insert({
       user_id: args.reporterId,
       kind: "report_resolved",
@@ -340,6 +364,7 @@ export async function resendMissingReportNotifications(
         target_ref: args.targetRef,
         reason_code: args.reasonCode,
         party_place: args.placeName ?? null,
+        actor_nickname: targetName,
         decision: args.decision,
         note: cleanNote,
       },
@@ -395,10 +420,10 @@ function imageMimeOf(path: string, blobType: string): string {
   return ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : ext === "gif" ? "image/gif" : "image/jpeg";
 }
 
-async function downloadChatImagesAsDataUrls(svc: SupabaseClient, paths: string[], max: number): Promise<string[]> {
+async function downloadStorageImagesAsDataUrls(svc: SupabaseClient, bucketName: "chat-images" | "avatars", paths: string[], max: number): Promise<string[]> {
   if (paths.length === 0 || max <= 0) return [];
   const storage = (svc as unknown as { storage?: { from?: (b: string) => { download?: (p: string) => Promise<{ data: Blob | null; error: unknown }> } } }).storage;
-  const bucket = storage?.from?.("chat-images");
+  const bucket = storage?.from?.(bucketName);
   if (bucket?.download === undefined) return [];
   const out: string[] = [];
   for (const p of paths.slice(0, max)) {
@@ -429,24 +454,32 @@ export async function runReportStp(
     content: ReportModerationInput;
     /** 私聊圖片附件路徑（`chat-images` bucket），於背景下載轉 data:image/ 併入審核 */
     chatImagePaths?: string[];
+    /** 被舉報人頭像在 `avatars` bucket 的路徑（用戶舉報；頭像存 https 連結，背景下載後送審） */
+    avatarPath?: string | null;
+    /** 用戶舉報只有公開檔案、無互動證據：不准自動結案（iOS DEF-20261126-010） */
+    profileOnly?: boolean;
     /** 單測注入 */
     moderate?: (input: ReportModerationInput) => Promise<ModerationChainResult>;
     sendEmail?: typeof sendSupportEmail;
   },
 ): Promise<{ decision: ReportAiDecision; emailed: boolean }> {
-  const judgeable = isAiJudgeableReason(args.reasonCode);
+  // 酒局舉報（0093）一律人工：成立會取消整局、影響全部成員，不讓 AI 自動決定
+  const partyReport = args.targetType === "party";
+  const judgeable = !partyReport && isAiJudgeableReason(args.reasonCode);
   let verdict: ModerationChainResult | null = null;
   if (judgeable) {
     try {
       let input: ReportModerationInput = args.content;
-      if (Array.isArray(args.chatImagePaths) && args.chatImagePaths.length > 0) {
-        const existing = [...(args.content.imageDataUrls ?? []), ...(args.content.imageDataUrl ? [args.content.imageDataUrl] : [])];
+      const appendFrom = async (bucketName: "chat-images" | "avatars", paths: string[]): Promise<void> => {
+        if (paths.length === 0) return;
+        const existing = [...(input.imageDataUrls ?? []), ...(input.imageDataUrl ? [input.imageDataUrl] : [])];
         const remaining = Math.max(0, REPORT_MAX_AI_IMAGES - existing.length);
-        const downloaded = await downloadChatImagesAsDataUrls(svc, args.chatImagePaths, remaining);
-        if (downloaded.length > 0) {
-          input = { ...args.content, imageDataUrls: [...existing, ...downloaded] };
-        }
-      }
+        const downloaded = await downloadStorageImagesAsDataUrls(svc, bucketName, paths, remaining);
+        if (downloaded.length > 0) input = { ...input, imageDataUrl: undefined, imageDataUrls: [...existing, ...downloaded] };
+      };
+      // 聊天圖（實際互動證據）優先佔名額，頭像最後
+      if (Array.isArray(args.chatImagePaths)) await appendFrom("chat-images", args.chatImagePaths);
+      if (typeof args.avatarPath === "string" && args.avatarPath !== "") await appendFrom("avatars", [args.avatarPath]);
       // 與 Ivy Bar 共用同一套 MiniMax-M3 API（大小寫環境變數皆認，Vercel 常見 minimaxi_api_key / MINIMAXI_API_KEY）
       const minimaxKey = process.env.minimaxi_api_key ?? process.env.MINIMAXI_API_KEY ?? process.env.MINIMAX_API_KEY;
       const minimaxBaseUrl = process.env.MINIMAX_API_BASE ?? process.env.MINIMAX_BASE_URL;
@@ -454,7 +487,7 @@ export async function runReportStp(
         scoreReportWithMinimax(modInput, {
           apiKey: minimaxKey,
           baseUrl: minimaxBaseUrl,
-          targetType: args.targetType,
+          targetType: args.targetType === "party" ? undefined : args.targetType,
           reasonCode: args.reasonCode,
           reasonText: args.reasonText,
         })))(input);
@@ -462,7 +495,7 @@ export async function runReportStp(
       console.warn(`[reportStp] AI moderation failed, routing to human: ${err instanceof Error ? err.message : "unknown"}`);
     }
   }
-  let route = routeReport({ reasonCode: args.reasonCode, verdict });
+  let route = routeReport({ reasonCode: args.reasonCode, verdict, profileOnly: args.profileOnly === true, humanOnly: partyReport });
   if (route.reason === "ai_unavailable") {
     const detail =
       verdict === null
@@ -505,6 +538,7 @@ export async function runReportStp(
         reporterId: args.reporterId,
         reasonCode: args.reasonCode,
         placeName: args.placeName,
+        targetName: args.targetName,
         decision: target,
         note: target === "actioned" ? `${REPORT_AUTO_ACTION_NOTE}${catText}` : REPORT_AUTO_DISMISS_NOTE,
       });
@@ -706,7 +740,7 @@ export async function reverseActionedReport(
     try {
       const trust = await writeTrustEvent(svc, {
         user_id: args.targetUserId,
-        kind: args.targetType === "post" ? "post_report_reverted" : "user_report_reverted",
+        kind: args.targetType === "post" ? "post_report_reverted" : args.targetType === "party" ? "party_report_reverted" : "user_report_reverted",
         delta: -reportTrustDelta(args.targetType, args.reasonCode),
         party_id: null,
         ref_id: `report:${args.reportId}:revert`,

@@ -4,6 +4,7 @@ import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { notifyReportSubmitted, runReportStp } from "@/lib/api/reportStp";
 import {
+  avatarStoragePath,
   buildUserProfileModerationText,
   collectPostImageDataUrls,
   extractChatImagePaths,
@@ -13,6 +14,7 @@ import {
 import {
   messageEvidence,
   parseReportBody,
+  PARTY_REPORT_DAILY_MAX,
   REPORT_DEDUPE_MS,
   REPORT_EVIDENCE_MAX,
   clipSnapshotText,
@@ -26,6 +28,16 @@ type MessageRow = {
   kind: string;
   body: string | null;
   attachments?: unknown;
+  created_at: string | null;
+};
+type PartyRow = {
+  id: string;
+  host_user_id: string;
+  place: string | null;
+  start_at: string | null;
+  host_intro: string | null;
+  purpose_other: string | null;
+  status: string | null;
   created_at: string | null;
 };
 type PostRow = {
@@ -49,6 +61,8 @@ const MESSAGE_CONTEXT = 5;
  *   用戶：`{target_user_id, reason?, reason_code?}`（舊形狀照舊可用）
  *   帖子：`{target_type:"post", target_id:<checkins.id>, reason?, reason_code?}`
  *   訊息：`{target_type:"message", target_id:<messages.id>, reason?, reason_code?}`
+ *   酒局：`{target_type:"party", target_id:<parties.id>, reason_code∈fake|dangerous|inappropriate|harassment|other, reason?}`
+ *     （0093；一律人工，成立即取消未結束的局；同一局只能舉報一次；每人 24h 最多 10 個酒局）
  * 帖子／訊息的作者由服務端按目標反查，並留證據快照；舉報進後台 `/innerharbour/user-reports`。
  * reason 限 200 字；reason_code ∈ harassment|inappropriate|spam|underage|other。
  */
@@ -72,6 +86,7 @@ export async function POST(req: Request): Promise<Response> {
   let targetUserId = p.targetUserId;
   let snapshot: SnapshotLine[] | null = null;
   let postForStp: PostRow | null = null;
+  let partyForStp: PartyRow | null = null;
   let chatImagePaths: string[] = [];
 
   if (p.targetType === "message" && p.targetRef !== null) {
@@ -114,6 +129,30 @@ export async function POST(req: Request): Promise<Response> {
     postForStp = post;
     const text = [post.place_name, post.note].filter((s): s is string => typeof s === "string" && s !== "").join(" · ");
     snapshot = [{ who: "reported", kind: post.kind ?? "post", text: clipSnapshotText(text), at: post.created_at }];
+  } else if (p.targetType === "party" && p.targetRef !== null) {
+    // 酒局舉報（0093）：用舉報人自己的會話讀（RLS 決定看不看得到這個局），發起人由服務端反查
+    const { data } = await supabase
+      .from("parties")
+      .select("id,host_user_id,place,start_at,host_intro,purpose_other,status,created_at")
+      .eq("id", p.targetRef)
+      .maybeSingle();
+    const party = data as PartyRow | null;
+    if (party === null) return apiError("not_found", "找不到這個酒局", 404);
+    if (party.host_user_id === userId) return apiError("invalid_params", "不能舉報自己發起的酒局", 400);
+    targetUserId = party.host_user_id;
+    partyForStp = party;
+    // 每人 24h 最多舉報 PARTY_REPORT_DAILY_MAX 個酒局（同一局只能舉報一次另由唯一索引＋下方查重兜底）
+    const { count } = await supabase
+      .from("cheers_reports")
+      .select("id", { count: "exact", head: true })
+      .eq("reporter_id", userId)
+      .eq("target_type", "party")
+      .gte("created_at", new Date(Date.now() - 24 * 3600_000).toISOString());
+    if ((count ?? 0) >= PARTY_REPORT_DAILY_MAX) return apiError("rate_limited", "今天舉報次數已達上限，請明天再試", 429);
+    const text = [party.place, party.start_at, party.host_intro, party.purpose_other]
+      .filter((s): s is string => typeof s === "string" && s.trim() !== "")
+      .join(" · ");
+    snapshot = [{ who: "reported", kind: "party", text: clipSnapshotText(text), at: party.created_at }];
   }
 
   if (targetUserId === null) {
@@ -143,7 +182,8 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // 24h 內同一人對同一對象的重複舉報不再入庫（回成功，免洗版；證據以第一次為準）
-  const since = new Date(Date.now() - REPORT_DEDUPE_MS).toISOString();
+  // 酒局：同一人對同一局永遠只算一次（0093 唯一索引兜並發）
+  const since = new Date(p.targetType === "party" ? 0 : Date.now() - REPORT_DEDUPE_MS).toISOString();
   let dupe = supabase
     .from("cheers_reports")
     .select("id")
@@ -171,6 +211,10 @@ export async function POST(req: Request): Promise<Response> {
     })
     .select("id")
     .single();
+  // 並發重複提交撞上酒局唯一索引：當作已舉報
+  if (error !== null && error.code === "23505") {
+    return apiOk({ reported: true });
+  }
   if (error !== null) {
     console.error(`[api/v1/cheers/reports] insert error: code=${error.code} message=${error.message}`);
     return apiError("internal", "举报失败", 500);
@@ -182,6 +226,7 @@ export async function POST(req: Request): Promise<Response> {
   let targetName: string | null = null;
   let targetBio: string | null = null;
   let targetAvatar: string | null = null;
+  let targetAvatarPath: string | null = null;
   try {
     let tuRes = await svc.from("users").select("nickname,bio,avatar_url").eq("id", targetUserId).maybeSingle();
     if (tuRes.error?.code === "42703") {
@@ -191,6 +236,8 @@ export async function POST(req: Request): Promise<Response> {
     if (typeof tu?.nickname === "string" && tu.nickname.trim() !== "") targetName = tu.nickname.trim();
     if (typeof tu?.bio === "string" && tu.bio.trim() !== "") targetBio = tu.bio.trim();
     if (typeof tu?.avatar_url === "string" && tu.avatar_url.startsWith("data:image/")) targetAvatar = tu.avatar_url;
+    // 頭像實際存 avatars bucket 的 https 公開連結：記下路徑，背景下載後送審（iOS DEF-20261126-010）
+    else targetAvatarPath = avatarStoragePath(tu?.avatar_url as string | null | undefined);
   } catch {}
 
   if (reportId !== "") {
@@ -200,7 +247,7 @@ export async function POST(req: Request): Promise<Response> {
       targetType: p.targetType,
       targetRef: p.targetRef,
       reasonCode: p.reasonCode,
-      placeName: postForStp?.place_name ?? null,
+      placeName: postForStp?.place_name ?? partyForStp?.place ?? null,
       targetName,
     });
     // 三類舉報都走 MiniMax-M3 初審＋置信度分流：
@@ -229,6 +276,10 @@ export async function POST(req: Request): Promise<Response> {
             }
           : { text: reportedTextFromSnapshot(snapshot) || undefined };
     const stpChatImagePaths = chatImagePaths;
+    const stpPartyPlace = partyForStp?.place ?? null;
+    // 用戶舉報沒有任何互動證據（沒勾聊天文字／圖）：AI 只看得到公開檔案，檔案乾淨不等於沒騷擾 → 不准自動結案
+    const stpProfileOnly = p.targetType === "user" && reportedTextFromSnapshot(snapshot).trim() === "" && chatImagePaths.length === 0;
+    const stpAvatarPath = p.targetType === "user" ? targetAvatarPath : null;
     after(async () => {
       const bgSvc = await createServiceClient();
       await runReportStp(bgSvc, {
@@ -239,10 +290,12 @@ export async function POST(req: Request): Promise<Response> {
         reporterId: userId,
         reasonCode: p.reasonCode,
         reasonText: p.reason,
-        placeName: stpPost?.place_name ?? null,
+        placeName: stpPost?.place_name ?? stpPartyPlace,
         targetName,
         content: stpContent,
         chatImagePaths: stpChatImagePaths,
+        avatarPath: stpAvatarPath,
+        profileOnly: stpProfileOnly,
       });
     });
   }
