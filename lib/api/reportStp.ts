@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { moderateCheckin, type ModerationChainResult, type ModerationInput } from "../moderation";
+import type { ModerationChainResult, ModerationInput } from "../moderation";
 import { buildReportEmail, sendSupportEmail } from "../email/supportEmail";
-import { routeReport, type ReportAiDecision } from "../reportTriage";
+import { routeReport, scoreReportWithMinimax, type ReportAiDecision } from "../reportTriage";
 import { writeTrustEvent } from "../trust/ledger";
 import { retryWrite } from "./retryWrite";
 
@@ -402,17 +402,30 @@ export async function runReportStp(
   let verdict: ModerationChainResult | null = null;
   if (judgeable) {
     try {
+      // 與 Ivy Bar 共用同一套 MiniMax-M3 API（大小寫環境變數皆認，Vercel 常見 minimaxi_api_key / MINIMAXI_API_KEY）
+      const minimaxKey = process.env.minimaxi_api_key ?? process.env.MINIMAXI_API_KEY ?? process.env.MINIMAX_API_KEY;
+      const minimaxBaseUrl = process.env.MINIMAX_API_BASE ?? process.env.MINIMAX_BASE_URL;
       verdict = await (args.moderate ?? ((input: ModerationInput) =>
-        moderateCheckin(input, {
-          openaiKey: process.env.OPENAI_API_KEY,
-          minimaxKey: process.env.MINIMAX_API_KEY ?? process.env.minimaxi_api_key,
-          minimaxBaseUrl: process.env.MINIMAX_BASE_URL,
+        scoreReportWithMinimax(input, {
+          apiKey: minimaxKey,
+          baseUrl: minimaxBaseUrl,
+          reasonCode: args.reasonCode,
+          reasonText: args.reasonText,
         })))(args.content);
     } catch (err) {
       console.warn(`[reportStp] AI moderation failed, routing to human: ${err instanceof Error ? err.message : "unknown"}`);
     }
   }
   let route = routeReport({ reasonCode: args.reasonCode, verdict });
+  if (route.reason === "ai_unavailable") {
+    const detail =
+      verdict === null
+        ? "null"
+        : "skipped" in verdict && verdict.skipped
+          ? `skipped:${verdict.reason}${verdict.errors ? `(${verdict.errors.map((e) => `${e.vendor}:${e.status ?? "err"}`).join(",")})` : ""}`
+          : `via:${verdict.via}:no-score`;
+    console.warn(`[reportStp] ai_unavailable report=${args.reportId} detail=${detail}`);
+  }
 
   const saveRoute = async (decision: ReportAiDecision): Promise<void> => {
     const { error } = await svc.from("cheers_reports").update({

@@ -47,14 +47,14 @@ const base = {
   reportId: "r1", targetType: "post" as const, targetRef: "c1", targetUserId: "u2", reporterId: "u1",
   reasonCode: "harassment", reasonText: null, placeName: "中環", targetName: "Chris", content: { text: "罵人" },
 };
-const openai = (flagged: boolean, score: number) => async () =>
-  flagged ? { flagged: true as const, categories: ["harassment"], via: "openai" as const, score } : { flagged: false as const, via: "openai" as const, score };
+const minimax = (flagged: boolean, score: number) => async () =>
+  flagged ? { flagged: true as const, categories: ["harassment"], via: "minimax" as const, score } : { flagged: false as const, via: "minimax" as const, score };
 
 describe("runReportStp 置信度分流", () => {
   it("高置信違規：自動處分（下架、寫 AI 欄位），不寄郵件", async () => {
     const { svc, writes } = fakeSvc();
     const sendEmail = vi.fn();
-    const r = await runReportStp(svc, { ...base, moderate: openai(true, 0.97), sendEmail });
+    const r = await runReportStp(svc, { ...base, moderate: minimax(true, 0.97), sendEmail });
     expect(r).toEqual({ decision: "auto_actioned", emailed: false });
     expect(writes.some((w) => w.table === "checkins" && (w.values as { visibility?: string }).visibility === "private")).toBe(true);
     expect(writes.some((w) => w.table === "cheers_reports" && (w.values as { ai_decision?: string }).ai_decision === "auto_actioned")).toBe(true);
@@ -64,7 +64,7 @@ describe("runReportStp 置信度分流", () => {
   it("高置信無違規：自動結案，通知舉報人，不下架不寄信", async () => {
     const { svc, writes } = fakeSvc();
     const sendEmail = vi.fn();
-    const r = await runReportStp(svc, { ...base, moderate: openai(false, 0.02), sendEmail });
+    const r = await runReportStp(svc, { ...base, moderate: minimax(false, 0.02), sendEmail });
     expect(r.decision).toBe("auto_dismissed");
     expect(writes.some((w) => w.table === "checkins")).toBe(false);
     expect(writes.some((w) => w.table === "notifications" && (w.values as { kind?: string; payload?: { decision?: string } }).kind === "report_resolved"
@@ -75,7 +75,7 @@ describe("runReportStp 置信度分流", () => {
   it("置信度不足：人工＋通知帖子作者審核中＋寄一次郵件（先佔位）", async () => {
     const { svc, writes } = fakeSvc();
     const sendEmail = vi.fn(async () => ({ ok: true as const, id: "em_1" }));
-    const r = await runReportStp(svc, { ...base, moderate: openai(false, 0.4), sendEmail });
+    const r = await runReportStp(svc, { ...base, moderate: minimax(false, 0.4), sendEmail });
     expect(r).toEqual({ decision: "human", emailed: true });
     expect(sendEmail).toHaveBeenCalledTimes(1);
     expect(writes.some((w) => w.table === "notifications" && (w.values as { kind?: string }).kind === "post_reported")).toBe(true);
@@ -86,7 +86,7 @@ describe("runReportStp 置信度分流", () => {
   it("郵件寄失敗：把 support_emailed_at 清回 NULL 以便重寄", async () => {
     const { svc, writes } = fakeSvc();
     const sendEmail = vi.fn(async () => ({ ok: false as const, status: 403, error: "domain not verified" }));
-    const r = await runReportStp(svc, { ...base, moderate: openai(false, 0.4), sendEmail });
+    const r = await runReportStp(svc, { ...base, moderate: minimax(false, 0.4), sendEmail });
     expect(r.emailed).toBe(false);
     expect(writes.some((w) => w.table === "cheers_reports" && (w.values as { support_emailed_at?: unknown }).support_emailed_at === null)).toBe(true);
   });
@@ -95,7 +95,7 @@ describe("runReportStp 置信度分流", () => {
     const { svc } = fakeSvc({ noClaim: true });
     const sendEmail = vi.fn();
     // noClaim 也讓自動處分搶不到 → 走人工；佔位也搶不到 → 不寄
-    const r = await runReportStp(svc, { ...base, moderate: openai(false, 0.4), sendEmail });
+    const r = await runReportStp(svc, { ...base, moderate: minimax(false, 0.4), sendEmail });
     expect(r).toEqual({ decision: "human", emailed: false });
     expect(sendEmail).not.toHaveBeenCalled();
   });
@@ -114,7 +114,7 @@ describe("runReportStp 置信度分流", () => {
   it("0090 未遷移（42703）：不能去重但照寄", async () => {
     const { svc } = fakeSvc({ claimError: "42703" });
     const sendEmail = vi.fn(async () => ({ ok: true as const, id: null }));
-    expect((await runReportStp(svc, { ...base, moderate: openai(false, 0.4), sendEmail })).emailed).toBe(true);
+    expect((await runReportStp(svc, { ...base, moderate: minimax(false, 0.4), sendEmail })).emailed).toBe(true);
   });
 });
 

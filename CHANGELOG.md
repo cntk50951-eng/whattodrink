@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased] — 舉報 AI 分流改走 MiniMax-M3（2026-11-26）
+
+### Changed
+
+- 舉報初審評分改與 Ivy Bar 共用 MiniMax-M3（`api.minimaxi.com` chat completions），不再用 OpenAI 類別分數。高置信門檻不變：≥0.85 自動處分、≤0.10 且未標記自動結案，其餘轉人工。
+- 平台回 `input_sensitive` 視作高置信違規（0.95）。沒金鑰、沒內容、呼叫或 JSON 解析失敗仍轉人工。環境變數認 `minimaxi_api_key`／`MINIMAXI_API_KEY`／`MINIMAX_API_KEY`。
+
 ## [Unreleased] — 舉報改判雙向、翻頁游標 `+` 容錯（2026-11-25）
 
 ### Added
