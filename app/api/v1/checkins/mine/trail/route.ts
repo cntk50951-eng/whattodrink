@@ -1,6 +1,6 @@
 import { toMineRow } from "@/lib/api/checkins";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { MY_TRAIL_HEADERS, parseMyTrailList, trailBoundsArgs } from "@/lib/api/myTrail";
+import { MY_TRAIL_HEADERS, parseMyTrailList, readTrailSeq, trailBoundsArgs } from "@/lib/api/myTrail";
 import { getAuthedClient } from "@/lib/supabase/server";
 
 export async function GET(req: Request): Promise<Response> {
@@ -32,5 +32,8 @@ export async function GET(req: Request): Promise<Response> {
     return parsed === null ? [] : [parsed];
   });
   const next_cursor = rows.length > limit ? (page.at(-1)?.page_cursor ?? null) : null;
-  return apiOk({ checkins, next_cursor }, 200, MY_TRAIL_HEADERS);
+  // 全局「第 N 站」（0092；缺就不帶，客戶端退回本地序號）
+  const { seq, total } = await readTrailSeq(supabase, checkins.map((c) => c.id));
+  const withSeq = checkins.map((c) => (seq.has(c.id) ? { ...c, seq: seq.get(c.id) } : c));
+  return apiOk(total === null ? { checkins: withSeq, next_cursor } : { checkins: withSeq, next_cursor, total }, 200, MY_TRAIL_HEADERS);
 }

@@ -4,6 +4,7 @@ import { getBlockedUserIds, isPairBlocked, withBlockGuard } from "@/lib/api/bloc
 import { areFriends, type FriendshipRow } from "@/lib/friends";
 import { canViewCheckin, parseCheckinIdParam } from "@/lib/api/checkins";
 import { summarizeRatings } from "@/lib/api/rating";
+import { fuzzCoordinate } from "@/lib/api/pins";
 
 /**
  * UR E.2 打卡詳情（🔒）。
@@ -150,10 +151,10 @@ async function getHandler(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  const { supabase, userId } = await getAuthedClient();
-  if (userId === null) {
-    return apiError("unauthorized", "未登录", 401);
-  }
+  // DEF-20261125-032：訪客可讀**公開**帖詳情（地圖公開釘本來就免登入；留言列表亦然）。
+  // 訪客的 supabase 是匿名會話，主行讀取仍受 RLS「checkins wall public read」約束（只見 public）；
+  // 非 public 一律 404 不洩露；*_by_me 恆 false，不查本人行。
+  const { supabase, userId } = await getAuthedClient(_req);
   const { id } = await params;
   if (typeof id !== "string" || id === "") {
     return apiError("invalid_params", "id 非法", 400);
@@ -180,6 +181,7 @@ async function getHandler(
     );
   }
   if (row === null) {
+    if (userId === null) return apiError("not_found", "打卡不存在", 404);
     // UR E.22 歸檔回退（舊分享鏈不斷；只讀快照＋archived 旗，互動端點沿舊 404）。
     const archived = await readArchived(supabase, userId, id);
     if (archived !== null) return archived;
@@ -187,10 +189,14 @@ async function getHandler(
   }
   const ownerId = typeof row.user_id === "string" ? row.user_id : null;
   const service = await createServiceClient();
+  const visibility = row.visibility;
+  if (userId === null) {
+    if (visibility !== "public") return apiError("not_found", "打卡不存在", 404);
+    return respondDetail({ row, id, ownerId, userId: null, supabase, service, blockedIds: new Set<string>() });
+  }
   if (ownerId !== null && ownerId !== userId && (await isPairBlocked(service, userId, ownerId))) {
     return apiError("not_found", "打卡不存在", 404);
   }
-  const visibility = row.visibility;
   let friendIds: string[] = [];
   if (
     ownerId !== null &&
@@ -220,24 +226,46 @@ async function getHandler(
   if (!canViewCheckin(userId, ownerId, visibility, friendIds)) {
     return apiError("forbidden", "無權查看", 403);
   }
+  const blockedIds = await getBlockedUserIds(service, userId);
+  return respondDetail({ row, id, ownerId, userId, supabase, service, blockedIds });
+}
+
+function guestCoord(v: unknown, userId: string | null): number | null {
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  return userId === null ? fuzzCoordinate(v) : v;
+}
+
+/** 詳情回包（過了可見門之後；userId null＝訪客：計數改走 service、本人狀態恆 false） */
+async function respondDetail(args: {
+  row: Record<string, unknown>;
+  id: string;
+  ownerId: string | null;
+  userId: string | null;
+  supabase: Awaited<ReturnType<typeof getAuthedClient>>["supabase"];
+  service: Awaited<ReturnType<typeof createServiceClient>>;
+  blockedIds: Set<string>;
+}): Promise<Response> {
+  const { row, id, ownerId, userId, service, blockedIds } = args;
+  // 訪客沒有 RLS 會話可讀互動表：已過可見門（public），計數走 service（同評分／碰杯聚合口徑）
+  const supabase = userId === null ? (service as unknown as typeof args.supabase) : args.supabase;
+  const none = Promise.resolve({ data: null });
   // UR E.10 batch4 互动计数＋酒款（加法字段，旧客户端忽略即兼容）。
   // UR E.12 评分明细聚合走 service（路由已过可见门，沿 D.2 口径；只吐聚合＋本人行）。
   const postId = row.id as string;
   const beerId = (row.beer_id as string | null) ?? null;
-  const blockedIds = await getBlockedUserIds(service, userId);
   const [{ count: likeCount }, { data: likedRow }, { count: wantCount }, { data: wantedRow }, { count: commentCount }, { data: beerRow }, { data: ratingRows }, { data: savedRow }] =
     await Promise.all([
       supabase.from("post_likes").select("post_id", { count: "exact", head: true }).eq("post_id", postId),
-      supabase.from("post_likes").select("post_id").eq("post_id", postId).eq("user_id", userId).maybeSingle(),
+      userId === null ? none : supabase.from("post_likes").select("post_id").eq("post_id", postId).eq("user_id", userId).maybeSingle(),
       supabase.from("checkin_wants").select("checkin_id", { count: "exact", head: true }).eq("checkin_id", postId),
-      supabase.from("checkin_wants").select("checkin_id").eq("checkin_id", postId).eq("user_id", userId).maybeSingle(),
+      userId === null ? none : supabase.from("checkin_wants").select("checkin_id").eq("checkin_id", postId).eq("user_id", userId).maybeSingle(),
       supabase.from("checkin_comments").select("id", { count: "exact", head: true }).eq("checkin_id", postId).eq("status", "visible"),
       beerId === null
         ? Promise.resolve({ data: null })
         : supabase.from("beers").select("name").eq("id", beerId).maybeSingle(),
       service.from("checkin_ratings").select("user_id,rating").eq("checkin_id", postId),
       // UR E.26 收藏态（本人行；匿名无此分支，归档分支恒 false）。
-      supabase.from("checkin_saves").select("checkin_id").eq("checkin_id", postId).eq("user_id", userId).maybeSingle(),
+      userId === null ? none : supabase.from("checkin_saves").select("checkin_id").eq("checkin_id", postId).eq("user_id", userId).maybeSingle(),
     ]);
   const clamp = (n: number | null): number =>
     typeof n === "number" && Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
@@ -246,7 +274,7 @@ async function getHandler(
       typeof r === "object" && r !== null && "rating" in (r as Record<string, unknown>),
   );
   const { avg: ratingAvg, count: ratingCount } = summarizeRatings(ratingList);
-  const mineRating = ratingList.find((r) => r.user_id === userId)?.rating;
+  const mineRating = userId === null ? undefined : ratingList.find((r) => r.user_id === userId)?.rating;
   const myRating =
     typeof mineRating === "number" && Number.isInteger(mineRating) ? mineRating : null;
   // UR E.14 乾杯聚合（service 直讀，路由已过可见门）。
@@ -259,14 +287,11 @@ async function getHandler(
     .limit(3);
   type CheersRecent = { user_id: string; nickname: string; avatar_url: string | null; created_at: string };
   let recentCheers: CheersRecent[] = [];
-  // cheered_by_me（本帖是否已敬过；路由本就 401 拦匿名，匿名无此分支）。
-  const { data: myCheerRow } = await service
-    .from("cheers")
-    .select("id")
-    .eq("checkin_id", postId)
-    .eq("from_user_id", userId)
-    .limit(1)
-    .maybeSingle();
+  // cheered_by_me（本帖是否已敬过；訪客恆 false）。
+  const { data: myCheerRow } =
+    userId === null
+      ? { data: null }
+      : await service.from("cheers").select("id").eq("checkin_id", postId).eq("from_user_id", userId).limit(1).maybeSingle();
   const cheeredByMe = myCheerRow !== null;
   if (Array.isArray(cheersRows) && cheersRows.length > 0) {
     const fromIds = [...new Set(cheersRows.map((r) => (r as { from_user_id: string }).from_user_id))];
@@ -321,8 +346,9 @@ async function getHandler(
       hashtags: Array.isArray(row.hashtags) ? (row.hashtags as unknown[]).filter((x): x is string => typeof x === "string") : [],
       created_at: row.created_at as string,
       place_name: (row.place_name as string | null) ?? null,
-      lat: (row.lat as number | null) ?? null,
-      lng: (row.lng as number | null) ?? null,
+      // 訪客與公開地圖釘同口徑：座標截斷到 3 位小數（約 100m），原始值不外泄（DEF-20261125-032）
+      lat: guestCoord(row.lat, userId),
+      lng: guestCoord(row.lng, userId),
       beer_name: ((beerRow as { name?: unknown } | null)?.name as string | undefined) ?? null,
       // UR E.12 他人制：只吐平均＋人数＋本人行（旧作者自评 `rating` 已退役，不再吐）。
       rating_avg: ratingAvg,

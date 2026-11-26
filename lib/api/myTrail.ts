@@ -55,3 +55,39 @@ export function trailBoundsArgs(bounds: TrailBoundaries | null) {
     p_north: bounds?.north ?? null,
   };
 }
+
+type TrailSeqRpc = {
+  rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }>;
+};
+
+/**
+ * 足跡全局序號（DEF-20261125-035，0092）：回傳 id→第幾站（由舊到新 1-based）與本人足跡總數。
+ * fail-soft：RPC 未部署／失敗／回包不對時回空表、total null，路由照常回列表（客戶端退回本地序號）。
+ */
+export async function readTrailSeq(
+  client: TrailSeqRpc,
+  ids: readonly string[],
+): Promise<{ seq: Map<string, number>; total: number | null }> {
+  const seq = new Map<string, number>();
+  if (ids.length === 0) return { seq, total: null };
+  try {
+    const { data, error } = await client.rpc("my_checkin_trail_seq", { p_ids: ids });
+    if (error !== null && error !== undefined) {
+      console.error("[myTrail] seq read failed:", error);
+      return { seq, total: null };
+    }
+    let total: number | null = null;
+    for (const row of Array.isArray(data) ? data : []) {
+      const r = row as { id?: unknown; seq?: unknown; total?: unknown };
+      const n = Number(r.seq);
+      const t = Number(r.total);
+      if (typeof r.id !== "string" || !Number.isInteger(n) || n < 1) continue;
+      seq.set(r.id, n);
+      if (Number.isInteger(t) && t >= n) total = t;
+    }
+    return { seq, total };
+  } catch (err) {
+    console.error("[myTrail] seq read threw:", err);
+    return { seq, total: null };
+  }
+}

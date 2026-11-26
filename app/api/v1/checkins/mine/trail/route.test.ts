@@ -100,4 +100,39 @@ describe("owner trail API", () => {
       points: [{ ...singlePoint, checkin: { id, photo_url: null } }, clusterPoint],
     });
   });
+
+  it("attaches the global stop number and total from 0092 to list rows and map singles (DEF-20261125-035)", async () => {
+    auth.rpc.mockImplementation(async (fn: string) => {
+      if (fn === "my_checkin_trail_seq") return { data: [{ id, seq: 6, total: 9 }], error: null };
+      if (fn === "my_checkin_trail_page") return { data: [{ checkin, page_cursor: cursor }], error: null };
+      return {
+        data: [
+          { id, lat: 22.3, lng: 114.1, count: 1, checkin, bbox: null },
+          { id: "trail:16:1:2", lat: 22.3, lng: 114.1, count: 3, checkin: null, bbox: bbox },
+        ],
+        error: null,
+      };
+    });
+    const list = await (await getList(makeReq())).json();
+    expect(list.total).toBe(9);
+    expect(list.checkins[0]).toMatchObject({ id, seq: 6 });
+    expect(auth.rpc).toHaveBeenCalledWith("my_checkin_trail_seq", { p_ids: [id] });
+    const map = await (await getMap(makeReq("/map", { bbox: "114,22,115,23", zoom: "12" }))).json();
+    expect(map.total).toBe(9);
+    expect(map.points[0]).toMatchObject({ seq: 6 });
+    expect(map.points[1].seq).toBeUndefined();
+  });
+
+  it("keeps serving the trail without seq when 0092 is not deployed", async () => {
+    auth.rpc.mockImplementation(async (fn: string) =>
+      fn === "my_checkin_trail_seq"
+        ? { data: null, error: { code: "PGRST202", message: "missing" } }
+        : { data: [{ checkin, page_cursor: cursor }], error: null },
+    );
+    const res = await getList(makeReq());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.total).toBeUndefined();
+    expect(body.checkins[0].seq).toBeUndefined();
+  });
 });

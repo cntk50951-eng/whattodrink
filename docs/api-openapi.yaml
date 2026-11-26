@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.71.0
+  version: 1.72.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -1316,9 +1316,10 @@ paths:
   /api/v1/checkins/{id}:
     get:
       operationId: getCheckinDetail
-      summary: 打卡詳情三件套（需登录；本人／public／互好友可見，UR E.2）
+      summary: 打卡詳情三件套（本人／public／互好友可見，UR E.2；1.72.0 起未登入可讀 public 帖，非 public 404、*_by_me 恆 false、不走歸檔回退；未登入時 lat／lng 與公開地圖釘同口徑截斷至 3 位小數）
       security:
         - bearerAuth: []
+        - {}
       parameters:
         - name: id
           in: path
@@ -1614,6 +1615,10 @@ paths:
                     maxItems: 200
                     items:
                       $ref: "#/components/schemas/MyTrailMapPoint"
+                  total:
+                    type: integer
+                    minimum: 0
+                    description: 1.72.0：本人足跡總數（單點 seq 的分母）；0092 未部署時不帶。
         "400":
           $ref: "#/components/responses/InvalidParams"
         "401":
@@ -7361,9 +7366,17 @@ components:
                     description: 列表只回傳縮圖，原圖按需由打卡詳情取用。
                   note:
                     type: [string, "null"]
+                  seq:
+                    type: integer
+                    minimum: 1
+                    description: 1.72.0：全局「第 N 站」——本人全部足跡（含歸檔）由舊到新的 1-based 序號，不受視野／分頁影響；0092 未部署時不帶。
         next_cursor:
           type: [string, "null"]
           description: 下一頁游標，已到最後一頁時為 null。
+        total:
+          type: integer
+          minimum: 0
+          description: 1.72.0：本人足跡總數（與 seq 同口徑；0092 未部署時不帶）。
     MyTrailMapPoint:
       type: object
       required: [id, lat, lng, count, checkin, bbox]
@@ -7387,6 +7400,10 @@ components:
         bbox:
           type: [string, "null"]
           description: 聚合點含站點的 WGS-84 west,south,east,north 範圍（邊界包含，重合點可退化為單一位置），可用於足跡列表查詢。單點為 null。
+        seq:
+          type: integer
+          minimum: 1
+          description: 1.72.0：單點的全局「第 N 站」（同 MyTrailPage.checkins[].seq）；聚合點不帶；0092 未部署時不帶。
     Comment:
       type: object
       required: [id, checkin_id, body, status, created_at, author]

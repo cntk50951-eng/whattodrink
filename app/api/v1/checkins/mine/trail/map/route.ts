@@ -1,6 +1,6 @@
 import { toMineRow } from "@/lib/api/checkins";
 import { apiError, apiOk } from "@/lib/api/envelope";
-import { MY_TRAIL_HEADERS, parseMyTrailMap, trailBoundsArgs } from "@/lib/api/myTrail";
+import { MY_TRAIL_HEADERS, parseMyTrailMap, readTrailSeq, trailBoundsArgs } from "@/lib/api/myTrail";
 import { getAuthedClient } from "@/lib/supabase/server";
 
 type DbTrailPoint = {
@@ -33,5 +33,8 @@ export async function GET(req: Request): Promise<Response> {
     const checkin = toMineRow(row.checkin);
     return row.count === 1 && checkin === null ? [] : [{ ...row, checkin }];
   });
-  return apiOk({ points }, 200, MY_TRAIL_HEADERS);
+  // 單點帶全局「第 N 站」（0092；聚合點沒有；缺就不帶）
+  const { seq, total } = await readTrailSeq(supabase, points.flatMap((p) => (p.count === 1 && p.checkin !== null ? [p.checkin.id] : [])));
+  const withSeq = points.map((p) => (p.count === 1 && p.checkin !== null && seq.has(p.checkin.id) ? { ...p, seq: seq.get(p.checkin.id) } : p));
+  return apiOk(total === null ? { points: withSeq } : { points: withSeq, total }, 200, MY_TRAIL_HEADERS);
 }
