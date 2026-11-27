@@ -1,11 +1,16 @@
 import { apiError, apiOk } from "@/lib/api/envelope";
+import {
+  googleNearbySearch,
+  isMainlandChina,
+  readGoogleServerKey,
+} from "@/lib/api/googlePlaces";
 import { gcj02ToWgs84 } from "@/lib/geo";
 
 /**
- * UR G.4 附近酒吧直调（高德 place/around 服务端代理，Key 不出服务端）。
+ * UR G.4 附近酒吧／便利店服务端代理（Key 不出服务端）。
  * `GET /api/v1/places/around?lat=&lng=&radius=&kind=` —— kind 只要 bar|store
- * （酒吧／便利店；iOS 双色钉口径）；radius 默认 3000 空即扩 5000；距离升序；
- * 坐标 GCJ→WGS 落库口径（Leaflet 直画）；无 Key 即 503（前端藏入口或提示配 key）。
+ * 路由策略：中国大陆境内优先高德；香港与海外优先 Google Places (New)（含 15min 网格缓存＋每日硬上限），
+ * 失败或达上限平滑降级高德。所有坐标统一 WGS-84 输出，API 契约完全向下兼容。
  */
 
 export type AroundKind = "bar" | "store";
@@ -66,40 +71,65 @@ export async function GET(req: Request): Promise<Response> {
   const radiusRaw = Number(q.get("radius"));
   const radius = Number.isInteger(radiusRaw) && radiusRaw >= 500 && radiusRaw <= 5000 ? radiusRaw : 3000;
 
+  const googleKey = readGoogleServerKey();
   const amapKey =
     process.env.AMAP_KEY ??
     process.env.AMAP_WEB_KEY ??
     process.env.NEXT_PUBLIC_AMAP_KEY ??
     process.env.NEXT_PUBLIC_AMAP_WEB_KEY ??
     null;
-  if (amapKey === null || amapKey === "") {
-    return apiError("internal", "附近搜索未配置（缺 AMAP_KEY）", 503);
+
+  if (!googleKey && (amapKey === null || amapKey === "")) {
+    return apiError("internal", "附近搜索未配置（缺 GOOGLE_MAPS_SERVER_KEY / AMAP_KEY）", 503);
   }
 
+  const preferGoogle = googleKey !== null && !isMainlandChina({ lat, lng });
+
   try {
-    let pois = await aroundOnce(amapKey, lat, lng, radius, KIND_KEYWORDS[kind]);
-    if (pois.length === 0 && radius < 5000) {
-      pois = await aroundOnce(amapKey, lat, lng, 5000, KIND_KEYWORDS[kind]);
+    if (preferGoogle) {
+      let gPlaces = await googleNearbySearch({ key: googleKey, lat, lng, radius, kind });
+      if (gPlaces !== null && gPlaces.length === 0 && radius < 5000) {
+        gPlaces = await googleNearbySearch({ key: googleKey, lat, lng, radius: 5000, kind });
+      }
+      if (gPlaces !== null) {
+        return apiOk({ places: gPlaces });
+      }
     }
-    const places = [];
-    for (const p of pois) {
-      if (typeof p.id !== "string" || typeof p.name !== "string") continue;
-      const [plng, plat] = String(p.location ?? "").split(",").map(Number);
-      if (!Number.isFinite(plat) || !Number.isFinite(plng)) continue;
-      const wgs = gcj02ToWgs84({ lat: plat, lng: plng });
-      const dist = typeof p.distance === "string" ? Math.round(Number(p.distance)) : NaN;
-      places.push({
-        id: p.id,
-        name: p.name,
-        address: typeof p.address === "string" ? p.address : "",
-        tel: typeof p.tel === "string" && p.tel !== "" ? p.tel : null,
-        lat: wgs.lat,
-        lng: wgs.lng,
-        distance_m: Number.isFinite(dist) ? dist : null,
-        kind,
-      });
+
+    if (amapKey) {
+      let pois = await aroundOnce(amapKey, lat, lng, radius, KIND_KEYWORDS[kind]);
+      if (pois.length === 0 && radius < 5000) {
+        pois = await aroundOnce(amapKey, lat, lng, 5000, KIND_KEYWORDS[kind]);
+      }
+      const places = [];
+      for (const p of pois) {
+        if (typeof p.id !== "string" || typeof p.name !== "string") continue;
+        const [plng, plat] = String(p.location ?? "").split(",").map(Number);
+        if (!Number.isFinite(plat) || !Number.isFinite(plng)) continue;
+        const wgs = gcj02ToWgs84({ lat: plat, lng: plng });
+        const dist = typeof p.distance === "string" ? Math.round(Number(p.distance)) : NaN;
+        places.push({
+          id: p.id,
+          name: p.name,
+          address: typeof p.address === "string" ? p.address : "",
+          tel: typeof p.tel === "string" && p.tel !== "" ? p.tel : null,
+          lat: wgs.lat,
+          lng: wgs.lng,
+          distance_m: Number.isFinite(dist) ? dist : null,
+          kind,
+        });
+      }
+      if (places.length > 0 || !googleKey) {
+        return apiOk({ places });
+      }
     }
-    return apiOk({ places });
+
+    if (googleKey && !preferGoogle) {
+      const gPlaces = await googleNearbySearch({ key: googleKey, lat, lng, radius, kind });
+      if (gPlaces !== null) return apiOk({ places: gPlaces });
+    }
+
+    return apiOk({ places: [] });
   } catch (e) {
     console.error(`[api/v1/places/around] error: ${e instanceof Error ? e.message : "unknown"}`);
     return apiError("internal", "附近搜索失败", 500);

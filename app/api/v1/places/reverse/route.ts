@@ -1,4 +1,9 @@
 import { apiError, apiOk } from "@/lib/api/envelope";
+import {
+  googleReverseGeocode,
+  isMainlandChina,
+  readGoogleServerKey,
+} from "@/lib/api/googlePlaces";
 
 export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
@@ -17,11 +22,17 @@ export async function GET(req: Request): Promise<Response> {
     }
   }
 
+  const googleKey = readGoogleServerKey();
   const amapKey =
     process.env.AMAP_KEY ??
     process.env.NEXT_PUBLIC_AMAP_KEY ??
     process.env.AMAP_WEB_KEY ??
     null;
+
+  if (googleKey && !isMainlandChina({ lat, lng })) {
+    const gRes = await googleReverseGeocode({ key: googleKey, lat, lng });
+    if (gRes) return apiOk(gRes);
+  }
 
   if (amapKey) {
     try {

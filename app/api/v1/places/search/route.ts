@@ -1,4 +1,11 @@
 import { apiError, apiOk } from "@/lib/api/envelope";
+import {
+  googleTextSearch,
+  isMainlandChina,
+  readGoogleServerKey,
+} from "@/lib/api/googlePlaces";
+import { DEFAULT_CENTER } from "@/lib/geo";
+import type { LatLng } from "@/lib/geo";
 
 /**
  * UR F.1 地点搜索代理（高德优先，Nominatim 回退）。
@@ -56,16 +63,39 @@ export async function GET(req: Request): Promise<Response> {
   if (q.length < 1) return apiError("invalid_params", "q 必填", 400);
   if (q.length > 40) return apiError("invalid_params", "关键词过长", 400);
 
-  const cacheKey = q.toLowerCase();
+  const rawLat = url.searchParams.get("lat");
+  const rawLng = url.searchParams.get("lng");
+  const parsedLat = rawLat !== null ? Number(rawLat) : NaN;
+  const parsedLng = rawLng !== null ? Number(rawLng) : NaN;
+  const bias: LatLng =
+    Number.isFinite(parsedLat) &&
+    Number.isFinite(parsedLng) &&
+    Math.abs(parsedLat) <= 90 &&
+    Math.abs(parsedLng) <= 180
+      ? { lat: parsedLat, lng: parsedLng }
+      : DEFAULT_CENTER;
+
+  const cacheKey = `${q.toLowerCase()}@${bias.lat.toFixed(2)},${bias.lng.toFixed(2)}`;
   const cached = cacheGet(cacheKey);
   if (cached) return apiOk(cached);
 
+  const googleKey = readGoogleServerKey();
   const amapKey =
     process.env.AMAP_KEY ??
     process.env.NEXT_PUBLIC_AMAP_KEY ??
     process.env.AMAP_WEB_KEY ??
     process.env.NEXT_PUBLIC_AMAP_WEB_KEY ??
     null;
+
+  // 非中国大陆境内优先走 Google Places (New) searchText（含网格缓存＋每日硬上限）
+  if (googleKey && !isMainlandChina(bias)) {
+    const gPlaces = await googleTextSearch({ key: googleKey, query: q, bias });
+    if (gPlaces !== null && gPlaces.length > 0) {
+      const payload = { places: gPlaces };
+      cacheSet(cacheKey, payload);
+      return apiOk(payload);
+    }
+  }
 
   // 轻度节流：距上次真实外调 < 400ms 则短暂等待，避免前端抖动打爆 Nominatim
   const now = Date.now();
