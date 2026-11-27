@@ -17,6 +17,16 @@ export const PARTY_REPORT_REASON_CODES = ["fake", "dangerous", "inappropriate", 
 /** 每人每 24h 最多舉報幾個酒局（防濫用；同一局只能舉報一次由 0093 唯一索引兜底） */
 export const PARTY_REPORT_DAILY_MAX = 10;
 
+/**
+ * 酒局舉報入庫前的判定（iOS R6-05）：**先查重、後限額**。
+ * 第 10 筆其實已入庫但客戶端沒收到回包時，重試同一局要回「已提交」，不能先撞每日上限回 429。
+ */
+export function partyReportGate(alreadyReported: boolean, reportsToday: number): "duplicate" | "rate_limited" | "ok" {
+  if (alreadyReported) return "duplicate";
+  if (reportsToday >= PARTY_REPORT_DAILY_MAX) return "rate_limited";
+  return "ok";
+}
+
 /** DB 讀回的 target_type 正規化（未知值當 user，與舊行默認一致） */
 export function asReportTargetType(v: unknown): ReportTargetType {
   return isOneOf(REPORT_TARGET_TYPES, v) ? v : "user";

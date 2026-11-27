@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
+import { partyReportGate, PARTY_REPORT_DAILY_MAX,
   asReportTargetType,
   messageEvidence,
   PARTY_REPORT_REASON_CODES,
@@ -167,5 +167,16 @@ describe("酒局舉報（0093；iOS DEF-20261126-006 ④）", () => {
     expect(asReportTargetType("party")).toBe("party");
     expect(asReportTargetType("weird")).toBe("user");
     expect(asReportTargetType(null)).toBe("user");
+  });
+});
+
+describe("partyReportGate（iOS R6-05：先查重、後限額）", () => {
+  it("同一局已舉報過＝重試，即使今天已到上限也回已提交", () => {
+    expect(partyReportGate(true, PARTY_REPORT_DAILY_MAX)).toBe("duplicate");
+    expect(partyReportGate(true, 0)).toBe("duplicate");
+  });
+  it("新的局才限額", () => {
+    expect(partyReportGate(false, PARTY_REPORT_DAILY_MAX)).toBe("rate_limited");
+    expect(partyReportGate(false, PARTY_REPORT_DAILY_MAX - 1)).toBe("ok");
   });
 });

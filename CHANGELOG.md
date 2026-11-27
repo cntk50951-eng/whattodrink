@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased] — 酒局舉報先查重、後限額（2026-11-26；iOS 第六輪審核 R6-05／DEF-20261126-042）
+
+### Fixed
+- `POST /api/v1/cheers/reports` 酒局分支：以前先查「24 小時 10 個酒局」上限，再查同一局是否舉報過。第 10 筆其實已入庫、但客戶端沒收到回包時，重試會先拿到 429，與「重複舉報回成功」的約定衝突。現在先查同一人對同一局有沒有舉報過，有就回 `reported:true`，新的局才限額（`partyReportGate`＋單測 2 條）。
+- 驗證：vitest 161 檔 1,595/1,595、`tsc --noEmit`、改動檔 eslint 0 error。無 migration。
+
 ## [Unreleased] — 第四批反饋：主頁翻頁輕量化、推送暱稱縮寫、遇見按暱稱找人（2026-11-26，openapi 1.74.0；iOS DEF-20261126-020／023／026）
 
 ### Changed

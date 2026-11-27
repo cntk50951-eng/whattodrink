@@ -14,7 +14,7 @@ import {
 import {
   messageEvidence,
   parseReportBody,
-  PARTY_REPORT_DAILY_MAX,
+  partyReportGate,
   REPORT_DEDUPE_MS,
   REPORT_EVIDENCE_MAX,
   clipSnapshotText,
@@ -141,14 +141,24 @@ export async function POST(req: Request): Promise<Response> {
     if (party.host_user_id === userId) return apiError("invalid_params", "不能舉報自己發起的酒局", 400);
     targetUserId = party.host_user_id;
     partyForStp = party;
-    // 每人 24h 最多舉報 PARTY_REPORT_DAILY_MAX 個酒局（同一局只能舉報一次另由唯一索引＋下方查重兜底）
+    // 先查重再限額（iOS R6-05）：同一人對同一局永遠只算一次；已舉報過＝回包丟失後的重試，直接回已提交，
+    // 不能先撞「每人 24h 最多 PARTY_REPORT_DAILY_MAX 個酒局」回 429（並發仍由 0093 唯一索引＋下方查重兜底）
+    const { data: priorParty } = await supabase
+      .from("cheers_reports")
+      .select("id")
+      .eq("reporter_id", userId)
+      .eq("target_type", "party")
+      .eq("target_ref", p.targetRef)
+      .limit(1);
     const { count } = await supabase
       .from("cheers_reports")
       .select("id", { count: "exact", head: true })
       .eq("reporter_id", userId)
       .eq("target_type", "party")
       .gte("created_at", new Date(Date.now() - 24 * 3600_000).toISOString());
-    if ((count ?? 0) >= PARTY_REPORT_DAILY_MAX) return apiError("rate_limited", "今天舉報次數已達上限，請明天再試", 429);
+    const gate = partyReportGate(Array.isArray(priorParty) && priorParty.length > 0, count ?? 0);
+    if (gate === "duplicate") return apiOk({ reported: true });
+    if (gate === "rate_limited") return apiError("rate_limited", "今天舉報次數已達上限，請明天再試", 429);
     const text = [party.place, party.start_at, party.host_intro, party.purpose_other]
       .filter((s): s is string => typeof s === "string" && s.trim() !== "")
       .join(" · ");
