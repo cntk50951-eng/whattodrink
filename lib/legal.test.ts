@@ -69,7 +69,7 @@ describe("公開法律頁內容", () => {
     }
   });
 
-  it("私隱政策具名第三方 AI，並寫明 Sign in with Apple 的資料處理（2026-11-24 起 Apple 登入上線，版本 1.2）", () => {
+  it("私隱政策具名第三方 AI，並寫明 Sign in with Apple 的資料處理（2026-11-24 起 Apple 登入上線，版本隨條款升級）", () => {
     const APPLE_SIGNIN: Record<string, RegExp> = { "zh-Hant": /Apple 登入/, "zh-Hans": /Apple 登录/, en: /sign in with Apple/i };
     const NO_TOKEN: Record<string, string> = { "zh-Hant": "我們不保存任何 Apple 令牌", "zh-Hans": "我们不保存任何 Apple 令牌", en: "We do not store any Apple tokens" };
     for (const l of LOCALES) {
@@ -81,13 +81,25 @@ describe("公開法律頁內容", () => {
     }
   });
 
-  it("條款含 Ivy 與兒少安全兩節，三語章節數一致；兩份文件版本都是 1.2（與 iOS currentVersion／AOS CURRENT_VERSION 同步）", () => {
+  it("條款含 Ivy 與兒少安全兩節，三語章節數一致；兩份文件版本都是 1.3（與 iOS currentVersion／AOS CURRENT_VERSION 同步）", () => {
     for (const l of LOCALES) {
       const t = getLegalDoc("terms", l);
-      expect(t.version).toBe("1.2");
-      expect(getLegalDoc("privacy", l).version).toBe("1.2");
+      expect(t.version).toBe("1.3");
+      expect(getLegalDoc("privacy", l).version).toBe("1.3");
       expect(JSON.stringify(t)).toContain("Ivy");
       expect(JSON.stringify(t)).toContain("/legal/child-safety");
+    }
+  });
+
+  it("私隱政策具名各端實際使用的地圖與地點服務（Apple／Google／高德／OpenStreetMap）", () => {
+    const NAMES: Record<LegalLocale, string[]> = {
+      "zh-Hant": ["Apple 地圖", "Google 地圖", "高德地圖", "OpenStreetMap"],
+      "zh-Hans": ["Apple 地图", "Google 地图", "高德地图", "OpenStreetMap"],
+      en: ["Apple Maps", "Google Maps", "AMap (Gaode)", "OpenStreetMap"],
+    };
+    for (const l of LOCALES) {
+      const all = JSON.stringify(getLegalDoc("privacy", l));
+      for (const name of NAMES[l]) expect(all).toContain(name);
     }
   });
 

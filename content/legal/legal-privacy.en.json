@@ -1,6 +1,6 @@
 {
   "title": "Privacy Policy",
-  "effective": "24 November 2026",
+  "effective": "27 November 2026",
   "summaryTitle": "In one sentence",
   "summary": [
     "We only collect what the app needs to work. Your location is used to show the map and nearby friends, and you can go invisible, block people or delete your account at any time. We do not use your data to track you across apps or websites."
@@ -50,7 +50,9 @@
         "Your data may be processed by:"
       ],
       "bullets": [
-        "AMap (Gaode): maps and search. Your location is sent to its servers. You agree to this when you accept these terms on first launch.",
+        "Apple Maps (iOS): maps, place search, walking routes and area names. Your location and search text are sent to Apple.",
+        "Google and AMap (Gaode) (Android and web): place search, and the map in the Android app, come mainly from Google (Google Maps and Places) in Hong Kong, Macau, Taiwan and overseas, and mainly from AMap in mainland China; Android devices that cannot use Google services use AMap instead. Place searches and area names go through our server, which passes your location and search text to the relevant provider; if one finds nothing or is unavailable, they may be passed to the other. When a map is shown, the map service receives the area you view and the device information it needs directly. You agree to this when you accept these terms on first launch of the Android app.",
+        "OpenStreetMap (web maps and fallback lookups): the web map may use its map tiles or AMap's, and our server may also query it when the services above find no place. The map area you view, your location or your search text is sent to the relevant service.",
         "Supabase: sign-in and data storage.",
         "Google: only if you choose to sign in with Google; we receive your email and name.",
         "Apple: only if you choose to sign in with Apple, we receive your Apple account identifier and email (or Apple's relay address). When you delete your account, we ask you to authorize with Apple once more and send the resulting one-time authorization code to Apple, so that we can revoke our sign-in authorization for your Apple account. We do not store any Apple tokens.",
@@ -66,5 +68,5 @@
       ]
     }
   ],
-  "version": "1.2"
+  "version": "1.3"
 }

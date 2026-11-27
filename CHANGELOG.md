@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased] — 法律文件 1.3：各端地圖服務披露（2026-11-27）
+
+### Changed
+- 私隱政策「第三方服務」按實際資料流改寫：Apple 地圖（iOS）；Google 與高德地圖（Android 及網頁版，含經伺服器的地點查詢）；OpenStreetMap（網頁版地圖及後備查詢）。取代原來只寫高德的一條。
+- 私隱政策與條款版本 1.2 → 1.3（六份 JSON 與 iOS／AOS 逐字節一致）；私隱政策生效日期 2026-11-27。法務未看。
+
 ## [Unreleased] — 口味卡專屬同意、發局／邀約冪等（2026-11-26，openapi 1.75.0，migration 0094／0095；iOS IOS-C01／C04）
 
 ### Changed
