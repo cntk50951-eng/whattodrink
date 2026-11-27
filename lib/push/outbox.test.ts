@@ -115,7 +115,7 @@ describe("type-specific notification copy",()=>{
   expect(eventPayload({...event({kind:"chat"}),payload:{conversation_id:"conv"}},"en").aps).toMatchObject({alert:{title:"You have a new message"}});
  });
  it("cleans display names",()=>{
-  expect(cleanName("  Ray\u202e\n  ")).toBe("Ray");expect(cleanName("x".repeat(50))).toHaveLength(30);expect(Array.from(cleanName("🍺".repeat(50)) as string)).toHaveLength(30);expect(cleanName("   ")).toBeUndefined();expect(cleanName(5)).toBeUndefined();
+  expect(cleanName("  Ray\u202e\n  ")).toBe("Ray");expect(cleanName("x".repeat(50))).toBe("x".repeat(15)+"…");expect(cleanName("🍺".repeat(50))).toBe("🍺".repeat(7)+"…");expect(cleanName("👨\u200d👩\u200d👧")).toBe("👨\u200d👩\u200d👧");expect(cleanName("A\u2067B")).toBe("AB");expect(cleanName("   ")).toBeUndefined();expect(cleanName(5)).toBeUndefined();
  });
 });
 

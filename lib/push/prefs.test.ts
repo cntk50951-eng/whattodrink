@@ -6,6 +6,7 @@ import {
   cheersMergedTitle,
   fillPushTemplate,
   parsePushPrefs,
+  pushName,
   pushPrefsOf,
 } from "./prefs";
 
@@ -166,5 +167,23 @@ describe("sumBadge", () => {
       game_requests_pending: 3,
       badge: 0,
     });
+  });
+});
+
+describe("pushName（iOS DEF-20261126-023）", () => {
+  it("短名原樣；長名按顯示寬度縮成「前段…」", () => {
+    expect(pushName("Chloe")).toBe("Chloe");
+    expect(pushName("ChristopherWong")).toBe("ChristopherWong");
+    expect(pushName("ChristopherWongTaiMan")).toBe("ChristopherWong…");
+    expect(pushName("陳大文陳大文陳大文")).toBe("陳大文陳大文陳…");
+    expect(pushName("一二三四五六七八")).toBe("一二三四五六七八");
+  });
+  it("不切開 emoji／組合字，去掉方向控制字元與多餘空白", () => {
+    expect(pushName("👨‍👩‍👧‍👦".repeat(10))).toBe("👨‍👩‍👧‍👦".repeat(7) + "…");
+    expect(pushName("  Ray\u202e  Chan \n")).toBe("Ray Chan");
+  });
+  it("填進碰杯標題後名字和動作都看得到", () => {
+    const title = fillPushTemplate("{name} 碰了你一杯", { name: pushName("a".repeat(30)) });
+    expect(title).toBe("a".repeat(15) + "… 碰了你一杯");
   });
 });

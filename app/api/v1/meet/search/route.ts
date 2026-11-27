@@ -7,6 +7,7 @@ import { ageOf } from "@/lib/api/profile";
 import { haversineMeters } from "@/lib/geo";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { minimaxChat } from "@/lib/minimax";
+import { nicknameFromQuery } from "@/lib/searchPlan";
 import {
   MEET_DAILY_LIMIT,
   MEET_LLM_TIMEOUT_MS,
@@ -187,6 +188,14 @@ export async function POST(req: Request): Promise<Response> {
     // P0 噪音護欄（整组乱填即丢；只走 LLM 路径，用户自选不动）。
     const g = dropNoisyGroups(s.criteria);
     criteria = g.criteria;
+    // iOS DEF-20261126-026：「找 chris」這類短句模型可能不給 nickname，按規則補（只在沒有其他條件時，免得誤加）
+    if (criteria.nickname === undefined && Object.keys(criteria).length === 0) {
+      const nick = nicknameFromQuery(queryRaw);
+      if (nick !== null) {
+        const n = sanitizeCriteria({ nickname: nick }).criteria.nickname;
+        if (n !== undefined) criteria = { ...criteria, nickname: n };
+      }
+    }
     ignored = [...parsed.ignored, ...s.dropped].slice(0, 5);
     if (g.droppedGroups.length > 0) {
       notes.push("泛指條件已略過");

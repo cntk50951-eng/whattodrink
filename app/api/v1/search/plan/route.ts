@@ -4,7 +4,7 @@ import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { matchBlockedSearchTerm } from "@/lib/searchQueryGuard";
 import { minimaxChat } from "@/lib/minimax";
 import { MEET_DAILY_LIMIT, MEET_LLM_TIMEOUT_MS, meetCriteriaSchemaText } from "@/lib/meet";
-import { PLAN_QUERY_MAX, type PlanStage, parsePlanReply, planStreamLine, sanitizePlan, searchPlanPrompt, wantsPlanStream } from "@/lib/searchPlan";
+import { PLAN_QUERY_MAX, type PlanStage, parsePlanReply, planStreamLine, sanitizePlan, searchPlanPrompt, wantsPlanStream, withNicknameFallback } from "@/lib/searchPlan";
 import type { ApiErrorCode } from "@/lib/api/envelope";
 import { hkDayStartISO } from "@/lib/api/party";
 
@@ -126,7 +126,8 @@ async function runPlan(userId: string, query: string, onStage: (s: PlanStage) =>
   return {
     ok: true,
     data: {
-      intents: plan.intents,
+      // iOS DEF-20261126-026：「找 chris」這類短句模型偶爾漏掉人名，按規則補 people.nickname
+      intents: withNicknameFallback(plan.intents, query),
       ignored: [...parsed.ignored, ...plan.dropped].slice(0, 5),
       remaining_today: Math.max(0, MEET_DAILY_LIMIT - (used + 1)),
     },

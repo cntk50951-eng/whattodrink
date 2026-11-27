@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePlanReply, planStreamLine, sanitizePlan, searchPlanPrompt, wantsPlanStream } from "./searchPlan";
+import { nicknameFromQuery, parsePlanReply, planStreamLine, sanitizePlan, searchPlanPrompt, wantsPlanStream, withNicknameFallback } from "./searchPlan";
 
 describe("searchPlan", () => {
   it("用戶例句：女生＋附近 24 小時酒吧 → 兩個意圖", () => {
@@ -58,5 +58,43 @@ describe("計劃進度流", () => {
     expect(wantsPlanStream({ query: "x", stream: "true" }, "application/json")).toBe(false);
     expect(wantsPlanStream({ query: "x", stream: true }, null)).toBe(true);
     expect(wantsPlanStream({ query: "x" }, "Application/X-NDJSON")).toBe(true);
+  });
+});
+
+describe("nicknameFromQuery（iOS DEF-20261126-026）", () => {
+  it("口語「找／搵／find X」與明說暱稱都認得", () => {
+    expect(nicknameFromQuery("找chris")).toBe("chris");
+    expect(nicknameFromQuery("找 Chris")).toBe("Chris");
+    expect(nicknameFromQuery("幫我找一個 Kelvin")).toBe("Kelvin");
+    expect(nicknameFromQuery("find Kelvin")).toBe("Kelvin");
+    expect(nicknameFromQuery("search for amy_99")).toBe("amy_99");
+    expect(nicknameFromQuery("找一個暱稱為Chris的人")).toBe("Chris");
+    expect(nicknameFromQuery("昵称是 阿明")).toBe("阿明");
+    expect(nicknameFromQuery("搵個叫阿明的人")).toBe("阿明");
+  });
+  it("地點／酒類／泛指、或句子還有別的條件時不當人名", () => {
+    expect(nicknameFromQuery("找bar")).toBeNull();
+    expect(nicknameFromQuery("搵酒吧")).toBeNull();
+    expect(nicknameFromQuery("find whisky")).toBeNull();
+    expect(nicknameFromQuery("搵 IPA")).toBeNull();
+    expect(nicknameFromQuery("找gin")).toBeNull();
+    expect(nicknameFromQuery("找人")).toBeNull();
+    expect(nicknameFromQuery("附近有咩酒吧叫得出名")).toBeNull();
+    expect(nicknameFromQuery("找chris 一齊飲威士忌")).toBeNull();
+  });
+});
+
+describe("withNicknameFallback", () => {
+  it("模型只給了地點：補按暱稱找人放最前，地點保留（「找 Soho」可能真是找地方）", () => {
+    const places = { type: "places", keywords: ["chris"], near_me: false };
+    expect(withNicknameFallback([places] as never, "找chris")).toEqual([{ type: "people", criteria: { nickname: "chris" } }, places]);
+    const soho = { type: "places", keywords: ["Soho"], near_me: false };
+    expect(withNicknameFallback([soho] as never, "find Soho")).toEqual([{ type: "people", criteria: { nickname: "Soho" } }, soho]);
+  });
+  it("已有找人意圖或不是人名：原樣返回", () => {
+    const people = [{ type: "people", criteria: { gender: "female" } }] as never;
+    expect(withNicknameFallback(people, "找chris")).toBe(people);
+    const places = [{ type: "places", keywords: ["酒吧"], near_me: true }] as never;
+    expect(withNicknameFallback(places, "搵酒吧")).toBe(places);
   });
 });

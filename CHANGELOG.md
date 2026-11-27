@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased] — 第四批反饋：主頁翻頁輕量化、推送暱稱縮寫、遇見按暱稱找人（2026-11-26，openapi 1.74.0；iOS DEF-20261126-020／023／026）
+
+### Changed
+
+- `GET /api/v1/users/{id}/profile` 新增 `recent_only=1`：只為翻頁取打卡列表，跳過統計、口味推測與偏好（`stats`／`preferences`／`taste_inference` 回 null，其餘照常）。游標改為下推到查詢（以前每表固定取最新 200 行再在記憶體裡切，翻得越深越慢，超過 200 行就翻不到）；兩表改為並行查詢。翻頁時 `friends_only_count` 回 null。iOS 打卡日曆翻月、「更多回憶」用這個模式。
+- 推送暱稱統一縮寫（`pushName`）：按顯示寬度截（中日韓字算 2，上限 16，約 8 個中文字或 16 個英文字母），超過以「…」收尾，不切開 emoji／組合字；地點與酒名上限 24。碰杯、好友請求／接受、大話骰邀請、酒局通知（`partyNoticeCopy`）、outbox 通知（`cleanName`）全部套用。`cleanName` 不再刪掉 ZWJ／ZWNJ（以前組合 emoji 會被拆開），並多去掉 U+2066–2069 方向隔離字元。
+- 推送文案校對：繁中碰杯／好友接受改書面語，與 App 內一致（「{name} 碰了你一杯」「在你的打卡 · {beer}」「{name} 接受了你的好友請求」）；大話骰邀請改「{name} 邀請你玩大話骰」；英文 `Liar's Dice`；投訴回執英文 `Your complaint was received`（以前誤寫成 report）。
+- 遇見搜索按暱稱找人：計劃與舊版解析的 prompt 加入「找／搵／find X」規則與例句；模型漏掉時用規則兜底（`nicknameFromQuery`／`withNicknameFallback`）：只認拉丁字母開頭的單詞，或明說「暱稱／名叫／叫做 X」，或以「的人」收尾的「叫 X」；排除 bar、gin、IPA 等地點和酒類詞；句子帶其他條件時不兜底。兜底只在最前面補一個找人意圖，模型給的地點意圖保留（「找 Soho」可能真的是找地方，拿不準就兩個都給）。
+- 驗證：vitest 161 檔 1,593/1,593（新增 pushName、nicknameFromQuery、withNicknameFallback、cleanName 組合 emoji 測試）、`tsc --noEmit`、改動檔 eslint 0 error；openapi redocly 錯誤數與 HEAD 相同（206，都是原有的）。**沒有連真實 DB 和推送通道實測**。
+
 ## [Unreleased] — 酒局舉報（2026-11-26，openapi 1.73.0，migration 0093；iOS-0.205）
 
 ### Added

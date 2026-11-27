@@ -368,10 +368,14 @@ async function profileOf(req: Request, viewerId: string | null, targetId: string
     Object.assign(user, visibleInfoFor(u, relationship === "friend"));
   }
 
+  // recent_only=1（1.74.0；iOS DEF-20261126-020）：打卡日曆翻月／「更多回憶」翻頁只要打卡列表，
+  // 跳過統計、口味推測等重查詢；回包形狀不變（stats／preferences／taste_inference 為 null）。
+  const recentOnly = new URL(req.url).searchParams.get("recent_only") === "1";
+
   // stats（矩阵 C：对所有人可见，但只统计查看者看得到的行；本人看全部总数）。
   let stats: Record<string, number | null> | null = null;
   let nights: Set<string> | null = null;
-  if (statsVisible) {
+  if (statsVisible && !recentOnly) {
     // 本人全集；好友 public＋friends；陌生人 public（private 永不计入）。
     const visForStats =
       self || relationship === "friend" ? ["public", "friends", ...(self ? ["private"] : [])] : ["public"];
@@ -452,18 +456,25 @@ async function profileOf(req: Request, viewerId: string | null, targetId: string
   let recent_cursor: string | null = null;
   let friends_only_count: number | null = null;
   {
-    const { data: mainRows } = await supa
+    // 游標下推到查詢（以前固定取最新 200 行再在記憶體裡切，翻得越深越慢、超過 200 行就翻不到；iOS DEF-20261126-020）
+    const cursorIso = Number.isFinite(cursorMs) ? new Date(cursorMs).toISOString() : null;
+    const RECENT_SCAN = 200;
+    let mainQ = supa
       .from("checkins")
       .select("id,kind,visibility,place_name,lat,lng,created_at,expires_at,note,photo_thumb,beer_id,tags,hashtags")
-      .eq("user_id", targetId)
-      .order("created_at", { ascending: false })
-      .limit(200);
-    const { data: archRows } = await supa
+      .eq("user_id", targetId);
+    let archQ = supa
       .from("checkins_archive")
       .select("id,kind,visibility,place_name,lat,lng,created_at,expires_at,note,photo_thumb,beer_id,tags,hashtags")
-      .eq("user_id", targetId)
-      .order("created_at", { ascending: false })
-      .limit(200);
+      .eq("user_id", targetId);
+    if (cursorIso !== null) {
+      mainQ = mainQ.lt("created_at", cursorIso);
+      archQ = archQ.lt("created_at", cursorIso);
+    }
+    const [{ data: mainRows }, { data: archRows }] = await Promise.all([
+      mainQ.order("created_at", { ascending: false }).limit(RECENT_SCAN),
+      archQ.order("created_at", { ascending: false }).limit(RECENT_SCAN),
+    ]);
     const all = [
       ...((mainRows ?? []) as Record<string, unknown>[]),
       ...((archRows ?? []) as Record<string, unknown>[]),
@@ -477,7 +488,7 @@ async function profileOf(req: Request, viewerId: string | null, targetId: string
     // private 永不见。「另有 N 条」只数 friends（不含 private，不泄露存在）。
     // 訪客用空字串 viewer：不等於任何用戶 id，canViewCheckin 只放行 public
     const visible = visibleRowsFor(viewerId ?? "", targetId, all, myFriendIds);
-    if (!self && relationship !== "friend") {
+    if (!self && relationship !== "friend" && cursorIso === null) {
       friends_only_count = friendsOnlyCountOf(all);
     }
     const afterCursor =
@@ -553,10 +564,10 @@ async function profileOf(req: Request, viewerId: string | null, targetId: string
     can_add_friend: !self && relationship === "none",
     stats,
     // UR E.28 口味（preferences 与 stats 同门；taste 只给自己）。
-    preferences: statsVisible ? narrowPreferences(u.preferences) : null,
+    preferences: statsVisible && !recentOnly ? narrowPreferences(u.preferences) : null,
     // 好友视角推测（iOS-0.95）：好友按可见行现算，陌生人 null。
     taste_inference:
-      self || relationship === "friend"
+      !recentOnly && (self || relationship === "friend")
         ? self
           ? await tasteInference(supa, targetId, nowMs)
           : await tasteInferenceForFriend(supa, targetId, nowMs)

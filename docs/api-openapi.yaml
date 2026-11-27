@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.73.0
+  version: 1.74.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -4007,9 +4007,15 @@ paths:
             type: integer
         - name: cursor
           in: query
-          description: created_at ISO（keyset 下一页）
+          description: created_at ISO（keyset 下一页；1.74.0 起游标下推到查询，可翻过最新 200 行）
           schema:
             type: string
+        - name: recent_only
+          in: query
+          description: 1.74.0：传 `1` 只为翻页取打卡列表——跳过统计、口味推测、偏好（stats／preferences／taste_inference 回 null），其余字段照常；翻页时 friends_only_count 回 null
+          schema:
+            type: string
+            enum: ["1"]
       responses:
         "200":
           description: 主页包（user＋relationship＋stats＋recent＋locked 恒 false；iOS 对表解；矩阵 C：对所有人完整，足迹按 visibility 过滤，统计只计可见）

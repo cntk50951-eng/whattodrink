@@ -9,7 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ApnsEnv } from "./apns";
 import { configuredPushDevices, hasPushChannel, isDeadPushReason, nativePushConfigFromEnv, sendNativePush } from "./native";
 import { computeBadge } from "./badge";
-import { cheersCollapseId, cheersMergedTitle, fillPushTemplate, pushPrefsOf } from "./prefs";
+import { cheersCollapseId, cheersMergedTitle, fillPushTemplate, PUSH_NAME_WIDTH, PUSH_PLACE_WIDTH, pushName, pushPrefsOf } from "./prefs";
 import { createServiceClient } from "@/lib/supabase/server";
 import zhHant from "@/messages/zh-Hant.json";
 import zhHans from "@/messages/zh-Hans.json";
@@ -136,7 +136,7 @@ export async function sendCheersPush(args: {
       .eq("id", fromUserId)
       .maybeSingle();
     const fromNick = (fromRow as { nickname?: unknown } | null)?.nickname;
-    const fromName = typeof fromNick === "string" && fromNick !== "" ? fromNick : "酒友";
+    const fromName = pushName(typeof fromNick === "string" && fromNick !== "" ? fromNick : "酒友", PUSH_NAME_WIDTH);
     const { data: postRow } = await supa
       .from("checkins")
       .select("beer_id")
@@ -161,7 +161,7 @@ export async function sendCheersPush(args: {
           : fillPushTemplate(t("pushCheersTitle"), { name: fromName });
       const alert: Record<string, string> = { title };
       if (beerName !== "") {
-        alert.body = fillPushTemplate(t("pushCheersBody"), { beer: beerName });
+        alert.body = fillPushTemplate(t("pushCheersBody"), { beer: pushName(beerName, PUSH_PLACE_WIDTH) });
       }
       const payload = {
         ...(d.platform === "aos" ? aosMeta : { recipient_id: toUserId }),
@@ -257,7 +257,7 @@ export async function sendCheersPush(args: {
       .eq("id", fromUserId)
       .maybeSingle();
     const nick = (fromRow as { nickname?: unknown } | null)?.nickname;
-    const fromName = typeof nick === "string" && nick !== "" ? nick : "酒友";
+    const fromName = pushName(typeof nick === "string" && nick !== "" ? nick : "酒友", PUSH_NAME_WIDTH);
     const aosMeta=devs.some(d=>d.platform==="aos")?await aosEventMeta(supa,"friendships",kind==="request"?{user_id:fromUserId,friend_id:toUserId,status:"pending"}:{user_id:toUserId,friend_id:fromUserId,status:"accepted"},toUserId,kind==="request"?"friend_request":"friend_accepted"):null;
     let sent = 0;
     for (const d of devs) {
@@ -353,7 +353,7 @@ export async function sendGameInvitePush(args: {
       .eq("id", fromUserId)
       .maybeSingle();
     const nick = (fromRow as { nickname?: unknown } | null)?.nickname;
-    const fromName = typeof nick === "string" && nick !== "" ? nick : "酒友";
+    const fromName = pushName(typeof nick === "string" && nick !== "" ? nick : "酒友", PUSH_NAME_WIDTH);
     const aosMeta=devs.some(d=>d.platform==="aos")?await aosEventMeta(supa,"game_invites",{room_id:roomId,from_user_id:fromUserId,to_user_id:toUserId,status:"pending"},toUserId,"game_invite"):null;
     let sent = 0;
     for (const d of devs) {
@@ -421,8 +421,8 @@ export function partyNoticeCopy(
   place: string,
   reason?: "violation",
 ): { title: string; body: string } {
-  const p = place.trim() || (locale === "en" ? "the bar" : "酒吧");
-  const a = actorName.trim() || (locale === "en" ? "A friend" : "酒友");
+  const p = pushName(place, PUSH_PLACE_WIDTH) || (locale === "en" ? "the bar" : "酒吧");
+  const a = pushName(actorName, PUSH_NAME_WIDTH) || (locale === "en" ? "A friend" : "酒友");
   // 酒局經舉報核實違規、由平台取消（0093）：不寫成「發起人撤銷了」
   if (kind === "party_cancelled" && reason === "violation") {
     if (locale === "en") return { title: "Gathering cancelled", body: `The gathering at ${p} was cancelled for breaking community rules` };

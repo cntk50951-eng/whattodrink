@@ -1,6 +1,7 @@
 /** D.12 pure policy. Lock-screen copy never accepts message text or complaint evidence. */
 import { timingSafeEqual } from "node:crypto";
 import { NICKNAME_MAX } from "../api/profile";
+import { PUSH_NAME_WIDTH, pushName } from "./prefs";
 
 export const NOTICE_KINDS = ["member_joined","party_cancelled","member_left","member_left_late","reminder_1h","attendance_confirm","complaint_filed","complaint_response_needed","complaint_ack","complaint_result","trust_changed","game_join_request","game_join_result","game_kicked"] as const;
 /** Isolate push credentials from Vercel Cron. Explicit empty/weak values fail closed. */
@@ -32,7 +33,7 @@ const TITLE: Record<string, [string,string,string]> = {
  attendance_confirm:["請確認酒局出席情況","请确认酒局出席情况","Confirm gathering attendance"],
  complaint_filed:["你有新的案件通知","你有新的案件通知","You have a case update"],
  complaint_response_needed:["有案件需要你回應","有案件需要你回应","A case needs your response"],
- complaint_ack:["你的投訴已收到","你的投诉已收到","Your report was received"],
+ complaint_ack:["你的投訴已收到","你的投诉已收到","Your complaint was received"],
  complaint_result:["案件處理結果已更新","案件处理结果已更新","Your case result is available"],
  trust_changed:["你的誠信資料已更新","你的诚信资料已更新","Your trust information was updated"],
  game_join_request:["有人申請加入遊戲","有人申请加入游戏","Someone requested to join your game"],
@@ -49,8 +50,9 @@ export type CopyContext = { actor?: string; host?: string };
 export function cleanName(v: unknown): string|undefined {
  if (typeof v!=="string") return undefined;
  // 按字符截到暱稱上限（不切開 emoji）：舊帳號暱稱可能比現在的上限長
- const s=Array.from(v.replace(/[\u0000-\u001f\u007f​-‏‪-‮]/g,"").trim()).slice(0,NICKNAME_MAX).join("").trim();
- return s===""?undefined:s;
+ const s=Array.from(v.replace(/[\u0000-\u001f\u007f\u200b\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,"").trim()).slice(0,NICKNAME_MAX).join("").trim();
+ // 鎖屏一行放不下長暱稱：顯示寬度超過 16 就縮寫成「前段…」（iOS DEF-20261126-023）
+ return s===""?undefined:pushName(s,PUSH_NAME_WIDTH);
 }
 type L3 = [string,string,string];
 const pick=(l:L3,locale:string|null):string=>l[locale==="en"?2:locale==="zh-Hans"?1:0];

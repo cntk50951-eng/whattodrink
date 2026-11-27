@@ -143,6 +143,9 @@ export function searchPlanPrompt(peopleSchema: string): { system: string } {
     `输入：想搵人一齊飲威士忌，同埋睇下大家飲過咩威士忌\n输出：{"intents":[{"type":"people","criteria":{"taste_keys":["whisky"]}},{"type":"posts","tags":["whisky"],"near_me":false}],"ignored":[]}`,
     `输入：香港仔有冇通宵嘅bar\n输出：{"intents":[{"type":"places","keywords":["香港仔","bar"],"near_me":false,"open_24h":true}],"ignored":[]}`,
     `输入：找一個暱稱為Chris的人\n输出：{"intents":[{"type":"people","criteria":{"nickname":"Chris"}}],"ignored":[]}`,
+    `输入：找chris\n输出：{"intents":[{"type":"people","criteria":{"nickname":"chris"}}],"ignored":[]}`,
+    `输入：搵阿明\n输出：{"intents":[{"type":"people","criteria":{"nickname":"阿明"}}],"ignored":[]}`,
+    `输入：find Kelvin\n输出：{"intents":[{"type":"people","criteria":{"nickname":"Kelvin"}}],"ignored":[]}`,
     `输入：#微醺 嘅帖子\n输出：{"intents":[{"type":"posts","hashtags":["微醺"],"near_me":false}],"ignored":[]}`,
   ].join("\n");
   return {
@@ -160,6 +163,7 @@ export function searchPlanPrompt(peopleSchema: string): { system: string } {
       "2. 拿不准是找人还是找地点时，两个都给。",
       "3. 年龄「X岁以下」→age_max=X-1；「X岁以上」→age_min=X+1；「X 岁左右」→X±3。",
       "4. 不支持的（外貌、身材、种族、宗教、性取向等敏感属性，以及无法映射的描述）丢弃并把原文片段记入 ignored（≤5）。",
+      "5. 「找／搵／搜／find／search」后面直接跟一个像人名的词（英文名、人名、昵称，不是地区／酒吧类型／酒名），就是按昵称找人：people.criteria.nickname＝那个词（保留原样大小写），不要当成地点。",
       "示例：",
       shots,
       '输出形状：{"intents":[...], "ignored":["原文片段"]}',
@@ -189,5 +193,42 @@ export function planStreamLine(e: PlanStreamEvent): string {
 
 export function wantsPlanStream(body: Record<string, unknown>, accept: string | null): boolean {
   return body.stream === true || (accept ?? "").toLowerCase().includes("application/x-ndjson");
+}
+
+/** 明显的地点／类型词：不当人名（「找 bar」「搵酒吧」） */
+const NOT_NAMES = new Set([
+  "bar", "bars", "pub", "pubs", "club", "clubs", "party", "parties", "nearby", "people", "friends",
+  "wine", "beer", "whisky", "whiskey", "cocktail", "cocktails", "gin", "rum", "vodka", "tequila", "ipa", "lager",
+  "stout", "ale", "sake", "soju", "highball",
+]);
+
+/**
+ * 兜底（iOS DEF-20261126-026）：「找 chris／搵阿明／find Kelvin／找暱稱叫 X 的人」這類短句，
+ * 模型偶爾把名字丢掉或当成地点。规则：明说「叫／暱稱／昵称」→ 取后面的词；否则只认拉丁字母开头的单词（避免把「找酒吧」当人名）。
+ * 返回 null＝不是按昵称找人。纯函数，可单测。
+ */
+export function nicknameFromQuery(query: string): string | null {
+  const q = query.trim().replace(/[。！？!?.，,]+$/u, "");
+  // 「暱稱／名叫／叫做 X」直接認；單獨一個「叫」必須以「的人」收尾（免得「叫得出名」被當人名）
+  const explicit =
+    /(?:暱稱(?:為|是|叫)?|昵称(?:为|是|叫)?|nickname(?:\s+is)?|名叫|叫做)\s*[「“"']?([^\s「」“”"'的]{1,20})[」”"']?(?:\s*(?:的人|這個人|这个人))?$/iu.exec(q) ??
+    /叫\s*[「“"']?([^\s「」“”"'的]{1,20})[」”"']?\s*(?:的人|這個人|这个人)$/u.exec(q);
+  if (explicit !== null) return explicit[1];
+  const m = /^(?:幫我|帮我|請|请)?\s*(?:找|搵|搜|尋找|寻找|find|search(?:\s+for)?|look\s+for)\s*(?:一個|一个|一位|個|个|位)?\s*([A-Za-z][A-Za-z0-9_.\-]{1,19})(?:\s*(?:的人|這個人|这个人))?$/iu.exec(q);
+  if (m === null) return null;
+  return NOT_NAMES.has(m[1].toLowerCase()) ? null : m[1];
+}
+
+/**
+ * 计划里没有找人意图、句子又像按昵称找人：补一个 people.nickname 意图放最前。
+ * 地点意图保留（「找 Soho／find Central」可能真是找地方，拿不准就两个都给，和 prompt 规则 2 一致）
+ */
+export function withNicknameFallback(intents: PlanIntent[], query: string): PlanIntent[] {
+  if (intents.some((i) => i.type === "people")) return intents;
+  const nick = nicknameFromQuery(query);
+  if (nick === null) return intents;
+  const s = sanitizeCriteria({ nickname: nick });
+  if (s.criteria.nickname === undefined) return intents;
+  return [{ type: "people", criteria: s.criteria } as PlanIntent, ...intents];
 }
 

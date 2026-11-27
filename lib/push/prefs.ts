@@ -60,6 +60,35 @@ export function parsePushPrefs(raw: unknown): { body: PushPrefs } | { error: str
   return { body };
 }
 
+/**
+ * 推送裡的名字／地點縮寫（iOS DEF-20261126-023）：鎖屏一行放不下 30 字暱稱，整串名字會把「碰了你一杯」擠到看不見。
+ * 按顯示寬度截：中日韓／全形字算 2、其他算 1；超過 `maxWidth` 時保留前面、以「…」收尾（不切開 emoji／組合字）。
+ * 同時去掉控制字元、零寬空格與方向控制字元，避免名字把文案順序攪亂（保留 ZWJ／ZWNJ：組合 emoji 和部分文字要靠它們）。
+ */
+export function pushName(raw: string, maxWidth = 16): string {
+  const clean = raw.replace(/[\u0000-\u001f\u007f\u200b\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "").replace(/\s+/g, " ").trim();
+  const seg = typeof Intl !== "undefined" && "Segmenter" in Intl
+    ? Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(clean), (s) => s.segment)
+    : Array.from(clean);
+  const width = (g: string): number => (/[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]|[\u{1f300}-\u{1faff}]/u.test(g) ? 2 : 1);
+  const total = seg.reduce((n, g) => n + width(g), 0);
+  if (total <= maxWidth) return clean;
+  let out = "";
+  let used = 0;
+  for (const g of seg) {
+    const w = width(g);
+    if (used + w > maxWidth - 1) break;
+    out += g;
+    used += w;
+  }
+  return `${out.trimEnd()}…`;
+}
+
+/** 推送名字寬度上限（約 8 個中文字或 16 個英文字母） */
+export const PUSH_NAME_WIDTH = 16;
+/** 推送地點／酒名寬度上限 */
+export const PUSH_PLACE_WIDTH = 24;
+
 /** 模板填空（{name}／{beer}／{n}；缺键留空，调用方定省略规则）。 */
 export function fillPushTemplate(tpl: string, vars: Record<string, string | number>): string {
   let out = tpl;
