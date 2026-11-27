@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.74.0
+  version: 1.75.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -515,7 +515,7 @@ paths:
             type: string
       responses:
         "200":
-          description: "他人 {card}；本人另带 {visible, ready, stale, refreshes_left}。card 形状见 web lib/tasteCard.ts（persona/traits/flavor/picks/scenes/explore/palette/confidence）"
+          description: "他人 {card}（1.75.0：本人同意过且 visible 才给）；本人另带 {consented, visible, ready, stale, refreshes_left}，未同意时 card=null、consented=false（App 显示「生成口味卡」并先征求同意）。card 形状见 web lib/tasteCard.ts（persona/traits/flavor/picks/scenes/explore/palette/confidence）"
           content:
             application/json:
               schema:
@@ -528,7 +528,7 @@ paths:
   /api/v1/me/taste-card:
     post:
       operationId: generateTasteCard
-      summary: 生成／刷新 AI 口味卡（需登录；同步调模型≤~30s；force=手动重新生成，限 3 次/24h；资料不足 not_ready）
+      summary: 生成／刷新 AI 口味卡（需登录；同步调模型≤~30s；force=手动重新生成，限 3 次/24h；资料不足 not_ready；1.75.0 起须口味卡专属同意）
       security:
         - bearerAuth: []
       requestBody:
@@ -539,9 +539,12 @@ paths:
               properties:
                 force:
                   type: boolean
+                consent:
+                  type: boolean
+                  description: 1.75.0：用户刚在 App 同意「用 AI 生成口味卡」时传 true（服务端记 consented_at）；已同意过可不传。未同意且不传 → status=consent_required，不读资料、不调模型
       responses:
         "200":
-          description: "{status: ok|unchanged|not_ready|rate_limited, card, refreshes_left}"
+          description: "{status: ok|unchanged|not_ready|rate_limited|consent_required, card, refreshes_left}"
           content:
             application/json:
               schema:
@@ -553,7 +556,7 @@ paths:
           description: 模型失败
     patch:
       operationId: setTasteCardVisible
-      summary: 对他人隐藏／恢复公开 AI 口味卡
+      summary: 对他人隐藏／公开 AI 口味卡（1.75.0：新卡默认只有自己；未同意时 visible=true 回 409 not_allowed）
       security:
         - bearerAuth: []
       requestBody:
@@ -571,6 +574,18 @@ paths:
           description: "{visible, updated}"
         "400":
           $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: 未同意用 AI 生成口味卡，不能公开（not_allowed）
+    delete:
+      operationId: withdrawTasteCardConsent
+      summary: 撤回口味卡 AI 同意（1.75.0；删掉卡片与同意记录，之后不再生成；冪等）
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "{withdrawn: true}"
         "401":
           $ref: "#/components/responses/Unauthorized"
   /api/v1/me/bar-memory:
@@ -2277,6 +2292,9 @@ paths:
               type: object
               required: [place, slot, bill_intent]
               properties:
+                client_request_id:
+                  type: string
+                  description: 1.75.0（migration 0095）：冪等鍵（8–64 位字母／數字／-／_，建議 UUID）。同一次發送嘗試的重試沿用；同一發起人＋同一鍵只建一筆，重放回第一次的 {id, expires_at}
                 to_user_id:
                   type: string
                   format: uuid
@@ -2363,6 +2381,9 @@ paths:
               type: object
               required: [place, lat, lng, start_at, seats_total, min_members, bill_intent, purposes, host_intro]
               properties:
+                client_request_id:
+                  type: string
+                  description: 1.75.0（migration 0095）：冪等鍵（8–64 位字母／數字／-／_，建議 UUID）。同一次發送嘗試的重試沿用；同一發起人＋同一鍵只建一筆，重放回第一次的 {id, expires_at}
                 place:
                   type: string
                   maxLength: 30

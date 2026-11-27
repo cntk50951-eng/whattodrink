@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
+import { tasteCardConsentGranted, tasteCardPublic,
   buildTasteCardMessages, parseTasteCardReply, pushRefresh, sanitizeTasteCard, tasteCardNeedsRefresh, tasteCardReady,
   tasteCardSources, tasteInputsHash, tasteRefreshesLeft, type TasteInputs,
 } from "./tasteCard";
@@ -105,5 +105,21 @@ describe("prompt", () => {
     expect(m[0].content).toContain("不推斷也不提及");
     expect(m[0].content).toContain("最近的自述");     // 記憶（最新自述）優先於歷史打卡
     expect(JSON.parse(m[1].content).data.preferences.favorites).toEqual(["japanese_whisky"]);
+  });
+});
+
+describe("口味卡同意閘（iOS IOS-C01）", () => {
+  it("已記錄同意或本次帶 consent:true 才可生成；舊 App 自動生成（不帶）被擋", () => {
+    expect(tasteCardConsentGranted("2026-11-26T10:00:00Z", undefined)).toBe(true);
+    expect(tasteCardConsentGranted(null, true)).toBe(true);
+    expect(tasteCardConsentGranted(null, undefined)).toBe(false);
+    expect(tasteCardConsentGranted(undefined, "true")).toBe(false);
+    expect(tasteCardConsentGranted("", false)).toBe(false);
+  });
+  it("他人只看得到：同意過＋自己選了公開", () => {
+    expect(tasteCardPublic({ visible: true, consented_at: "2026-11-26T10:00:00Z" })).toBe(true);
+    expect(tasteCardPublic({ visible: true, consented_at: null })).toBe(false);
+    expect(tasteCardPublic({ visible: false, consented_at: "2026-11-26T10:00:00Z" })).toBe(false);
+    expect(tasteCardPublic(null)).toBe(false);
   });
 });

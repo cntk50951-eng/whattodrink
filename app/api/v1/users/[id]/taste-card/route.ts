@@ -2,7 +2,7 @@ import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { BlockLookupError, blockLookupUnavailable, isPairBlocked } from "@/lib/api/blocks";
 import { loadCardRow, loadTasteInputs } from "@/lib/tasteCardData";
-import { tasteCardNeedsRefresh, tasteCardReady, tasteInputsHash, tasteRefreshesLeft, type TasteCard } from "@/lib/tasteCard";
+import { tasteCardConsentGranted, tasteCardNeedsRefresh, tasteCardPublic, tasteCardReady, tasteInputsHash, tasteRefreshesLeft, type TasteCard } from "@/lib/tasteCard";
 
 /**
  * AI 口味卡读取（🔒；id 或 `me`）。只读缓存，永不触发生成（生成走 POST /me/taste-card）。
@@ -30,15 +30,19 @@ export async function GET(
       if (e instanceof BlockLookupError) return blockLookupUnavailable();
       throw e;
     }
-    return apiOk({ card: row !== null && row.visible ? card : null });
+    // IOS-C01：本人同意過且選了公開才給他人看
+    return apiOk({ card: tasteCardPublic(row) ? card : null });
   }
   // 本人：告诉 App 现在是否值得（后台）生成一次
   const inputs = await loadTasteInputs(svc, userId);
   const ready = tasteCardReady(inputs);
   const stale = ready && tasteCardNeedsRefresh(row === null ? null : { inputs_hash: row.inputs_hash, computed_at: row.computed_at }, tasteInputsHash(inputs), Date.now());
+  const consented = tasteCardConsentGranted(row?.consented_at, undefined);
   return apiOk({
-    card,
-    visible: row?.visible ?? true,
+    // 沒同意：不給卡（舊卡是未經同意生成的），App 改顯示「生成口味卡」並先徵求同意
+    card: consented ? card : null,
+    consented,
+    visible: row?.visible ?? false,
     ready,
     stale,
     refreshes_left: tasteRefreshesLeft(row?.refreshes, Date.now()),

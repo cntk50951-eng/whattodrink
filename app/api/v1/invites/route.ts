@@ -1,4 +1,5 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
+import { clientRequestIdOf } from "@/lib/api/clientRequestId";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { canViewCheckin } from "@/lib/api/checkins";
 import { friendIdsOf, type FriendshipRow } from "@/lib/friends";
@@ -34,6 +35,20 @@ export async function POST(req: Request): Promise<Response> {
   const parsed = parseInviteBody(raw);
   if ("error" in parsed) {
     return apiError("invalid_params", parsed.error, 400);
+  }
+  // IOS-C04：同一次發送嘗試重試回第一次建好的那條邀約，不另建
+  const clientRequestId = clientRequestIdOf(raw);
+  if (clientRequestId !== null) {
+    const { data: prior, error: priorErr } = await supabase
+      .from("drink_invites")
+      .select("id,expires_at")
+      .eq("from_user_id", userId)
+      .eq("client_request_id", clientRequestId)
+      .maybeSingle();
+    if (priorErr === null && prior !== null) {
+      const pr = prior as { id: string; expires_at: string };
+      return apiOk({ id: pr.id, expires_at: pr.expires_at });
+    }
   }
   // 定靶：checkin 解作者（可见门沿详情口径，不可见 404 不泄归属）；to_user 直用。
   let toUserId: string;
@@ -145,10 +160,19 @@ export async function POST(req: Request): Promise<Response> {
       poi_id: parsed.poi_id ?? null,
       start_at: new Date(w.startAt).toISOString(),
       expires_at: new Date(w.expiresAt).toISOString(),
+      ...(clientRequestId !== null ? { client_request_id: clientRequestId } : {}),
       status: "sent",
     })
     .select("id,expires_at")
     .single();
+  if (iErr?.code === "23505" && clientRequestId !== null) {
+    const { data: dup } = await supabase
+      .from("drink_invites").select("id,expires_at").eq("from_user_id", userId).eq("client_request_id", clientRequestId).maybeSingle();
+    if (dup !== null) {
+      const d = dup as { id: string; expires_at: string };
+      return apiOk({ id: d.id, expires_at: d.expires_at });
+    }
+  }
   if (iErr !== null || inserted === null) {
     console.error(`[api/v1/invites] insert error: code=${iErr?.code} message=${iErr?.message}`);
     return apiError("internal", "邀約發送失敗", 500);

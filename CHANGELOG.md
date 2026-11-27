@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased] — 口味卡專屬同意、發局／邀約冪等（2026-11-26，openapi 1.75.0，migration 0094／0095；iOS IOS-C01／C04）
+
+### Changed
+- AI 口味卡須專屬同意（Apple 5.1.2）：`POST /me/taste-card` 要有已記錄的同意（`consented_at`）或本次帶 `consent: true`，否則回 200 `{status:"consent_required"}`，不讀資料、不調模型（舊版 App 只認 ok／unchanged／not_ready，會靜默不顯示）。新增 `DELETE /me/taste-card` 撤回（刪卡與同意）；`PATCH {visible:true}` 未同意回 409 `not_allowed`；`GET /users/{id}/taste-card` 他人只見「同意過且公開」的卡，本人另帶 `consented`，未同意時 card=null。
+- 0094：`user_taste_cards.consented_at`；`visible` 默認改 false；**既有的卡全部改為不公開**（都是未經同意生成的）。
+- `POST /parties`、`POST /invites` 支持 `client_request_id` 冪等鍵（0095 唯一索引）：同一發起人＋同一鍵重放回第一次的 `{id, expires_at}`；並發撞唯一索引（23505）也回原記錄。
+
+### 部署
+- **先跑 0094、0095，再部署 web**（0095 未跑時帶冪等鍵的建立會失敗）。
+- 驗證：vitest 全量、`tsc --noEmit`、改動檔 eslint 0 error。未連真實 DB 實跑 migration。
+
 ## [Unreleased] — 酒局舉報先查重、後限額（2026-11-26；iOS 第六輪審核 R6-05／DEF-20261126-042）
 
 ### Fixed

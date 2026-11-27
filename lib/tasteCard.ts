@@ -233,3 +233,16 @@ export function parseTasteCardReply(reply: string, dislikedWords: string[] = [],
   }
   return null;
 }
+
+/**
+ * 口味卡同意閘（iOS IOS-C01；Apple 5.1.2）：已記錄同意，或這次請求帶 `consent: true`（用戶剛在 App 同意）才可生成。
+ * 舊版 App 自動生成時不帶 consent → 拒絕（回 consent_required，舊 App 只認 ok／unchanged／not_ready，靜默不顯示）。
+ */
+export function tasteCardConsentGranted(consentedAt: string | null | undefined, bodyConsent: unknown): boolean {
+  return (typeof consentedAt === "string" && consentedAt !== "") || bodyConsent === true;
+}
+
+/** 他人能不能看到這張卡：本人同意過、且自己選了公開 */
+export function tasteCardPublic(row: { visible?: boolean | null; consented_at?: string | null } | null): boolean {
+  return row !== null && row.visible === true && typeof row.consented_at === "string" && row.consented_at !== "";
+}

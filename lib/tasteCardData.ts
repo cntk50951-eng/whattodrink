@@ -8,7 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { sanitizeBarMemory } from "./barMemory";
 import { aggregateTaste, parsePreferences } from "./api/taste";
 import { MinimaxError, minimaxChat } from "./minimax";
-import {
+import { tasteCardConsentGranted,
   buildTasteCardMessages, parseTasteCardReply, pushRefresh, tasteCardNeedsRefresh, tasteCardReady, tasteInputsHash,
   tasteRefreshesLeft, type TasteCard, type TasteInputs,
 } from "./tasteCard";
@@ -63,10 +63,10 @@ export async function loadTasteInputs(svc: SupabaseClient, userId: string): Prom
   return { preferences, checkins, memory };
 }
 
-export type CardRow = { payload: unknown; inputs_hash: string; computed_at: string; visible: boolean; refreshes: unknown };
+export type CardRow = { payload: unknown; inputs_hash: string; computed_at: string; visible: boolean; refreshes: unknown; consented_at: string | null };
 
 export async function loadCardRow(svc: SupabaseClient, userId: string): Promise<CardRow | null> {
-  const { data, error } = await svc.from("user_taste_cards").select("payload,inputs_hash,computed_at,visible,refreshes").eq("user_id", userId).maybeSingle();
+  const { data, error } = await svc.from("user_taste_cards").select("payload,inputs_hash,computed_at,visible,refreshes,consented_at").eq("user_id", userId).maybeSingle();
   if (error !== null) {
     // 表未遷移（0059 沒跑）：當沒有，不炸
     console.warn(`[taste-card] load skipped: ${error.code} ${error.message}`);
@@ -80,6 +80,7 @@ export type GenerateOutcome =
   | { status: "unchanged"; card: TasteCard | null }
   | { status: "not_ready" }
   | { status: "rate_limited" }
+  | { status: "consent_required" }
   | { status: "failed" };
 
 /**
@@ -92,7 +93,12 @@ export async function generateTasteCard(
   apiKey: string,
   nowMs: number,
   force: boolean,
+  consent: unknown = undefined,
 ): Promise<GenerateOutcome> {
+  // IOS-C01：沒有口味卡專屬同意，不讀輸入、不調模型（先查同意，連資料都不碰）
+  const prior = await loadCardRow(svc, userId);
+  if (!tasteCardConsentGranted(prior?.consented_at, consent)) return { status: "consent_required" };
+  const consentedAt = prior?.consented_at ?? new Date(nowMs).toISOString();
   const inputs = await loadTasteInputs(svc, userId);
   if (!tasteCardReady(inputs)) return { status: "not_ready" };
   const hash = tasteInputsHash(inputs);
@@ -131,7 +137,8 @@ export async function generateTasteCard(
       payload: card,
       inputs_hash: hash,
       computed_at: new Date(nowMs).toISOString(),
-      visible: row?.visible ?? true,
+      visible: row?.visible ?? false,   // 新卡默認只有自己看得到（0094）
+      consented_at: consentedAt,
       refreshes: force ? pushRefresh(row?.refreshes, nowMs) : (row?.refreshes ?? []),
     },
     { onConflict: "user_id" },

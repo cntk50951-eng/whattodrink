@@ -2,6 +2,7 @@ import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseCompositeCursor } from "@/lib/api/compositeCursor";
 import { isMinorDob } from "@/lib/api/cheers";
+import { clientRequestIdOf } from "@/lib/api/clientRequestId";
 import { countGenders, cancelPolicy, hkDayStartISO, isAllowedPoiCoverUrl, leavePolicy, mineOrCondition, parsePartyBody, partyCoverUploadPath, partyExpiresAt, PARTY_POI_IMAGE_HOSTS_DEFAULT } from "@/lib/api/party";
 import { hostTrustMap, readTrust } from "@/lib/trust/ledger";
 import { TRUST_CONFIG } from "@/lib/trust/config";
@@ -31,6 +32,21 @@ export async function POST(req: Request): Promise<Response> {
   const parsed = parsePartyBody(raw);
   if ("error" in parsed) {
     return apiError("invalid_params", parsed.error, 400);
+  }
+  // IOS-C04：同一次「發佈嘗試」重試（弱網連點／回包丟失）回第一次建好的那個局，不另建
+  const clientRequestId = clientRequestIdOf(raw);
+  if (clientRequestId !== null) {
+    const { data: prior, error: priorErr } = await supabase
+      .from("parties")
+      .select("id,expires_at")
+      .eq("host_user_id", userId)
+      .eq("client_request_id", clientRequestId)
+      .maybeSingle();
+    // 0095 未跑（42703）時查詢失敗：當作沒有，沿舊行為
+    if (priorErr === null && prior !== null) {
+      const pr = prior as { id: string; expires_at: string };
+      return apiOk({ id: pr.id, expires_at: pr.expires_at }, 200);
+    }
   }
   const { data: meRow } = await supabase
     .from("users")
@@ -149,10 +165,21 @@ export async function POST(req: Request): Promise<Response> {
       purpose_other: b.purpose_other,
       host_intro: b.host_intro,
       ...(b.cover_url !== undefined ? { cover_url: b.cover_url, cover_source: b.cover_source } : {}),
+      ...(clientRequestId !== null ? { client_request_id: clientRequestId } : {}),
       status: "open",
     })
     .select("id")
     .single();
+  // 並發的同一嘗試撞唯一索引（23505）：回已建好的那個
+  if (iErr?.code === "23505" && clientRequestId !== null) {
+    const { data: dup } = await supabase
+      .from("parties").select("id,expires_at").eq("host_user_id", userId).eq("client_request_id", clientRequestId).maybeSingle();
+    if (dup !== null) {
+      if (coverPath !== null) await deleteCoverPath(coverPath);
+      const d = dup as { id: string; expires_at: string };
+      return apiOk({ id: d.id, expires_at: d.expires_at }, 200);
+    }
+  }
   if (iErr !== null || inserted === null) {
     console.error(`[api/v1/parties] insert error: code=${iErr?.code} message=${iErr?.message}`);
     if (coverPath !== null) await deleteCoverPath(coverPath);
