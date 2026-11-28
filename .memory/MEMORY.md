@@ -33,3 +33,4 @@
 - [分享打卡分頁接口與既有噪音](2026-11-27-share-page-api-and-preexisting-gate-noise.md) — 游標保微秒、合併後可短頁；21 點一條測試失敗（原因未確認）、openapi 嚴格解析本來就錯
 - [舉報結果推送](2026-11-27-report-result-push.md) — 0096 重建入隊函數；SQL 未實跑；先遷移再部署再發包
 - [推送四項修復](2026-11-27-push-audit-fixes.md) — 撤回要看 deleted_at；http2 session 要掛 error；FCM 聊天不設 collapseKey；部署前查 0079
+- [探索走獨立分支](2026-11-27-explore-view-separate-branch.md) — 默認列表不改

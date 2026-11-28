@@ -1,6 +1,8 @@
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseCompositeCursor } from "@/lib/api/compositeCursor";
+import { BlockLookupError, blockLookupUnavailable, getBlockedUserIds } from "@/lib/api/blocks";
+import { EXPLORE_SQL_EXCLUDE_LIMIT, exploreCursorFilter, exploreFetchLimit, explorePage, parseExploreParams } from "@/lib/api/partyExplore";
 import { isMinorDob } from "@/lib/api/cheers";
 import { clientRequestIdOf } from "@/lib/api/clientRequestId";
 import { countGenders, cancelPolicy, hkDayStartISO, isAllowedPoiCoverUrl, leavePolicy, mineOrCondition, parsePartyBody, partyCoverUploadPath, partyExpiresAt, PARTY_POI_IMAGE_HOSTS_DEFAULT } from "@/lib/api/party";
@@ -222,6 +224,8 @@ type PartyListRow = {
  * 只回未过期非 cancelled；`box=mine` 回我发起＋我参加（含 cancelled／过期，
  * 需登录，匿名 401）；行含 status＋計數＋host＋本人旗＋距離
  * （`near` 一次性查询用，不存储）。
+ * UR E.34 `view=explore&phase=active|ended&from=&to=`：探索分頁（進行中按開始時間升序、已結束降序，
+ *   `start_at|id` keyset；撤銷不回；排除封鎖雙方；已結束流需登入並排除本人已刪除的局）。不帶 view 行為不變。
  * cursor：優先用回包的 `next_cursor`（`<created_at>|<id>` 複合 keyset，按 created_at、id 倒序，
  *   同一時間戳的多行跨頁不漏不重）；舊客戶端傳純 created_at ISO 仍可用（只按 created_at 嚴格小於，行為同前）。
  */
@@ -247,6 +251,11 @@ export async function GET(req: Request): Promise<Response> {
       bbox = { west: w, south: s, east: e, north: n };
     }
   }
+  const exploreParsed = parseExploreParams(q);
+  if (exploreParsed !== null && "error" in exploreParsed) {
+    return apiError("invalid_params", exploreParsed.error, 400);
+  }
+  const explore = exploreParsed;
   const cursor = q.get("cursor");
   const composite = parseCompositeCursor(cursor);
   const cursorMs = cursor !== null && composite === null ? Date.parse(cursor) : NaN;
@@ -254,14 +263,35 @@ export async function GET(req: Request): Promise<Response> {
   const { supabase, userId: viewerId } = await getAuthedClient(req);
   const nowIso = new Date(Date.now()).toISOString();
   // round-2 撤销保留：box=mine 回我发起＋我参加（含 cancelled／过期，需登录）。
-  const box = q.get("box") === "mine" ? "mine" : "all";
+  const box = explore === null && q.get("box") === "mine" ? "mine" : "all";
 
-  if (box === "mine" && viewerId === null) {
+  if ((box === "mine" || explore?.phase === "ended") && viewerId === null) {
     return apiError("unauthorized", "未登录", 401);
   }
 
   let joinedIds: string[] = [];
   let hiddenPartyIds = new Set<string>();
+  // 探索已結束流：本人「刪除」過的局不能又冒出來（同我的約局口徑）
+  if (explore?.phase === "ended" && viewerId !== null) {
+    const hides = await supabase.from("party_hides").select("party_id").eq("user_id", viewerId);
+    if (hides.error !== null && hides.error.code !== "42P01") {
+      console.error(`[api/v1/parties] hides error: code=${hides.error.code} message=${hides.error.message}`);
+      return apiError("internal", "酒局讀取失敗", 500);
+    }
+    hiddenPartyIds = new Set(
+      ((hides.data ?? []) as { party_id?: unknown }[]).map((h) => h.party_id).filter((v): v is string => typeof v === "string" && UUID_RE.test(v)),
+    );
+  }
+  // 探索：封鎖雙方的局在限頁前排除；查不到就 503，不放行
+  let blockedHosts: string[] = [];
+  if (explore !== null && viewerId !== null) {
+    try {
+      blockedHosts = [...(await getBlockedUserIds(await createServiceClient(), viewerId))].filter((v) => UUID_RE.test(v));
+    } catch (e) {
+      if (e instanceof BlockLookupError) return blockLookupUnavailable();
+      throw e;
+    }
+  }
   if (box === "mine" && viewerId !== null) {
     // 先查「我參加的局」與「我已隱藏的終態局」，在 SQL 限頁前排除隱藏 ID，避免 51 筆藏 1 筆時首頁只回 49 筆導致客戶端提早停止翻頁
     const [joinsRes, hidesRes] = await Promise.all([
@@ -295,7 +325,12 @@ export async function GET(req: Request): Promise<Response> {
   }
   const hiddenList = [...hiddenPartyIds];
   const pushSqlHiddenFilter = hiddenList.length > 0 && hiddenList.length <= 200;
-  const fetchLimit = pushSqlHiddenFilter ? limit : Math.min(limit + hiddenList.length, 500);
+  const pushSqlBlockedFilter = blockedHosts.length > 0 && blockedHosts.length <= EXPLORE_SQL_EXCLUDE_LIMIT;
+  const memoryHidden = pushSqlHiddenFilter ? 0 : hiddenList.length;
+  const memoryBlocked = pushSqlBlockedFilter ? 0 : blockedHosts.length;
+  const fetchLimit = explore !== null
+    ? exploreFetchLimit(limit, memoryHidden + memoryBlocked)
+    : pushSqlHiddenFilter ? limit : Math.min(limit + hiddenList.length, 500);
 
   const BASE_COLS = "id,host_user_id,place,city,lat,lng,start_at,expires_at,seats_total,seats_male,seats_female,min_members,bill_intent,purposes,purpose_other,host_intro,status,created_at";
   let rows: unknown[] | null = null;
@@ -304,10 +339,18 @@ export async function GET(req: Request): Promise<Response> {
     let query = supabase
       .from("parties")
       .select(cols)
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
+      .order(explore === null ? "created_at" : "start_at", { ascending: explore?.phase === "active" })
+      .order("id", { ascending: explore?.phase === "active" })
       .limit(fetchLimit);
-    if (box === "mine" && viewerId !== null) {
+    if (explore !== null) {
+      query = query.eq("status", "open");
+      query = explore.phase === "active" ? query.gt("expires_at", nowIso) : query.lte("expires_at", nowIso);
+      if (explore.from !== null) query = query.gte("start_at", explore.from);
+      if (explore.to !== null) query = query.lt("start_at", explore.to);
+      if (explore.cursor !== null) query = query.or(exploreCursorFilter(explore.phase, explore.cursor));
+      if (pushSqlBlockedFilter) query = query.not("host_user_id", "in", `(${blockedHosts.join(",")})`);
+      if (pushSqlHiddenFilter) query = query.not("id", "in", `(${hiddenList.join(",")})`);
+    } else if (box === "mine" && viewerId !== null) {
       query = query.or(mineOrCondition(viewerId, joinedIds));
       if (pushSqlHiddenFilter) {
         query = query.not("id", "in", `(${hiddenList.join(",")})`);
@@ -323,7 +366,9 @@ export async function GET(req: Request): Promise<Response> {
         .gte("lng", bbox.west)
         .lte("lng", bbox.east);
     }
-    if (composite !== null) {
+    if (explore !== null) {
+      // 探索游標已在上面按 start_at 套用
+    } else if (composite !== null) {
       // 值已由 parseCompositeCursor 嚴格校驗（時間戳字符集＋UUID），可安全拼進 or()
       query = query.or(`created_at.lt.${composite.createdAt},and(created_at.eq.${composite.createdAt},id.lt.${composite.id})`);
     } else if (Number.isFinite(cursorMs)) {
@@ -336,9 +381,16 @@ export async function GET(req: Request): Promise<Response> {
     console.error(`[api/v1/parties] list error: code=${error.code} message=${error.message}`);
     return apiError("internal", "酒局讀取失敗", 500);
   }
-  const list = ((rows ?? []) as PartyListRow[])
-    .filter((r) => typeof r.id === "string" && !hiddenPartyIds.has(r.id))
-    .slice(0, limit);
+  const fetched = ((rows ?? []) as PartyListRow[]).filter((r) => typeof r.id === "string");
+  const page = explore === null
+    ? null
+    : explorePage(fetched, {
+        limit,
+        fetchLimit,
+        excludedHosts: new Set(pushSqlBlockedFilter ? [] : blockedHosts),
+        excludedParties: hiddenPartyIds,
+      });
+  const list = page !== null ? page.list : fetched.filter((r) => !hiddenPartyIds.has(r.id)).slice(0, limit);
   const ids = list.map((r) => r.id);
   const hostIds = [...new Set(list.map((r) => r.host_user_id))];
   let hosts = new Map<string, { nickname: string; avatar_url: string | null }>();
@@ -468,7 +520,9 @@ export async function GET(req: Request): Promise<Response> {
   });
   // UR E.29 同步游标（服务端 ms；changes 的 since 原样回传，与翻页 cursor 区分命名）。
   const lastRow = list.length > 0 ? list[list.length - 1] : null;
-  const next_cursor = lastRow !== null && typeof lastRow.created_at === "string" ? `${lastRow.created_at}|${lastRow.id}` : null;
+  const next_cursor = page !== null
+    ? page.next_cursor
+    : lastRow !== null && typeof lastRow.created_at === "string" ? `${lastRow.created_at}|${lastRow.id}` : null;
   return apiOk({ items, sync_cursor: Date.now(), next_cursor });
 }
 

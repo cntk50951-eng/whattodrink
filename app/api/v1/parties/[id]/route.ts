@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { cancelPolicy, canDeleteExpiredParty, leavePolicy, minutesBeforeStart } from "@/lib/api/party";
+import { partyMemberAccess } from "@/lib/api/partyExplore";
 import { classifyTransition, updatedRowCount } from "@/lib/api/transition";
 import { hostTrustMap } from "@/lib/trust/ledger";
 import { writeTrustEvent } from "@/lib/trust/ledger";
@@ -37,6 +38,7 @@ type PartyRow = {
  * UR E.23 局詳情（🌐匿名可看；iOS-0.57 联调）。
  * `GET /api/v1/parties/:id` —— 詳情＋`members[{user_id,nickname,avatar_url,gender,joined_at,is_host}]`
  * （host 行由 host_user_id 合成，joined_at 取局創建；無需 joins 行）。
+ * UR E.34：正常結束的局要登入（401）；非發起人／參加者只回發起人一行＋人數，並帶 `members_hidden: true`。
  */
 export async function GET(
   req: Request,
@@ -89,6 +91,8 @@ export async function GET(
   const joinedMap = new Map(jrows.map((j) => [j.user_id, j.joined_at]));
   const joinedByMe = viewerId !== null && (joinedMap.has(viewerId) || row.host_user_id === viewerId);
   const nowMs = Date.now();
+  const access = partyMemberAccess({ status: row.status, expiresAtMs: Date.parse(row.expires_at), viewerId, isMember: joinedByMe, nowMs });
+  if (access === "login") return apiError("unauthorized", "登录后查看", 401);
   const members = memberIds.map((uid) => {
     const p = profiles.get(uid) ?? { nickname: "酒友", avatar_url: null, gender: null };
     return {
@@ -141,7 +145,8 @@ export async function GET(
     status: row.status,
     created_at: row.created_at,
     joined_count: jrows.length,
-    members,
+    members: access === "host_only" ? members.filter((m) => m.is_host) : members,
+    ...(access === "host_only" ? { members_hidden: true } : {}),
     host: {
       user_id: hostMember.user_id,
       nickname: hostMember.nickname,

@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased] — 酒局「探索」分頁與已結束的局（2026-11-27，UR E.34，openapi 1.78.0，migration 0097；iOS-0.214／AOS-0.150）
+
+### Added
+- `GET /parties?view=explore&phase=active|ended&from=&to=`：進行中按開始時間升序、已結束降序，`start_at|id` 分頁；撤銷不回；限頁前排除封鎖雙方與本人刪除的局；已結束需登入。
+
+### Changed
+- 正常結束的局詳情需要登入；非參加者只看到發起人和人數（`members_hidden`）。默認列表行為不變。
+
+### 驗證
+- vitest（含路由 8 條、純函數 7 條）、tsc、eslint、build 過。**只用假資料庫測過；0097 未在任何資料庫執行、未部署**。
+
+### 部署
+- 先執行 `0097_parties_explore_idx.sql`，再部署 web，最後發兩端新版。
+
 ## [Unreleased] — 原生推送四項修復（2026-11-27，UR D.9／D.11／D.12，無 migration、接口形狀不變）
 
 ### Fixed

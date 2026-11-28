@@ -4663,3 +4663,11 @@ UR E.33　舉報結果推送給舉報人（Android；2026-11-27）[WIP]
 > iOS-0.213／AOS-0.149。方案：iOS repo `docs/plans/2026-11-27-report-block/plan.md`。只改後端。
 - AC：migration 0096 讓 `report_resolved` 入 `native_push_outbox` 並帶 `report_id`；通用標題不含原因和暱稱；未讀即可發；不進 `IOS_OUTBOX_KINDS`；openapi 1.77.0。
 - *改動記錄*：2026-11-27 用戶回覆開始。migration 由用戶執行；部署與 commit／push 另行確認。
+
+UR E.34　酒局「探索」看得到所有人的局＋分頁（2026-11-27）[WIP]
+
+> iOS-0.214／AOS-0.150。方案：iOS repo `docs/plans/2026-11-27-party-explore-paging/plan.md`。
+- AC：`GET /parties?view=explore&phase=active|ended&from=&to=&cursor=&limit=`；進行中流按開始時間升序、已結束流降序，`start_at|id` keyset；撤銷的不回；限頁前排除封鎖雙方與本人已刪除的局；已結束流要登入（401）；封鎖查不到回 503。默認接口行為不變。
+- AC：已結束的局詳情要登入；非參加者只回發起人與人數（`members_hidden`）。
+- AC：migration 0097 加 `(start_at,id) WHERE status='open'` 索引；openapi 1.78.0。
+- *改動記錄*：2026-11-27 用戶回覆開始（建議值：過去 3 天含今天已結束；他人已結束局登入才看；篩選在客戶端、分頁自動續載）。

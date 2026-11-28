@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.77.0
+  version: 1.78.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -2550,8 +2550,35 @@ paths:
           description: >
             翻頁游標。優先傳上一頁回包的 `next_cursor`（`<created_at>|<id>`，按 created_at、id 倒序的複合 keyset，
             同一時間戳的多行跨頁不漏不重）；舊客戶端傳純 created_at ISO 仍可用（只按 created_at 嚴格小於）。格式不符的複合游標按純時間戳處理。
+            `view=explore` 時游標是 `<start_at>|<id>`，只接受回包的 `next_cursor`（格式不符 400）。
           schema:
             type: string
+        - name: view
+          in: query
+          description: >
+            1.78.0（UR E.34）：傳 `explore` 走探索分頁；不傳＝原有默認行為（不變）。探索只回未撤銷的局、排除與觀看者互相封鎖的發起人，
+            有 `box` 也忽略；還有下一頁才回 `next_cursor`（過濾後可能出現本頁為空但有游標，客戶端繼續翻）。
+          schema:
+            type: string
+            enum: [explore]
+        - name: phase
+          in: query
+          description: view=explore 必填。`active`＝未結束（開局＋3 小時未到），按 start_at、id 升序；`ended`＝已結束，降序，需登录，並排除觀看者已刪除的局。
+          schema:
+            type: string
+            enum: [active, ended]
+        - name: from
+          in: query
+          description: view=explore 可選：start_at 下界（含）
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: view=explore 可選：start_at 上界（不含）
+          schema:
+            type: string
+            format: date-time
       responses:
         "200":
           description: 酒局行（含 status／joined_count／male_count／female_count／host／joined_by_me／is_mine／distance_m／purposes＋cover_url／cover_source（可空；无封面为 null）＋登录才回 purpose_other／host_intro；登录行加 my_arrived（我是否已到场打卡）／cancel_policy，参加行加 leave_policy；sync_cursor 服务端 ms，UR E.29；next_cursor＝下一頁複合游標（`<created_at>|<id>`，本頁最後一行；空頁為 null））
@@ -2559,8 +2586,20 @@ paths:
             application/json:
               schema:
                 type: object
+        "400":
+          description: view=explore 參數非法（phase／from／to／cursor）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "503":
+          description: view=explore 時暫時查不到封鎖關係（可重試）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "401":
-          description: box=mine 需登录
+          description: box=mine 或 view=explore&phase=ended 需登录
           content:
             application/json:
               schema:
@@ -2570,7 +2609,7 @@ paths:
   /api/v1/parties/{id}:
     get:
       operationId: getParty
-      summary: 局詳情（匿名可看，匿名只回 purposes；members 含性別＋is_host；登录加 my_arrived（我是否已到场打卡）／cancel_policy／leave_policy，UR E.23）
+      summary: 局詳情（匿名可看，匿名只回 purposes；members 含性別＋is_host；登录加 my_arrived（我是否已到场打卡）／cancel_policy／leave_policy，UR E.23。1.78.0：正常結束的局匿名回 401；非發起人／參加者的 members 只有發起人一行，並帶 members_hidden=true，人數看 joined_count）
       parameters:
         - name: id
           in: path
@@ -2585,6 +2624,12 @@ paths:
             application/json:
               schema:
                 type: object
+        "401":
+          description: 已結束的局需登录（1.78.0）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
