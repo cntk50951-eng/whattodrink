@@ -4,6 +4,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { parseCheckinIdParam } from "@/lib/api/checkins";
 import { parseRequestAction } from "@/lib/friends";
 import { sendFriendPush } from "@/lib/push/send";
+import { isPairBlocked, withBlockGuard } from "@/lib/api/blocks";
 
 /**
  * UR B.3 请求动作（🔒）。
@@ -11,7 +12,7 @@ import { sendFriendPush } from "@/lib/push/send";
  * 缺反向行即补；已 accepted 幂等 200）／decline 删入行＋清反向 pending／cancel 删己方行；
  * 非 pending（不存在／已处理）404；越权 404（不泄存在性）；拉黑任一方 404。
  */
-export async function PATCH(
+async function patchHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -60,12 +61,7 @@ export async function PATCH(
   // 拉黑任一方即 404（关系已变，不操作；只认 cheers_blocks 手动屏蔽，
   // chat_mutes 自动行不拦 accept——重加接受时成对清除，否则死结，见下）。
   const other = isRecipient ? row.user_id : row.friend_id;
-  const { data: blocks } = await svc
-    .from("cheers_blocks")
-    .select("blocker_id")
-    .or(`and(blocker_id.eq.${userId},blocked_id.eq.${other}),and(blocker_id.eq.${other},blocked_id.eq.${userId})`)
-    .limit(1);
-  if (Array.isArray(blocks) && blocks.length > 0) {
+  if (await isPairBlocked(svc, userId, other as string)) {
     return apiError("not_found", "请求不存在", 404);
   }
 
@@ -132,3 +128,5 @@ export async function PATCH(
   await svc.from("friendships").delete().eq("id", row.id);
   return apiOk({ status: "cancelled" as const });
 }
+
+export const PATCH = withBlockGuard(patchHandler);

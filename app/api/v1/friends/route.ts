@@ -5,6 +5,7 @@ import { directKey } from "@/lib/api/chat";
 import { areFriends, friendIdsOf, parseAddFriendBody, parseRequestMessage, parseRequestOrigin, toFriendListItem } from "@/lib/friends";
 import { sendFriendPush } from "@/lib/push/send";
 import { isDeletionPending } from "@/lib/accountDeletion";
+import { isPairBlocked, withBlockGuard } from "@/lib/api/blocks";
 
 /**
  * DEF-20260926-009＋UR A.19：最小好友邀請（🔒，V1 無接受 UI）。
@@ -27,7 +28,7 @@ async function ensureUserRow(
 ): Promise<void> {
   // 缺行自建沿 DEF-20250925-001（POST /checkins、GET /me 同配方）。
   try {
-    const { data: ensured } = await supabase
+    const { data: ensured } = await (await createServiceClient())
       .from("users")
       .select("id")
       .eq("id", userId)
@@ -40,7 +41,7 @@ async function ensureUserRow(
   } catch {}
 }
 
-export async function POST(req: Request): Promise<Response> {
+async function postHandler(req: Request): Promise<Response> {
   const { supabase, userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
@@ -102,16 +103,8 @@ export async function POST(req: Request): Promise<Response> {
   // UR B.3 拉黑任一方不可发（404 不泄；走 service，反向行 authed 不可见）。
   // 只认 cheers_blocks（手动屏蔽）：chat_mutes（删好友自动行）有意不拦，
   // 否则解除后重加死结（交接 §六-2）；mute 在 accept 成功时成对清除。
-  {
-    const blockSvc = await createServiceClient();
-    const { data: blockRows } = await blockSvc
-      .from("cheers_blocks")
-      .select("blocker_id")
-      .or(`and(blocker_id.eq.${userId},blocked_id.eq.${targetUserId}),and(blocker_id.eq.${targetUserId},blocked_id.eq.${userId})`)
-      .limit(1);
-    if (Array.isArray(blockRows) && blockRows.length > 0) {
-      return apiError("not_found", "對象不存在", 404);
-    }
+  if (await isPairBlocked(await createServiceClient(), userId, targetUserId)) {
+    return apiError("not_found", "對象不存在", 404);
   }
   // UR B.3 每日新请求 20 个（HK 天，防骚扰）。
   {
@@ -382,3 +375,5 @@ export async function DELETE(req: Request): Promise<Response> {
   }
   return apiOk({ removed: true });
 }
+
+export const POST = withBlockGuard(postHandler);

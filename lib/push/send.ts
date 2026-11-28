@@ -14,6 +14,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import zhHant from "@/messages/zh-Hant.json";
 import zhHans from "@/messages/zh-Hans.json";
 import en from "@/messages/en.json";
+import { isPairBlocked } from "../api/blocks";
 
 const COPY: Record<string, Record<string, string>> = {
   "zh-Hant": zhHant.v2 as Record<string, string>,
@@ -86,20 +87,18 @@ export async function sendCheersPush(args: {
     const devs = configuredPushDevices(devices, cfg);
     if (devs.length === 0) return { sent: 0, skipped: "no-devices" };
     // 三刀 2：prefs 开关。
-    const { data: peerRow } = await supa
+    const { data: peerRow, error: prefsErr } = await supa
       .from("users")
       .select("push_prefs")
       .eq("id", toUserId)
       .maybeSingle();
+    // 讀不到偏好就不發：否則關掉通知的人照樣收到
+    if (prefsErr) return { sent: 0, skipped: "prefs-unknown" };
     const prefs = pushPrefsOf((peerRow as { push_prefs?: unknown } | null)?.push_prefs);
     if (!prefs.cheers) return { sent: 0, skipped: "prefs-off" };
     // 三刀 3：屏蔽任一方向。
-    const { data: blocks } = await supa
-      .from("cheers_blocks")
-      .select("blocker_id")
-      .or(`and(blocker_id.eq.${fromUserId},blocked_id.eq.${toUserId}),and(blocker_id.eq.${toUserId},blocked_id.eq.${fromUserId})`)
-      .limit(1);
-    if (Array.isArray(blocks) && blocks.length > 0) return { sent: 0, skipped: "blocked" };
+    // 讀不到封鎖名單當作已封鎖：不發
+    if (await isPairBlocked(supa, fromUserId, toUserId).catch(() => true)) return { sent: 0, skipped: "blocked" };
     // 限频：小时 20＋同对 10min。
     const hourAgo = new Date(nowMs - 3600_000).toISOString();
     const { count: hourCount } = await supa
@@ -243,11 +242,13 @@ export async function sendCheersPush(args: {
       .limit(10);
     const devs = configuredPushDevices(devices, cfg).filter(d => !args.aosOnly || d.platform === "aos");
     if (devs.length === 0) return { sent: 0, skipped: "no-devices" };
-    const { data: peerRow } = await supa
+    const { data: peerRow, error: prefsErr } = await supa
       .from("users")
       .select("push_prefs")
       .eq("id", toUserId)
       .maybeSingle();
+    // 讀不到偏好就不發：否則關掉通知的人照樣收到
+    if (prefsErr) return { sent: 0, skipped: "prefs-unknown" };
     const prefs = pushPrefsOf((peerRow as { push_prefs?: unknown } | null)?.push_prefs);
     if (!prefs.friends) return { sent: 0, skipped: "prefs-off" };
     const badge = await computeBadge(supa, toUserId);
@@ -339,11 +340,13 @@ export async function sendGameInvitePush(args: {
       .limit(10);
     const devs = configuredPushDevices(devices, cfg);
     if (devs.length === 0) return { sent: 0, skipped: "no-devices" };
-    const { data: peerRow } = await supa
+    const { data: peerRow, error: prefsErr } = await supa
       .from("users")
       .select("push_prefs")
       .eq("id", toUserId)
       .maybeSingle();
+    // 讀不到偏好就不發：否則關掉通知的人照樣收到
+    if (prefsErr) return { sent: 0, skipped: "prefs-unknown" };
     const prefs = pushPrefsOf((peerRow as { push_prefs?: unknown } | null)?.push_prefs);
     if (!prefs.game_invites) return { sent: 0, skipped: "prefs-off" };
     const badge = await computeBadge(supa, toUserId);
@@ -505,11 +508,13 @@ export async function sendPartyNoticePush(args: {
         .limit(10);
       const devs = configuredPushDevices(devices, cfg);
       if (devs.length === 0) continue;
-      const { data: peerRow } = await supa
+      const { data: peerRow, error: prefsErr } = await supa
         .from("users")
         .select("push_prefs")
         .eq("id", toUserId)
         .maybeSingle();
+      // 讀不到偏好就不發：否則關掉通知的人照樣收到
+      if (prefsErr) continue;
       const prefs = pushPrefsOf((peerRow as { push_prefs?: unknown } | null)?.push_prefs);
       if (isInvite ? !prefs.invite_replies : !prefs.party) continue;
       const badge = await computeBadge(supa, toUserId);

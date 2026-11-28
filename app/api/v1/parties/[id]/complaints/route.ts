@@ -7,6 +7,7 @@ import { after } from "next/server";
 import { directKey } from "@/lib/api/chat";
 import { buildChatEvidence, parseChatMessageIds } from "@/lib/complaintChat";
 import { parseComplaintBody } from "@/lib/complaints";
+import { requireUserRead, withUserGuard } from "@/lib/api/userRead";
 
 /**
  * UR E.31 C2 投訴提交（🔒）。
@@ -16,11 +17,11 @@ import { parseComplaintBody } from "@/lib/complaints";
  * 每局每对一次／每日 5 条／暂停期／late_* 拒／detail 审。201 `{id, status}`。
  * safety 直进人工＋safety_alerts 行；其余 awaiting_response（24h 申辩期）。投訴不必等局結束（no_show 須開局後）。
  */
-export async function POST(
+async function postHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  const { supabase, userId } = await getAuthedClient(req);
+  const { userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
   }
@@ -51,11 +52,10 @@ export async function POST(
     return apiError("invalid_params", "不可投訴自己", 400);
   }
   // 投訴人门：隐身／未成年／暂停期。
-  const { data: meRow } = await supabase
-    .from("users")
-    .select("mode,dob,complaint_suspended_until")
-    .eq("id", userId)
-    .maybeSingle();
+  const meRow = await requireUserRead(
+    "complaints.self",
+    (await createServiceClient()).from("users").select("mode,dob,complaint_suspended_until").eq("id", userId).maybeSingle(),
+  );
   const me = ((meRow ?? {}) as Record<string, unknown>);
   if (me.mode === "stealth") {
     return apiError("forbidden", "隱身模式不可投訴", 403);
@@ -253,3 +253,5 @@ export async function POST(
   }
   return apiOk({ id: cid, status }, 201);
 }
+
+export const POST = withUserGuard(postHandler);

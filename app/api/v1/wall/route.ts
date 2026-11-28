@@ -1,5 +1,6 @@
 import { createClient, createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { attachAuthors } from "@/lib/api/authors";
 import { getBlockedUserIds, withBlockGuard } from "@/lib/api/blocks";
 import { friendIdsOf } from "@/lib/friends";
 import {
@@ -25,7 +26,7 @@ import {
  */
 
 const WALL_COLUMNS =
-  "id,user_id,photo_url,note,transcript,audio_url,audio_seconds,created_at,users(nickname,avatar_url,gender),post_likes(count)";
+  "id,user_id,photo_url,note,transcript,audio_url,audio_seconds,created_at,post_likes(count)";
 
 async function getHandler(req: Request) {
   const parsed = parseWallParams(new URL(req.url).searchParams);
@@ -117,9 +118,14 @@ async function getHandler(req: Request) {
       rows = (data ?? []) as unknown[];
     }
 
+    const authored = await attachAuthors(await createServiceClient(), rows, "nickname,avatar_url,gender");
+    if (authored.error !== null) {
+      console.error(`[api/v1/wall] authors error: code=${authored.error.code} message=${authored.error.message}`);
+      return apiError("internal", "wall 讀取失敗", 500);
+    }
     let skipped = 0;
     const mapped: WallPostJson[] = [];
-    for (const row of rows) {
+    for (const row of authored.rows) {
       if (blockedIds.size > 0 && typeof row === "object" && row !== null) {
         const uid = (row as Record<string, unknown>).user_id;
         if (typeof uid === "string" && blockedIds.has(uid)) continue;

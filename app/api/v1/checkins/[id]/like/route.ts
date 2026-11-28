@@ -6,6 +6,7 @@ import { friendIdsOf } from "@/lib/friends";
 import { buildLikeJson } from "@/lib/api/likes";
 import { isMinorDob } from "@/lib/api/cheers";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { requireUserRead, withUserGuard } from "@/lib/api/userRead";
 
 type PostRow = { id: string; user_id: string | null; visibility: unknown };
 
@@ -25,11 +26,10 @@ async function postHandler(
     return apiError("unauthorized", "未登录", 401);
   }
   // UR E.19 未成年禁写（赞／想喝／投分／回敬共用；dob 缺席放行）。
-  const { data: minorRow } = await supabase
-    .from("users")
-    .select("dob")
-    .eq("id", userId)
-    .maybeSingle();
+  const minorRow = await requireUserRead(
+    "like.age",
+    (await createServiceClient()).from("users").select("dob").eq("id", userId).maybeSingle(),
+  );
   if (isMinorDob((minorRow as { dob?: unknown } | null)?.dob, Date.now())) {
     return apiError("forbidden", "未滿 18 歲不可點贊", 403);
   }
@@ -73,11 +73,10 @@ async function postHandler(
     }
   }
   // 隐身禁赞（沿 E.7；计数公开，赞即暴露）。
-  const { data: meRow } = await supabase
-    .from("users")
-    .select("mode")
-    .eq("id", userId)
-    .maybeSingle();
+  const meRow = await requireUserRead(
+    "like.mode",
+    (await createServiceClient()).from("users").select("mode").eq("id", userId).maybeSingle(),
+  );
   if ((meRow as { mode?: unknown } | null)?.mode === "stealth") {
     return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
   }
@@ -122,4 +121,4 @@ async function postHandler(
   return apiOk(buildLikeJson(liked, count ?? 0));
 }
 
-export const POST = withBlockGuard(postHandler);
+export const POST = withUserGuard(withBlockGuard(postHandler));

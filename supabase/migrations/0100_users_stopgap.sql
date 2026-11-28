@@ -1,0 +1,5 @@
+-- ⛔ 已作廢，不要執行。
+-- 2026-11-28 執行後匿名的欄位級授權沒有生效（原因未查明），正式站地圖打卡釘回 42501；
+-- 已用 `grant all on public.users to anon, authenticated;` 回復授權，並移除觸發器。
+-- 遺留的函數 public.guard_users_client_writes() 沒有掛在任何表上，由 0101 清掉。
+-- 原內容刻意移除，避免再被執行；完整修復見 0101。

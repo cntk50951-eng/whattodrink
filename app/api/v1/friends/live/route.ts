@@ -2,6 +2,7 @@ import { createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { friendIdsOf } from "@/lib/friends";
 import { toLiveFriend } from "@/lib/presence";
+import { requireUserRead, withUserGuard } from "@/lib/api/userRead";
 
 /**
  * UR A.21 在線好友實時位 `GET /api/v1/friends/live`（🔒）。
@@ -13,17 +14,16 @@ import { toLiveFriend } from "@/lib/presence";
  * 无 public 帖的好友会被静默丢掉；id 集已由 friendships 互好友校验限定，可见性仍由 server 端三刀保证）。
  * 輪詢 30s 一次（首期；EPIC B 落地切訂閱，shape 不變）。
  */
-export async function GET(req: Request): Promise<Response> {
+async function getHandler(req: Request): Promise<Response> {
   const { userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
   }
   const svc = await createServiceClient();
-  const { data: me } = await svc
-    .from("users")
-    .select("mode")
-    .eq("id", userId)
-    .maybeSingle();
+  const me = await requireUserRead(
+    "friendsLive.self",
+    svc.from("users").select("mode").eq("id", userId).maybeSingle(),
+  );
   if ((me as { mode?: unknown } | null)?.mode === "stealth") {
     return apiOk({ friends: [] });
   }
@@ -70,3 +70,5 @@ export async function GET(req: Request): Promise<Response> {
   }
   return apiOk({ friends });
 }
+
+export const GET = withUserGuard(getHandler);

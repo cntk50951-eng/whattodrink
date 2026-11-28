@@ -15,6 +15,7 @@ import { advanceSpy, canSendText, leaksOwnWord } from "@/lib/games/spy";
 import { loadSpyState } from "@/lib/games/spyStore";
 import { advanceShipo, canSendTextShipo } from "@/lib/games/shipo";
 import { loadShipoState } from "@/lib/games/shipoStore";
+import { withBlockGuard } from "@/lib/api/blocks";
 
 /**
  * UR H.2 房内聊天读（🔒，在座成员）。
@@ -22,7 +23,7 @@ import { loadShipoState } from "@/lib/games/shipoStore";
  * 按观看者过滤（与我有拉黑／静音关系的成员消息不回）；撤回行只回 `{removed:true}`。
  * 房结束 24h 后懒删消息（touch 即清）。
  */
-export async function GET(
+async function getHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -252,3 +253,5 @@ export async function POST(
   const row = inserted as { id: string; created_at: string };
   return apiOk({ id: row.id, created_at: row.created_at }, 201);
 }
+
+export const GET = withBlockGuard(getHandler);

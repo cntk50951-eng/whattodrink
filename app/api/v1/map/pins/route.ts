@@ -1,5 +1,6 @@
 import { createClient, createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { attachAuthors } from "@/lib/api/authors";
 import { getBlockedUserIds, withBlockGuard } from "@/lib/api/blocks";
 import { PINS_RANGE_MS, parsePinsParams, toPinJson } from "@/lib/api/pins";
 import type { BBox } from "@/lib/api/pins";
@@ -18,7 +19,9 @@ import { friendIdsOf, hideOnlineForViewer } from "@/lib/friends";
  */
 
 const PINS_COLUMNS =
-  "id,lat,lng,place_name,created_at,kind,expires_at,user_id,photo_thumb,note,users!checkins_user_id_fkey(nickname,avatar_url,gender,dob,bio,last_seen_at,mode),beers(name,emoji)";
+  "id,lat,lng,place_name,created_at,kind,expires_at,user_id,photo_thumb,note,beers(name,emoji)";
+/** 作者欄位（服務端身分補；DEF-20261128-003） */
+const AUTHOR_COLUMNS = "nickname,avatar_url,gender,dob,bio,last_seen_at,mode";
 
 async function getHandler(req: Request): Promise<Response> {
   const parsed = parsePinsParams(new URL(req.url).searchParams);
@@ -97,7 +100,7 @@ async function getHandler(req: Request): Promise<Response> {
         console.warn(`[api/v1/map/pins] kind column missing (code=${firstErr?.code}), fallback to bbox-only: ${firstErr?.message}`);
         const { data: fbData, error: fbError } = await supabase
           .from("checkins")
-          .select("id,user_id,lat,lng,place_name,created_at,users!checkins_user_id_fkey(nickname,avatar_url,gender,dob,bio,last_seen_at),beers(name,emoji)")
+          .select("id,user_id,lat,lng,place_name,created_at,beers(name,emoji)")
           .eq("visibility", "public")
           .not("lat", "is", null)
           .not("lng", "is", null)
@@ -111,8 +114,9 @@ async function getHandler(req: Request): Promise<Response> {
           console.error(`[api/v1/map/pins] fallback error: code=${fbError.code} message=${fbError.message} details=${(fbError as unknown as {details?:string})?.details ?? ""}`);
           return apiError("internal", `pins 讀取失敗(fallback): ${fbError.code} ${fbError.message} ${(fbError as unknown as {details?:string})?.details ?? ""}`.trim(), 500);
         }
-        const rows = (fbData ?? []) as unknown[];
-        const pins = rows
+        const fallback = await attachAuthors(await createServiceClient(), (fbData ?? []) as unknown[], "nickname,avatar_url,gender,dob,bio,last_seen_at");
+        if (fallback.error !== null) return authorsFailed(fallback.error);
+        const pins = fallback.rows
           .map((r) => toPinJson(r))
           .filter((p): p is NonNullable<typeof p> => p !== null && !blockedIds.has(p.userId));
         return apiOk({ pins, sync_cursor: Date.now() });
@@ -134,7 +138,9 @@ async function getHandler(req: Request): Promise<Response> {
       const cb = (b as Record<string, unknown>).created_at as string;
       return cb.localeCompare(ca);
     });
-    const sliced = merged.slice(0, limit);
+    const authored = await attachAuthors(await createServiceClient(), merged.slice(0, limit), AUTHOR_COLUMNS);
+    if (authored.error !== null) return authorsFailed(authored.error);
+    const sliced: unknown[] = authored.rows;
     const rows: unknown[] = sliced;
     // UR A.17 綠點關係過濾：先看有無 friends 模式作者，有＋viewer 已登入才拉關係（省一次查詢）
     let viewerFriendIds: string[] = [];
@@ -275,8 +281,10 @@ async function friendsScopePins(
       const cb = (b as Record<string, unknown>).created_at as string;
       return cb.localeCompare(ca);
     });
+    const authored = await attachAuthors(await createServiceClient(), merged.slice(0, limit), AUTHOR_COLUMNS);
+    if (authored.error !== null) return authorsFailed(authored.error);
     const pins = [];
-    for (const row of merged.slice(0, limit)) {
+    for (const row of authored.rows) {
       const pin = toPinJson(row);
       if (pin !== null) pins.push(pin);
     }
@@ -284,6 +292,11 @@ async function friendsScopePins(
   } catch (err) {
     return apiError("internal", err instanceof Error ? err.message : "unknown", 500);
   }
+}
+
+function authorsFailed(error: { code?: string; message?: string }): Response {
+  console.error(`[api/v1/map/pins] authors error: code=${error.code} message=${error.message}`);
+  return apiError("internal", "pins 讀取失敗", 500);
 }
 
 export const GET = withBlockGuard(getHandler);

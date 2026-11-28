@@ -295,7 +295,7 @@ async function respondDetail(args: {
   const cheeredByMe = myCheerRow !== null;
   if (Array.isArray(cheersRows) && cheersRows.length > 0) {
     const fromIds = [...new Set(cheersRows.map((r) => (r as { from_user_id: string }).from_user_id))];
-    const { data: cheerUsers } = await service
+    const { data: cheerUsers, error: cheerUsersErr } = await service
       .from("users")
       .select("id,nickname,avatar_url,mode")
       .in("id", fromIds);
@@ -304,7 +304,9 @@ async function respondDetail(args: {
         (u) => [u.id, u],
       ),
     );
-    recentCheers = (cheersRows as { from_user_id: string; created_at: string }[])
+    // 讀不到對方模式就整組不列：無法確認誰是隱身
+    if (cheerUsersErr) console.error(`[api/v1/checkins/id] cheer users error: code=${cheerUsersErr.code}`);
+    recentCheers = ((cheerUsersErr ? [] : cheersRows) as { from_user_id: string; created_at: string }[])
       .filter((r) => !blockedIds.has(r.from_user_id) && (peerMap.get(r.from_user_id)?.mode ?? "public") !== "stealth")
       .map((r) => {
         const peer = peerMap.get(r.from_user_id);

@@ -7,6 +7,7 @@ import { MEET_DAILY_LIMIT, MEET_LLM_TIMEOUT_MS, extractEmail, meetCriteriaSchema
 import { PLAN_QUERY_MAX, type PlanStage, parsePlanReply, planStreamLine, sanitizePlan, searchPlanPrompt, wantsPlanStream, withNicknameFallback } from "@/lib/searchPlan";
 import type { ApiErrorCode } from "@/lib/api/envelope";
 import { hkDayStartISO } from "@/lib/api/party";
+import { requireUserRead, withUserGuard } from "@/lib/api/userRead";
 
 /**
  * 遇見智能搜索·計劃（🔒）：`POST {query}` → `{intents[], ignored[], remaining_today}`。
@@ -20,7 +21,7 @@ type PlanOutcome =
   | { ok: true; data: { intents: unknown; ignored: string[]; remaining_today: number } }
   | { ok: false; code: ApiErrorCode; message: string; status: number };
 
-export async function POST(req: Request): Promise<Response> {
+async function postHandler(req: Request): Promise<Response> {
   const { userId } = await getAuthedClient(req);
   if (userId === null) return apiError("unauthorized", "未登录", 401);
   let raw: unknown = null;
@@ -142,9 +143,14 @@ async function runPlan(userId: string, query: string, onStage: (s: PlanStage) =>
 
 /** 今日（香港）已用的遇見搜索次數。 */
 async function usedToday(svc: Awaited<ReturnType<typeof createServiceClient>>, userId: string, nowMs: number): Promise<number> {
-  const { data } = await svc.from("users").select("meet_search_date,meet_search_count").eq("id", userId).maybeSingle();
+  const data = await requireUserRead(
+    "plan.quota",
+    svc.from("users").select("meet_search_date,meet_search_count").eq("id", userId).maybeSingle(),
+  );
   const me = (data ?? {}) as Record<string, unknown>;
   const dayStart = hkDayStartISO(nowMs).slice(0, 10);
   const sameDay = typeof me.meet_search_date === "string" && me.meet_search_date >= dayStart;
   return sameDay && typeof me.meet_search_count === "number" ? me.meet_search_count : 0;
 }
+
+export const POST = withUserGuard(postHandler);

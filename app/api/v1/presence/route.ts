@@ -1,4 +1,4 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { parsePresenceBody } from "@/lib/presence";
 import { nextOnlineSince } from "@/lib/nearbyPeople";
@@ -11,7 +11,7 @@ import { nextOnlineSince } from "@/lib/nearbyPeople";
  * - 頻率門（30s＋50m）在客戶端；server 只驗形狀，不驗節流。
  */
 export async function POST(req: Request): Promise<Response> {
-  const { supabase, userId } = await getAuthedClient(req);
+  const { userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
   }
@@ -25,7 +25,7 @@ export async function POST(req: Request): Promise<Response> {
   if ("error" in parsed) {
     return apiError("invalid_params", parsed.error, 400);
   }
-  const { data: me, error: meErr } = await supabase
+  const { data: me, error: meErr } = await (await createServiceClient())
     .from("users")
     .select("mode,last_seen_at")
     .eq("id", userId)
@@ -45,19 +45,19 @@ export async function POST(req: Request): Promise<Response> {
     last_seen_at: nowIso,
   };
   // online_since 要讀舊值：單獨查（列可能還沒遷移，查不到就當 null，不影響心跳）。
-  const { data: sinceRow } = await supabase
+  const { data: sinceRow } = await (await createServiceClient())
     .from("users")
     .select("online_since")
     .eq("id", userId)
     .maybeSingle();
   const prevSince = (sinceRow as { online_since?: unknown } | null)?.online_since;
   const prevSeen = (me as { last_seen_at?: unknown } | null)?.last_seen_at;
-  let { error: upErr } = await supabase
+  let { error: upErr } = await (await createServiceClient())
     .from("users")
     .update({ ...base, online_since: nextOnlineSince(prevSeen, prevSince, nowMs) })
     .eq("id", userId);
   if (upErr !== null && /online_since/.test(upErr.message ?? "")) {
-    ({ error: upErr } = await supabase.from("users").update(base).eq("id", userId));
+    ({ error: upErr } = await (await createServiceClient()).from("users").update(base).eq("id", userId));
   }
   if (upErr !== null) {
     return apiError("internal", "写入位置失败", 500);

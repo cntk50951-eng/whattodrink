@@ -23,6 +23,7 @@ import {
   type CommentJson,
 } from "@/lib/api/comments";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { requireUserRead, UserLookupError, withUserGuard } from "@/lib/api/userRead";
 
 /**
  * UR E.7 留言列表（🌐 免登入）＋發表（🌐 匿名／登入雙通道）。
@@ -180,6 +181,7 @@ async function getHandler(
         : null;
     return apiOk({ comments: page, nextCursor });
   } catch (err) {
+    if (err instanceof UserLookupError) throw err; // 交給 withUserGuard 回 503
     console.error(
       `[api/v1/comments] unexpected: ${err instanceof Error ? err.message : err}`,
     );
@@ -277,11 +279,10 @@ async function postHandler(
 
     // UR E.19 未成年禁留言（登录态；匿名沿旧口径，首登闸另管）。
     if (userId !== null) {
-      const { data: dobRow } = await service
-        .from("users")
-        .select("dob")
-        .eq("id", userId)
-        .maybeSingle();
+      const dobRow = await requireUserRead(
+        "comments.age",
+        service.from("users").select("dob").eq("id", userId).maybeSingle(),
+      );
       if (isMinorDob((dobRow as { dob?: unknown } | null)?.dob, Date.now())) {
         return apiError("forbidden", "未滿 18 歲不可留言", 403);
       }
@@ -443,6 +444,7 @@ async function postHandler(
     }
     return apiOk({ comment }, 201);
   } catch (err) {
+    if (err instanceof UserLookupError) throw err; // 交給 withUserGuard 回 503
     console.error(
       `[api/v1/comments] unexpected: ${err instanceof Error ? err.message : err}`,
     );
@@ -451,4 +453,4 @@ async function postHandler(
 }
 
 export const GET = withBlockGuard(getHandler);
-export const POST = withBlockGuard(postHandler);
+export const POST = withUserGuard(withBlockGuard(postHandler));

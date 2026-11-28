@@ -10,6 +10,8 @@ vi.mock("@/lib/moderation", () => ({ moderateCheckin: server.moderate, moderatio
 vi.mock("@/lib/searchQueryGuard", () => ({ matchBlockedSearchTerm: () => null }));
 // vitest 沒有 `@/` 別名：用到的 lib 以相對路徑接上
 vi.mock("@/lib/api/envelope", () => import("../../../../../lib/api/envelope"));
+vi.mock("@/lib/api/userRead", () => import("../../../../../lib/api/userRead"));
+vi.mock("@/lib/api/blocks", () => import("../../../../../lib/api/blocks"));
 vi.mock("@/lib/api/cheers", () => ({ isMinorDob: (d: string) => d > "2010" }));
 vi.mock("@/lib/api/profile", () => import("../../../../../lib/api/profile"));
 vi.mock("@/lib/api/taste", () => import("../../../../../lib/api/taste"));
@@ -26,7 +28,7 @@ const person = (id: string, nickname: string, extra: Row = {}) => ({
   info_visibility: { interests: "public" }, preferences: null, last_seen_at: null, ...extra,
 });
 
-function setup(opts: { users: Row[]; emailTarget?: string | null; used?: number }) {
+function setup(opts: { users: Row[]; emailTarget?: string | null; used?: number; failRead?: string }) {
   const writes: Row[] = [];
   const rpc = vi.fn(async () => ({ data: { allowed: true, user_id: opts.emailTarget ?? null }, error: null }));
   const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
@@ -35,12 +37,15 @@ function setup(opts: { users: Row[]; emailTarget?: string | null; used?: number 
     const filters: ((r: Row) => boolean)[] = [];
     const chain: Record<string, unknown> = {};
     const rows = () => (table === "users" ? [mine as Row, ...opts.users] : []).filter((r) => filters.every((f) => f(r)));
-    for (const k of ["select", "or", "order", "limit"]) chain[k] = () => chain;
+    let columns = "";
+    for (const k of ["or", "order", "limit"]) chain[k] = () => chain;
+    chain.select = (c: string) => ((columns = c), chain);
     chain.eq = (k: string, v: unknown) => (filters.push((r) => r[k] === v), chain);
     chain.neq = (k: string, v: unknown) => (filters.push((r) => r[k] !== v), chain);
     chain.in = (k: string, v: unknown[]) => (filters.push((r) => v.includes(r[k])), chain);
     chain.ilike = (k: string, p: string) => (filters.push((r) => String(r[k]).toLowerCase().includes(p.slice(1, -1).toLowerCase())), chain);
-    chain.maybeSingle = async () => ({ data: rows()[0] ?? null, error: null });
+    chain.maybeSingle = async () =>
+      table === "users" && columns === opts.failRead ? { data: null, error: { code: "unit" } } : { data: rows()[0] ?? null, error: null };
     chain.update = (v: Row) => (writes.push(v), { eq: async () => ({ error: null }) });
     chain.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: rows(), error: null }).then(res);
     return chain;
@@ -105,5 +110,13 @@ describe("UR I.4 meet search", () => {
     expect(writes).toEqual([]);
     expect(server.llm).not.toHaveBeenCalled();
     expect(server.moderate).not.toHaveBeenCalled();
+  });
+  it("refuses instead of granting free searches when the daily count cannot be read", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const count = "meet_search_date,meet_search_count";
+    const { rpc } = setup({ users: [], failRead: count });
+    expect((await call(PLAN, { query: "搵 x@example.com" })).status).toBe(503);
+    expect((await call(POST, { criteria: { email: "x@example.com" } })).status).toBe(503);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

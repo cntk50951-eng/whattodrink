@@ -12,13 +12,14 @@ import {
   isStealthUser,
 } from "@/lib/games/rooms";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { withUserGuard } from "@/lib/api/userRead";
 
 /**
  * UR H.1 改房规（🔒，仅房主，仅 lobby）。
  * `POST /api/v1/games/rooms/{id}/rules {rules}` —— 200 `{version, rules}`。
  * 房规非法回落默认（parseRules，不 400）；开局后 409 wrong_phase。
  */
-export async function POST(
+async function postHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -66,3 +67,5 @@ export async function POST(
   await appendEvent(svc, loaded.room.id, version, "rules_changed", userId, { rules });
   return apiOk({ version, rules });
 }
+
+export const POST = withUserGuard(postHandler);

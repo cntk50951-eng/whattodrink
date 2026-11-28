@@ -8,13 +8,14 @@ import {
   isStealthUser,
 } from "@/lib/games/rooms";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { withUserGuard } from "@/lib/api/userRead";
 
 /**
  * UR H.1 准备（🔒）。
  * `POST /api/v1/games/rooms/{id}/ready {ready:bool}` —— 200 `{version, ready}`。
  * 仅 lobby（开局后 409 wrong_phase）；成员 active 才可（门禁见 loadRoomAsMember）。
  */
-export async function POST(
+async function postHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -62,3 +63,5 @@ export async function POST(
   await appendEvent(svc, room.id, version, "ready_changed", userId, { ready: parsed.ready });
   return apiOk({ version, ready: parsed.ready });
 }
+
+export const POST = withUserGuard(postHandler);

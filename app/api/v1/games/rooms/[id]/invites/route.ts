@@ -11,6 +11,8 @@ import {
   isStealthUser,
 } from "@/lib/games/rooms";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { requireUserRead, withUserGuard } from "@/lib/api/userRead";
+import { withBlockGuard } from "@/lib/api/blocks";
 
 /**
  * UR H.1 邀请（🔒，仅房主，仅 lobby）。
@@ -20,7 +22,7 @@ import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
  * 非在场成员（member）／pending 去重幂等（已有即 invited，不重推）。
  * 不 bump room version（邀请不改变房间状态）；新邀 after() 推 game_invite。
  */
-export async function POST(
+async function postHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -53,10 +55,10 @@ export async function POST(
   }
   const memberIds = new Set(members.map((m) => m.user_id));
   // 矩阵 B：隐身者不可被邀进游戏房——对方只见「未能邀请」，不说原因（reason 用 internal，不泄隐身）。
-  const { data: targetModes } = await svc
-    .from("users")
-    .select("id,mode")
-    .in("id", parsed.userIds);
+  const targetModes = await requireUserRead(
+    "games.invite.targets",
+    svc.from("users").select("id,mode").in("id", parsed.userIds),
+  );
   const stealthTargets = new Set(
     (((targetModes ?? []) as unknown[]) as { id?: unknown; mode?: unknown }[])
       .filter((u) => u.mode === "stealth" && typeof u.id === "string")
@@ -123,3 +125,5 @@ export async function POST(
   }
   return apiOk({ invited, skipped });
 }
+
+export const POST = withUserGuard(withBlockGuard(postHandler));

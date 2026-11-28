@@ -4,6 +4,8 @@ import { isMinorDob } from "@/lib/api/cheers";
 import { PARTY_CANCEL_CUTOFF_MIN, minutesBeforeStart, seatFor } from "@/lib/api/party";
 import { writeTrustEvent } from "@/lib/trust/ledger";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { requireUserRead, withUserGuard } from "@/lib/api/userRead";
+import { isPairBlocked } from "@/lib/api/blocks";
 
 type PartyRow = {
   id: string;
@@ -21,7 +23,7 @@ type PartyRow = {
  * `409 party_full/gender_full`，沿 seatFor 口径；secret 只占开放席）；
  * 已参加幂等 200；过期 410；cancelled 局 410。
  */
-export async function POST(
+async function postHandler(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -46,11 +48,10 @@ export async function POST(
   if (Date.parse(party.expires_at) < Date.now()) {
     return apiError("invalid_params", "酒局已過期", 410);
   }
-  const { data: meRow } = await supabase
-    .from("users")
-    .select("mode,gender,dob")
-    .eq("id", userId)
-    .maybeSingle();
+  const meRow = await requireUserRead(
+    "joins.self",
+    (await createServiceClient()).from("users").select("mode,gender,dob").eq("id", userId).maybeSingle(),
+  );
   const me = (meRow ?? {}) as { mode?: unknown; gender?: unknown; dob?: unknown };
   if (me.mode === "stealth") {
     return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
@@ -95,13 +96,10 @@ export async function POST(
   );
   const genders = new Map<string, string>();
   if (jrows.length > 0) {
-    const { data: users } = await supabase
-      .from("users")
-      .select("id,gender")
-      .in(
-        "id",
-        jrows.map((j) => j.user_id),
-      );
+    const users = await requireUserRead(
+      "joins.genders",
+      (await createServiceClient()).from("users").select("id,gender").in("id", jrows.map((j) => j.user_id)),
+    );
     for (const u of ((users ?? []) as { id: string; gender: string | null }[])) {
       genders.set(u.id, u.gender ?? "secret");
     }
@@ -222,12 +220,9 @@ export async function DELETE(
   }
   // 通知 host（中途离席不发；host 自己退不发；拉黑关系不发，不泄存在）。
   if (!afterStart && party.host_user_id !== userId) {
-    const { data: blockRows } = await svc
-      .from("cheers_blocks")
-      .select("blocker_id")
-      .or(`and(blocker_id.eq.${party.host_user_id},blocked_id.eq.${userId}),and(blocker_id.eq.${userId},blocked_id.eq.${party.host_user_id})`)
-      .limit(1);
-    if (!Array.isArray(blockRows) || blockRows.length === 0) {
+    // 退出已經寫入：讀不到封鎖名單只是不發通知，不能回 503
+    const blocked = await isPairBlocked(svc, party.host_user_id, userId).catch(() => true);
+    if (!blocked) {
       const { data: nickRow } = await svc.from("users").select("nickname").eq("id", userId).maybeSingle();
       const nick =
         typeof (nickRow as { nickname?: unknown } | null)?.nickname === "string" &&
@@ -250,3 +245,5 @@ export async function DELETE(
   }
   return apiOk({ left: true, minutes_before_start: minutes, late });
 }
+
+export const POST = withUserGuard(postHandler);

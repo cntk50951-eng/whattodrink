@@ -21,6 +21,7 @@ import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 import { applySpyAction, settleSpyRoom } from "@/lib/games/spyRoom";
 import { applyTrainAction, settleTrainRoom } from "@/lib/games/trainRoom";
 import { applyShipoAction, settleShipoRoom } from "@/lib/games/shipoRoom";
+import { withUserGuard } from "@/lib/api/userRead";
 
 /**
  * UR H.1 动作（🔒）。
@@ -34,7 +35,7 @@ import { applyShipoAction, settleShipoRoom } from "@/lib/games/shipoRoom";
  *   （§十三：deal_only 房仅房主可调，调用即开，不等确认；开盅后不自动开新局）。
  * - 限流 5/s（429）。每次写前先懒超时结算。
  */
-export async function POST(
+async function postHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -278,3 +279,5 @@ export async function POST(
   const events = await getEventsSince(svc, room.id, parsed.expectedVersion);
   return apiOk({ version, events });
 }
+
+export const POST = withUserGuard(postHandler);

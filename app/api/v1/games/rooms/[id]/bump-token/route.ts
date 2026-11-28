@@ -3,13 +3,14 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { isStealthUser, loadRoomAsMember, requireHost } from "@/lib/games/rooms";
 import { issueBumpToken } from "@/lib/games/bump";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { withUserGuard } from "@/lib/api/userRead";
 
 /**
  * 蓝牙碰一碰：房主取凭证（仅房主，仅 lobby）。
  * `POST /api/v1/games/rooms/{id}/bump-token` —— 200 `{token, expires_at}`。
  * 房主 App 打开「碰一碰」面板后每 30 秒换一枚，通过 BLE 特征值给贴近的手机读。
  */
-export async function POST(
+async function postHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -35,3 +36,5 @@ export async function POST(
   }
   return apiOk({ token: issued.token, expires_at: issued.expiresAt });
 }
+
+export const POST = withUserGuard(postHandler);

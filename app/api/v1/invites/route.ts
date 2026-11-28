@@ -6,6 +6,8 @@ import { friendIdsOf, type FriendshipRow } from "@/lib/friends";
 import { inviteWindow, parseInviteBody } from "@/lib/api/invites";
 import { isMinorDob } from "@/lib/api/cheers";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { requireUserRead, withUserGuard } from "@/lib/api/userRead";
+import { isPairBlocked, withBlockGuard } from "@/lib/api/blocks";
 
 /** HK 今日 0 点 UTC ISO（3／天窗口下界，沿 cheers 口径）。 */
 function hkDayStartISO(nowMs: number): string {
@@ -21,7 +23,7 @@ function hkDayStartISO(nowMs: number): string {
  * `GET /api/v1/invites?box=inbox|sent` —— 收（sent 待回＋accepted 未来到）／
  * 发（全行＋对方公开三列＋is_friend；陌生人分区由客户端按 is_friend 切）。
  */
-export async function POST(req: Request): Promise<Response> {
+async function postHandler(req: Request): Promise<Response> {
   const { supabase, userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
@@ -87,31 +89,23 @@ export async function POST(req: Request): Promise<Response> {
   if (toUserId === userId) {
     return apiError("forbidden", "不可約自己", 403);
   }
-  const { data: meRow } = await supabase
-    .from("users")
-    .select("mode")
-    .eq("id", userId)
-    .maybeSingle();
+  const meRow = await requireUserRead(
+    "invites.self",
+    (await createServiceClient()).from("users").select("mode").eq("id", userId).maybeSingle(),
+  );
   if ((meRow as { mode?: unknown } | null)?.mode === "stealth") {
     return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
   }
   // users RLS 讀不到沒公開打卡的陌生人（會誤報「對方不存在」）：只讀存在與否＋mode，走 service
   const svc = await createServiceClient();
-  const { data: peerRow } = await svc
-    .from("users")
-    .select("id,mode")
-    .eq("id", toUserId)
-    .maybeSingle();
+  const peerRow = await requireUserRead(
+    "invites.peer",
+    svc.from("users").select("id,mode").eq("id", toUserId).maybeSingle(),
+  );
   if (peerRow === null) return apiError("not_found", "對方不存在", 404);
   const peer = peerRow as { id: string; mode?: unknown };
-  const { data: blockRows } = await supabase
-    .from("cheers_blocks")
-    .select("blocker_id,blocked_id")
-    .or(
-      `and(blocker_id.eq.${peer.id},blocked_id.eq.${userId}),and(blocker_id.eq.${userId},blocked_id.eq.${peer.id})`,
-    )
-    .limit(2);
-  if (Array.isArray(blockRows) && blockRows.length > 0) {
+  // 任一方向都算；走 service：登入身分按 RLS 只看得到自己建立的封鎖（被對方封鎖看不到）
+  if (await isPairBlocked(svc, userId, peer.id)) {
     return apiError("forbidden", "TA 暫時不接收邀請", 403);
   }
   const dayStart = hkDayStartISO(Date.now());
@@ -135,11 +129,10 @@ export async function POST(req: Request): Promise<Response> {
     return apiError("rate_limited", "今日已約過 TA 太多次（上限 5 次），明天再來", 429);
   }
   // UR E.19 未成年禁约（共用 isMinorDob；同敬酒口径）。
-  const { data: inviterRow } = await supabase
-    .from("users")
-    .select("dob")
-    .eq("id", userId)
-    .maybeSingle();
+  const inviterRow = await requireUserRead(
+    "invites.age",
+    (await createServiceClient()).from("users").select("dob").eq("id", userId).maybeSingle(),
+  );
   if (isMinorDob((inviterRow as { dob?: unknown } | null)?.dob, Date.now())) {
     return apiError("forbidden", "未滿 18 歲不可約喝酒", 403);
   }
@@ -268,3 +261,5 @@ export async function GET(req: Request): Promise<Response> {
   const pending = list.filter((r) => r.status === "sent").length;
   return apiOk({ items, pending });
 }
+
+export const POST = withUserGuard(withBlockGuard(postHandler));

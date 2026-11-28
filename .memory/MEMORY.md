@@ -35,3 +35,4 @@
 - [推送四項修復](2026-11-27-push-audit-fixes.md) — 撤回要看 deleted_at；http2 session 要掛 error；FCM 聊天不設 collapseKey；部署前查 0079
 - [探索走獨立分支](2026-11-27-explore-view-separate-branch.md) — 默認列表不改
 - [電郵找人與匹配度](2026-11-28-meet-email-lookup.md) — 上限放服務端表；審核也算送 AI；版本號觸發同意
+- [Supabase 默認授權](2026-11-28-supabase-default-grants.md) — 函數／視圖連 anon、authenticated 一起收

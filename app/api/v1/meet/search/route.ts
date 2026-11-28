@@ -35,6 +35,8 @@ import {
   type MeetCriteria,
 } from "@/lib/meet";
 import { hkDayStartISO } from "@/lib/api/party";
+import { requireUserRead, withUserGuard } from "@/lib/api/userRead";
+import { BlockLookupError, withBlockGuard } from "@/lib/api/blocks";
 
 const ONLINE_WINDOW_MS = 5 * 60_000;
 const TASTE_EVAL_CAP = 40;
@@ -80,7 +82,7 @@ function freshMs(v: unknown, nowMs: number): number | null {
  * 硬過濾（自己／拉黑／解友／隱身／未成年／discoverable 非 true／明確條件）＋
  * 可見欄位匹配＋確定性打分 Top 10。用量見 `remaining_today`。
  */
-export async function POST(req: Request): Promise<Response> {
+async function postHandler(req: Request): Promise<Response> {
   const { userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
@@ -106,11 +108,10 @@ export async function POST(req: Request): Promise<Response> {
   const svc = await createServiceClient();
   const nowMs = Date.now();
   // 搜索者门：性别＋生日齐（引导完成）＋已成年。
-  const { data: meRow } = await svc
-    .from("users")
-    .select("gender,dob,live_lat,live_lng,last_seen_at,meet_search_date,meet_search_count")
-    .eq("id", userId)
-    .maybeSingle();
+  const meRow = await requireUserRead(
+    "meet.self",
+    svc.from("users").select("gender,dob,live_lat,live_lng,last_seen_at,meet_search_date,meet_search_count").eq("id", userId).maybeSingle(),
+  );
   const me = ((meRow ?? {}) as Record<string, unknown>);
   if (me.gender !== "male" && me.gender !== "female") {
     return apiError("onboarding_required", "請先完成性別與生日", 403);
@@ -230,7 +231,8 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const out = await runSearch(svc, userId, me, criteria, nowMs, lang, emailTarget);
-  const remaining = await remainingToday(svc, userId, nowMs);
+  // 結果已經算完、次數已扣：這裡只是回報剩餘次數，讀不到回 0，不把整次搜索丟掉
+  const remaining = await remainingToday(svc, userId, nowMs).catch(() => 0);
   // P1 条件生效说明（距离／在线只对好友生效，用户需知道）。
   if (criteria.nearby_km !== undefined || criteria.online_only === true) {
     notes.push(text.friendsOnly);
@@ -247,11 +249,10 @@ async function remainingToday(
   userId: string,
   nowMs: number,
 ): Promise<number> {
-  const { data } = await svc
-    .from("users")
-    .select("meet_search_date,meet_search_count")
-    .eq("id", userId)
-    .maybeSingle();
+  const data = await requireUserRead(
+    "meet.quota",
+    svc.from("users").select("meet_search_date,meet_search_count").eq("id", userId).maybeSingle(),
+  );
   const r = ((data ?? {}) as Record<string, unknown>);
   const dayStart = hkDayStartISO(nowMs).slice(0, 10);
   const sameDay = typeof r.meet_search_date === "string" && r.meet_search_date >= dayStart;
@@ -354,11 +355,13 @@ async function runSearch(
   const candIds = cands.map((c) => c.id);
   // 关系一次取：候选人边（共同好友计数）＋我的拉黑／解友（好友集上已取复用）。
   const inList = [...new Set([userId, ...candIds])].map((id) => `"${id}"`).join(",");
-  const [{ data: edgeFs }, { data: myBlocks }, { data: myMutes }] = await Promise.all([
+  const [{ data: edgeFs }, { data: myBlocks, error: blocksErr }, { data: myMutes, error: mutesErr }] = await Promise.all([
     svc.from("friendships").select("user_id,friend_id,status").eq("status", "accepted").or(`user_id.in.(${inList}),friend_id.in.(${inList})`).limit(5000),
     svc.from("cheers_blocks").select("blocker_id,blocked_id").or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`).limit(2000),
     svc.from("chat_mutes").select("blocker_id,blocked_id").or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`).limit(2000),
   ]);
+  const blockFailed = blocksErr ?? mutesErr;
+  if (blockFailed) throw new BlockLookupError("meet", blockFailed.code ?? "unknown");
   const blocked = new Set<string>();
   for (const b of ((myBlocks ?? []) as unknown[]) as { blocker_id?: unknown; blocked_id?: unknown }[]) {
     if (typeof b.blocker_id === "string" && typeof b.blocked_id === "string") {
@@ -601,3 +604,5 @@ async function topTasteGroup(
   const g = typeof top.key === "string" ? groupOfKey(top.key) : null;
   return g;
 }
+
+export const POST = withUserGuard(withBlockGuard(postHandler));

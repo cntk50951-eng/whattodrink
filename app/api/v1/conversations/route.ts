@@ -15,6 +15,8 @@ import {
   type ChatMessageJson,
   type ConversationJson,
 } from "@/lib/api/chat";
+import { requireUserRead, withUserGuard } from "@/lib/api/userRead";
+import { isPairBlocked, withBlockGuard } from "@/lib/api/blocks";
 
 const NINETY_DAYS_MS = 90 * 24 * 3600_000;
 
@@ -26,7 +28,7 @@ const NINETY_DAYS_MS = 90 * 24 * 3600_000;
  * RLS 表達不了對方關係校驗，沿 D.1 設計）。
  * 回 `{id, created, is_friend, origin}`。
  */
-export async function POST(req: Request): Promise<Response> {
+async function postHandler(req: Request): Promise<Response> {
   const { supabase, userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
@@ -51,11 +53,10 @@ export async function POST(req: Request): Promise<Response> {
   // 讀對方走 service client：users 的 RLS 只放行「自己」與「有公開打卡的人」，沒公開打卡的陌生人
   // 用登錄身份讀會得到 null → 誤報「找不到该用户」（iOS 陌生人聊天首發失敗的根因之一）。只取 id,mode 兩列。
   const peerSvc = await createServiceClient();
-  const { data: peer } = await peerSvc
-    .from("users")
-    .select("id,mode")
-    .eq("id", peerId)
-    .maybeSingle();
+  const peer = await requireUserRead(
+    "conversations.peer",
+    peerSvc.from("users").select("id,mode").eq("id", peerId).maybeSingle(),
+  );
   const peerRow = peer as { id?: unknown; mode?: unknown } | null;
   if (peerRow === null || typeof peerRow.id !== "string") {
     return apiError("not_found", "找不到该用户", 404);
@@ -63,21 +64,14 @@ export async function POST(req: Request): Promise<Response> {
   // PRIVACY_MODE_MATRIX 矩阵 A/B：隐身可发起／被发起聊天，不拦、不说原因。
   // UR D.10 陌生人放行（不限关系； RSVP 门改拉黑＋未成年＋日限额）。
   // 拉黑任一方向即 404（不泄存在，沿 profile 口径；走 service，blocks 反向行 authed 不可见）。
-  const blockSvc = await createServiceClient();
-  const { data: blockRows } = await blockSvc
-    .from("cheers_blocks")
-    .select("blocker_id")
-    .or(`and(blocker_id.eq.${userId},blocked_id.eq.${peerId}),and(blocker_id.eq.${peerId},blocked_id.eq.${userId})`)
-    .limit(1);
-  if (Array.isArray(blockRows) && blockRows.length > 0) {
+  if (await isPairBlocked(await createServiceClient(), userId, peerId)) {
     return apiError("not_found", "找不到该用户", 404);
   }
   // 未成年禁发起（沿 cheers 口径；dob 缺席放行）。
-  const { data: minorRow } = await supabase
-    .from("users")
-    .select("dob")
-    .eq("id", userId)
-    .maybeSingle();
+  const minorRow = await requireUserRead(
+    "conversations.age",
+    (await createServiceClient()).from("users").select("dob").eq("id", userId).maybeSingle(),
+  );
   if (isMinorDob((minorRow as { dob?: unknown } | null)?.dob, Date.now())) {
     return apiError("forbidden", "未滿 18 歲不可聊天", 403);
   }
@@ -326,3 +320,5 @@ export async function GET(req: Request): Promise<Response> {
   // 空頁兜底：page 空時不取 [-1]（上已 early-return，雙保險）
   return apiOk({ conversations: page, nextCursor });
 }
+
+export const POST = withUserGuard(withBlockGuard(postHandler));

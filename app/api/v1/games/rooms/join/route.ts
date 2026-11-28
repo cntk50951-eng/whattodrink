@@ -25,6 +25,8 @@ import {
 } from "@/lib/games/rooms";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { requireUserRead, withUserGuard } from "@/lib/api/userRead";
+import { withBlockGuard } from "@/lib/api/blocks";
 
 /**
  * UR H.1 输码加入（🔒，POC）。
@@ -34,7 +36,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * 满员（409）／与任一在场成员无拉黑解友（403）／与房主好友或同酒局（403）。
  * 重进（left→active）与本房重复加入（200 幂等）都處理。
  */
-export async function POST(req: Request): Promise<Response> {
+async function postHandler(req: Request): Promise<Response> {
   const { userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
@@ -58,7 +60,10 @@ export async function POST(req: Request): Promise<Response> {
   }
   const nowMs = Date.now();
   await purgeExpiredRooms(svc, nowMs);
-  const { data: meRow } = await svc.from("users").select("dob").eq("id", userId).maybeSingle();
+  const meRow = await requireUserRead(
+    "games.join.age",
+    svc.from("users").select("dob").eq("id", userId).maybeSingle(),
+  );
   if (isMinorDob((meRow as { dob?: unknown } | null)?.dob, nowMs)) {
     return apiError("age_restricted", "未滿 18 歲不可玩酒桌遊戲", 403);
   }
@@ -198,3 +203,5 @@ async function createJoinRequest(
     202,
   );
 }
+
+export const POST = withUserGuard(withBlockGuard(postHandler));

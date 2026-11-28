@@ -14,6 +14,7 @@ import {
   isStealthUser,
 } from "@/lib/games/rooms";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { requireUserRead, withUserGuard } from "@/lib/api/userRead";
 
 /**
  * UR H.1 建房（🔒，POC）。
@@ -22,7 +23,7 @@ import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
  * 小时 10 房（429）。房主 ready=false（与成员同口径，开始要全员 ready）。
  * 写走 service（game_* RLS 零 policy 锁死，沿 0042）。
  */
-export async function POST(req: Request): Promise<Response> {
+async function postHandler(req: Request): Promise<Response> {
   const { userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
@@ -43,7 +44,10 @@ export async function POST(req: Request): Promise<Response> {
   }
   const nowMs = Date.now();
   await purgeExpiredRooms(svc, nowMs);
-  const { data: meRow } = await svc.from("users").select("dob").eq("id", userId).maybeSingle();
+  const meRow = await requireUserRead(
+    "games.create.age",
+    svc.from("users").select("dob").eq("id", userId).maybeSingle(),
+  );
   if (isMinorDob((meRow as { dob?: unknown } | null)?.dob, nowMs)) {
     return apiError("age_restricted", "未滿 18 歲不可玩酒桌遊戲", 403);
   }
@@ -113,3 +117,5 @@ export async function POST(req: Request): Promise<Response> {
   });
   return apiOk({ room }, 201);
 }
+
+export const POST = withUserGuard(postHandler);

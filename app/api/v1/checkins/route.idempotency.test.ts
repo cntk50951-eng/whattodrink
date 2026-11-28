@@ -17,6 +17,7 @@ const ROW = {
 };
 
 vi.mock("@/lib/api/envelope", () => import("../../../../lib/api/envelope"));
+vi.mock("@/lib/api/userRead", () => import("../../../../lib/api/userRead"));
 vi.mock("@/lib/api/checkins", () => import("../../../../lib/api/checkins"));
 vi.mock("@/lib/api/checkinIdempotency", () => import("../../../../lib/api/checkinIdempotency"));
 vi.mock("@/lib/api/privacy", () => import("../../../../lib/api/privacy"));

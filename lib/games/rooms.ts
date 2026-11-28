@@ -23,6 +23,8 @@ import { parseTrainRules, type TrainRules } from "./train";
 import { applyTrainLeave } from "./trainStore";
 import { parseShipoRules, SHIPO_MAX_PLAYERS, SHIPO_MIN_PLAYERS, type ShipoRules } from "./shipo";
 import { applyShipoLeave } from "./shipoStore";
+import { requireUserRead } from "../api/userRead";
+import { BlockLookupError } from "../api/blocks";
 
 export const ROOM_TTL_MS = 2 * 3600_000;
 export const ROOM_DELETE_AFTER_END_MS = 24 * 3600_000;
@@ -439,10 +441,12 @@ export async function hasBlockOrMute(
   b: string,
 ): Promise<boolean> {
   const or = `and(blocker_id.eq.${a},blocked_id.eq.${b}),and(blocker_id.eq.${b},blocked_id.eq.${a})`;
-  const [{ data: blocks }, { data: mutes }] = await Promise.all([
+  const [{ data: blocks, error: blocksErr }, { data: mutes, error: mutesErr }] = await Promise.all([
     svc.from("cheers_blocks").select("blocker_id").or(or).limit(1),
     svc.from("chat_mutes").select("blocker_id").or(or).limit(1),
   ]);
+  const failed = blocksErr ?? mutesErr;
+  if (failed) throw new BlockLookupError("room-pair", failed.code ?? "unknown");
   return (Array.isArray(blocks) && blocks.length > 0) || (Array.isArray(mutes) && mutes.length > 0);
 }
 
@@ -1174,7 +1178,7 @@ export async function applyReveal(
 
 /** 隐身者不可进入游戏（PRIVACY_MODE_MATRIX 矩阵 A；留痕类，自己被攔即明說）。 */
 export async function isStealthUser(svc: SupabaseClient, userId: string): Promise<boolean> {
-  const { data } = await svc.from("users").select("mode").eq("id", userId).maybeSingle();
+  const data = await requireUserRead("games.stealth", svc.from("users").select("mode").eq("id", userId).maybeSingle());
   return (data as { mode?: unknown } | null)?.mode === "stealth";
 }
 
@@ -1234,7 +1238,7 @@ export async function isGameMuted(svc: SupabaseClient, roomId: string, userId: s
 
 /** 被禁玩（users.game_banned_until 未过期）。 */
 export async function isGameBanned(svc: SupabaseClient, userId: string, nowMs: number): Promise<boolean> {
-  const { data } = await svc.from("users").select("game_banned_until").eq("id", userId).maybeSingle();
+  const data = await requireUserRead("games.ban", svc.from("users").select("game_banned_until").eq("id", userId).maybeSingle());
   const until = (data as { game_banned_until?: unknown } | null)?.game_banned_until;
   return typeof until === "string" && Date.parse(until) > nowMs;
 }

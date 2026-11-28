@@ -7,6 +7,7 @@ import { type FriendshipRow, friendIdsOf } from "@/lib/friends";
 import { cheersQuota, isMinorDob, parseCheersBody, parseCheersMessage } from "@/lib/api/cheers";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
 import { sendCheersPush } from "@/lib/push/send";
+import { requireUserRead, withUserGuard } from "@/lib/api/userRead";
 
 type CheckinRow = {
   id: string;
@@ -60,11 +61,10 @@ async function postHandler(req: Request): Promise<Response> {
     return apiError("invalid_params", parsed.error, 400);
   }
   // 隐身禁敬／取消（矩阵 A：留痕类，自己被攔即明說）。
-  const { data: meRow } = await supabase
-    .from("users")
-    .select("mode")
-    .eq("id", userId)
-    .maybeSingle();
+  const meRow = await requireUserRead(
+    "cheers.self",
+    (await createServiceClient()).from("users").select("mode").eq("id", userId).maybeSingle(),
+  );
   if ((meRow as { mode?: unknown } | null)?.mode === "stealth") {
     return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
   }
@@ -89,11 +89,10 @@ async function postHandler(req: Request): Promise<Response> {
     toUserId = post.user_id;
   } else {
     const peerId = parsed.to_user_id as string;
-    const { data: peerRow } = await supabase
-      .from("users")
-      .select("id")
-      .eq("id", peerId)
-      .maybeSingle();
+    const peerRow = await requireUserRead(
+      "cheers.peer",
+      (await createServiceClient()).from("users").select("id").eq("id", peerId).maybeSingle(),
+    );
     if (peerRow === null) return apiError("not_found", "对方不存在", 404);
     const { data: posts } = await supabase
       .from("checkins")
@@ -118,11 +117,10 @@ async function postHandler(req: Request): Promise<Response> {
     return apiError("not_found", "打卡不存在", 404);
   }
   // UR E.19 未成年禁写（共用 isMinorDob；dob 缺席放行，首登闸另管）。
-  const { data: fromRow } = await supabase
-    .from("users")
-    .select("dob")
-    .eq("id", userId)
-    .maybeSingle();
+  const fromRow = await requireUserRead(
+    "cheers.age",
+    (await createServiceClient()).from("users").select("dob").eq("id", userId).maybeSingle(),
+  );
   if (isMinorDob((fromRow as { dob?: unknown } | null)?.dob, Date.now())) {
     return apiError("forbidden", "未滿 18 歲不可乾杯", 403);
   }
@@ -201,11 +199,10 @@ async function deleteHandler(req: Request): Promise<Response> {
     return apiError("unauthorized", "未登录", 401);
   }
   // 隐身不可取消碰杯（矩阵 A：取消是留痕类操作，自己被攔即明說；2026-10-11 新增）。
-  const { data: meRow } = await supabase
-    .from("users")
-    .select("mode")
-    .eq("id", userId)
-    .maybeSingle();
+  const meRow = await requireUserRead(
+    "cheers.self",
+    (await createServiceClient()).from("users").select("mode").eq("id", userId).maybeSingle(),
+  );
   if ((meRow as { mode?: unknown } | null)?.mode === "stealth") {
     return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
   }
@@ -268,5 +265,5 @@ async function deleteHandler(req: Request): Promise<Response> {
   });
 }
 
-export const POST = withBlockGuard(postHandler);
-export const DELETE = withBlockGuard(deleteHandler);
+export const POST = withUserGuard(withBlockGuard(postHandler));
+export const DELETE = withUserGuard(withBlockGuard(deleteHandler));

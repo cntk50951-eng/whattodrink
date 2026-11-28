@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock("next/server", () => ({ after: () => undefined }));
 vi.mock("@/lib/api/envelope", () => import("../../../../lib/api/envelope"));
+vi.mock("@/lib/api/blocks", () => import("../../../../lib/api/blocks"));
 vi.mock("@/lib/api/chat", () => import("../../../../lib/api/chat"));
 vi.mock("@/lib/friends", () => import("../../../../lib/friends"));
 vi.mock("@/lib/push/send", () => ({ sendFriendPush: vi.fn() }));

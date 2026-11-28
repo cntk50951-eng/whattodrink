@@ -12,6 +12,8 @@ import {
   type NearbyPerson,
   type NearbyUserRow,
 } from "@/lib/nearbyPeople";
+import { requireUserRead, withUserGuard } from "@/lib/api/userRead";
+import { BlockLookupError, withBlockGuard } from "@/lib/api/blocks";
 
 const POOL_CAP = 300;
 
@@ -26,7 +28,7 @@ const POOL_CAP = 300;
  * - 排序：本次上線時間新→舊，再距離近→遠；最多 50 人。
  * 搜索者門：需完成性別＋生日並已成年（沿遇見 I.1）。
  */
-export async function GET(req: Request): Promise<Response> {
+async function getHandler(req: Request): Promise<Response> {
   const { userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
@@ -37,11 +39,10 @@ export async function GET(req: Request): Promise<Response> {
   }
   const svc = await createServiceClient();
   const nowMs = Date.now();
-  const { data: meRow } = await svc
-    .from("users")
-    .select("mode,gender,dob,preferences,last_seen_at,live_lat,live_lng")
-    .eq("id", userId)
-    .maybeSingle();
+  const meRow = await requireUserRead(
+    "nearby.self",
+    svc.from("users").select("mode,gender,dob,preferences,last_seen_at,live_lat,live_lng").eq("id", userId).maybeSingle(),
+  );
   const me = (meRow ?? {}) as Record<string, unknown>;
   if (me.mode === "stealth") {
     return apiOk({ people: [], radius_km: radiusKm, needs_location: false });
@@ -96,11 +97,13 @@ export async function GET(req: Request): Promise<Response> {
   if (ids.length === 0) {
     return apiOk({ people: [], radius_km: radiusKm, needs_location: false });
   }
-  const [{ data: blocks }, { data: mutes }, { data: fs }] = await Promise.all([
+  const [{ data: blocks, error: blocksErr }, { data: mutes, error: mutesErr }, { data: fs }] = await Promise.all([
     svc.from("cheers_blocks").select("blocker_id,blocked_id").or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`).limit(2000),
     svc.from("chat_mutes").select("blocker_id,blocked_id").or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`).limit(2000),
     svc.from("friendships").select("user_id,friend_id,status").or(`user_id.eq.${userId},friend_id.eq.${userId}`).limit(2000),
   ]);
+  const blockFailed = blocksErr ?? mutesErr;
+  if (blockFailed) throw new BlockLookupError("nearby", blockFailed.code ?? "unknown");
   const hidden = new Set<string>();
   for (const list of [blocks, mutes]) {
     for (const b of ((list ?? []) as unknown[]) as { blocker_id?: unknown; blocked_id?: unknown }[]) {
@@ -126,3 +129,5 @@ export async function GET(req: Request): Promise<Response> {
   const people = sortNearby(cands).slice(0, NEARBY_PEOPLE_LIMIT);
   return apiOk({ people, radius_km: radiusKm, needs_location: false });
 }
+
+export const GET = withUserGuard(withBlockGuard(getHandler));

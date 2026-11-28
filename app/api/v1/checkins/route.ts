@@ -13,6 +13,7 @@ import {
   parseIdempotencyKey,
   stripMissingOptionalColumn,
 } from "@/lib/api/checkinIdempotency";
+import { userLookupUnavailable } from "@/lib/api/userRead";
 
 /**
  * UR A.12 打卡雙類型（🔒，承 A.10）。
@@ -117,7 +118,7 @@ export async function POST(req: Request): Promise<Response> {
   try {
     // 防御：若 public.users 缺行（0006 触发器未执行或旧库），先补行再落库，避免 FK 23503
     try {
-      const { data: ensured } = await supabase.from("users").select("id").eq("id", userId).maybeSingle();
+      const { data: ensured } = await (await createServiceClient()).from("users").select("id").eq("id", userId).maybeSingle();
       // UR I.3：恢复期内不自建空行（会撞上恢复）
       if (ensured === null && !(await isDeletionPending(userId))) {
         // 尝试从 auth 取昵称/头像，失败则兜底
@@ -137,7 +138,7 @@ export async function POST(req: Request): Promise<Response> {
     // 0007 未遷移時 users.mode 缺列，按 public 回退
     let mode: string = "public";
     try {
-      const { data: userRow, error: userErr } = await supabase
+      const { data: userRow, error: userErr } = await (await createServiceClient())
         .from("users")
         .select("mode")
         .eq("id", userId)
@@ -154,7 +155,7 @@ export async function POST(req: Request): Promise<Response> {
         mode = (userRow as { mode?: string } | null)?.mode ?? "public";
       }
     } catch {
-      mode = "public";
+      return userLookupUnavailable();
     }
     // 矩阵 D：隐身不再拦打卡（见上）；visibility 由发布时模式定格。
     // UR E.2 發送工作流：即時在線審核（圖＋文＋轉錄一次調過；語音本體兩邊
@@ -230,17 +231,16 @@ export async function POST(req: Request): Promise<Response> {
         }
       }
     }
-    // 0062：用戶設了「打卡默認可見性」就用它（隱身仍強制 private）。單獨查、出錯（列未建）一律當沒設，
-    // 回退按模式——不能併進上面的 mode 查詢，否則 0062 未跑會讓所有人落到 public 回退。
-    let visibilityOverride: unknown = null;
-    try {
-      const { data: ov, error: ovErr } = await supabase
-        .from("users")
-        .select("checkin_visibility")
-        .eq("id", userId)
-        .maybeSingle();
-      if (!ovErr) visibilityOverride = (ov as { checkin_visibility?: unknown } | null)?.checkin_visibility ?? null;
-    } catch {}
+    // 0062：用戶設了「打卡默認可見性」就用它（隱身仍強制 private）。單獨查：列未建當沒設、按模式；
+    // 其他讀取失敗拒絕發佈（否則設了較窄範圍的人會發成公開）。不能併進上面的 mode 查詢，
+    // 否則 0062 未跑會讓所有人落到 public 回退。
+    const { data: ov, error: ovErr } = await (await createServiceClient())
+      .from("users")
+      .select("checkin_visibility")
+      .eq("id", userId)
+      .maybeSingle();
+    if (ovErr && ovErr.code !== "42703" && ovErr.code !== "PGRST204") return userLookupUnavailable();
+    const visibilityOverride: unknown = ovErr ? null : (ov as { checkin_visibility?: unknown } | null)?.checkin_visibility ?? null;
     const visibility = checkinVisibilityFor(mode, visibilityOverride);
     const expiresAt = kind === "flash" ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
 

@@ -1,4 +1,4 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 
 type FsRow = {
@@ -44,7 +44,7 @@ export async function GET(req: Request): Promise<Response> {
   const userById = new Map<string, { nickname: string; avatar_url: string | null; gender: string | null }>();
   const postById = new Map<string, { place_name: string | null; photo_thumb: string | null }>();
   if (peerIds.length > 0) {
-    const { data: users } = await supabase
+    const { data: users } = await (await createServiceClient())
       .from("users")
       .select("id,nickname,avatar_url,gender")
       .in("id", peerIds);

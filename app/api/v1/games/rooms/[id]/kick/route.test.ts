@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // 第七輪 §3.3：房主「移出並拉黑」——拉黑沒寫成不能回已移出；兩個選項各自只做自己的事。
 const state = vi.hoisted(() => ({ blockFail: false, log: [] as string[] }));
 vi.mock("@/lib/api/envelope", () => import("../../../../../../../lib/api/envelope"));
+vi.mock("@/lib/api/userRead", () => import("../../../../../../../lib/api/userRead"));
 vi.mock("@/lib/mode", () => ({ STEALTH_SELF_BLOCK_MSG: "stealth" }));
 vi.mock("@/lib/games/rooms", () => ({
   parseKickBody: (raw: { user_id?: string; block?: boolean }) => ({ userId: raw.user_id, block: raw.block === true }),

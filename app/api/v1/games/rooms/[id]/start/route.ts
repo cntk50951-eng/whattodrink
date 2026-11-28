@@ -16,6 +16,7 @@ import { startTrainRoom } from "@/lib/games/trainRoom";
 import { startShipoRoom } from "@/lib/games/shipoRoom";
 import { SHIPO_MAX_PLAYERS, SHIPO_MIN_PLAYERS } from "@/lib/games/shipo";
 import { TRAIN_MAX_PLAYERS, TRAIN_MIN_PLAYERS } from "@/lib/games/train";
+import { withUserGuard } from "@/lib/api/userRead";
 
 /**
  * UR H.1 开始（🔒，仅房主）。
@@ -24,7 +25,7 @@ import { TRAIN_MAX_PLAYERS, TRAIN_MIN_PLAYERS } from "@/lib/games/train";
  * 首局 starter＝座位最小 active（输家先叫是次局起，见 batch-3 next_round）。
  * 骰 service 摇（crypto），只进 dice 列（RLS 锁死，客户端只能 batch-3 按人拿）。
  */
-export async function POST(
+async function postHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -127,3 +128,5 @@ export async function POST(
   });
   return apiOk({ version });
 }
+
+export const POST = withUserGuard(postHandler);

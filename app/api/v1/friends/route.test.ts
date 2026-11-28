@@ -2,6 +2,7 @@ import {beforeEach,describe,expect,it,vi} from "vitest";
 const state=vi.hoisted(()=>({rows:[] as Array<Record<string,unknown>>,jobs:[] as Array<()=>Promise<void>>,push:vi.fn(),failUpdate:false,updates:[] as Array<Record<string,unknown>>}));
 vi.mock("next/server",()=>({after:(job:()=>Promise<void>)=>state.jobs.push(job)}));
 vi.mock("@/lib/api/envelope",()=>import("../../../../lib/api/envelope"));
+vi.mock("@/lib/api/blocks", () => import("../../../../lib/api/blocks"));
 vi.mock("@/lib/api/chat",()=>import("../../../../lib/api/chat"));
 vi.mock("@/lib/friends",()=>import("../../../../lib/friends"));
 vi.mock("@/lib/push/send",()=>({sendFriendPush:state.push}));

@@ -1,5 +1,6 @@
 import { createClient, createServiceClient, getAuthedClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
+import { attachAuthors } from "@/lib/api/authors";
 import { getBlockedUserIds, withBlockGuard } from "@/lib/api/blocks";
 import { toPinJson } from "@/lib/api/pins";
 import { haversineMeters } from "@/lib/geo";
@@ -12,7 +13,7 @@ import { normalizeHashtag } from "@/lib/hashtags";
  * 縮圖、作者公開欄位），不回原圖／語音。文字條件（酒類／#標籤／關鍵詞）任一命中即入選；給了座標則按半徑過濾並按距離排。最多 20 條。
  */
 const COLUMNS =
-  "id,lat,lng,place_name,created_at,kind,expires_at,user_id,photo_thumb,note,tags,hashtags,users!checkins_user_id_fkey(nickname,avatar_url,gender,dob,bio,last_seen_at,mode),beers(name,emoji)";
+  "id,lat,lng,place_name,created_at,kind,expires_at,user_id,photo_thumb,note,tags,hashtags,beers(name,emoji)";
 
 const KW_RE = /^[\p{L}\p{N}_\-·]+$/u;
 
@@ -72,7 +73,16 @@ async function postHandler(req: Request): Promise<Response> {
     console.error(`[search/posts] error: ${flash.error.code} ${flash.error.message}`);
     return apiError("internal", "搜尋失敗", 500);
   }
-  const rows = [...((flash.data ?? []) as unknown[]), ...((post.data ?? []) as unknown[])] as Record<string, unknown>[];
+  const authored = await attachAuthors(
+    await createServiceClient(),
+    [...((flash.data ?? []) as unknown[]), ...((post.data ?? []) as unknown[])],
+    "nickname,avatar_url,gender,dob,bio,last_seen_at,mode",
+  );
+  if (authored.error !== null) {
+    console.error(`[search/posts] authors error: ${authored.error.code} ${authored.error.message}`);
+    return apiError("internal", "搜尋失敗", 500);
+  }
+  const rows = authored.rows as Record<string, unknown>[];
   const blockedIds = await getBlockedUserIds(await createServiceClient(), userId);
   const out: Record<string, unknown>[] = [];
   for (const r of rows) {

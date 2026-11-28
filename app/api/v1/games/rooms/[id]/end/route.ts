@@ -8,6 +8,7 @@ import {
   isStealthUser,
 } from "@/lib/games/rooms";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { withUserGuard } from "@/lib/api/userRead";
 
 /**
  * UR H.1 结束（🔒，仅房主）。
@@ -15,7 +16,7 @@ import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
  * 已结束重调回 409 wrong_phase（结算看 batch-3 的 GET）。
  * 行保留 24h 供断线回看结算（purgeExpiredRooms 懒删）。
  */
-export async function POST(
+async function postHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -48,3 +49,5 @@ export async function POST(
   await appendEvent(svc, loaded.room.id, version, "room_ended", userId, { reason: "host" });
   return apiOk({ version });
 }
+
+export const POST = withUserGuard(postHandler);

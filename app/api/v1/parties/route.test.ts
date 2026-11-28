@@ -6,6 +6,7 @@ const server = vi.hoisted(() => ({ authed: vi.fn(), service: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ getAuthedClient: server.authed, createServiceClient: server.service }));
 // vitest 沒有 `@/` 別名：路由的 lib 依賴照倉內慣例用相對路徑接上；本測試用不到的整包替身
 vi.mock("@/lib/api/envelope", () => import("../../../../lib/api/envelope"));
+vi.mock("@/lib/api/userRead", () => import("../../../../lib/api/userRead"));
 vi.mock("@/lib/api/compositeCursor", () => import("../../../../lib/api/compositeCursor"));
 vi.mock("@/lib/api/blocks", () => import("../../../../lib/api/blocks"));
 vi.mock("@/lib/api/partyExplore", () => import("../../../../lib/api/partyExplore"));

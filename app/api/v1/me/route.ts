@@ -8,6 +8,7 @@ import { hkDayStartISO } from "@/lib/api/party";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { parsePreferences } from "@/lib/api/taste";
 import { parsePushPrefs } from "@/lib/push/prefs";
+import { requireUserRead, UserLookupError, withUserGuard } from "@/lib/api/userRead";
 
 /**
  * UR A.16 隱身模式（A.4-6 子集先行，一次一個端點）。
@@ -26,7 +27,7 @@ async function ensureUserRow(
   userId: string,
 ): Promise<void> {
   try {
-    const { data: ensured } = await supabase
+    const { data: ensured } = await (await createServiceClient())
       .from("users")
       .select("id")
       .eq("id", userId)
@@ -59,7 +60,7 @@ export async function GET(req: Request): Promise<Response> {
       return apiError("account_pending_deletion", "账号已申请注销，可在恢复期内恢复", 403);
     }
     await ensureUserRow(supabase, userId);
-    const { data, error } = await supabase
+    const { data, error } = await (await createServiceClient())
       .from("users")
       .select(ME_SELECT)
       .eq("id", userId)
@@ -67,7 +68,7 @@ export async function GET(req: Request): Promise<Response> {
     if (error) {
       // 0007 未遷移（mode 缺列 42703）：回退舊列，mode 按 public
       if (error.code === "42703") {
-        const { data: legacy, error: legacyErr } = await supabase
+        const { data: legacy, error: legacyErr } = await (await createServiceClient())
           .from("users")
           .select(ME_SELECT_LEGACY)
           .eq("id", userId)
@@ -102,7 +103,7 @@ export async function GET(req: Request): Promise<Response> {
   }
 }
 
-export async function PATCH(req: Request): Promise<Response> {  const { supabase, userId } = await getAuthedClient(req);
+async function patchHandler(req: Request): Promise<Response> {  const { supabase, userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
   }
@@ -144,11 +145,10 @@ export async function PATCH(req: Request): Promise<Response> {  const { supabase
     await ensureUserRow(supabase, userId);
     const nowIso = new Date().toISOString();
     // 当前行（改名频率＋变化检测＋旧头像清理用；本人行自读）。
-    const { data: curRaw } = await supabase
-      .from("users")
-      .select("nickname,bio,avatar_url,nickname_updated_at,nickname_daily_count,info_visibility,dob")
-      .eq("id", userId)
-      .maybeSingle();
+    const curRaw = await requireUserRead(
+      "me.current",
+      (await createServiceClient()).from("users").select("nickname,bio,avatar_url,nickname_updated_at,nickname_daily_count,info_visibility,dob").eq("id", userId).maybeSingle(),
+    );
     const cur = (curRaw ?? {}) as {
       nickname?: unknown;
       bio?: unknown;
@@ -284,7 +284,7 @@ export async function PATCH(req: Request): Promise<Response> {  const { supabase
       return apiError("invalid_params", "body 無有效字段", 400);
     }
       // UR E.18：舊誤導文案退役（缺列直報真名，沿 0024 口徑；不再提 0007）。
-    const { data, error } = await supabase
+    const { data, error } = await (await createServiceClient())
       .from("users")
       .update(update)
       .eq("id", userId)
@@ -310,6 +310,7 @@ export async function PATCH(req: Request): Promise<Response> {  const { supabase
     }
     return apiOk({ me });
   } catch (err) {
+    if (err instanceof UserLookupError) throw err; // 交給 withUserGuard 回 503
     return apiError("internal", err instanceof Error ? err.message : "unknown", 500);
   }
 }
@@ -407,3 +408,5 @@ export async function DELETE(req: Request): Promise<Response> {
     return apiError("internal", "注销失败，请稍后重试", 500);
   }
 }
+
+export const PATCH = withUserGuard(patchHandler);

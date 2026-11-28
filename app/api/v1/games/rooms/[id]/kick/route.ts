@@ -8,6 +8,7 @@ import {
   isStealthUser,
 } from "@/lib/games/rooms";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { withUserGuard } from "@/lib/api/userRead";
 
 /**
  * UR H.1 踢人（🔒，仅房主）。
@@ -15,7 +16,7 @@ import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
  * 不可踢自己／房主（房主想走用 leave）；被踢者 status=kicked，重进码 403。
  * 局中善后与 leave 同（applyDeparture）。
  */
-export async function POST(
+async function postHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -80,3 +81,5 @@ export async function POST(
   });
   return apiOk({ version: done.version });
 }
+
+export const POST = withUserGuard(postHandler);

@@ -22,6 +22,7 @@ import { settleShipoRoom } from "@/lib/games/shipoRoom";
 import { loadShipoState } from "@/lib/games/shipoStore";
 import { pickShipoLang } from "@/lib/games/shipoCards";
 import { loadTrainState } from "@/lib/games/trainStore";
+import { withUserGuard } from "@/lib/api/userRead";
 
 const ONLINE_WINDOW_MS = 15_000;
 
@@ -34,7 +35,7 @@ const ONLINE_WINDOW_MS = 15_000;
  * - ended 房：有行（active／left／kicked）即可看结算；非 ended 只 active 可看。
  * - GET 顺带刷我 `last_seen_at`（online 15s 窗）。
  */
-export async function GET(
+async function getHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -177,3 +178,5 @@ export async function GET(
     events,
   });
 }
+
+export const GET = withUserGuard(getHandler);

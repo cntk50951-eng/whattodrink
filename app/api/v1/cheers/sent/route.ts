@@ -1,4 +1,4 @@
-import { getAuthedClient } from "@/lib/supabase/server";
+import { getAuthedClient, createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api/envelope";
 import { friendIdsOf, type FriendshipRow } from "@/lib/friends";
 
@@ -37,7 +37,7 @@ export async function GET(req: Request): Promise<Response> {
   let backSet = new Set<string>();
   let friendSet = new Set<string>();
   if (toIds.length > 0) {
-    const { data: users } = await supabase
+    const { data: users } = await (await createServiceClient())
       .from("users")
       .select("id,nickname,avatar_url")
       .in("id", toIds);

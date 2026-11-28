@@ -5,6 +5,7 @@ import { canViewCheckin, parseMineParams, toMineRow } from "@/lib/api/checkins";
 import { parseCheckinIdParam } from "@/lib/api/checkins";
 import { friendIdsOf } from "@/lib/friends";
 import { parseSavesVisibility, savesAccess } from "@/lib/api/privacy";
+import { userLookupUnavailable } from "@/lib/api/userRead";
 
 /**
  * 看别人收藏（WEB_HANDOFF_USER_SAVES，iOS 别人主页「收藏」标签）。
@@ -57,6 +58,8 @@ export async function GET(
       .select("saves_visibility")
       .eq("id", targetId)
       .maybeSingle();
+    // 列未建＝舊行為（好友可看）；其他讀取失敗拒絕回應，否則設為不公開的人會被好友看到
+    if (setErr !== null && setErr.code !== "42703" && setErr.code !== "PGRST204") return userLookupUnavailable();
     const setting = parseSavesVisibility(
       setErr === null ? (setRow as { saves_visibility?: unknown } | null)?.saves_visibility : null,
     );

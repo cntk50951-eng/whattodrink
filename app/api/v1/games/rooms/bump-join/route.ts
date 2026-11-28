@@ -17,6 +17,8 @@ import {
 } from "@/lib/games/rooms";
 import { parseBumpBody, verifyBumpToken } from "@/lib/games/bump";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { requireUserRead, withUserGuard } from "@/lib/api/userRead";
+import { withBlockGuard } from "@/lib/api/blocks";
 
 /**
  * 蓝牙碰一碰加入（需登录）。
@@ -25,7 +27,7 @@ import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
  * 唯一差别：凭证有效（只能贴近房主手机经 BLE 读到）即直接入座，不看好友／同酒局，不走房主审批。
  * 凭证 60 秒过期；每人每分钟 20 次。
  */
-export async function POST(req: Request): Promise<Response> {
+async function postHandler(req: Request): Promise<Response> {
   const { userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
@@ -55,7 +57,10 @@ export async function POST(req: Request): Promise<Response> {
     return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
   }
   await purgeExpiredRooms(svc, nowMs);
-  const { data: meRow } = await svc.from("users").select("dob").eq("id", userId).maybeSingle();
+  const meRow = await requireUserRead(
+    "games.bump.age",
+    svc.from("users").select("dob").eq("id", userId).maybeSingle(),
+  );
   if (isMinorDob((meRow as { dob?: unknown } | null)?.dob, nowMs)) {
     return apiError("age_restricted", "未滿 18 歲不可玩酒桌遊戲", 403);
   }
@@ -120,3 +125,5 @@ async function nicknameOf(
   const n = (data as { nickname?: unknown } | null)?.nickname;
   return typeof n === "string" && n !== "" ? n : "酒友";
 }
+
+export const POST = withUserGuard(withBlockGuard(postHandler));

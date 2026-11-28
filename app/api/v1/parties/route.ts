@@ -11,6 +11,7 @@ import { TRUST_CONFIG } from "@/lib/trust/config";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { haversineMeters } from "@/lib/geo";
 import { STEALTH_SELF_BLOCK_MSG } from "@/lib/mode";
+import { requireUserRead, withUserGuard } from "@/lib/api/userRead";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -20,7 +21,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * `start_at` 未来 14 天内；host 不自動占席（joined_count 從 0 起，用戶定案 2026-10-08）。
  * 回 `201 {id, expires_at}`（`expires_at`＝`start_at`＋3h，問答定案）。
  */
-export async function POST(req: Request): Promise<Response> {
+async function postHandler(req: Request): Promise<Response> {
   const { supabase, userId } = await getAuthedClient(req);
   if (userId === null) {
     return apiError("unauthorized", "未登录", 401);
@@ -50,11 +51,10 @@ export async function POST(req: Request): Promise<Response> {
       return apiOk({ id: pr.id, expires_at: pr.expires_at }, 200);
     }
   }
-  const { data: meRow } = await supabase
-    .from("users")
-    .select("mode,dob")
-    .eq("id", userId)
-    .maybeSingle();
+  const meRow = await requireUserRead(
+    "parties.self",
+    (await createServiceClient()).from("users").select("mode,dob").eq("id", userId).maybeSingle(),
+  );
   const me = (meRow ?? {}) as { mode?: unknown; dob?: unknown };
   if (me.mode === "stealth") {
     return apiError("forbidden", STEALTH_SELF_BLOCK_MSG, 403);
@@ -556,3 +556,5 @@ async function deleteCoverPath(storagePath: string): Promise<void> {
     console.error(`[api/v1/parties] cover remove threw: ${err instanceof Error ? err.message : "unknown"}`);
   }
 }
+
+export const POST = withUserGuard(postHandler);

@@ -379,7 +379,7 @@ async function profileOf(req: Request, viewerId: string | null, targetId: string
     // 本人全集；好友 public＋friends；陌生人 public（private 永不计入）。
     const visForStats =
       self || relationship === "friend" ? ["public", "friends", ...(self ? ["private"] : [])] : ["public"];
-    // 0062：收藏可见性（列未建／出错＝friends，旧行为）；与 /users/{id}/saves 的门同口径。
+    // 0062：收藏可见性（列未建＝friends，旧行为；其他讀取失敗當 private，不露數量）；与 /users/{id}/saves 的门同口径。
     const { data: savesSetRow, error: savesSetErr } = await supa
       .from("users")
       .select("saves_visibility")
@@ -388,7 +388,9 @@ async function profileOf(req: Request, viewerId: string | null, targetId: string
     const savesCountVisible =
       savesAccess(
         parseSavesVisibility(
-          savesSetErr === null ? (savesSetRow as { saves_visibility?: unknown } | null)?.saves_visibility : null,
+          savesSetErr === null
+            ? (savesSetRow as { saves_visibility?: unknown } | null)?.saves_visibility
+            : savesSetErr.code === "42703" || savesSetErr.code === "PGRST204" ? null : "private",
         ),
         self,
         relationship === "friend",
