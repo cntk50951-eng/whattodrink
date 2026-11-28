@@ -1,6 +1,6 @@
 {
   "title": "Privacy Policy",
-  "effective": "27 November 2026",
+  "effective": "28 November 2026",
   "summaryTitle": "In one sentence",
   "summary": [
     "We only collect what the app needs to work. Your location is used to show the map and nearby friends, and you can go invisible, block people or delete your account at any time. We do not use your data to track you across apps or websites."
@@ -12,7 +12,8 @@
       "tag": "Friends see nickname and avatar",
       "paragraphs": [
         "[Required] Email, nickname, gender and date of birth (date of birth confirms you are 18 or over; gender is used for meetup gender quotas and for showing people nearby, and may appear on your profile). Avatar is optional. Used to sign you in and show your profile.",
-        "If you sign in with Apple, we receive your Apple account identifier and email address from Apple. If you choose \"Hide My Email\", we receive an Apple-generated relay address instead of your real email. We do not receive your name or your Apple password."
+        "If you sign in with Apple, we receive your Apple account identifier and email address from Apple. If you choose \"Hide My Email\", we receive an Apple-generated relay address instead of your real email. We do not receive your name or your Apple password.",
+        "[Optional] If you turn on “Let people find me by email” in Meet (off by default), anyone who knows your full email address can use it to find your Meet card. Search results never show your email, and these searches are not sent to the AI providers we use (if you use voice input, your phone’s speech recognition service still turns it into text). You can turn it off at any time. If you sign in with Apple and use “Hide My Email”, you can only be found by the relay address Apple created."
       ]
     },
     {
@@ -68,5 +69,5 @@
       ]
     }
   ],
-  "version": "1.3"
+  "version": "1.4"
 }

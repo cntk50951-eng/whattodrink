@@ -3,7 +3,7 @@ import { apiError, apiOk } from "@/lib/api/envelope";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { matchBlockedSearchTerm } from "@/lib/searchQueryGuard";
 import { minimaxChat } from "@/lib/minimax";
-import { MEET_DAILY_LIMIT, MEET_LLM_TIMEOUT_MS, meetCriteriaSchemaText } from "@/lib/meet";
+import { MEET_DAILY_LIMIT, MEET_LLM_TIMEOUT_MS, extractEmail, meetCriteriaSchemaText } from "@/lib/meet";
 import { PLAN_QUERY_MAX, type PlanStage, parsePlanReply, planStreamLine, sanitizePlan, searchPlanPrompt, wantsPlanStream, withNicknameFallback } from "@/lib/searchPlan";
 import type { ApiErrorCode } from "@/lib/api/envelope";
 import { hkDayStartISO } from "@/lib/api/party";
@@ -60,6 +60,16 @@ export async function POST(req: Request): Promise<Response> {
 }
 
 async function runPlan(userId: string, query: string, onStage: (s: PlanStage) => void): Promise<PlanOutcome> {
+  // 句子裡有完整電郵：整句只在本機處理，不送審核也不送模型；只回「按電郵找人」。次數在 /meet/search 查詢時扣
+  const email = extractEmail(query);
+  if (email !== null) {
+    const used = await usedToday(await createServiceClient(), userId, Date.now());
+    if (used >= MEET_DAILY_LIMIT) return { ok: false, code: "rate_limited", message: "今日搜尋次數已用完", status: 429 };
+    return {
+      ok: true,
+      data: { intents: [{ type: "people", criteria: { email } }], ignored: [], remaining_today: Math.max(0, MEET_DAILY_LIMIT - (used + 1)) },
+    };
+  }
   onStage("moderating");
   // 本地敏感詞先擋（不依賴外部審核、不扣次數）；外部審核對短關鍵詞常放行
   const hit = matchBlockedSearchTerm(query);
@@ -81,11 +91,7 @@ async function runPlan(userId: string, query: string, onStage: (s: PlanStage) =>
 
   const svc = await createServiceClient();
   const nowMs = Date.now();
-  const { data: meRow } = await svc.from("users").select("meet_search_date,meet_search_count").eq("id", userId).maybeSingle();
-  const me = (meRow ?? {}) as Record<string, unknown>;
-  const dayStart = hkDayStartISO(nowMs).slice(0, 10);
-  const sameDay = typeof me.meet_search_date === "string" && me.meet_search_date >= dayStart;
-  const used = sameDay && typeof me.meet_search_count === "number" ? me.meet_search_count : 0;
+  const used = await usedToday(svc, userId, nowMs);
   if (used >= MEET_DAILY_LIMIT) return { ok: false, code: "rate_limited", message: "今日搜尋次數已用完", status: 429 };
 
   const key = process.env.minimaxi_api_key ?? "";
@@ -132,4 +138,13 @@ async function runPlan(userId: string, query: string, onStage: (s: PlanStage) =>
       remaining_today: Math.max(0, MEET_DAILY_LIMIT - (used + 1)),
     },
   };
+}
+
+/** 今日（香港）已用的遇見搜索次數。 */
+async function usedToday(svc: Awaited<ReturnType<typeof createServiceClient>>, userId: string, nowMs: number): Promise<number> {
+  const { data } = await svc.from("users").select("meet_search_date,meet_search_count").eq("id", userId).maybeSingle();
+  const me = (data ?? {}) as Record<string, unknown>;
+  const dayStart = hkDayStartISO(nowMs).slice(0, 10);
+  const sameDay = typeof me.meet_search_date === "string" && me.meet_search_date >= dayStart;
+  return sameDay && typeof me.meet_search_count === "number" ? me.meet_search_count : 0;
 }

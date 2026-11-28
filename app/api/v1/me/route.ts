@@ -272,6 +272,14 @@ export async function PATCH(req: Request): Promise<Response> {  const { supabase
       }
       update.discoverable = discRaw;
     }
+    // UR I.4 允許用電郵找到我（默認關；與上面的開關分開）
+    const emailDiscRaw = (raw as Record<string, unknown>).email_discoverable;
+    if (emailDiscRaw !== undefined) {
+      if (typeof emailDiscRaw !== "boolean") {
+        return apiError("invalid_params", "email_discoverable 只要 boolean", 400);
+      }
+      update.email_discoverable = emailDiscRaw;
+    }
     if (Object.keys(update).length === 0) {
       return apiError("invalid_params", "body 無有效字段", 400);
     }

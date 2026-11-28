@@ -5,7 +5,7 @@ import { hkDayStartISO } from "@/lib/api/party";
 
 /**
  * UR I.1 遇見狀態（🔒）。
- * `GET /api/v1/meet/status` —— `{discoverable: null|boolean, remaining_today}`。
+ * `GET /api/v1/meet/status` —— `{discoverable: null|boolean, email_discoverable?: boolean, remaining_today}`。
  * null＝未问过（iOS 弹首次询问）；remaining 按 HK 自然日 10 次口径现算（只读不写）。
  */
 export async function GET(req: Request): Promise<Response> {
@@ -23,7 +23,11 @@ export async function GET(req: Request): Promise<Response> {
   const dayStart = hkDayStartISO(Date.now()).slice(0, 10);
   const sameDay = typeof r.meet_search_date === "string" && r.meet_search_date >= dayStart;
   const used = sameDay && typeof r.meet_search_count === "number" ? r.meet_search_count : 0;
+  // 0098 未執行時沒有這一欄：不回該欄位（客戶端隱藏開關），不影響其他狀態
+  const email = await svc.from("users").select("email_discoverable").eq("id", userId).maybeSingle();
+  const allowEmail = (email.data as { email_discoverable?: unknown } | null)?.email_discoverable;
   return apiOk({
+    ...(email.error === null && typeof allowEmail === "boolean" ? { email_discoverable: allowEmail } : {}),
     discoverable: typeof r.discoverable === "boolean" ? r.discoverable : null,
     remaining_today: Math.max(0, MEET_DAILY_LIMIT - used),
   });

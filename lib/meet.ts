@@ -6,6 +6,7 @@
 
 import { INTERESTS, LANGUAGES, OCCUPATIONS } from "./api/profile";
 import { TASTE_GROUPS, groupOfKey, type TasteGroupKey } from "./api/taste";
+import { INTEREST_LABELS, LANGUAGE_LABELS, TASTE_LABELS, type MeetLang } from "./meetLabels";
 
 export const MEET_DAILY_LIMIT = 10;
 export const MEET_MAX_RESULTS = 10;
@@ -28,7 +29,20 @@ export type MeetCriteria = {
   online_only?: boolean;
   /** 暱稱關鍵字（2026-11-25，iOS DEF-20261125-017：「找暱稱為 Chris 的人」）；硬過濾、包含匹配、不分大小寫。 */
   nickname?: string;
+  /** 完整電郵（1.79.0，UR I.4）：只找開啟「允許用電郵找到我」的人；不送 AI、每次查詢都扣次數。 */
+  email?: string;
 };
+
+const EMAIL_RE = /[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)+/;
+export const MEET_EMAIL_MAX = 254;
+
+/** 句子裡的完整電郵（全形 ＠ 等先做 NFKC）；回小寫。沒有回 null。只在本機處理，不可記日誌。 */
+export function extractEmail(text: unknown): string | null {
+  if (typeof text !== "string") return null;
+  const m = EMAIL_RE.exec(text.normalize("NFKC"));
+  if (m === null || m[0].length > MEET_EMAIL_MAX) return null;
+  return m[0].toLowerCase();
+}
 
 /** 暱稱關鍵字上限（與暱稱本身上限 NICKNAME_MAX 同為 30 字符）。 */
 export const MEET_NICKNAME_MAX = 30;
@@ -80,7 +94,7 @@ export function sanitizeCriteria(raw: unknown): { criteria: MeetCriteria; droppe
   const r = raw as Record<string, unknown>;
   const KNOWN = new Set([
     "gender", "age_min", "age_max", "height_min", "height_max", "occupations",
-    "languages", "interests", "taste_groups", "taste_keys", "nearby_km", "online_only", "nickname",
+    "languages", "interests", "taste_groups", "taste_keys", "nearby_km", "online_only", "nickname", "email",
   ]);
   for (const k of Object.keys(r)) {
     if (!KNOWN.has(k) && !dropped.includes(k)) dropped.push(k);
@@ -166,9 +180,17 @@ export function sanitizeCriteria(raw: unknown): { criteria: MeetCriteria; droppe
   if (r.online_only === true) criteria.online_only = true;
   else if (r.online_only !== undefined && r.online_only !== false) dropped.push("online_only");
   if (r.nickname !== undefined) {
-    const nick = meetNicknameKeyword(r.nickname);
-    if (nick === null) dropped.push("nickname");
+    // 填在暱稱裡的完整電郵按電郵查（不能拿去做暱稱包含匹配）
+    const asEmail = extractEmail(r.nickname);
+    const nick = asEmail === null ? meetNicknameKeyword(r.nickname) : null;
+    if (asEmail !== null) criteria.email = asEmail;
+    else if (nick === null) dropped.push("nickname");
     else criteria.nickname = nick;
+  }
+  if (r.email !== undefined) {
+    const email = extractEmail(r.email);
+    if (email === null || email !== String(r.email).normalize("NFKC").trim().toLowerCase()) dropped.push("email");
+    else criteria.email = email;
   }
   return { criteria, dropped };
 }
@@ -241,19 +263,6 @@ export function scoreCandidate(c: MeetCriteria, s: ScoredSoft): number {
   return Math.min(100, Math.round((earned * 100) / max));
 }
 
-const LANG_LABEL: Record<string, string> = {
-  yue: "粵語",
-  zh: "普通話",
-  en: "英文",
-  ja: "日文",
-  ko: "韓文",
-  fr: "法文",
-  de: "德文",
-  es: "西班牙文",
-  th: "泰文",
-  other: "其他語言",
-};
-
 export const TASTE_HEADLINE: Record<string, string> = {
   beer: "啤酒派",
   whisky: "威士忌派",
@@ -274,9 +283,9 @@ export const TASTE_HEADLINE: Record<string, string> = {
   zero: "無酒精派",
 };
 
-export function tasteHeadline(group: string | null): string | null {
+export function tasteHeadline(group: string | null, lang: MeetLang = "zh-Hant"): string | null {
   if (group === null) return null;
-  return TASTE_HEADLINE[group] ?? null;
+  return TASTE_LABELS[group]?.[lang] ?? null;
 }
 
 /** taste_groups 命中（旧口径保留；新代码用 tasteLevel，单类组兼容）。 */
@@ -363,6 +372,7 @@ export function preferredHeadline(
   c: MeetCriteria,
   declared: DeclaredTaste,
   inferredTop: TasteGroupKey | null,
+  lang: MeetLang = "zh-Hant",
 ): string | null {
   const groups: string[] = [];
   for (const g of c.taste_groups ?? []) {
@@ -381,10 +391,10 @@ export function preferredHeadline(
     return null;
   };
   const fav = hitGroup(declared.favorites);
-  if (fav !== null) return tasteHeadline(fav);
+  if (fav !== null) return tasteHeadline(fav, lang);
   const lik = hitGroup(declared.likes);
-  if (lik !== null) return tasteHeadline(lik);
-  return tasteHeadline(inferredTop);
+  if (lik !== null) return tasteHeadline(lik, lang);
+  return tasteHeadline(inferredTop, lang);
 }
 
 export type ReasonHit = {
@@ -396,43 +406,139 @@ export type ReasonHit = {
 };
 
 /**
- * 理由短語（≤3，只用命中條件拼裝，不編造；不含暱稱／id，LLM 潤色預留但本期不用）。
- * 優先級：口味＞興趣＞語言＞共同好友＞距離。
+ * 理由短語（≤3，只用命中條件拼裝，不編造；不含暱稱／id）。
+ * 優先級：口味＞興趣＞語言＞共同好友＞距離。按 App 語言用書面語（1.79.0）。
  */
-export function buildReasons(hit: ReasonHit): string[] {
+export function buildReasons(hit: ReasonHit, lang: MeetLang = "zh-Hant"): string[] {
+  const pick = (hant: string, hans: string, en: string): string => (lang === "en" ? en : lang === "zh-Hans" ? hans : hant);
   const out: string[] = [];
-  if (hit.taste !== null) out.push(`都係${hit.taste}`);
-  if (out.length < 3 && hit.interest !== null) out.push(`都鍾意${hit.interest.replace(/_/g, " ")}`);
-  if (out.length < 3 && hit.language !== null) out.push(`講${LANG_LABEL[hit.language] ?? hit.language}`);
-  if (out.length < 3 && hit.mutual > 0) out.push(`${hit.mutual} 位共同好友`);
+  if (hit.taste !== null) out.push(pick(`同樣是${hit.taste}`, `同样是${hit.taste}`, `Also into ${hit.taste}`));
+  if (out.length < 3 && hit.interest !== null) {
+    const label = INTEREST_LABELS[hit.interest]?.[lang] ?? hit.interest.replace(/_/g, " ");
+    out.push(pick(`同樣喜歡${label}`, `同样喜欢${label}`, `Also likes ${label.toLowerCase()}`));
+  }
+  if (out.length < 3 && hit.language !== null) {
+    const label = LANGUAGE_LABELS[hit.language]?.[lang] ?? hit.language;
+    out.push(pick(`會說${label}`, `会说${label}`, `Speaks ${label}`));
+  }
+  if (out.length < 3 && hit.mutual > 0) {
+    out.push(pick(`${hit.mutual} 位共同好友`, `${hit.mutual} 位共同好友`, `Mutual friends: ${hit.mutual}`));
+  }
   if (out.length < 3 && hit.nearbyM !== null) {
-    out.push(hit.nearbyM < 1000 ? `距你 ${hit.nearbyM}m` : `距你 ${(hit.nearbyM / 1000).toFixed(1)}km`);
+    const d = hit.nearbyM < 1000 ? `${hit.nearbyM}m` : `${(hit.nearbyM / 1000).toFixed(1)}km`;
+    out.push(pick(`距離你 ${d}`, `距离你 ${d}`, `${d} away`));
   }
   return out.slice(0, 3);
 }
 
+type SoftHit = { occupations: boolean; languages: number; interests: number; tasteLevel: 0 | 1 | 2 | 3 };
+
+/** 用戶提出的偏好類別（興趣／語言／職業／口味）：提出幾類、命中幾類。口徑同 `isFullMatch`。 */
+export function softCategoryHits(c: MeetCriteria, hit: SoftHit): { asked: number; met: number } {
+  const rows: [boolean, boolean][] = [
+    [c.occupations !== undefined, hit.occupations],
+    [c.languages !== undefined, hit.languages > 0],
+    [c.interests !== undefined, hit.interests > 0],
+    [hasTasteCriteria(c), hit.tasteLevel > 0],
+  ];
+  const asked = rows.filter(([a]) => a);
+  return { asked: asked.length, met: asked.filter(([, m]) => m).length };
+}
+
 /**
- * 放寬建議（results < 3 時）：年齡各放 5 歲、距離翻倍、去 online_only。
+ * 顯示給用戶的匹配度（1.79.0，DEF-20261128-001）：提出的條件中符合幾項。
+ * 硬條件（性別、年齡、身高、暱稱、附近、在線、電郵）能進結果就是符合；偏好類別至少中一項算符合。
+ * 100 ＝ `match: "full"`。排序另用 `scoreCandidate`（含共同好友、在線、口味強弱）。
+ */
+export function meetMatchPercent(c: MeetCriteria, hit: SoftHit): number {
+  const hard = [
+    c.gender !== undefined,
+    c.age_min !== undefined || c.age_max !== undefined,
+    c.height_min !== undefined || c.height_max !== undefined,
+    c.nickname !== undefined,
+    c.nearby_km !== undefined,
+    c.online_only === true,
+    c.email !== undefined,
+  ].filter(Boolean).length;
+  const soft = softCategoryHits(c, hit);
+  const total = hard + soft.asked;
+  return total === 0 ? 100 : Math.round(((hard + soft.met) * 100) / total);
+}
+
+/** 暱稱接近程度：0 完全同名、1 開頭相同、2 只是包含（沒按暱稱搜回 0）。 */
+export function nicknameRank(nickname: unknown, keyword: string | undefined): 0 | 1 | 2 {
+  if (keyword === undefined) return 0;
+  const n = typeof nickname === "string" ? nickname.normalize("NFKC").trim().toLowerCase() : "";
+  const k = keyword.normalize("NFKC").trim().toLowerCase();
+  if (n === k) return 0;
+  return n.startsWith(k) ? 1 : 2;
+}
+
+/** 遇見回包的說明文字。 */
+export function meetNotes(lang: MeetLang): { noiseDropped: string; friendsOnly: string; noEmail: string; noNickname: (n: string) => string } {
+  if (lang === "en") {
+    return {
+      noiseDropped: "Overly broad conditions were skipped.",
+      friendsOnly: "Distance and online status only apply to friends.",
+      noEmail: "No one found with this email who allows being found by email.",
+      noNickname: (n) => `No one found with a name containing “${n}”. They may not have turned on “Let others find me”, or may be in stealth mode.`,
+    };
+  }
+  if (lang === "zh-Hans") {
+    return {
+      noiseDropped: "泛指条件已略过",
+      friendsOnly: "距离／在线只对好友生效",
+      noEmail: "找不到使用这个电邮、并开启了「允许用电邮找到我」的用户",
+      noNickname: (n) => `找不到昵称含「${n}」的用户；对方可能没有开启「允许被找到」，或正在隐身`,
+    };
+  }
+  return {
+    noiseDropped: "泛指條件已略過",
+    friendsOnly: "距離／在線只對好友生效",
+    noEmail: "找不到使用這個電郵、並開啟了「允許用電郵找到我」的用戶",
+    noNickname: (n) => `找不到暱稱含「${n}」的用戶；對方可能沒有開啟「允許被找到」，或正在隱身`,
+  };
+}
+
+/**
+ * 放寬建議（results < 3 時）：年齡各放 5 歲、距離翻倍、去 online_only；有偏好條件且還有別的條件時拿掉一類偏好。
  * 全空条件即原样回（note 说明无可放宽）。
  */
-export function relaxedCriteria(c: MeetCriteria): { note: string; criteria: MeetCriteria } {
+export function relaxedCriteria(c: MeetCriteria, lang: MeetLang = "zh-Hant"): { note: string; criteria: MeetCriteria } {
+  const pick = (hant: string, hans: string, en: string): string => (lang === "en" ? en : lang === "zh-Hans" ? hans : hant);
   const next: MeetCriteria = { ...c };
   const notes: string[] = [];
   if (next.age_min !== undefined || next.age_max !== undefined) {
     next.age_min = Math.max(18, (next.age_min ?? 18) - 5);
     next.age_max = Math.min(99, (next.age_max ?? 99) + 5);
-    notes.push("放寬咗年齡範圍");
+    notes.push(pick("放寬年齡範圍", "放宽年龄范围", "wider age range"));
   }
   if (next.nearby_km !== undefined) {
     next.nearby_km = Math.min(100, next.nearby_km * 2);
-    notes.push("放寬咗距離");
+    notes.push(pick("放寬距離", "放宽距离", "wider distance"));
   }
   if (next.online_only === true) {
     delete next.online_only;
-    notes.push("唔再只要在線");
+    notes.push(pick("不限在線", "不限在线", "include people offline"));
+  }
+  if (Object.keys(next).length > 1) {
+    if (next.interests !== undefined) {
+      delete next.interests;
+      notes.push(pick("不限興趣", "不限兴趣", "any interests"));
+    } else if (next.occupations !== undefined) {
+      delete next.occupations;
+      notes.push(pick("不限職業", "不限职业", "any occupation"));
+    } else if (next.languages !== undefined) {
+      delete next.languages;
+      notes.push(pick("不限語言", "不限语言", "any language"));
+    } else if (hasTasteCriteria(next) && Object.keys(next).some((k) => k !== "taste_groups" && k !== "taste_keys")) {
+      delete next.taste_groups;
+      delete next.taste_keys;
+      notes.push(pick("不限口味", "不限口味", "any taste"));
+    }
   }
   return {
-    note: notes.length > 0 ? notes.join("、") : "暫無可放寬條件，試下改描述",
+    note: notes.length > 0 ? notes.join(pick("、", "、", ", ")) : pick("暫無可放寬的條件，試試改描述", "暂无可放宽的条件，试试改描述", "Nothing to relax. Try describing it differently."),
     criteria: next,
   };
 }

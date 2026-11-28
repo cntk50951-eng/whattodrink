@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.78.0
+  version: 1.79.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -318,6 +318,9 @@ paths:
   /api/v1/search/plan:
     post:
       operationId: searchPlan
+      description: >
+        1.79.0：query 含完整电邮时不送审核与 LLM，直接回 people.criteria.email（扣次数在随后的 /meet/search）。
+        posts／parties 的 near_me 只有用户说了附近才为 true；parties 关键词去掉「酒局」等泛词。
       summary: 遇見智能搜索·計劃（需登录）。一句话（≤120 字）→ LLM 拆成 1–4 类意图 people／places／parties／posts（字段白名单校验，每类最多一个）；扣遇见每日次数（解析成功才扣），审核同 meet。真正查询由客户端用既有接口／高德执行
       security:
         - bearerAuth: []
@@ -3318,6 +3321,9 @@ paths:
                 info_visibility:
                   type: object
                   description: 可见性合并（key 缺席不动；值为 null 恢复默认 friends）
+                email_discoverable:
+                  type: boolean
+                  description: 允许用电邮找到我（UR I.4，1.79.0）
                 discoverable:
                   type: boolean
                   description: 被搜到同意（遇見；null 从未问过，UR I.1）
@@ -4882,7 +4888,12 @@ paths:
   /api/v1/meet/search:
     post:
       operationId: searchMeet
-      summary: 遇見搜索（需登录；性别生日齐＋18+；query 走 LLM 翻条件扣次数，criteria 直查不扣；UR I.1）
+      summary: 遇見搜索（需登录；性别生日齐＋18+；query 走 LLM 翻条件扣次数，criteria 直查不扣；含电邮的查询例外，见下；UR I.1／I.4）
+      description: >
+        1.79.0（UR I.4）：query 含完整电邮或 criteria.email 时只按电邮查（含电邮的 query 不送审核与 LLM），
+        每次扣 1 次每日次数；只找开启 email_discoverable 的人（好友也一样）；不回 stats／relaxed／friends_not_discoverable，
+        「没有这个电邮」与「对方没开启／隐身／封锁／未成年」回包相同。结果按暱稱接近程度、匹配度、原排序分、活跃排；
+        提了兴趣／语言／职业／口味却一类都没中的人不列。reasons／taste_headline／notes 按 Accept-Language（繁／简／英）。
       security:
         - bearerAuth: []
       requestBody:
@@ -4901,7 +4912,7 @@ paths:
                   $ref: "#/components/schemas/MeetCriteria"
       responses:
         "200":
-          description: 条件＋忽略＋Top 10（results<3 附 relaxed 放宽建议；remaining_today 剩余额度；stats 匿名计数＋friends_not_discoverable；notes 条件生效说明）
+          description: 条件＋忽略＋Top 10（MeetResult.score 1.79.0 起＝提出的条件中符合几项的百分比，100 即 match=full；results<3 附 relaxed 放宽建议；remaining_today 剩余额度；stats 匿名计数＋friends_not_discoverable；notes 条件生效说明）
           content:
             application/json:
               schema:
@@ -4976,6 +4987,9 @@ paths:
                   discoverable:
                     type: boolean
                     nullable: true
+                  email_discoverable:
+                    type: boolean
+                    description: 1.79.0：允许用电邮找到我（默认 false）；0098 未执行时不回此栏
                   remaining_today:
                     type: integer
         "401":
@@ -6887,6 +6901,10 @@ components:
           type: integer
         online_only:
           type: boolean
+        email:
+          type: string
+          format: email
+          description: 1.79.0 起；完整电邮（不支持部分匹配）。只找开启 email_discoverable 的人
         nickname:
           type: string
           maxLength: 30

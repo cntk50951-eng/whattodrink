@@ -27,8 +27,10 @@
 | DEF-20261127-038 | 角標與聊天未讀數把撤回及過期會話的訊息算進去 | Fixed | P1 | 2026-11-27 / @user（推送檢查） | UR D.9 | `lib/push/badge.ts` `computeBadge` 不過濾 `messages.deleted_at` 與 `conversations.expires_at`（列表 RPC 0079 兩者都過濾） |
 | DEF-20261127-039 | APNs 連線層錯誤沒有監聽，可讓行程退出 | Fixed | P1 | 2026-11-27 / @user（推送檢查） | UR D.9 | `lib/push/apns.ts` `sessionFor` 沒有掛 session `error` 監聽；GOAWAY 後 closed 但未 destroyed 的連線仍被復用 |
 | DEF-20261127-040 | Android 聊天推送受 FCM 可摺疊訊息限流 | Fixed | P1 | 2026-11-27 / @user（推送檢查） | UR D.11 | `lib/push/fcm.ts` 所有訊息都設 `android.collapseKey` |
-| DEF-20261128-001 | 遇見找人結果顯示「匹配 0%」（iOS／Android／網頁） | Investigating | P1 | 2026-11-28 / @user（iOS 實測） | UR I.1 | `lib/meet.ts` `maxPossibleScore` 分母固定含共同好友 5＋在線 2；陌生人兩項多為 0。待用戶定算法 |
-| DEF-20261128-002 | 遇見推薦理由夾英文興趣代號（如「都鍾意ball sports」） | Open | P2 | 2026-11-28 / 排查 001 時發現 | UR I.1 | `lib/meet.ts` `buildReasons` 直接輸出興趣 key |
+| DEF-20261128-001 | 遇見找人結果顯示「匹配 0%」（iOS／Android／網頁） | Fixed | P1 | 2026-11-28 / @user（iOS 實測） | UR I.1 | `lib/meet.ts` `maxPossibleScore` 分母固定含共同好友 5＋在線 2；陌生人兩項多為 0。修：`meetMatchPercent`（未部署） |
+| DEF-20261128-002 | 遇見推薦理由夾英文興趣代號（如「都鍾意ball sports」） | Fixed | P2 | 2026-11-28 / 排查 001 時發現 | UR I.1 | `lib/meet.ts` `buildReasons` 直接輸出興趣 key；修：`lib/meetLabels.ts`（未部署） |
+| DEF-20261128-003 | 有公開打卡的用戶，其 `users` 整行可能可用 anon key 直接讀取（含生日、即時位置、偏好） | Open | P0（待核實） | 2026-11-28 / 做 UR I.4 查權限時發現 | 待開 | 遷移檔：0005 `users wall public read` 按行放行、倉內沒有欄位級收回；**正式庫現況未查** |
+| DEF-20261128-004 | 用戶可能可直接改自己 `users` 行的受控欄位（搜索次數、投訴停權、遊戲禁用時間等） | Open | P1（待核實） | 2026-11-28 / 做 UR I.4 查權限時發現 | 待開 | 遷移檔：0006 `users self update` 不限欄位，倉內沒找到保護觸發器；**正式庫現況未查** |
 | DEF-20261114-001 | `/intro-next` 從簡中／英文切不回繁體 | Verified | P1 | 2026-11-14 / @user | UR M.2 | 繁體入口未帶 locale，next-intl 沿用 NEXT_LOCALE cookie；12 路 HTTP＋瀏覽器點擊通過，待用戶確認 |
 | DEF-20261114-002 | `/intro-next` 首次載入無法開啟播放 | Verified | P1 | 2026-11-14 / @user | UR M.3／M.4 | 有界預載、掛載後初始化；8 項慢載單測及三語實際播放回歸，隨 M.4 發布 |
 | DEF-20261116-003 | 推送cron持續報configuration missing | Verified | P1 | 2026-11-16 / @user | UR D.12 | Open→Investigating；用戶boolean結果URL與Secret均不存在，Vault缺兩項配置；待用戶補齊及驗證cron／HTTP，未呼叫HTTP |
@@ -1062,7 +1064,7 @@
 
 ## DEF-20261128-001 — 遇見找人結果顯示「匹配 0%」
 
-- **状态**：Open → Investigating（根因確認，等用戶定算法，未改代碼）
+- **状态**：Open → Investigating → Fixing → Fixed（未提交、未部署，不标 Verified）
 - **严重度**：P1
 - **发现日期 / 报告人**：2026-11-28 / @user（iOS 實測）
 - **复现步骤**：遇見輸入只有硬條件的句子（暱稱、性別、年齡等），查看陌生人結果。
@@ -1070,7 +1072,7 @@
 - **初判根因**：打分規則。
 - **确诊根因**：`lib/meet.ts` `maxPossibleScore` 分母固定加共同好友上限 5 與在線 2，`scoreCandidate` 只有偏好條件和這兩項能得分。臨時單測（跑完已刪）：暱稱＝0、性別＋年齡＝0、興趣命中＝36、最愛口味命中＝53，四者 `isFullMatch` 皆 true。兩端和網頁直接顯示伺服器 `score`。
 - **关联 UR**：UR I.1。
-- **修复验证**：未修。方案見 iOS 倉 `docs/plans/2026-11-28-meet-accuracy/plan.md`。
+- **修复验证**：`meet.test.ts` 與 `meet/search/route.test.ts`（假資料庫）通過；用戶選「按符合條件數」。方案見 iOS 倉 `docs/plans/2026-11-28-meet-accuracy/plan.md`。
 - **回归范围**：`/api/v1/meet/search` 排序與分數；iOS、Android、網頁遇見。
 
 ## DEF-20261122-001 — 关站时 `/privacy` 与 `/terms` 跳到 Coming Soon

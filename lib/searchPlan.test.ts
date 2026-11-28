@@ -98,3 +98,18 @@ describe("withNicknameFallback", () => {
     expect(withNicknameFallback(places, "搵酒吧")).toBe(places);
   });
 });
+
+describe("UR I.4 搜索計劃", () => {
+  it("帖子和酒局：沒說附近就不限距離", () => {
+    const { intents } = sanitizePlan([{ type: "posts" }, { type: "parties" }, { type: "places" }]);
+    expect(intents.map((i) => (i as { near_me: boolean }).near_me)).toEqual([false, false, true]);
+  });
+  it("酒局泛詞不當關鍵詞", () => {
+    const { intents } = sanitizePlan([{ type: "parties", keywords: ["酒局", "Party", "約酒", "威士忌", "中環"] }]);
+    expect((intents[0] as { keywords: string[] }).keywords).toEqual(["威士忌", "中環"]);
+  });
+  it("模型給空的找人意圖：按暱稱補上並取代", () => {
+    const empty = { type: "people", criteria: {} };
+    expect(withNicknameFallback([empty] as never, "找chris")).toEqual([{ type: "people", criteria: { nickname: "chris" } }]);
+  });
+});

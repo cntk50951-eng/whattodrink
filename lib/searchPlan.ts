@@ -5,6 +5,11 @@
  */
 
 import { sanitizeCriteria, dropNoisyGroups, type MeetCriteria } from "./meet";
+
+/** 酒局關鍵詞裡的泛詞：指的就是「酒局」本身，拿去比對會把結果全部濾掉。 */
+const PARTY_GENERIC = new Set([
+  "酒局", "局", "約局", "约局", "約酒", "约酒", "酒聚", "聚會", "聚会", "飲酒", "饮酒", "喝酒", "飲嘢", "party", "parties", "meetup", "gathering", "drinks",
+]);
 import { groupOfKey } from "./api/taste";
 import { normalizeHashtag } from "./hashtags";
 
@@ -87,9 +92,10 @@ export function sanitizePlan(raw: unknown): { intents: PlanIntent[]; dropped: st
       const when = typeof r.when === "string" && (PARTY_WHENS as readonly string[]).includes(r.when) ? (r.when as PartyWhen) : null;
       intents.push({
         type: "parties",
-        keywords: keywordsOf(r.keywords),
+        keywords: keywordsOf(r.keywords, 6).filter((k) => !PARTY_GENERIC.has(k.toLowerCase())).slice(0, 3),
         when,
-        near_me: r.near_me !== false,
+        // 沒說「附近」就不限距離（1.79.0）
+        near_me: r.near_me === true,
         radius_m: clampInt(r.radius_m, 200, 30_000, 5000),
       });
     } else if (type === "posts") {
@@ -106,7 +112,7 @@ export function sanitizePlan(raw: unknown): { intents: PlanIntent[]; dropped: st
         tags: [...new Set(tags)],
         hashtags,
         keywords: keywordsOf(r.keywords),
-        near_me: r.near_me !== false,
+        near_me: r.near_me === true,
         radius_m: clampInt(r.radius_m, 200, 30_000, 5000),
         within_hours: clampInt(r.within_hours, 1, 720, 168),
       });
@@ -224,11 +230,12 @@ export function nicknameFromQuery(query: string): string | null {
  * 地点意图保留（「找 Soho／find Central」可能真是找地方，拿不准就两个都给，和 prompt 规则 2 一致）
  */
 export function withNicknameFallback(intents: PlanIntent[], query: string): PlanIntent[] {
-  if (intents.some((i) => i.type === "people")) return intents;
+  // 模型有時給一個空條件的找人意圖：那等於沒認出人名，照樣補
+  if (intents.some((i) => i.type === "people" && Object.keys(i.criteria).length > 0)) return intents;
   const nick = nicknameFromQuery(query);
   if (nick === null) return intents;
   const s = sanitizeCriteria({ nickname: nick });
   if (s.criteria.nickname === undefined) return intents;
-  return [{ type: "people", criteria: s.criteria } as PlanIntent, ...intents];
+  return [{ type: "people", criteria: s.criteria } as PlanIntent, ...intents.filter((i) => i.type !== "people")];
 }
 

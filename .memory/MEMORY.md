@@ -34,3 +34,4 @@
 - [舉報結果推送](2026-11-27-report-result-push.md) — 0096 重建入隊函數；SQL 未實跑；先遷移再部署再發包
 - [推送四項修復](2026-11-27-push-audit-fixes.md) — 撤回要看 deleted_at；http2 session 要掛 error；FCM 聊天不設 collapseKey；部署前查 0079
 - [探索走獨立分支](2026-11-27-explore-view-separate-branch.md) — 默認列表不改
+- [電郵找人與匹配度](2026-11-28-meet-email-lookup.md) — 上限放服務端表；審核也算送 AI；版本號觸發同意

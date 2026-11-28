@@ -81,11 +81,11 @@ describe("公開法律頁內容", () => {
     }
   });
 
-  it("條款含 Ivy 與兒少安全兩節，三語章節數一致；兩份文件版本都是 1.3（與 iOS currentVersion／AOS CURRENT_VERSION 同步）", () => {
+  it("條款含 Ivy 與兒少安全兩節，三語章節數一致；兩份文件版本都是 1.4（與 iOS currentVersion／AOS CURRENT_VERSION 同步）", () => {
     for (const l of LOCALES) {
       const t = getLegalDoc("terms", l);
-      expect(t.version).toBe("1.3");
-      expect(getLegalDoc("privacy", l).version).toBe("1.3");
+      expect(t.version).toBe("1.4");
+      expect(getLegalDoc("privacy", l).version).toBe("1.4");
       expect(JSON.stringify(t)).toContain("Ivy");
       expect(JSON.stringify(t)).toContain("/legal/child-safety");
     }

@@ -16,6 +16,9 @@ UI 定稿前只记录、不建表；EPIC 3.0 按 `future-schema.md` 落表。
 
 - UR D.11／D.12 原生推送資料：`push-devices.md`（設備身份／私有token；D.12新增內部outbox／delivery與排程，App不直接讀寫）。
 
+- UR E.34 酒局探索：登入用戶可瀏覽他人已結束的局（店名、時間、發起人、人數）；成員名單只給參加者。索引 `parties_open_start_idx`（0097）。
+- UR I.4 遇見電郵找人（0098）：`users.email_discoverable`（boolean，默認 false，`PATCH /me`、`GET /meet/status`）；`meet_email_lookups`（user_id、日期、次數，只有 service_role 可讀寫）。查詢用 `auth.users.email`，不回給客戶端。
+
 ## 标注约定（四列）
 
 每字段回答四问，缺一不可：

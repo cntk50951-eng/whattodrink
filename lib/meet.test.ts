@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  type MeetCriteria,
+  extractEmail,
+  meetMatchPercent,
+  nicknameRank,
+  softCategoryHits,
   buildReasons,
   dropNoisyGroups,
   isFullMatch,
@@ -63,9 +68,9 @@ describe("buildReasons（≤3，只用命中）", () => {
   it("优先级口味＞兴趣＞语言＞共同＞距离", () => {
     expect(
       buildReasons({ taste: "威士忌派", interest: "cafe_hopping", language: "yue", mutual: 2, nearbyM: 800 }),
-    ).toEqual(["都係威士忌派", "都鍾意cafe hopping", "講粵語"]);
+    ).toEqual(["同樣是威士忌派", "同樣喜歡探索咖啡店", "會說粵語"]);
     expect(buildReasons({ taste: null, interest: null, language: null, mutual: 0, nearbyM: 2500 })).toEqual([
-      "距你 2.5km",
+      "距離你 2.5km",
     ]);
     expect(buildReasons({ taste: null, interest: null, language: null, mutual: 0, nearbyM: null })).toEqual([]);
   });
@@ -170,3 +175,39 @@ describe("暱稱關鍵字（DEF-20261125-017）", () => {
   });
 });
 
+describe("UR I.4 匹配度、電郵、暱稱", () => {
+  const miss = { occupations: false, languages: 0, interests: 0, tasteLevel: 0 as const };
+  it("只有硬條件＝100（DEF-20261128-001：以前是 0）", () => {
+    expect(meetMatchPercent({ nickname: "chris" }, miss)).toBe(100);
+    expect(meetMatchPercent({ gender: "female", age_min: 20, age_max: 29 }, miss)).toBe(100);
+  });
+  it("100 與完全符合一致；偏好沒中按類別扣", () => {
+    const c: MeetCriteria = { gender: "female", interests: ["hiking", "yoga"], taste_keys: ["lager"] };
+    const all = { occupations: false, languages: 0, interests: 1, tasteLevel: 1 as const };
+    expect([meetMatchPercent(c, all), isFullMatch(c, all)]).toEqual([100, true]);
+    const half = { ...all, tasteLevel: 0 as const };
+    expect([meetMatchPercent(c, half), isFullMatch(c, half)]).toEqual([67, false]);
+    expect(softCategoryHits(c, miss)).toEqual({ asked: 2, met: 0 });
+  });
+  it("完整電郵：全形＠、轉小寫；殘缺的不算", () => {
+    expect(extractEmail("找 Chris.W+hk＠Example.COM 嘅人")).toBe("chris.w+hk@example.com");
+    expect(extractEmail("找 chris@example.com.")).toBe("chris@example.com");
+    for (const bad of ["找chris", "chris@", "@chris", "chris@example"]) expect(extractEmail(bad)).toBeNull();
+  });
+  it("條件裡的電郵要完整；填在暱稱裡的轉成電郵", () => {
+    expect(sanitizeCriteria({ email: "A@b.com" }).criteria).toEqual({ email: "a@b.com" });
+    expect(sanitizeCriteria({ email: "找 a@b.com" }).dropped).toEqual(["email"]);
+    expect(sanitizeCriteria({ nickname: "a@b.com" }).criteria).toEqual({ email: "a@b.com" });
+  });
+  it("暱稱：完全同名＞開頭相同＞包含", () => {
+    expect(["Chris", "Chris Wong", "Big chris", "x"].map((n) => nicknameRank(n, "chris"))).toEqual([0, 1, 2, 2]);
+  });
+  it("放寬建議可拿掉偏好；只剩一個條件時不拿", () => {
+    expect(relaxedCriteria({ gender: "female", interests: ["hiking"] }).criteria).toEqual({ gender: "female" });
+    expect(relaxedCriteria({ interests: ["hiking"] }).criteria).toEqual({ interests: ["hiking"] });
+  });
+  it("理由按語言", () => {
+    expect(buildReasons({ taste: null, interest: "ball_sports", language: "yue", mutual: 0, nearbyM: 800 }, "en")).toEqual(["Also likes ball sports", "Speaks Cantonese", "800m away"]);
+    expect(buildReasons({ taste: null, interest: "ball_sports", language: null, mutual: 0, nearbyM: null }, "zh-Hans")).toEqual(["同样喜欢球类"]);
+  });
+});

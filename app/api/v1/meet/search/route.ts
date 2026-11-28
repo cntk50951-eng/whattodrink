@@ -8,6 +8,8 @@ import { haversineMeters } from "@/lib/geo";
 import { moderateCheckin, moderationAction } from "@/lib/moderation";
 import { minimaxChat } from "@/lib/minimax";
 import { nicknameFromQuery } from "@/lib/searchPlan";
+import { pickSuggestionLang } from "@/lib/meetSuggestions";
+import type { MeetLang } from "@/lib/meetLabels";
 import {
   MEET_DAILY_LIMIT,
   MEET_LLM_TIMEOUT_MS,
@@ -16,7 +18,12 @@ import {
   buildReasons,
   declaredTasteOf,
   dropNoisyGroups,
+  extractEmail,
   isFullMatch,
+  meetMatchPercent,
+  meetNotes,
+  nicknameRank,
+  softCategoryHits,
   meetNicknamePattern,
   meetParsePrompt,
   parseMeetReply,
@@ -118,11 +125,17 @@ export async function POST(req: Request): Promise<Response> {
   let criteria: MeetCriteria;
   let ignored: string[];
   const notes: string[] = [];
-  let llmPath = false;
+  const lang: MeetLang = pickSuggestionLang(req.headers.get("accept-language"));
+  const text = meetNotes(lang);
+  // 描述裡有完整電郵：只按電郵查，整句不送審核也不送模型
+  const queryEmail = hasCriteria ? null : extractEmail(queryRaw);
   if (hasCriteria) {
     const s = sanitizeCriteria(body.criteria);
     criteria = s.criteria;
     ignored = s.dropped.slice(0, 5);
+  } else if (queryEmail !== null) {
+    criteria = { email: queryEmail };
+    ignored = [];
   } else {
     // 内容审核（query 明文；不过 403 标项／全挂 503，沿 PATCH /me）。
     const verdict = await moderateCheckin(
@@ -198,7 +211,7 @@ export async function POST(req: Request): Promise<Response> {
     }
     ignored = [...parsed.ignored, ...s.dropped].slice(0, 5);
     if (g.droppedGroups.length > 0) {
-      notes.push("泛指條件已略過");
+      notes.push(text.noiseDropped);
     }
     // 扣次數（解析成功才扣；查询失败不回滚——条件已产出，沿"成功扣"口径）。
     const todayStr = new Date(nowMs + 8 * 3600_000).toISOString().slice(0, 10);
@@ -206,15 +219,25 @@ export async function POST(req: Request): Promise<Response> {
       .from("users")
       .update({ meet_search_date: todayStr, meet_search_count: usedToday + 1 })
       .eq("id", userId);
-    llmPath = true;
   }
-  void llmPath;
 
-  const out = await runSearch(svc, userId, me, criteria, nowMs);
+  // 電郵查詢不論從哪個入口進來都在這裡扣次數（否則可以無限試別人的電郵）
+  let emailTarget: string | null = null;
+  if (criteria.email !== undefined) {
+    const looked = await lookupByEmail(svc, userId, criteria.email, nowMs);
+    if (looked instanceof Response) return looked;
+    emailTarget = looked.userId;
+  }
+
+  const out = await runSearch(svc, userId, me, criteria, nowMs, lang, emailTarget);
   const remaining = await remainingToday(svc, userId, nowMs);
   // P1 条件生效说明（距离／在线只对好友生效，用户需知道）。
   if (criteria.nearby_km !== undefined || criteria.online_only === true) {
-    notes.push("距離／在線只對好友生效");
+    notes.push(text.friendsOnly);
+  }
+  if (out.results.length === 0) {
+    if (criteria.email !== undefined) notes.push(text.noEmail);
+    else if (criteria.nickname !== undefined) notes.push(text.noNickname(criteria.nickname));
   }
   return apiOk({ ...out, ignored, notes, remaining_today: remaining });
 }
@@ -236,11 +259,40 @@ async function remainingToday(
   return Math.max(0, MEET_DAILY_LIMIT - used);
 }
 
+/**
+ * 按完整電郵找人：先看共用的每日次數，再由資料庫函數原子扣次數並查（上限記在只有服務端能寫的表）。
+ * 沒這個電郵、對方沒開啟，都回 userId=null。電郵不寫日誌。
+ */
+async function lookupByEmail(
+  svc: Awaited<ReturnType<typeof createServiceClient>>,
+  userId: string,
+  email: string,
+  nowMs: number,
+): Promise<{ userId: string | null } | Response> {
+  const exhausted = (): Response => apiError("rate_limited", "今日搜尋次數已用完", 429);
+  const remaining = await remainingToday(svc, userId, nowMs);
+  if (remaining <= 0) return exhausted();
+  const today = new Date(nowMs + 8 * 3600_000).toISOString().slice(0, 10);
+  const { data, error } = await svc.rpc("meet_lookup_by_email", { p_searcher: userId, p_email: email, p_day: today, p_limit: MEET_DAILY_LIMIT });
+  if (error !== null) {
+    console.error(`[meet] email lookup error: code=${error.code}`);
+    return apiError("internal", "暫時未能用電郵搜尋", 503);
+  }
+  const r = (data ?? {}) as { allowed?: unknown; user_id?: unknown };
+  if (r.allowed !== true) return exhausted();
+  await svc
+    .from("users")
+    .update({ meet_search_date: today, meet_search_count: MEET_DAILY_LIMIT - remaining + 1 })
+    .eq("id", userId);
+  return { userId: typeof r.user_id === "string" ? r.user_id : null };
+}
+
 type SearchOut = {
   criteria: MeetCriteria;
   results: unknown[];
-  stats: { pool: number; passed: number };
-  friends_not_discoverable: number;
+  /** 電郵查詢不回人數統計（會透露這個電郵存不存在） */
+  stats?: { pool: number; passed: number };
+  friends_not_discoverable?: number;
   relaxed?: { note: string; criteria: MeetCriteria };
 };
 
@@ -250,7 +302,12 @@ async function runSearch(
   me: Record<string, unknown>,
   criteria: MeetCriteria,
   nowMs: number,
+  lang: MeetLang,
+  emailTarget: string | null,
 ): Promise<SearchOut> {
+  const byEmail = criteria.email !== undefined;
+  const nobody: SearchOut = { criteria, results: [] };
+  if (byEmail && emailTarget === null) return nobody;
   // P0 好友不受 discoverable 限制：先取我的全部边，好友集用于入池；池＝discoverable 真陌生人＋全部好友。
   const { data: allFs } = await svc
     .from("friendships")
@@ -269,8 +326,11 @@ async function runSearch(
     .from("users")
     .select("id,nickname,avatar_url,gender,dob,height_cm,occupation,languages,interests,preferences,info_visibility,discoverable,mode,last_seen_at,live_lat,live_lng")
     .neq("id", userId)
-    .neq("mode", "stealth")
-    .or(friendIn !== "" ? `discoverable.eq.true,id.in.(${friendIn})` : `discoverable.eq.true`);
+    .neq("mode", "stealth");
+  // 電郵查詢只看那一個人（是否允許已在資料庫函數裡判斷，與「允許被找到」是兩個開關）
+  poolQuery = byEmail
+    ? poolQuery.eq("id", emailTarget as string)
+    : poolQuery.or(friendIn !== "" ? `discoverable.eq.true,id.in.(${friendIn})` : `discoverable.eq.true`);
   // 暱稱關鍵字是硬過濾（包含、不分大小寫）；仍只在可被搜到的陌生人＋好友內找，封鎖在下面照常排除
   if (criteria.nickname !== undefined) poolQuery = poolQuery.ilike("nickname", meetNicknamePattern(criteria.nickname));
   const { data: pool } = await poolQuery
@@ -279,7 +339,7 @@ async function runSearch(
   const cands = (((pool ?? []) as unknown[]) as CandRow[]).filter((c) => typeof c.id === "string");
   // P1 未开启好友数（精确计数，不受 200 池上限影响）。
   let friendsNotDiscoverable = 0;
-  if (preFriends.size > 0) {
+  if (preFriends.size > 0 && !byEmail) {
     const { data: fDisc } = await svc
       .from("users")
       .select("id")
@@ -288,7 +348,8 @@ async function runSearch(
     friendsNotDiscoverable = ((fDisc ?? []) as unknown[]).length;
   }
   if (cands.length === 0) {
-    return { criteria, results: [], relaxed: relaxedCriteria(criteria), stats: { pool: 0, passed: 0 }, friends_not_discoverable: friendsNotDiscoverable };
+    if (byEmail) return nobody;
+    return { criteria, results: [], relaxed: relaxedCriteria(criteria, lang), stats: { pool: 0, passed: 0 }, friends_not_discoverable: friendsNotDiscoverable };
   }
   const candIds = cands.map((c) => c.id);
   // 关系一次取：候选人边（共同好友计数）＋我的拉黑／解友（好友集上已取复用）。
@@ -426,28 +487,40 @@ async function runSearch(
   for (const p of passed) {
     p.declared = declaredTasteOf((p.row as unknown as Record<string, unknown>).preferences);
   }
-  // 两遍打分：先无口味取前 40，再算口味重排（口味要逐人查帖，POC 限流）。
+  // 聲明口味不用查帖，全部人先算；打卡推斷要逐人查，只算排前 40 的
+  for (const p of passed) p.soft.tasteLevel = tasteLevel(criteria, p.declared, null);
+  const hitsOf = (p: Scored) => ({
+    occupations: p.soft.occupation,
+    languages: p.soft.languages,
+    interests: p.soft.interests,
+    tasteLevel: p.soft.tasteLevel,
+  });
+  const byActivity = (a: Scored, b: Scored): number => (a.activeMs ?? Infinity) - (b.activeMs ?? Infinity);
+  const byName = (a: Scored, b: Scored): number =>
+    nicknameRank(a.row.nickname, criteria.nickname) - nicknameRank(b.row.nickname, criteria.nickname);
   const first = passed
-    .map((p) => ({ p, s: scoreCandidate(criteria, { ...p.soft, tasteLevel: 0 }) }))
-    .sort((a, b) => b.s - a.s || (a.p.activeMs ?? Infinity) - (b.p.activeMs ?? Infinity))
+    .map((p) => ({ p, met: softCategoryHits(criteria, hitsOf(p)).met, s: scoreCandidate(criteria, p.soft) }))
+    .sort((a, b) => byName(a.p, b.p) || b.met - a.met || b.s - a.s || byActivity(a.p, b.p))
     .slice(0, TASTE_EVAL_CAP);
   for (const { p } of first) {
     const top = await topTasteGroup(svc, p.row.id, p.isFriend);
     p.soft.tasteGroup = top;
     p.soft.tasteLevel = tasteLevel(criteria, p.declared, top);
   }
-  const ranked = first
-    .map(({ p }) => {
-      const full = isFullMatch(criteria, {
-        occupations: p.soft.occupation,
-        languages: p.soft.languages,
-        interests: p.soft.interests,
-        tasteLevel: p.soft.tasteLevel,
-      });
-      return { p, s: scoreCandidate(criteria, p.soft), full };
+  const ranked = passed
+    // 提了偏好條件卻一類都沒中的人不列（口味推斷算完才判斷）
+    .filter((p) => {
+      const h = softCategoryHits(criteria, hitsOf(p));
+      return h.asked === 0 || h.met > 0;
     })
-    // P2：完全符合在前，同级按分、活跃排。
-    .sort((a, b) => Number(b.full) - Number(a.full) || b.s - a.s || (a.p.activeMs ?? Infinity) - (b.p.activeMs ?? Infinity))
+    .map((p) => ({
+      p,
+      s: meetMatchPercent(criteria, hitsOf(p)),
+      rank: scoreCandidate(criteria, p.soft),
+      full: isFullMatch(criteria, hitsOf(p)),
+    }))
+    // 暱稱越接近越前；再按匹配度、原排序分、活躍
+    .sort((a, b) => byName(a.p, b.p) || b.s - a.s || b.rank - a.rank || byActivity(a.p, b.p))
     .slice(0, MEET_MAX_RESULTS);
 
   const results = ranked.map(({ p, s, full }) => {
@@ -463,23 +536,24 @@ async function runSearch(
       score: s,
       match: full ? "full" : "partial",
       reasons: buildReasons({
-        taste: preferredHeadline(criteria, p.declared, p.soft.tasteGroup),
+        taste: preferredHeadline(criteria, p.declared, p.soft.tasteGroup, lang),
         interest: p.soft.interestHit,
         language: p.soft.languageHit,
         mutual: p.soft.mutual,
         nearbyM: p.soft.nearbyM,
-      }),
+      }, lang),
       height_cm: p.isFriend || infoVisibilityOf(c.info_visibility, "height") === "public" ? (typeof c.height_cm === "number" ? c.height_cm : null) : null,
       occupation: p.isFriend || infoVisibilityOf(c.info_visibility, "occupation") === "public" ? asStr(c.occupation) : null,
       languages: p.isFriend || infoVisibilityOf(c.info_visibility, "languages") === "public" ? asStrArr(c.languages) : [],
       interests: p.isFriend || infoVisibilityOf(c.info_visibility, "interests") === "public" ? asStrArr(c.interests) : [],
-      taste_headline: preferredHeadline(criteria, p.declared, p.soft.tasteGroup),
+      taste_headline: preferredHeadline(criteria, p.declared, p.soft.tasteGroup, lang),
       mutual_friends_count: p.soft.mutual,
       distance_m: p.soft.nearbyM,
       online: p.soft.online,
       relationship: p.isFriend ? "friend" : (relById.get(c.id) ?? "none"),
     };
   });
+  if (byEmail) return { criteria, results };
   // P1 匿名统计（只含人数，无个人信息；iOS 解释"为什么没结果"用）。
   const out: SearchOut = {
     criteria,
@@ -488,7 +562,7 @@ async function runSearch(
     friends_not_discoverable: friendsNotDiscoverable,
   };
   if (results.length < 3) {
-    out.relaxed = relaxedCriteria(criteria);
+    out.relaxed = relaxedCriteria(criteria, lang);
   }
   return out;
 }
