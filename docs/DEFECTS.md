@@ -23,6 +23,10 @@
 
 | ID | 标题 | 状态 | 严重度 | 发现日期 / 报告人 | 关联 UR | 确诊根因 |
 | DEF-20261122-001 | 关站时 `/privacy` 与 `/terms` 跳到 Coming Soon | Verified | P2 | 2026-11-22 / @user | UR L.2 | `lib/home.ts` 的关站规则缺少旧入口转址；正式站回归通过 |
+| DEF-20261127-037 | 撤回的聊天訊息仍會推送 | Fixed | P1 | 2026-11-27 / @user（推送檢查） | UR D.12 | `lib/push/outbox.ts` `eventStillEligible` 查訊息時沒查 `deleted_at`（撤回是軟刪） |
+| DEF-20261127-038 | 角標與聊天未讀數把撤回及過期會話的訊息算進去 | Fixed | P1 | 2026-11-27 / @user（推送檢查） | UR D.9 | `lib/push/badge.ts` `computeBadge` 不過濾 `messages.deleted_at` 與 `conversations.expires_at`（列表 RPC 0079 兩者都過濾） |
+| DEF-20261127-039 | APNs 連線層錯誤沒有監聽，可讓行程退出 | Fixed | P1 | 2026-11-27 / @user（推送檢查） | UR D.9 | `lib/push/apns.ts` `sessionFor` 沒有掛 session `error` 監聽；GOAWAY 後 closed 但未 destroyed 的連線仍被復用 |
+| DEF-20261127-040 | Android 聊天推送受 FCM 可摺疊訊息限流 | Fixed | P1 | 2026-11-27 / @user（推送檢查） | UR D.11 | `lib/push/fcm.ts` 所有訊息都設 `android.collapseKey` |
 | DEF-20261114-001 | `/intro-next` 從簡中／英文切不回繁體 | Verified | P1 | 2026-11-14 / @user | UR M.2 | 繁體入口未帶 locale，next-intl 沿用 NEXT_LOCALE cookie；12 路 HTTP＋瀏覽器點擊通過，待用戶確認 |
 | DEF-20261114-002 | `/intro-next` 首次載入無法開啟播放 | Verified | P1 | 2026-11-14 / @user | UR M.3／M.4 | 有界預載、掛載後初始化；8 項慢載單測及三語實際播放回歸，隨 M.4 發布 |
 | DEF-20261116-003 | 推送cron持續報configuration missing | Verified | P1 | 2026-11-16 / @user | UR D.12 | Open→Investigating；用戶boolean結果URL與Secret均不存在，Vault缺兩項配置；待用戶補齊及驗證cron／HTTP，未呼叫HTTP |
@@ -1001,6 +1005,58 @@
 - DEF-20261116-003驗證進度（2026-11-17）：用戶手動wake取得request482，對應HTTP200／無timeout／無error，空批次claimed0正常。Vault→認證→dispatcher已跑通；待job6自動run最新status後確認原cron配置問題解決，尚未驗FCM實送／真機，不將D12整體打✓。
 
 - DEF-20261116-003狀態流轉補記：Open→Investigating→Fixing→Fixed（web專用Secret修正3f0929f已合入且用戶補齊Vault）→Verified（用戶提供自動cron連續三次成功及先前HTTP200）。只結束配置缺陷，不代表D.12或真機已驗收。
+
+## DEF-20261127-037 — 撤回的聊天訊息仍會推送
+
+- **状态**：Open → Investigating → Fixing → Fixed（未提交、未部署，不标 Verified）
+- **严重度**：P1
+- **发现日期 / 报告人**：2026-11-27 / @user（推送檢查）
+- **复现步骤**：好友聊天發訊息後 1 分鐘內撤回，看收件人手機通知。
+- **期望 vs 实际**：期望：撤回後不再推送；實際：派發時仍推「傳來新訊息」。
+- **初判根因**：同确诊根因。
+- **确诊根因**：`lib/push/outbox.ts` `eventStillEligible` 查訊息時沒查 `deleted_at`（撤回是軟刪）。
+- **关联 UR**：UR D.12。
+- **修复验证**：`outbox.test.ts` 新增 1 條（修復前失敗）：撤回後不合資格、派發時略過不呼叫服務商。**部署前須確認正式庫 `messages.deleted_at` 存在（0079）**；真機未驗。全量 vitest 1633／1633、tsc、`eslint lib/push`、build 通过。
+- **回归范围**：原生推送（iOS／Android）。
+
+## DEF-20261127-038 — 角標與聊天未讀數把撤回及過期會話的訊息算進去
+
+- **状态**：Open → Investigating → Fixing → Fixed（未提交、未部署，不标 Verified）
+- **严重度**：P1
+- **发现日期 / 报告人**：2026-11-27 / @user（推送檢查）
+- **复现步骤**：對方發訊息後撤回（或會話超過 90 天過期），看 App 角標與聊天紅點。
+- **期望 vs 实际**：期望：與會話列表未讀一致；實際：列表沒有未讀，角標仍多算。
+- **初判根因**：同确诊根因。
+- **确诊根因**：`lib/push/badge.ts` `computeBadge` 不過濾 `messages.deleted_at` 與 `conversations.expires_at`（列表 RPC 0079 兩者都過濾）。
+- **关联 UR**：UR D.9。
+- **修复验证**：新 `badge.test.ts` 5 條（撤回／過期兩條修復前失敗；查有效期失敗時不清零）。同樣依賴 0079；未用真實資料庫驗。全量 vitest 1633／1633、tsc、`eslint lib/push`、build 通过。
+- **回归范围**：原生推送（iOS／Android）。
+
+## DEF-20261127-039 — APNs 連線層錯誤沒有監聽，可讓行程退出
+
+- **状态**：Open → Investigating → Fixing → Fixed（未提交、未部署，不标 Verified）
+- **严重度**：P1
+- **发现日期 / 报告人**：2026-11-27 / @user（推送檢查）
+- **复现步骤**：APNs 連線建立失敗或中斷時派發推送（本機以回環位址重現）。
+- **期望 vs 实际**：期望：該次發送回報失敗並重試；實際：未捕獲的 session error，本機 Node 24 行程退出。
+- **初判根因**：同确诊根因。
+- **确诊根因**：`lib/push/apns.ts` `sessionFor` 沒有掛 session `error` 監聽；GOAWAY 後 closed 但未 destroyed 的連線仍被復用。
+- **关联 UR**：UR D.9。
+- **修复验证**：`apns.test.ts` 2 條走本機回環（修復前失敗）：連線被拒不冒未捕獲錯誤、GOAWAY 有在途請求時換新連線。Vercel 上未驗。全量 vitest 1633／1633、tsc、`eslint lib/push`、build 通过。
+- **回归范围**：原生推送（iOS／Android）。
+
+## DEF-20261127-040 — Android 聊天推送受 FCM 可摺疊訊息限流
+
+- **状态**：Open → Investigating → Fixing → Fixed（未提交、未部署，不标 Verified）
+- **严重度**：P1
+- **发现日期 / 报告人**：2026-11-27 / @user（推送檢查）
+- **复现步骤**：短時間內向同一台 Android 連發超過 20 條聊天訊息。
+- **期望 vs 实际**：期望：逐條及時到達；實際（按官方文檔，未在真機重現）：超出後每 3 分鐘補 1 條。
+- **初判根因**：同确诊根因。
+- **确诊根因**：`lib/push/fcm.ts` 所有訊息都設 `android.collapseKey`。
+- **关联 UR**：UR D.11。
+- **修复验证**：`fcm.test.ts` 2 條（聊天一條修復前失敗）：聊天無 `collapseKey`、保留 `collapse_id`；其他類型照舊。限流效果未在真機重現或驗證。全量 vitest 1633／1633、tsc、`eslint lib/push`、build 通过。
+- **回归范围**：原生推送（iOS／Android）。
 
 ## DEF-20261122-001 — 关站时 `/privacy` 与 `/terms` 跳到 Coming Soon
 

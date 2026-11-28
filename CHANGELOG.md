@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased] — 原生推送四項修復（2026-11-27，UR D.9／D.11／D.12，無 migration、接口形狀不變）
+
+### Fixed
+- DEF-20261127-037：撤回的聊天訊息不再推送。
+- DEF-20261127-038：角標與聊天未讀數不再把撤回的訊息、過期會話算進去（和會話列表同口徑）。
+- DEF-20261127-039：APNs 連線錯誤不再讓行程退出；收過 GOAWAY 的連線不再復用。
+- DEF-20261127-040：Android 聊天推送改為不可摺疊，避開 FCM 20 條突發／每 3 分鐘 1 條的限流。其他類型照舊。代價（按 [Firebase 文檔](https://firebase.google.com/docs/cloud-messaging/customize-messages/collapsible-message-types)）：不可摺疊訊息離線積壓超過 100 條時服務商會整批丟棄。
+
+### 驗證
+- 2026-11-27 全量 vitest 1633／1633（先前一次 21 點用例時過時不過，單獨重跑 10／10）、tsc、`eslint lib/push`、build 過。沒有發送真實推送、沒有連正式資料庫、未部署。
+
+### 部署前提
+- 正式庫必須有 `messages.deleted_at`（migration 0079）。沒有的話聊天推送會整批失敗、聊天未讀歸零。
+
 ## [Unreleased] — 舉報審核結果推送給舉報人（2026-11-27，UR E.33，openapi 1.77.0，migration 0096；AOS-0.149）
 
 ### Added

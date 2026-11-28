@@ -56,8 +56,10 @@ export async function eventStillEligible(db:SupabaseClient,e:OutboxEvent,now:num
  // Removal is a system result, including kick-and-block; it carries no host text.
  if(e.actor_id&&e.kind!=="game_kicked"&&await blocked(db,e.actor_id,e.recipient_id,e.source_type==="message"))return false;
  if(e.source_type==="message"){
-  const msg=await one(db.from("messages").select("id,conversation_id,sender_id,created_at").eq("id",e.source_id).limit(1));
+  const msg=await one(db.from("messages").select("id,conversation_id,sender_id,created_at,deleted_at").eq("id",e.source_id).limit(1));
   if(!msg||msg.sender_id!==e.actor_id||msg.conversation_id!==e.payload.conversation_id||recipient.mode==="stealth")return false;
+  // 撤回是軟刪（0079 deleted_at）：行還在，撤回後不能再推
+  if(typeof msg.deleted_at==="string")return false;
   const actor=await one(db.from("users").select("id,mode").eq("id",e.actor_id).limit(1));
   if(!actor||actor.mode==="stealth")return false;
   const [cm,sender,conv]=await Promise.all([

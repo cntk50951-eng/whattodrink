@@ -4221,6 +4221,7 @@ UR D.9　iOS 真推送 P1（E1 碰杯＋APNs 通道）[WIP]
 *改動記錄*
 - 2026-10-10：建檔置 [WIP]（WEB_HANDOFF_PUSH 输入＋三问答；直做）
 - 2026-10-10：实作 P1：0038＋devices 三端点（service 写）＋test-push（testOnly）＋PATCH /me push_prefs＋GET /me 回显＋counters（同口径）＋APNs 发送器（http2＋ES256 缓存＋collapse＋重试＋410 删行）＋E1 after() 触发＋三语文案＋openapi 1.22.0＋单测；缺 key 静默跳过。
+- 2026-11-27：DEF-20261127-038／039（推送檢查）：角標聊天未讀改為不計撤回訊息與過期會話；APNs 連線錯誤監聽與 GOAWAY 換連線。
 
 ---
 
@@ -4618,6 +4619,8 @@ UR L.2　关站时保留私隐政策与服务条款的旧入口 [WIP]
 
 - D.11 發佈授權（2026-11-16）：用戶明確要求將web API commit／push GitHub觸發Vercel；本批只提交D.11，不帶intro M.8／M.9或AOS原生改動，SITE_LIVE保持不變。
 
+- D.11／DEF-20261127-040（2026-11-27）：FCM 聊天訊息不再設 `collapseKey`（避開可摺疊限流），`data.collapse_id` 不變。
+
 
 ## UR D.12 AOS完整業務推送、持久outbox與排程（2026-11-16）[WIP]
 - 平台：共用後端新增事件先供AOS；iOS既有APNs payload／事件掛點保留，新增事件暫不發iOS。契約先行OpenAPI1.67.0，Android data-only含recipient_id／穩定event_id／epoch-ms expires_at，App驗帳號與去重後顯示。
@@ -4646,6 +4649,8 @@ UR L.2　关站时保留私隐政策与服务条款的旧入口 [WIP]
 - D.12／DEF-20261116-003（2026-11-17）：用戶job6 UTC08:22–08:24三次succeeded，結合Vault五欄true及request482 HTTP200，cron配置缺陷Verified；D.12保持WIP，FCM真事件與真機矩陣未驗。Supabase不需額外建立SQL。
 
 - 2026-11-18 D.12／DEF-20261118-001：現行22情境逐項追來源，修正舊memory誤判；補好友世代／酒局入席／遊戲批准與移出／Android失效邀請與冷啟身份，品牌smallIcon、大圖及前台橫幅。詳見web PUSH_COVERAGE_MATRIX；真機未驗，維持WIP。
+
+- D.12／DEF-20261127-037（2026-11-27）：派發資格檢查排除已撤回的聊天訊息。
 
 UR E.32　我的打卡分享列表分頁接口（App 聊天「分享打卡」；2026-11-27）[WIP]
 

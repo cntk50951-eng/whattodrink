@@ -112,10 +112,18 @@ export async function computeBadge(
     if (typeof r.user_id === "string" && r.user_id !== userId) myFids.add(r.user_id);
     if (typeof r.friend_id === "string" && r.friend_id !== userId) myFids.add(r.friend_id);
   }
+  const memberRows = ((members ?? []) as unknown[]) as { conversation_id?: unknown; last_read_at?: unknown }[];
+  // 過期會話在列表裡看不到（0079 RPC 過濾 expires_at），裡面的未讀用戶清不掉，不能算
+  const conversationIds = memberRows.map((m) => m.conversation_id).filter((id): id is string => typeof id === "string");
+  const liveRes = conversationIds.length === 0
+    ? { data: [], error: null }
+    : await supa.from("conversations").select("id").in("id", conversationIds).gt("expires_at", new Date().toISOString());
+  // 查不到有效期就不過濾（寧可多算，不能把全部聊天未讀清成 0）
+  const live = liveRes.error ? null : new Set((((liveRes.data ?? []) as unknown[]) as { id?: unknown }[]).map((c) => c.id));
   let chat = 0;
   let stranger = 0;
-  for (const m of ((members ?? []) as unknown[]) as { conversation_id?: unknown; last_read_at?: unknown }[]) {
-    if (typeof m.conversation_id !== "string") continue;
+  for (const m of memberRows) {
+    if (typeof m.conversation_id !== "string" || (live !== null && !live.has(m.conversation_id))) continue;
     const water = typeof m.last_read_at === "string" ? m.last_read_at : new Date(0).toISOString();
     const [{ count }, { data: peers }] = await Promise.all([
       supa
@@ -123,7 +131,8 @@ export async function computeBadge(
         .select("id", { count: "exact", head: true })
         .eq("conversation_id", m.conversation_id)
         .neq("sender_id", userId)
-        .gt("created_at", water),
+        .gt("created_at", water)
+        .is("deleted_at", null), // 撤回的不算（同列表 RPC）
       supa
         .from("conversation_members")
         .select("user_id")

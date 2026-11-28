@@ -45,6 +45,19 @@ describe("FCM payload", () => {
   });
 });
 
+describe("FCM collapsing (DEF-20261127-040)", () => {
+  // 可摺疊訊息每台裝置只給 20 條突發、每 3 分鐘補 1 條；聊天不能走這條限流
+  it("sends chat as non-collapsible while keeping the id Android uses to replace the notification", () => {
+    const m = fcmMessage({ ...args, collapseId: "chat-conv", payload: { t: "chat", conversation_id: "conv" } });
+    expect(m.android).not.toHaveProperty("collapseKey");
+    expect(m.android).toMatchObject({ priority: "high" });
+    expect(m.data).toMatchObject({ t: "chat", collapse_id: "chat-conv" });
+  });
+  it("keeps collapsing low-volume kinds", () => {
+    for (const t of ["cheers", "invite", "member_joined", "report_resolved"]) expect(fcmMessage({ ...args, payload: { t } }).android?.collapseKey).toBe(args.collapseId);
+  });
+});
+
 describe("FCM lifetime", () => {
   it("carries recipient identity and bounds provider TTL to the event expiry", () => {
     const expires = Date.now() + 30_000;

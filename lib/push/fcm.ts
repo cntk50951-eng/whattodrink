@@ -56,7 +56,9 @@ export function fcmMessage(args: { deviceToken: string; collapseId: string; payl
     android: {
       priority: "high",
       ttl: Math.max(0, Math.min(TTL_MS, expiresAt - now)),
-      collapseKey: args.collapseId,
+      // 可摺疊訊息每台裝置只給 20 條突發、每 3 分鐘補 1 條，聊天熱絡時會嚴重延遲；
+      // 聊天不設 collapseKey，通知欄裡的替換仍由 Android 按 data.collapse_id 做
+      ...(data.t === "chat" ? {} : { collapseKey: args.collapseId }),
     },
   };
 }

@@ -65,10 +65,18 @@ export function clearApnsTokenCache(): void {
 
 const sessions = new Map<string, ClientHttp2Session>();
 
-function sessionFor(host: string): ClientHttp2Session {
+/** 取可用的長連線（導出只供回歸測試）。收過 GOAWAY 的連線是 closed 但未必 destroyed，也要換新的 */
+export function apnsSessionFor(host: string): ClientHttp2Session {
   const s = sessions.get(host);
-  if (s !== undefined && !s.destroyed) return s;
+  if (s !== undefined && !s.closed && !s.destroyed) return s;
   const next = connect(host);
+  const forget = (): void => {
+    if (sessions.get(host) === next) sessions.delete(host);
+  };
+  // 連線層 "error" 沒人聽會變成未捕獲異常、整個行程退出；在途請求各自在 stream "error" 回報失敗
+  next.on("error", forget);
+  next.on("goaway", forget);
+  next.on("close", forget);
   sessions.set(host, next);
   return next;
 }
@@ -106,7 +114,7 @@ export async function sendApn(args: {
   expirationEpochSec?: number;
   timeoutMs?: number;
 }): Promise<ApnsResult> {
-  const session = sessionFor(HOSTS[args.env]);
+  const session = apnsSessionFor(HOSTS[args.env]);
   const token = apnsProviderToken(args.cfg);
   const headers = {
     ":method": "POST",

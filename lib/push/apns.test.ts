@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { createVerify, generateKeyPairSync } from "node:crypto";
+import { createServer, type ClientHttp2Session, type ServerHttp2Session } from "node:http2";
+import type { AddressInfo } from "node:net";
 import {
   APNS_COLLAPSE_ID_MAX_BYTES,
   apnsCollapseId,
   apnsConfigFromEnv,
   apnsProviderToken,
+  apnsSessionFor,
   clearApnsTokenCache,
 } from "./apns";
 
@@ -81,5 +84,66 @@ describe("apnsCollapseId（第五輪審核：酒局／私約取消與完成的 c
     const wide = "友".repeat(30); // 90 bytes
     expect(bytes(wide)).toBe(90);
     expect(bytes(apnsCollapseId(wide))).toBeLessThanOrEqual(APNS_COLLAPSE_ID_MAX_BYTES);
+  });
+});
+
+/** 回環上發一個請求：回狀態碼，或失敗代碼（絕不拋出） */
+function ask(session: ClientHttp2Session): Promise<number | string> {
+  return new Promise((resolve) => {
+    const stream = session.request({ ":method": "POST", ":path": "/3/device/x" });
+    stream.on("response", (h) => resolve(Number(h[":status"])));
+    stream.on("error", (e: NodeJS.ErrnoException) => resolve(e.code ?? e.message));
+    stream.resume();
+    stream.end("{}");
+  });
+}
+const tick = () => new Promise((r) => setTimeout(r, 100));
+
+describe("apnsSessionFor（DEF-20261127-039）", () => {
+  it("連不上時只讓該請求失敗，不冒出未捕獲錯誤，下次重新建連", async () => {
+    const uncaught: unknown[] = [];
+    const listener = (e: unknown) => uncaught.push(e);
+    process.on("uncaughtException", listener);
+    try {
+      const url = "http://127.0.0.1:1";
+      const first = apnsSessionFor(url);
+      expect(typeof (await ask(first))).toBe("string");
+      await tick();
+      const second = apnsSessionFor(url);
+      expect(second).not.toBe(first);
+      await ask(second);
+      await tick();
+      expect(uncaught).toEqual([]);
+    } finally {
+      process.off("uncaughtException", listener);
+    }
+  });
+
+  it("收到 GOAWAY 後即使還有在途請求，新請求也走新連線", async () => {
+    const server = createServer();
+    const serverSessions: ServerHttp2Session[] = [];
+    let streams = 0;
+    server.on("session", (x) => serverSessions.push(x));
+    server.on("stream", (stream) => {
+      stream.respond({ ":status": 200 });
+      if (++streams > 1) stream.end(); // 第一個請求一直掛著，讓舊連線關不掉
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    try {
+      const old = apnsSessionFor(url);
+      expect(await ask(old)).toBe(200);
+      serverSessions[0].goaway();
+      await tick();
+      const next = apnsSessionFor(url);
+      expect(next).not.toBe(old);
+      expect(await ask(next)).toBe(200);
+      expect(apnsSessionFor(url)).toBe(next); // 健康連線照舊復用
+      old.destroy();
+      next.destroy();
+    } finally {
+      for (const x of serverSessions) x.destroy();
+      server.close();
+    }
   });
 });

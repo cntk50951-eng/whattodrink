@@ -62,6 +62,13 @@ describe("D.12 authorization and privacy",()=>{
 describe("D.12 source rechecks",()=>{
  it("allows a live unread friend message",async()=>{expect(await eventStillEligible(database(chatTables()),event(),now)).toBe(true);});
  it.each(["cheers_blocks","chat_mutes"])("suppresses pair-level %s",async table=>{const t=chatTables();t[table]=[{blocker_id:"recipient",blocked_id:"actor"}];expect(await eventStillEligible(database(t),event(),now)).toBe(false);});
+ it("suppresses a recalled chat message, including between claim and delivery (DEF-20261127-037)",async()=>{
+  const t=chatTables();t.messages[0].deleted_at=null;expect(await eventStillEligible(database(t),event(),now)).toBe(true);
+  t.messages[0].deleted_at=new Date(now-500).toISOString();expect(await eventStillEligible(database(t),event(),now)).toBe(false);
+  vi.spyOn(Date,"now").mockReturnValue(now);t.native_push_outbox=[{...event(),status:"processing"}];
+  t.devices=[{id:"d",platform:"aos",user_id:"recipient",enabled:true,push_token:"one",locale:"en"}];
+  const result=await dispatchNativePush(database(t));expect(result.skipped).toBe(1);expect(transport.send).not.toHaveBeenCalled();
+ });
  it("rechecks current mute/read/expiry and sender membership",async()=>{
   for(const mutation of [(t:Record<string,R[]>)=>{t.conversation_members[0].muted=true;},(t:Record<string,R[]>)=>{t.conversation_members[0].last_read_at=new Date(now).toISOString();},(t:Record<string,R[]>)=>{t.conversation_members.pop();},(t:Record<string,R[]>)=>{t.conversations[0].expires_at=new Date(now-1).toISOString();}]){
    const t=chatTables();mutation(t);expect(await eventStillEligible(database(t),event(),now)).toBe(false);
