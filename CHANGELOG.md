@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased] — 舉報審核結果推送給舉報人（2026-11-27，UR E.33，openapi 1.77.0，migration 0096；AOS-0.149）
+
+### Added
+- `report_resolved` 進原生推送 outbox（只發 Android）：鎖屏只寫「你的舉報有處理結果」，payload 帶 `report_id`；未讀即發，不受偏好開關影響；多宗結果不互相覆蓋。
+
+### 驗證
+- 2026-11-27 全量 vitest 1623／1623、tsc、改動檔 eslint、build 過。**0096 沒有在任何資料庫實跑**（只核對相對 0077 僅兩處改動）；未部署。
+
+### 部署
+- **先跑 0096，再部署 web，最後才發新版 Android 包。** 舊版 Android 收到未知類型會忽略；新版在推送開啟時不再輪詢彈這類橫幅。
+
+## [Unreleased] — 聊天「分享打卡」列表分頁接口（2026-11-27，UR E.32，openapi 1.76.0；iOS-0.212／AOS-0.148）
+
+### Added
+- `GET /api/v1/checkins/mine/share`：本人打卡新到舊 keyset 分頁；`scope=shareable|blocked`、`limit`、`cursor`、`q`（店名／留言／酒款名）。舊接口不變，無 migration。
+- 驗證：新增 vitest 11 條過、tsc、改動檔 eslint、build 過；全量 1620／1621（失敗 1 條在 `barBlackjackStore`，未改動該檔）。**只用假查詢測過，未連真實資料庫、未部署**。部署後驗：可分享打卡超過 20 條的帳號翻頁到底，再做一次搜索。（同日稍後全量重跑 1623／1623，含上述 21 點測試：該條時過時不過。）
+
 ## [Unreleased] — 法律文件 1.3：各端地圖服務披露（2026-11-27）
 
 ### Changed

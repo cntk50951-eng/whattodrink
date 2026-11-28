@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: whattodrink API
-  version: 1.75.0
+  version: 1.77.0
   description: >
     三端同一契約（web／iOS／Android 以此為準，改契約先改此檔）。
     成功回裸數據對象，失敗回 {error:{code,message}}＋對應 HTTP 狀態
@@ -32,6 +32,7 @@ x-native-push-payloads:
       invite_id: 私人邀約UUID，可選
       party_id: 酒局UUID，可選
       complaint_id: 投訴案件UUID，可選
+      report_id: 舉報UUID，可選（report_resolved）
       room_id: 遊戲房UUID，可選
       code: 遊戲房號，可選
       checkin_id: 來源帖子UUID，可選
@@ -58,7 +59,8 @@ x-native-push-payloads:
       game_join_request: [t, room_id]
       game_join_result: [t, room_id, decision]
       game_kicked: [t, room_id]
-    notice_kinds: [member_joined, party_cancelled, member_left, member_left_late, reminder_1h, attendance_confirm, complaint_filed, complaint_response_needed, complaint_ack, complaint_result, trust_changed, game_join_request, game_join_result, game_kicked]
+      report_resolved: [t, report_id, decision]
+    notice_kinds: [member_joined, party_cancelled, member_left, member_left_late, reminder_1h, attendance_confirm, complaint_filed, complaint_response_needed, complaint_ack, complaint_result, trust_changed, game_join_request, game_join_result, game_kicked, report_resolved]
 paths:
   /api/internal/push-dispatch:
     post:
@@ -1550,6 +1552,53 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MinePage"
+        "400":
+          $ref: "#/components/responses/InvalidParams"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /api/v1/checkins/mine/share:
+    get:
+      operationId: listMyShareableCheckins
+      summary: 聊天「分享打卡」列表（本人，新到舊分頁）
+      description: |
+        `scope=shareable` 只回可發送進聊天的打卡（主表、public／friends、非快貼或未過期）；
+        `scope=blocked` 回私密、已過期與已歸檔的。列表只帶 96px 縮圖（映射到 `photo_url`），清晰圖按 id 走詳情接口。
+        一頁可能少於 limit（歸檔去重），以 `next_cursor` 是否為 null 判斷有沒有下一頁。回應禁止共用快取。
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [shareable, blocked]
+            default: shareable
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: cursor
+          in: query
+          description: 同一 scope 與 q 下，原樣傳回上一頁的 next_cursor。
+          schema:
+            type: string
+        - name: q
+          in: query
+          description: 比對店名、留言、酒款名；超過 24 字截斷，引號、反斜線、逗號、括號與萬用字元會被忽略。
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 新到舊的打卡與下一頁游標
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MineSharePage"
         "400":
           $ref: "#/components/responses/InvalidParams"
         "401":
@@ -7386,6 +7435,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MineRow"
+    MineSharePage:
+      type: object
+      required: [checkins, next_cursor]
+      properties:
+        checkins:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/MineRow"
+        next_cursor:
+          type: string
+          nullable: true
     MyTrailPage:
       type: object
       required: [checkins, next_cursor]

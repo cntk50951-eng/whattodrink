@@ -17,7 +17,8 @@ type Row = Record<string, unknown>;
  * never evidence or free text.
  * NOT here on purpose: party_cancelled, party_completed, invite_cancelled, invite_completed (sendPartyNoticePush: a direct iOS sender exists, adding them
  * would double-notify). A kind may be added only if iOS has no direct sender AND the iOS app can route it.
- * The UGC report notices (report_submitted, post_reported, post_actioned, report_actioned, report_resolved) are in-app only: the 0077 trigger never enqueues them.
+ * UGC report notices: report_submitted, post_reported, post_actioned and report_actioned stay in-app only (never enqueued).
+ * report_resolved (to the reporter) is pushed to AOS only since 0096; it is deliberately NOT in this set until iOS can route it.
  */
 export const IOS_OUTBOX_KINDS: ReadonlySet<string> = new Set([
  "chat","invite","invite_reply","member_joined","member_left","member_left_late","reminder_1h","attendance_confirm",
@@ -77,6 +78,8 @@ export async function eventStillEligible(db:SupabaseClient,e:OutboxEvent,now:num
  }
  const notice=await one(db.from("notifications").select("id,user_id,kind,read_at,payload,party_id,actor_id").eq("id",e.source_id).limit(1));
  if(!notice||notice.user_id!==e.recipient_id||notice.kind!==e.kind||notice.read_at!==null)return false;
+ // 舉報結果是自己提交的案件回執：沒有對應偏好開關，不受「酒局」開關影響（UR E.33）
+ if(e.kind==="report_resolved")return true;
  if(e.kind.startsWith("game_")){
   if(!prefs.game_invites||typeof e.payload.room_id!=="string")return false;
   const room=await one(db.from("game_rooms").select("id,host_id,status,expires_at").eq("id",e.payload.room_id).limit(1));
@@ -172,7 +175,7 @@ export async function dispatchNativePush(db:SupabaseClient):Promise<{claimed:num
     let timeout: ReturnType<typeof setTimeout>|undefined;
     stage="send";
     // 15s: the first firebase-admin call on a cold function also fetches an OAuth token.
-    const result=await Promise.race([sendNativePush({cfg,platform:device.platform,env:device.platform==="ios"&&device.environment==="sandbox"?"sandbox":"production",deviceToken:device.push_token,collapseId:`${e.kind}-${e.payload.conversation_id??e.payload.party_id??e.payload.room_id??e.recipient_id}`,payload}),new Promise<never>((_,reject)=>{timeout=setTimeout(()=>reject(new Error("provider-timeout")),15_000);})]).finally(()=>{if(timeout)clearTimeout(timeout);});
+    const result=await Promise.race([sendNativePush({cfg,platform:device.platform,env:device.platform==="ios"&&device.environment==="sandbox"?"sandbox":"production",deviceToken:device.push_token,collapseId:`${e.kind}-${e.payload.conversation_id??e.payload.party_id??e.payload.room_id??e.payload.report_id??e.recipient_id}`,payload}),new Promise<never>((_,reject)=>{timeout=setTimeout(()=>reject(new Error("provider-timeout")),15_000);})]).finally(()=>{if(timeout)clearTimeout(timeout);});
     stage="record";
     if(!result.ok)lastReason=result.reason;
     if(result.ok){await write(db.from("native_push_deliveries").upsert({event_id:e.id,device_id:device.id,status:"sent"},{onConflict:"event_id,device_id"}));successes++;}

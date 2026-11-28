@@ -4646,3 +4646,15 @@ UR L.2　关站时保留私隐政策与服务条款的旧入口 [WIP]
 - D.12／DEF-20261116-003（2026-11-17）：用戶job6 UTC08:22–08:24三次succeeded，結合Vault五欄true及request482 HTTP200，cron配置缺陷Verified；D.12保持WIP，FCM真事件與真機矩陣未驗。Supabase不需額外建立SQL。
 
 - 2026-11-18 D.12／DEF-20261118-001：現行22情境逐項追來源，修正舊memory誤判；補好友世代／酒局入席／遊戲批准與移出／Android失效邀請與冷啟身份，品牌smallIcon、大圖及前台橫幅。詳見web PUSH_COVERAGE_MATRIX；真機未驗，維持WIP。
+
+UR E.32　我的打卡分享列表分頁接口（App 聊天「分享打卡」；2026-11-27）[WIP]
+
+> iOS-0.212／AOS-0.148。方案：iOS repo `docs/plans/2026-11-27-chat-share-picker/plan.md`。只改後端，網頁介面不動。
+- AC：`GET /checkins/mine/share`（scope／limit／cursor／q），新到舊分頁、只回本人；舊接口不變；openapi 1.76.0；vitest 覆蓋。
+- *改動記錄*：2026-11-27 用戶回覆開始。部署與 commit／push 另行確認。
+
+UR E.33　舉報結果推送給舉報人（Android；2026-11-27）[WIP]
+
+> iOS-0.213／AOS-0.149。方案：iOS repo `docs/plans/2026-11-27-report-block/plan.md`。只改後端。
+- AC：migration 0096 讓 `report_resolved` 入 `native_push_outbox` 並帶 `report_id`；通用標題不含原因和暱稱；未讀即可發；不進 `IOS_OUTBOX_KINDS`；openapi 1.77.0。
+- *改動記錄*：2026-11-27 用戶回覆開始。migration 由用戶執行；部署與 commit／push 另行確認。

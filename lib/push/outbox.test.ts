@@ -228,3 +228,21 @@ describe("iOS chat delivery through the outbox (Push-2a)",()=>{
   const r=await dispatchNativePush(database(t));expect(r.skipped).toBe(1);expect(transport.send).not.toHaveBeenCalled();
  });
 });
+describe("UR E.33 report result push",()=>{
+ it("carries only ids and generic copy, and stays off iOS",()=>{
+  const payload=eventPayload({...event({kind:"report_resolved"}),actor_id:null,payload:{report_id:"report",decision:"actioned",actor_nickname:"private name",reason_code:"private reason",note:"private note"}},"zh-Hant");
+  expect(payload).toMatchObject({t:"report_resolved",report_id:"report",decision:"actioned"});
+  expect(JSON.stringify(payload)).not.toMatch(/private/);
+  expect(safePushCopy("report_resolved","en").title).toBe("Your report has been reviewed");
+  expect(IOS_OUTBOX_KINDS.has("report_resolved")).toBe(false);
+ });
+ it("is eligible while unread even with party notices turned off, and obsolete once read",async()=>{
+  const tables:Record<string,R[]>={users:[{id:"recipient",mode:"public",push_prefs:{party:false}}],
+   notifications:[{id:"notice",kind:"report_resolved",user_id:"recipient",read_at:null,payload:{report_id:"report"},party_id:null,actor_id:null}]};
+  const e=event({kind:"report_resolved",source_type:"notification",source_id:"notice",actor_id:null,payload:{report_id:"report"}});
+  expect(await eventStillEligible(database(tables),e,now)).toBe(true);
+  tables.notifications[0].read_at=new Date(now).toISOString();
+  expect(await eventStillEligible(database(tables),e,now)).toBe(false);
+ });
+});
+

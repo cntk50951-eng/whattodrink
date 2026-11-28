@@ -3,7 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NICKNAME_MAX } from "../api/profile";
 import { PUSH_NAME_WIDTH, pushName } from "./prefs";
 
-export const NOTICE_KINDS = ["member_joined","party_cancelled","member_left","member_left_late","reminder_1h","attendance_confirm","complaint_filed","complaint_response_needed","complaint_ack","complaint_result","trust_changed","game_join_request","game_join_result","game_kicked"] as const;
+export const NOTICE_KINDS = ["member_joined","party_cancelled","member_left","member_left_late","reminder_1h","attendance_confirm","complaint_filed","complaint_response_needed","complaint_ack","complaint_result","trust_changed","game_join_request","game_join_result","game_kicked","report_resolved"] as const;
 /** Isolate push credentials from Vercel Cron. Explicit empty/weak values fail closed. */
 export function pushDispatchSecret(env: Record<string, string | undefined>): string | undefined {
   return env.PUSH_DISPATCH_SECRET ?? env.CRON_SECRET;
@@ -39,6 +39,8 @@ const TITLE: Record<string, [string,string,string]> = {
  game_join_request:["有人申請加入遊戲","有人申请加入游戏","Someone requested to join your game"],
  game_join_result:["遊戲入座申請有結果","游戏入座申请有结果","Your game request has a result"],
  game_kicked:["你的遊戲房間狀態已更新","你的游戏房间状态已更新","Your game room status changed"],
+ // 鎖屏不寫舉報對象、原因或結果
+ report_resolved:["你的舉報有處理結果","你的举报有处理结果","Your report has been reviewed"],
 };
 export function safePushCopy(kind: string, locale: string | null): {title: string;body: string} {
  const index = locale === "en" ? 2 : locale === "zh-Hans" ? 1 : 0;
@@ -78,7 +80,7 @@ export function richPushCopy(kind: string, locale: string|null, ctx: CopyContext
 export function eventPayload(event: {id:string;recipient_id:string;kind:string;actor_id:string|null;payload:Record<string,unknown>;expires_at:string}, locale: string|null, ctx: CopyContext = {}): Record<string,unknown> {
  const copy=richPushCopy(event.kind,locale,ctx,event.payload)??safePushCopy(event.kind,locale);
  const ids: Record<string,unknown>={};
- for (const key of ["conversation_id","invite_id","party_id","complaint_id","room_id","code","decision","checkin_id"]) {
+ for (const key of ["conversation_id","invite_id","party_id","complaint_id","room_id","code","decision","checkin_id","report_id"]) {
   const value=event.payload[key];if(typeof value==="string") ids[key]=value;
  }
  return {aps:{alert:copy,sound:"default"},t:event.kind,recipient_id:event.recipient_id,event_id:event.id,
